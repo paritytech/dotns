@@ -63,7 +63,7 @@
     "@ensdomains/buffer": "^0.1.1",
     "@ensdomains/solsha1": "0.0.3",
     "@nomicfoundation/hardhat-verify": "^2.0.4",
-    "@openzeppelin/contracts": "4.9.3",
+    "@openzeppelin/contracts": "4.9.6",
     "@openzeppelin/contracts-v5": "npm:@openzeppelin/contracts@5.1.0",
     "@unruggable/gateways": "^1.2.2",
     "clones-with-immutable-args": "Arachnid/clones-with-immutable-args#feature/create2",
