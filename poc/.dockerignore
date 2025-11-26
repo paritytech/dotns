@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+*.md
+.vscode
+.wrangler
+.eslintignore
+.prettierignore
+*.log
+.env
+.env.local
