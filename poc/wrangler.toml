@@ -1,4 +1,4 @@
-name = "dotns"
+name = "dotns-resolver"
 main = "src/limoResolver.ts"
 compatibility_date = "2025-11-01"
 
