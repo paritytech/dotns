@@ -23,23 +23,23 @@ describe('TestRegistrar', () => {
   it('registers names', async () => {
     const { ensRegistry, testRegistrar } = await loadFixture()
 
-    await testRegistrar.write.register([labelhash('eth'), accounts[0].address])
+    await testRegistrar.write.register([labelhash('dot'), accounts[0].address])
 
     await expect(ensRegistry.read.owner([zeroHash])).resolves.toEqualAddress(
       testRegistrar.address,
     )
     await expect(
-      ensRegistry.read.owner([namehash('eth')]),
+      ensRegistry.read.owner([namehash('dot')]),
     ).resolves.toEqualAddress(accounts[0].address)
   })
 
   it('forbids transferring names within the test period', async () => {
     const { testRegistrar } = await loadFixture()
 
-    await testRegistrar.write.register([labelhash('eth'), accounts[1].address])
+    await testRegistrar.write.register([labelhash('dot'), accounts[1].address])
 
     await expect(
-      testRegistrar.write.register([labelhash('eth'), accounts[0].address]),
+      testRegistrar.write.register([labelhash('dot'), accounts[0].address]),
     ).toBeRevertedWithoutReason()
   })
 
@@ -47,16 +47,16 @@ describe('TestRegistrar', () => {
     const { ensRegistry, testRegistrar } = await loadFixture()
     const testClient = await connection.viem.getTestClient()
 
-    await testRegistrar.write.register([labelhash('eth'), accounts[1].address])
+    await testRegistrar.write.register([labelhash('dot'), accounts[1].address])
     await expect(
-      ensRegistry.read.owner([namehash('eth')]),
+      ensRegistry.read.owner([namehash('dot')]),
     ).resolves.toEqualAddress(accounts[1].address)
 
     await testClient.increaseTime({ seconds: 28 * 24 * 60 * 60 + 1 })
 
-    await testRegistrar.write.register([labelhash('eth'), accounts[0].address])
+    await testRegistrar.write.register([labelhash('dot'), accounts[0].address])
     await expect(
-      ensRegistry.read.owner([namehash('eth')]),
+      ensRegistry.read.owner([namehash('dot')]),
     ).resolves.toEqualAddress(accounts[0].address)
   })
 })

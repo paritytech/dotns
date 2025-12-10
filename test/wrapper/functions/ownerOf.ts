@@ -10,7 +10,7 @@ import {
 export const ownerOfTests = (loadFixture: LoadNameWrapperFixture) => {
   describe('ownerOf()', () => {
     const label = 'subdomain'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     it('Returns the owner', async () => {
       const { nameWrapper, accounts, actions } = await loadFixture()

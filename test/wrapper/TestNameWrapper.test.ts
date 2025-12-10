@@ -70,9 +70,9 @@ describe('NameWrapper', () => {
         ...contracts,
       })),
     targetTokenIds: [
-      toNameId('test1.eth'),
-      toNameId('test2.eth'),
-      toNameId('doesnotexist.eth'),
+      toNameId('test1.dot'),
+      toNameId('test2.dot'),
+      toNameId('doesnotexist.dot'),
     ],
     mint: async (
       { accounts, actions },
@@ -131,7 +131,7 @@ describe('NameWrapper', () => {
 
   describe('Transfer', () => {
     const label = 'transfer'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     async function transferFixture() {
       const initial = await loadFixture(nameWrapperFixture)
@@ -265,7 +265,7 @@ describe('NameWrapper', () => {
       } = await loadFixture(nameWrapperFixture)
 
       const label = 'base'
-      const name = `${label}.eth`
+      const name = `${label}.dot`
 
       await actions.register({
         label,
@@ -375,7 +375,7 @@ describe('NameWrapper', () => {
 
   describe('Grace period tests', () => {
     const label = 'test'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
     const sublabel = 'sub'
     const subname = `${sublabel}.${name}`
 
@@ -685,7 +685,7 @@ describe('NameWrapper', () => {
 
   describe('Registrar tests', () => {
     const label = 'sub1'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
     const sublabel = 'sub2'
     const subname = `${sublabel}.${name}`
 
@@ -711,7 +711,7 @@ describe('NameWrapper', () => {
       await testClient.mine({ blocks: 1 })
 
       // XXX: note that at this step, the hackler should use the current .eth
-      // registrar to directly register `sub1.eth` to himself, without wrapping
+      // registrar to directly register `sub1.dot` to himself, without wrapping
       // the name.
       await actions.register({
         label,
@@ -724,12 +724,12 @@ describe('NameWrapper', () => {
       // set `EnsRegistry.owner` as NameWrapper. Note that this step is used to
       // bypass the newly-introduced checks for [ZZ-001]
       //
-      // XXX: corrently, `sub1.eth` becomes a normal node
+      // XXX: corrently, `sub1.dot` becomes a normal node
       await ensRegistry.write.setOwner([namehash(name), nameWrapper.address], {
         account: accounts[2],
       })
 
-      // create `sub2.sub1.eth` to the victim user with `PARENT_CANNOT_CONTROL`
+      // create `sub2.sub1.dot` to the victim user with `PARENT_CANNOT_CONTROL`
       // burnt.
       await expect(
         nameWrapper.write.setSubnodeOwner(
@@ -750,7 +750,7 @@ describe('NameWrapper', () => {
 
   describe('ERC1155 additional tests', () => {
     const label = 'erc1155'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     it('Transferring a token that is not owned by the owner reverts', async () => {
       const { nameWrapper, actions, accounts } = await loadFixture(
@@ -792,7 +792,7 @@ describe('NameWrapper', () => {
         ),
       )
         .toBeRevertedWithCustomError('Unauthorised')
-        .withArgs([namehash(label + '.eth'), getAddress(accounts[2].address)])
+        .withArgs([namehash(label + '.dot'), getAddress(accounts[2].address)])
     })
 
     it('Approval on the Wrapper does not give permission to wrap a non .eth name', async () => {
@@ -975,7 +975,7 @@ describe('NameWrapper', () => {
 
   describe('Implicit unwrap tests', () => {
     const label = 'sub1'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
     const sublabel = 'sub2'
     const subname = `${sublabel}.${name}`
 
@@ -1007,7 +1007,7 @@ describe('NameWrapper', () => {
         CANNOT_UNWRAP,
       ])
 
-      // create `sub2.sub1.eth` w/o fuses burnt
+      // create `sub2.sub1.dot` w/o fuses burnt
       await actions.setSubnodeOwner.onNameWrapper({
         parentName: name,
         label: sublabel,
@@ -1026,7 +1026,7 @@ describe('NameWrapper', () => {
       await testClient.mine({ blocks: 1 })
 
       // XXX: note that at this step, the hacker should use the current .eth
-      // registrar to directly register `sub1.eth` to themselves, without wrapping
+      // registrar to directly register `sub1.dot` to themselves, without wrapping
       // the name.
       await actions.register({
         label,
@@ -1037,7 +1037,7 @@ describe('NameWrapper', () => {
       await expectOwnerOf(label).on(baseRegistrar).toBe(accounts[2])
 
       // XXX: PREPARE HACK!
-      // set `EnsRegistry.owner` of `sub1.eth` as the hacker themselves.
+      // set `EnsRegistry.owner` of `sub1.dot` as the hacker themselves.
       await ensRegistry.write.setOwner([namehash(name), accounts[2].address], {
         account: accounts[2],
       })
@@ -1050,7 +1050,7 @@ describe('NameWrapper', () => {
       )
       await expectOwnerOf(label).on(baseRegistrar).toBe(nameWrapper)
 
-      // set `sub2.sub1.eth` to the victim user w fuses burnt
+      // set `sub2.sub1.dot` to the victim user w fuses burnt
       // XXX: do this via `setChildFuses`
       // Cannot setChildFuses as the owner has not been updated in the wrapper when reregistering
       await expect(

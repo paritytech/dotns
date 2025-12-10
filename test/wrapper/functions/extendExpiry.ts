@@ -20,7 +20,7 @@ export const extendExpiryTests = (
 ) => {
   describe('extendExpiry()', () => {
     const label = 'fuses'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
     const sublabel = 'sub'
     const subname = `${sublabel}.${name}`
 
@@ -474,7 +474,7 @@ export const extendExpiryTests = (
 
       await expect(
         nameWrapper.write.extendExpiry([
-          namehash('eth'),
+          namehash('dot'),
           labelhash(label),
           expiry,
         ]),

@@ -15,7 +15,7 @@ export const getApprovedTests = (
 ) => {
   describe('getApproved()', () => {
     const label = 'subdomain'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     async function fixture() {
       const initial = await loadNameWrapperFixture()
@@ -34,9 +34,9 @@ export const getApprovedTests = (
     it('Returns returns zero address when ownerOf() is zero', async () => {
       const { nameWrapper } = await loadFixture()
 
-      await expectOwnerOf('unminted.eth').on(nameWrapper).toBe(zeroAccount)
+      await expectOwnerOf('unminted.dot').on(nameWrapper).toBe(zeroAccount)
       await expect(
-        nameWrapper.read.getApproved([toNameId('unminted.eth')]),
+        nameWrapper.read.getApproved([toNameId('unminted.dot')]),
       ).resolves.toEqualAddress(zeroAddress)
     })
 

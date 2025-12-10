@@ -14,7 +14,7 @@ export const setResolverTests = (
 ) => {
   describe('setResolver', () => {
     const label = 'setresolver'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     async function fixture() {
       const initial = await loadNameWrapperFixture()

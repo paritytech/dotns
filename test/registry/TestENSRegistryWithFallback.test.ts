@@ -21,7 +21,7 @@ async function fixtureWithEthSet() {
   const existing = await loadFixture()
   await existing.oldEnsRegistry.write.setSubnodeOwner([
     zeroHash,
-    labelhash('eth'),
+    labelhash('dot'),
     accounts[0].address,
   ])
   return existing
@@ -106,7 +106,7 @@ describe('ENSRegistryWithFallback', () => {
   })
 
   describe('fallback', () => {
-    const node = namehash('eth')
+    const node = namehash('dot')
 
     it('should use fallback ttl if owner is not set', async () => {
       const { oldEnsRegistry, ensRegistry } = await loadFixtureWithEthSet()

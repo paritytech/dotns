@@ -16,9 +16,9 @@ import {BytesUtils} from "./BytesUtils.sol";
 /// * `dns.length == 2 + ens.length` and the mapping is injective.
 ///
 library NameCoder {
-    /// @dev The namehash of "eth".
+    /// @dev The namehash of "dot".
     bytes32 public constant ETH_NODE =
-        0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae;
+        0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
 
     /// @dev The label was empty.
     ///      Error selector: `0xbf9a2740`
@@ -351,14 +351,14 @@ library NameCoder {
         return abi.encodePacked(assertLabelSize(label), label, name);
     }
 
-    /// @dev Transform `label` to DNS-encoded `{label}.eth`.
-    ///      * `ethName("eth") = "\x04test\x03eth\x00"`
+    /// @dev Transform `label` to DNS-encoded `{label}.dot`.
+    ///      * `ethName("test") = "\x04test\x03dot\x00"`
     ///      Behaves like `addLabel()`.
     ///
     /// @param label The label to encode.
     ///
     /// @return The DNS-encoded name.
     function ethName(string memory label) internal pure returns (bytes memory) {
-        return addLabel("\x03eth\x00", label);
+        return addLabel("\x03dot\x00", label);
     }
 }

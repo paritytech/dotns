@@ -20,7 +20,7 @@ describe('TLDPublicSuffixList', () => {
     const { tldPublicSuffixList } = await loadFixture()
 
     await expect(
-      tldPublicSuffixList.read.isPublicSuffix([dnsEncodeName('eth')]),
+      tldPublicSuffixList.read.isPublicSuffix([dnsEncodeName('dot')]),
     ).resolves.toBe(true)
     await expect(
       tldPublicSuffixList.read.isPublicSuffix([dnsEncodeName('com')]),
@@ -34,10 +34,10 @@ describe('TLDPublicSuffixList', () => {
       tldPublicSuffixList.read.isPublicSuffix([dnsEncodeName('')]),
     ).resolves.toBe(false)
     await expect(
-      tldPublicSuffixList.read.isPublicSuffix([dnsEncodeName('foo.eth')]),
+      tldPublicSuffixList.read.isPublicSuffix([dnsEncodeName('foo.dot')]),
     ).resolves.toBe(false)
     await expect(
-      tldPublicSuffixList.read.isPublicSuffix([dnsEncodeName('a.b.foo.eth')]),
+      tldPublicSuffixList.read.isPublicSuffix([dnsEncodeName('a.b.foo.dot')]),
     ).resolves.toBe(false)
   })
 })

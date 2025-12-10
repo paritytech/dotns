@@ -15,13 +15,13 @@ async function fixture() {
   const ensRegistry = await connection.viem.deployContract('ENSRegistry', [])
   const baseRegistrar = await connection.viem.deployContract(
     'BaseRegistrarImplementation',
-    [ensRegistry.address, namehash('eth')],
+    [ensRegistry.address, namehash('dot')],
   )
 
   await baseRegistrar.write.addController([controllerAccount.address])
   await ensRegistry.write.setSubnodeOwner([
     zeroHash,
-    labelhash('eth'),
+    labelhash('dot'),
     baseRegistrar.address,
   ])
 
@@ -56,7 +56,7 @@ describe('BaseRegistrar', () => {
     const block = await publicClient.getBlock({ blockHash: receipt.blockHash })
 
     await expect(
-      ensRegistry.read.owner([namehash('newname.eth')]),
+      ensRegistry.read.owner([namehash('newname.dot')]),
     ).resolves.toEqualAddress(registrantAccount.address)
     await expect(
       baseRegistrar.read.ownerOf([toLabelId('newname')]),
@@ -79,7 +79,7 @@ describe('BaseRegistrar', () => {
     const block = await publicClient.getBlock({ blockHash: receipt.blockHash })
 
     await expect(
-      ensRegistry.read.owner([namehash('silentname.eth')]),
+      ensRegistry.read.owner([namehash('silentname.dot')]),
     ).resolves.toEqualAddress(zeroAddress)
     await expect(
       baseRegistrar.read.ownerOf([toLabelId('silentname')]),
@@ -154,7 +154,7 @@ describe('BaseRegistrar', () => {
   it('should permit the owner to reclaim a name', async () => {
     const { ensRegistry, baseRegistrar } = await loadFixtureWithRegistration()
 
-    await ensRegistry.write.setOwner([namehash('newname.eth'), zeroAddress], {
+    await ensRegistry.write.setOwner([namehash('newname.dot'), zeroAddress], {
       account: registrantAccount,
     })
     await baseRegistrar.write.reclaim(
@@ -165,14 +165,14 @@ describe('BaseRegistrar', () => {
     )
 
     await expect(
-      ensRegistry.read.owner([namehash('newname.eth')]),
+      ensRegistry.read.owner([namehash('newname.dot')]),
     ).resolves.toEqualAddress(registrantAccount.address)
   })
 
   it('should prohibit anyone else from reclaiming a name', async () => {
     const { ensRegistry, baseRegistrar } = await loadFixtureWithRegistration()
 
-    await ensRegistry.write.setOwner([namehash('newname.eth'), zeroAddress], {
+    await ensRegistry.write.setOwner([namehash('newname.dot'), zeroAddress], {
       account: registrantAccount,
     })
 
@@ -200,7 +200,7 @@ describe('BaseRegistrar', () => {
       baseRegistrar.read.ownerOf([toLabelId('newname')]),
     ).resolves.toEqualAddress(otherAccount.address)
     await expect(
-      ensRegistry.read.owner([namehash('newname.eth')]),
+      ensRegistry.read.owner([namehash('newname.dot')]),
     ).resolves.toEqualAddress(registrantAccount.address)
 
     await baseRegistrar.write.transferFrom(
@@ -228,7 +228,8 @@ describe('BaseRegistrar', () => {
     const { baseRegistrar } = await loadFixtureWithRegistration()
     const testClient = await connection.viem.getTestClient()
 
-    await testClient.increaseTime({ seconds: 86400 + 3600 })
+    // Increase time to 1 minute into grace period (grace period is 5 minutes)
+    await testClient.increaseTime({ seconds: 86400 + 60 })
     await testClient.mine({ blocks: 1 })
 
     await expect(
@@ -254,7 +255,8 @@ describe('BaseRegistrar', () => {
     const { baseRegistrar } = await loadFixtureWithRegistration()
     const testClient = await connection.viem.getTestClient()
 
-    await testClient.increaseTime({ seconds: 86400 + 3600 })
+    // Increase time to 1 minute into grace period (grace period is 5 minutes)
+    await testClient.increaseTime({ seconds: 86400 + 60 })
     await testClient.mine({ blocks: 1 })
 
     await baseRegistrar.write.renew([toLabelId('newname'), 86400n], {
@@ -297,7 +299,7 @@ describe('BaseRegistrar', () => {
     })
 
     await expect(
-      ensRegistry.read.resolver([namehash('eth')]),
+      ensRegistry.read.resolver([namehash('dot')]),
     ).resolves.toEqualAddress(controllerAccount.address)
   })
 })

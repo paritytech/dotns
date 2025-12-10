@@ -16,7 +16,7 @@ import {
 import { urgArtifact } from '../fixtures/externalArtifacts.js'
 import { type KnownProfile, makeResolutions } from '../utils/resolutions.js'
 
-const testName = 'test.eth'
+const testName = 'test.dot'
 const l2CoinType = COIN_TYPE_DEFAULT | 12345n // any evm chain
 
 const connection = await hre.network.connect()

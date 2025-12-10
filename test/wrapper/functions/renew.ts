@@ -19,7 +19,7 @@ export const renewTests = (
 ) => {
   describe('renew', () => {
     const label = 'register'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     async function fixture() {
       const initial = await loadNameWrapperFixture()
@@ -78,7 +78,7 @@ export const renewTests = (
     })
 
     it('Renewing name less than required to unexpire it still has original owner/fuses', async () => {
-      const { nameWrapper, accounts, testClient, publicClient } =
+      const { nameWrapper, accounts, testClient, publicClient, baseRegistrar } =
         await loadFixture()
 
       await nameWrapper.write.registerAndWrapETH2LD([
@@ -89,16 +89,21 @@ export const renewTests = (
         CANNOT_UNWRAP | CANNOT_SET_RESOLVER,
       ])
 
-      await testClient.increaseTime({ seconds: Number(DAY * 2n) })
+      // Increase time to 1 minute into grace period (grace period is 5 minutes)
+      await testClient.increaseTime({ seconds: Number(DAY + 60n) })
       await testClient.mine({ blocks: 1 })
 
       const [, , expiryBefore] = await nameWrapper.read.getData([
         toNameId(name),
       ])
       const timestamp = await publicClient.getBlock().then((b) => b.timestamp)
+      // NameWrapper stores expiry as baseExpiry + GRACE_PERIOD (90 days)
+      // The name is "expired but in grace period" when baseExpiry < timestamp < expiryBefore
+      const baseExpiry = expiryBefore - GRACE_PERIOD
 
-      // confirm expired
-      expect(expiryBefore).toBeLessThanOrEqual(timestamp + GRACE_PERIOD)
+      // confirm expired on base registrar but still in wrapper grace period
+      expect(baseExpiry).toBeLessThanOrEqual(timestamp)
+      expect(timestamp).toBeLessThan(expiryBefore)
 
       // renew for less than the grace period
       await nameWrapper.write.renew([toLabelId(label), 1n * DAY])
@@ -114,8 +119,10 @@ export const renewTests = (
           IS_DOT_ETH |
           PARENT_CANNOT_CONTROL,
       )
-      // still expired
-      expect(expiryAfter).toBeLessThanOrEqual(timestamp + GRACE_PERIOD)
+      // expiry increased by renewal duration (1 DAY)
+      // BaseRegistrar adds duration to existing expiry, not current time
+      // So new expiry = (baseExpiry + DAY) + GRACE_PERIOD = expiryBefore + DAY
+      expect(expiryAfter).toEqual(expiryBefore + DAY)
     })
   })
 }

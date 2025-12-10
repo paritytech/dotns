@@ -88,11 +88,34 @@ const config = {
         },
       },
       {
+        version: '0.8.30',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1_000_000,
+          },
+          metadata: {
+            bytecodeHash: 'ipfs',
+            useLiteralContent: true,
+          },
+          evmVersion: 'paris',
+        },
+      },
+      {
         version: '0.8.17',
         settings: {
           optimizer: {
             enabled: true,
             runs: 1200,
+          },
+        },
+      },
+      {
+        version: '0.8.12',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1_000_000,
           },
         },
       },

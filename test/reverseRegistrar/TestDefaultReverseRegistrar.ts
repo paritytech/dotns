@@ -90,7 +90,7 @@ describe('DefaultReverseRegistrar', () => {
     async function setNameFixture() {
       const initial = await connection.networkHelpers.loadFixture(fixture)
 
-      const name = 'myname.eth'
+      const name = 'myname.dot'
 
       return {
         ...initial,
@@ -125,7 +125,7 @@ describe('DefaultReverseRegistrar', () => {
       const initial = await connection.networkHelpers.loadFixture(fixture)
       const { defaultReverseRegistrar, accounts } = initial
 
-      const name = 'myname.eth'
+      const name = 'myname.dot'
       const functionSelector = toFunctionSelector(
         defaultReverseRegistrar.abi.find(
           (f) =>

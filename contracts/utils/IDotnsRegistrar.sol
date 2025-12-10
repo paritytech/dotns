@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {IETHRegistrarController} from "../ethRegistrar/IETHRegistrarController.sol";
+import {IETHRegistrarController} from "../ethregistrar/IETHRegistrarController.sol";
 
 /// @title IDotnsRegistrar
 /// @notice Interface for orchestrating ENS registration and subdomain management with automated storage.

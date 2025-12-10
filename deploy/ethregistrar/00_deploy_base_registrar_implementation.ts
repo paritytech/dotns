@@ -14,7 +14,7 @@ export default deployScript(
     await deploy('BaseRegistrarImplementation', {
       account: deployer,
       artifact: artifacts.BaseRegistrarImplementation,
-      args: [registry.address, namehash('eth')],
+      args: [registry.address, namehash('dot')],
     })
   },
   {

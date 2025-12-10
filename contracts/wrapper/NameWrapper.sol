@@ -62,7 +62,7 @@ contract NameWrapper is
 
     uint64 private constant GRACE_PERIOD = 90 days;
     bytes32 private constant ETH_NODE =
-        0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae;
+        0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
     bytes32 private constant ETH_LABELHASH =
         0x4f5b812789fc606be1b3b16908db13fc7a9adf7ca72641f84d75b47069d3d7f0;
     bytes32 private constant ROOT_NODE =
@@ -94,7 +94,7 @@ contract NameWrapper is
             MAX_EXPIRY
         );
         names[ROOT_NODE] = "\x00";
-        names[ETH_NODE] = "\x03eth\x00";
+        names[ETH_NODE] = "\x03dot\x00";
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -976,8 +976,8 @@ contract NameWrapper is
     {
         bytes32 labelhash = keccak256(bytes(label));
         bytes32 node = _makeNode(ETH_NODE, labelhash);
-        // hardcode dns-encoded eth string for gas savings
-        bytes memory name = _addLabel(label, "\x03eth\x00");
+        // hardcode dns-encoded dot string for gas savings
+        bytes memory name = _addLabel(label, "\x03dot\x00");
         names[node] = name;
 
         _wrap(node, name, wrappedOwner, fuses | PARENT_CANNOT_CONTROL | IS_DOT_ETH, expiry);

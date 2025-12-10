@@ -27,7 +27,7 @@ contract ETHRegistrarController is Ownable, IETHRegistrarController, ERC165, ERC
     /// @notice The minimum duration for a registration.
     uint256 public constant MIN_REGISTRATION_DURATION = 5 minutes;
 
-    // @notice The node (i.e. namehash) for the eth TLD.
+    // @notice The node (i.e. namehash) for the dot TLD.
     bytes32 private constant ETH_NODE =
         0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
 
@@ -37,7 +37,7 @@ contract ETHRegistrarController is Ownable, IETHRegistrarController, ERC165, ERC
     /// @notice The ENS registry.
     ENS public immutable ens;
 
-    // @notice The base registrar implementation for the eth TLD.
+    // @notice The base registrar implementation for the dot TLD.
     BaseRegistrarImplementation immutable base;
 
     /// @notice The minimum time a commitment must exist to be valid.
@@ -52,7 +52,7 @@ contract ETHRegistrarController is Ownable, IETHRegistrarController, ERC165, ERC
     /// @notice The registrar for default.reverse. (i.e. fallback reverse for all EVM chains)
     IDefaultReverseRegistrar public immutable defaultReverseRegistrar;
 
-    /// @notice The price oracle for the eth TLD.
+    /// @notice The price oracle for the dot TLD.
     IPriceOracle public immutable prices;
 
     /// @notice A mapping of commitments to their timestamp.
@@ -95,6 +95,9 @@ contract ETHRegistrarController is Ownable, IETHRegistrarController, ERC165, ERC
     /// @notice Thrown when the maximum commitment age is too high.
     error MaxCommitmentAgeTooHigh();
 
+    /// @notice Thrown when the individuality type doesn't match the domain format requirements.
+    error InvalidIndividualityTypeForDomain(string label, IETHRegistrarController.IndividualityType provided);
+
     /// @notice Emitted when a name is registered.
     ///
     /// @param label The label of the name.
@@ -127,8 +130,8 @@ contract ETHRegistrarController is Ownable, IETHRegistrarController, ERC165, ERC
 
     /// @notice Constructor for the ETHRegistrarController.
     ///
-    /// @param _base The base registrar implementation for the eth TLD.
-    /// @param _prices The price oracle for the eth TLD.
+    /// @param _base The base registrar implementation for the dot TLD.
+    /// @param _prices The price oracle for the dot TLD.
     /// @param _minCommitmentAge The minimum time a commitment must exist to be valid.
     /// @param _maxCommitmentAge The maximum time a commitment can exist to be valid.
     /// @param _reverseRegistrar The registrar for addr.reverse.
@@ -178,12 +181,50 @@ contract ETHRegistrarController is Ownable, IETHRegistrarController, ERC165, ERC
         price = _rentPrice(label, labelhash, duration);
     }
 
-    /// @notice Returns true if the label is valid for registration.
+    /// @notice Returns true if the label is valid for registration with any individuality type.
+    /// @dev This is a simplified check that only validates basic format.
+    ///      Use validWithIndividuality() for full validation.
     ///
     /// @param label The label to check.
-    /// @return True if the label is valid, false otherwise.
+    /// @return True if the label has valid format, false otherwise.
     function valid(string calldata label) public pure returns (bool) {
+        // ENS standard: minimum 3 characters for valid labels
         return label.strlen() >= 3;
+    }
+
+    /// @notice Returns true if the label is valid for the specified individuality type.
+    /// @dev Validates domain format against individuality tier requirements:
+    ///      - NONE: 9+ chars - first come, first served
+    ///      - PERSON_LIGHT: 6+ chars + .XX (2 digits) - Light verification
+    ///      - PROOF_OF_PERSONHOOD: 6+ chars - Full personhood proof
+    ///      - GOVERNANCE: <6 chars - Polkadot governance only
+    ///
+    /// @param label The label to check.
+    /// @param individualityType The individuality verification level.
+    /// @return True if the label matches the individuality type requirements.
+    function validWithIndividuality(
+        string calldata label,
+        IETHRegistrarController.IndividualityType individualityType
+    )
+        public
+        pure
+        returns (bool)
+    {
+        if (individualityType == IETHRegistrarController.IndividualityType.NONE) {
+            // 9+ characters - first come, first served
+            return label.hasNineOrMoreChars();
+        } else if (individualityType == IETHRegistrarController.IndividualityType.PERSON_LIGHT) {
+            // 6+ characters + .XX (2 digits) - Light person verification
+            return label.isPersonLightFormat();
+        } else if (individualityType == IETHRegistrarController.IndividualityType.PROOF_OF_PERSONHOOD) {
+            // 6+ characters - Full personhood proof
+            return label.isProofOfPersonhoodFormat();
+        } else if (individualityType == IETHRegistrarController.IndividualityType.GOVERNANCE) {
+            // Less than 6 characters - Governance only
+            return label.isGovernanceFormat();
+        }
+
+        return false;
     }
 
     /// @notice Returns true if the label is valid and available for registration.
@@ -240,7 +281,15 @@ contract ETHRegistrarController is Ownable, IETHRegistrarController, ERC165, ERC
     /// @param registration.data The data for the name.
     /// @param registration.reverseRecord Which reverse record(s) to set.
     /// @param registration.referrer The referrer of the registration.
+    /// @param registration.individualityType The individuality verification level.
     function register(Registration calldata registration) public payable override {
+        // Validate that the label format matches the individuality type requirements
+        if (!validWithIndividuality(registration.label, registration.individualityType)) {
+            revert InvalidIndividualityTypeForDomain(
+                registration.label, registration.individualityType
+            );
+        }
+
         bytes32 labelhash = keccak256(bytes(registration.label));
         IPriceOracle.Price memory price =
             _rentPrice(registration.label, labelhash, registration.duration);

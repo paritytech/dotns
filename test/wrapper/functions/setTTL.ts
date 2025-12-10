@@ -14,7 +14,7 @@ export const setTTLTests = (
 ) =>
   describe('setTTL', () => {
     const label = 'setttl'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     async function fixture() {
       const initial = await loadNameWrapperFixture()

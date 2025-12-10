@@ -12,7 +12,7 @@ import {
 } from '../fixtures/ensip19.js'
 import { KnownProfile, makeResolutions } from '../utils/resolutions.js'
 
-const testName = 'test.eth'
+const testName = 'test.dot'
 const coinTypes = [COIN_TYPE_ETH, COIN_TYPE_DEFAULT, 0n, 1n]
 
 const connection = await hre.network.connect()

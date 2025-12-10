@@ -13,8 +13,8 @@ describe('StringUtils', () => {
     it('double quote', async () => {
       const F = await loadFixture()
       await expect(
-        F.read.escape(['My ENS is, "tanrikulu.eth"']),
-      ).resolves.toEqual('My ENS is, \\"tanrikulu.eth\\"')
+        F.read.escape(['My ENS is, "tanrikulu.dot"']),
+      ).resolves.toEqual('My ENS is, \\"tanrikulu.dot\\"')
     })
 
     it('backslash', async () => {

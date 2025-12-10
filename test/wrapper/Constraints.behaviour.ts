@@ -35,9 +35,9 @@ export const shouldRespectConstraints = (connection: NetworkConnection) => {
   const parentLabel = 'test1'
   const parentLabelHash = labelhash(parentLabel)
   const parentLabelId = toTokenId(parentLabelHash)
-  const parentNode = namehash('test1.eth')
+  const parentNode = namehash('test1.dot')
   const parentNodeId = toTokenId(parentNode)
-  const childNode = namehash('sub.test1.eth')
+  const childNode = namehash('sub.test1.dot')
   const childNodeId = toTokenId(childNode)
   const childLabel = 'sub'
   const childLabelHash = labelhash(childLabel)
@@ -1373,7 +1373,7 @@ export const shouldRespectConstraints = (connection: NetworkConnection) => {
       })
       await nameWrapper.write.wrap(
         [
-          dnsEncodeName(`${childLabel}.${parentLabel}.eth`),
+          dnsEncodeName(`${childLabel}.${parentLabel}.dot`),
           accounts[1].address,
           zeroAddress,
         ],

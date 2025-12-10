@@ -18,7 +18,7 @@ export const isWrappedTests = (
 ) => {
   describe('isWrapped(bytes32 node)', () => {
     const label = 'something'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     async function fixture() {
       const initial = await loadNameWrapperFixture()
@@ -78,7 +78,7 @@ export const isWrappedTests = (
 
       await expect(
         nameWrapper.read.isWrapped([
-          namehash('abcdefghijklmnop.eth'),
+          namehash('abcdefghijklmnop.dot'),
         ]) as Promise<boolean>,
       ).resolves.toBe(false)
     })
@@ -139,7 +139,7 @@ export const isWrappedTests = (
 
   describe('isWrapped(bytes32 parentNode, bytes32 labelhash)', () => {
     const label = 'something'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
     const sublabel = 'sub'
     const subname = `${sublabel}.${name}`
 
@@ -166,7 +166,7 @@ export const isWrappedTests = (
 
       await expect(
         nameWrapper.read.isWrapped([
-          namehash('eth'),
+          namehash('dot'),
           labelhash(label),
         ]) as Promise<boolean>,
       ).resolves.toBe(true)
@@ -180,7 +180,7 @@ export const isWrappedTests = (
 
       await expect(
         nameWrapper.read.isWrapped([
-          namehash('eth'),
+          namehash('dot'),
           labelhash(label),
         ]) as Promise<boolean>,
       ).resolves.toBe(false)
@@ -199,7 +199,7 @@ export const isWrappedTests = (
       await expectOwnerOf(label).on(baseRegistrar).toBe(accounts[0])
       await expect(
         nameWrapper.read.isWrapped([
-          namehash('eth'),
+          namehash('dot'),
           labelhash(label),
         ]) as Promise<boolean>,
       ).resolves.toBe(false)
@@ -210,7 +210,7 @@ export const isWrappedTests = (
 
       await expect(
         nameWrapper.read.isWrapped([
-          namehash('eth'),
+          namehash('dot'),
           labelhash('abcdefghijklmnop'),
         ]) as Promise<boolean>,
       ).resolves.toBe(false)

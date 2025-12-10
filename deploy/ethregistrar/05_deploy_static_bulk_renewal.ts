@@ -23,7 +23,7 @@ export default deployScript(
     const interfaceId = createInterfaceId(bulkRenewal.abi)
     const resolver = await read(registry, {
       functionName: 'resolver',
-      args: [namehash('eth')],
+      args: [namehash('dot')],
     })
     if (resolver === zeroAddress) {
       console.warn(
@@ -39,7 +39,7 @@ export default deployScript(
       { ...artifacts.OwnedResolver, address: resolver },
       {
         functionName: 'setInterface',
-        args: [namehash('eth'), interfaceId, bulkRenewal.address],
+        args: [namehash('dot'), interfaceId, bulkRenewal.address],
         account: owner,
       },
     )

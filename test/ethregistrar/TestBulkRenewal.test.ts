@@ -13,7 +13,7 @@ async function fixture() {
   // Create a base registrar
   const baseRegistrar = await connection.viem.deployContract(
     'BaseRegistrarImplementation',
-    [ensRegistry.address, namehash('eth')],
+    [ensRegistry.address, namehash('dot')],
   )
 
   // Setup reverse registrar
@@ -78,18 +78,18 @@ async function fixture() {
   // then transfer the .eth node to the base registrar.
   await ensRegistry.write.setSubnodeRecord([
     zeroHash,
-    labelhash('eth'),
+    labelhash('dot'),
     accounts[0].address,
     publicResolver.address,
     0n,
   ])
   const interfaceId = await getInterfaceId('IETHRegistrarController')
   await publicResolver.write.setInterface([
-    namehash('eth'),
+    namehash('dot'),
     interfaceId,
     controller.address,
   ])
-  await ensRegistry.write.setOwner([namehash('eth'), baseRegistrar.address])
+  await ensRegistry.write.setOwner([namehash('dot'), baseRegistrar.address])
 
   // Register some names
   for (const name of ['test1', 'test2', 'test3']) {

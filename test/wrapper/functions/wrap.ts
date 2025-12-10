@@ -216,7 +216,7 @@ export const wrapTests = (
 
       await expect(
         nameWrapper.write.wrap([
-          dnsEncodeName(`${label}.eth`),
+          dnsEncodeName(`${label}.dot`),
           accounts[1].address,
           zeroAddress,
         ]),
@@ -346,7 +346,7 @@ export const wrapTests = (
         await loadFixture()
 
       const label = 'test'
-      const name = `${label}.eth`
+      const name = `${label}.dot`
       const subLabel = 'sub'
       const subname = `${subLabel}.${name}`
 

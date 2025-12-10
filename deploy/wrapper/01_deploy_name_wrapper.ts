@@ -50,7 +50,7 @@ export default deployScript(
 
     const resolver = await read(registry, {
       functionName: 'resolver',
-      args: [namehash('eth')],
+      args: [namehash('dot')],
     })
 
     if (resolver === zeroAddress) {
@@ -71,7 +71,7 @@ export default deployScript(
       data: encodeFunctionData({
         abi: ownedResolver.abi,
         functionName: 'setInterface',
-        args: [namehash('eth'), interfaceId, nameWrapper.address],
+        args: [namehash('dot'), interfaceId, nameWrapper.address],
       }),
       account: owner,
     })

@@ -95,7 +95,7 @@ export default deployScript(
 
     const resolver = await read(registry, {
       functionName: 'resolver',
-      args: [namehash('eth')],
+      args: [namehash('dot')],
     })
     if (resolver === zeroAddress) {
       console.warn(
@@ -111,7 +111,7 @@ export default deployScript(
       { ...artifacts.OwnedResolver, address: resolver },
       {
         functionName: 'setInterface',
-        args: [namehash('eth'), interfaceId, controller.address],
+        args: [namehash('dot'), interfaceId, controller.address],
         account: owner,
       },
     )

@@ -26,7 +26,7 @@ import {
 export const wrapETH2LDTests = (loadFixture: LoadNameWrapperFixture) =>
   describe('wrapETH2LD()', () => {
     const label = 'wrapped2'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     it('wraps a name if sender is owner', async () => {
       const { ensRegistry, baseRegistrar, nameWrapper, accounts, actions } =

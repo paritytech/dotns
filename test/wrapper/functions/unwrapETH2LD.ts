@@ -15,7 +15,7 @@ import {
 export const unwrapETH2LDTests = (loadFixture: LoadNameWrapperFixture) =>
   describe('unwrapETH2LD()', () => {
     const label = 'unwrapped'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     it('Allows the owner to unwrap a name.', async () => {
       const { baseRegistrar, ensRegistry, nameWrapper, accounts, actions } =

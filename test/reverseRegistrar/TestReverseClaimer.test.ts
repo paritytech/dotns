@@ -11,7 +11,7 @@ async function fixture() {
   const ensRegistry = await connection.viem.deployContract('ENSRegistry', [])
   const baseRegistrar = await connection.viem.deployContract(
     'BaseRegistrarImplementation',
-    [ensRegistry.address, namehash('eth')],
+    [ensRegistry.address, namehash('dot')],
   )
 
   await baseRegistrar.write.addController([accounts[0].address])

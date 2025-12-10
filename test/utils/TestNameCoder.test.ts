@@ -38,7 +38,7 @@ describe('NameCoder', () => {
   describe('valid', () => {
     for (const ens of [
       '',
-      'test.eth',
+      'test.dot',
       MIN_LABEL,
       MAX_LABEL,
       `${MAX_LABEL}.${MAX_LABEL}`,
@@ -90,7 +90,7 @@ describe('NameCoder', () => {
 
     it('name.length is <root>', async () => {
       const F = await loadFixture()
-      const dns = dnsEncodeName('eth')
+      const dns = dnsEncodeName('dot')
       const offset = BigInt(size(dns))
       const prev = offset - 1n
       await expect(
@@ -187,7 +187,7 @@ describe('NameCoder', () => {
 
   describe('extractLabel()', () => {
     for (const [name] of [
-      ['', 'test.eth', 'a.bb.ccc.dddd.eeeee', forceHashedLabel('abc')],
+      ['', 'test.dot', 'a.bb.ccc.dddd.eeeee', forceHashedLabel('abc')],
     ]) {
       it(fmt(name), async () => {
         const F = await loadFixture()
@@ -225,7 +225,7 @@ describe('NameCoder', () => {
       it(fmt(label), async () => {
         const F = await loadFixture()
         await expect(
-          F.read.firstLabel([dnsEncodeName(`${label}.eth`)]),
+          F.read.firstLabel([dnsEncodeName(`${label}.dot`)]),
         ).resolves.toStrictEqual(label)
       })
     }
@@ -270,7 +270,7 @@ describe('NameCoder', () => {
       })
     }
 
-    testNoMatch('test.eth', 'com')
+    testNoMatch('test.dot', 'com')
     testNoMatch('a', 'b')
     testNoMatch('a', 'a.b')
     testNoMatch('a', 'b.a')
@@ -279,7 +279,7 @@ describe('NameCoder', () => {
     testMatch('eth')
     testMatch('a.b.c')
 
-    testMatch('test.eth', 'eth')
+    testMatch('test.dot', 'dot')
     testMatch('a.b.c.com', 'com')
     testMatch('test.xyz', 'xyz')
 
@@ -292,22 +292,22 @@ describe('NameCoder', () => {
       it('no match', async () => {
         const F = await loadFixture()
         await expect(
-          F.read.matchSuffix([dnsEncodeName('a.b.c.eth'), 4n, namehash('xyz')]),
-        ).resolves.toStrictEqual([false, namehash('c.eth'), 0n, 0n])
+          F.read.matchSuffix([dnsEncodeName('a.b.c.dot'), 4n, namehash('xyz')]),
+        ).resolves.toStrictEqual([false, namehash('c.dot'), 0n, 0n])
       })
 
       it('exact exact', async () => {
         const F = await loadFixture()
         await expect(
-          F.read.matchSuffix([dnsEncodeName('a.b.c.eth'), 6n, namehash('eth')]),
-        ).resolves.toStrictEqual([true, namehash('eth'), 6n, 6n])
+          F.read.matchSuffix([dnsEncodeName('a.b.c.dot'), 6n, namehash('dot')]),
+        ).resolves.toStrictEqual([true, namehash('dot'), 6n, 6n])
       })
 
       it('match', async () => {
         const F = await loadFixture()
         await expect(
-          F.read.matchSuffix([dnsEncodeName('a.b.c.eth'), 2n, namehash('eth')]),
-        ).resolves.toStrictEqual([true, namehash('b.c.eth'), 4n, 6n])
+          F.read.matchSuffix([dnsEncodeName('a.b.c.dot'), 2n, namehash('dot')]),
+        ).resolves.toStrictEqual([true, namehash('b.c.dot'), 4n, 6n])
       })
     })
   })
@@ -316,27 +316,27 @@ describe('NameCoder', () => {
     it('min label', async () => {
       const F = await loadFixture()
       await expect(
-        F.read.addLabel([dnsEncodeName('eth'), MIN_LABEL]),
-      ).resolves.toStrictEqual(dnsEncodeName(`${MIN_LABEL}.eth`))
+        F.read.addLabel([dnsEncodeName('dot'), MIN_LABEL]),
+      ).resolves.toStrictEqual(dnsEncodeName(`${MIN_LABEL}.dot`))
     })
 
     it('max label', async () => {
       const F = await loadFixture()
       await expect(
-        F.read.addLabel([dnsEncodeName('eth'), MAX_LABEL]),
-      ).resolves.toStrictEqual(dnsEncodeName(`${MAX_LABEL}.eth`))
+        F.read.addLabel([dnsEncodeName('dot'), MAX_LABEL]),
+      ).resolves.toStrictEqual(dnsEncodeName(`${MAX_LABEL}.dot`))
     })
 
     it('empty label reverts', async () => {
       const F = await loadFixture()
       await expect(
-        F.read.addLabel([dnsEncodeName('eth'), '']),
+        F.read.addLabel([dnsEncodeName('dot'), '']),
       ).toBeRevertedWithCustomError('LabelIsEmpty')
     })
 
     it('long label reverts', async () => {
       const F = await loadFixture()
-      await expect(F.read.addLabel([dnsEncodeName('eth'), LONG_LABEL]))
+      await expect(F.read.addLabel([dnsEncodeName('dot'), LONG_LABEL]))
         .toBeRevertedWithCustomError('LabelIsTooLong')
         .withArgs([LONG_LABEL])
     })
@@ -346,14 +346,14 @@ describe('NameCoder', () => {
     it('min label', async () => {
       const F = await loadFixture()
       await expect(F.read.ethName([MIN_LABEL])).resolves.toStrictEqual(
-        dnsEncodeName(`${MIN_LABEL}.eth`),
+        dnsEncodeName(`${MIN_LABEL}.dot`),
       )
     })
 
     it('max label', async () => {
       const F = await loadFixture()
       await expect(F.read.ethName([MAX_LABEL])).resolves.toStrictEqual(
-        dnsEncodeName(`${MAX_LABEL}.eth`),
+        dnsEncodeName(`${MAX_LABEL}.dot`),
       )
     })
 

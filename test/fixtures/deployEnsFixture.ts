@@ -110,7 +110,7 @@ const setEthResolverInterface = async (
   const contractInterface = await hre.artifacts.readArtifact(interfaceName)
   const interfaceId = createInterfaceId(contractInterface.abi)
   return await ethOwnedResolver.write.setInterface(
-    [namehash('eth'), interfaceId, contract.address],
+    [namehash('dot'), interfaceId, contract.address],
     {
       account: owner.account,
     },
@@ -158,13 +158,13 @@ export async function deployEnsStack(
 
   const baseRegistrarImplementation = await connection.viem.deployContract(
     'BaseRegistrarImplementation',
-    [ensRegistry.address, namehash('eth')],
+    [ensRegistry.address, namehash('dot')],
   )
 
   await baseRegistrarImplementation.write.transferOwnership([owner.address])
   await setRootSubnodeOwner(connection, {
     root,
-    label: 'eth',
+    label: 'dot',
     owner: baseRegistrarImplementation,
   })
 

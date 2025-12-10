@@ -25,7 +25,7 @@ import {
   shortCoin,
 } from '../fixtures/ensip19.js'
 
-const targetNode = namehash('eth')
+const targetNode = namehash('dot')
 
 const connection = await hre.network.connect()
 const accounts = await getAccounts(connection)
@@ -68,7 +68,7 @@ async function fixture() {
 
   await ensRegistry.write.setSubnodeOwner([
     zeroHash,
-    labelhash('eth'),
+    labelhash('dot'),
     accounts[0].address,
   ])
 
@@ -84,15 +84,15 @@ const loadFixture = async () => connection.networkHelpers.loadFixture(fixture)
 
 async function fixtureWithDnsRecords() {
   const existing = await loadFixture()
-  // a.eth. 3600 IN A 1.2.3.4
-  const arec = '016103657468000001000100000e10000401020304' as const
-  // b.eth. 3600 IN A 2.3.4.5
-  const b1rec = '016203657468000001000100000e10000402030405' as const
-  // b.eth. 3600 IN A 3.4.5.6
-  const b2rec = '016203657468000001000100000e10000403040506' as const
-  // eth. 86400 IN SOA ns1.ethdns.xyz. hostmaster.test.eth. 2018061501 15620 1800 1814400 14400
+  // a.dot. 3600 IN A 1.2.3.4
+  const arec = '016103646f74000001000100000e10000401020304' as const
+  // b.dot. 3600 IN A 2.3.4.5
+  const b1rec = '016203646f74000001000100000e10000402030405' as const
+  // b.dot. 3600 IN A 3.4.5.6
+  const b2rec = '016203646f74000001000100000e10000403040506' as const
+  // dot. 86400 IN SOA ns1.ethdns.xyz. hostmaster.test.dot. 2018061501 15620 1800 1814400 14400
   const soarec =
-    '03657468000006000100015180003a036e733106657468646e730378797a000a686f73746d6173746572057465737431036574680078492cbd00003d0400000708001baf8000003840' as const
+    '03646f74000006000100015180003a036e733106657468646e730378797a000a686f73746d617374657205746573743103646f740078492cbd00003d0400000708001baf8000003840' as const
   const rec = `0x${arec}${b1rec}${b2rec}${soarec}` as const
   const tx = existing.publicResolver.write.setDNSRecords([targetNode, rec])
   return { ...existing, rec, arec, b1rec, b2rec, soarec, tx }
@@ -928,7 +928,7 @@ describe('PublicResolver', () => {
         await expect(
           publicResolver.read.dnsRecord([
             targetNode,
-            keccak256(dnsEncodeName('a.eth')),
+            keccak256(dnsEncodeName('a.dot')),
             1,
           ]),
         ).resolves.toEqual(`0x${arec}`)
@@ -936,7 +936,7 @@ describe('PublicResolver', () => {
         await expect(
           publicResolver.read.dnsRecord([
             targetNode,
-            keccak256(dnsEncodeName('b.eth')),
+            keccak256(dnsEncodeName('b.dot')),
             1,
           ]),
         ).resolves.toEqual(`0x${b1rec}${b2rec}`)
@@ -944,7 +944,7 @@ describe('PublicResolver', () => {
         await expect(
           publicResolver.read.dnsRecord([
             targetNode,
-            keccak256(dnsEncodeName('eth')),
+            keccak256(dnsEncodeName('dot')),
             6,
           ]),
         ).resolves.toEqual(`0x${soarec}`)
@@ -953,11 +953,11 @@ describe('PublicResolver', () => {
       it('should update existing records', async () => {
         const { publicResolver } = await loadFixtureWithDnsRecords()
 
-        // a.eth. 3600 IN A 4.5.6.7
-        const arec = '016103657468000001000100000e10000404050607' as const
-        // eth. 86400 IN SOA ns1.ethdns.xyz. hostmaster.test.eth. 2018061502 15620 1800 1814400 14400
+        // a.dot. 3600 IN A 4.5.6.7
+        const arec = '016103646f74000001000100000e10000404050607' as const
+        // dot. 86400 IN SOA ns1.ethdns.xyz. hostmaster.test.dot. 2018061502 15620 1800 1814400 14400
         const soarec =
-          '03657468000006000100015180003a036e733106657468646e730378797a000a686f73746d6173746572057465737431036574680078492cbe00003d0400000708001baf8000003840' as const
+          '03646f74000006000100015180003a036e733106657468646e730378797a000a686f73746d617374657205746573743103646f740078492cbe00003d0400000708001baf8000003840' as const
         const rec = `0x${arec}${soarec}` as const
 
         await publicResolver.write.setDNSRecords([targetNode, rec])
@@ -965,14 +965,14 @@ describe('PublicResolver', () => {
         await expect(
           publicResolver.read.dnsRecord([
             targetNode,
-            keccak256(dnsEncodeName('a.eth')),
+            keccak256(dnsEncodeName('a.dot')),
             1,
           ]),
         ).resolves.toEqual(`0x${arec}`)
         await expect(
           publicResolver.read.dnsRecord([
             targetNode,
-            keccak256(dnsEncodeName('eth')),
+            keccak256(dnsEncodeName('dot')),
             6,
           ]),
         ).resolves.toEqual(`0x${soarec}`)
@@ -981,8 +981,8 @@ describe('PublicResolver', () => {
       it('should keep track of entries', async () => {
         const { publicResolver } = await loadFixtureWithDnsRecords()
 
-        // c.eth. 3600 IN A 1.2.3.4
-        const crec = '016303657468000001000100000e10000401020304' as const
+        // c.dot. 3600 IN A 1.2.3.4
+        const crec = '016303646f74000001000100000e10000401020304' as const
         const rec = `0x${crec}` as const
 
         await publicResolver.write.setDNSRecords([targetNode, rec])
@@ -991,13 +991,13 @@ describe('PublicResolver', () => {
         await expect(
           publicResolver.read.hasDNSRecords([
             targetNode,
-            keccak256(dnsEncodeName('c.eth')),
+            keccak256(dnsEncodeName('c.dot')),
           ]),
         ).resolves.toEqual(true)
         await expect(
           publicResolver.read.hasDNSRecords([
             targetNode,
-            keccak256(dnsEncodeName('d.eth')),
+            keccak256(dnsEncodeName('d.dot')),
           ]),
         ).resolves.toEqual(false)
 
@@ -1006,12 +1006,12 @@ describe('PublicResolver', () => {
         await expect(
           publicResolver.read.hasDNSRecords([
             targetNode,
-            keccak256(dnsEncodeName('c.eth')),
+            keccak256(dnsEncodeName('c.dot')),
           ]),
         ).resolves.toEqual(true)
 
-        // c.eth. 3600 IN A
-        const crec2 = '016303657468000001000100000e100000' as const
+        // c.dot. 3600 IN A
+        const crec2 = '016303646f74000001000100000e100000' as const
         const rec2 = `0x${crec2}` as const
 
         await publicResolver.write.setDNSRecords([targetNode, rec2])
@@ -1020,7 +1020,7 @@ describe('PublicResolver', () => {
         await expect(
           publicResolver.read.hasDNSRecords([
             targetNode,
-            keccak256(dnsEncodeName('c.eth')),
+            keccak256(dnsEncodeName('c.dot')),
           ]),
         ).resolves.toEqual(false)
       })
@@ -1028,8 +1028,8 @@ describe('PublicResolver', () => {
       it('should handle single-record updates', async () => {
         const { publicResolver } = await loadFixtureWithDnsRecords()
 
-        // e.eth. 3600 IN A 1.2.3.4
-        const erec = '016503657468000001000100000e10000401020304' as const
+        // e.dot. 3600 IN A 1.2.3.4
+        const erec = '016503646f74000001000100000e10000401020304' as const
         const rec = `0x${erec}` as const
 
         await publicResolver.write.setDNSRecords([targetNode, rec])
@@ -1037,7 +1037,7 @@ describe('PublicResolver', () => {
         await expect(
           publicResolver.read.dnsRecord([
             targetNode,
-            keccak256(dnsEncodeName('e.eth')),
+            keccak256(dnsEncodeName('e.dot')),
             1,
           ]),
         ).resolves.toEqual(`0x${erec}`)
@@ -1046,8 +1046,8 @@ describe('PublicResolver', () => {
       it('forbids setting DNS records by non-owners', async () => {
         const { publicResolver } = await loadFixtureWithDnsRecords()
 
-        // f.eth. 3600 IN A 1.2.3.4
-        const frec = '016603657468000001000100000e10000401020304' as const
+        // f.dot. 3600 IN A 1.2.3.4
+        const frec = '016603646f74000001000100000e10000401020304' as const
         const rec = `0x${frec}` as const
 
         await expect(
@@ -1065,21 +1065,21 @@ describe('PublicResolver', () => {
         await expect(
           publicResolver.read.dnsRecord([
             targetNode,
-            keccak256(dnsEncodeName('a.eth')),
+            keccak256(dnsEncodeName('a.dot')),
             1,
           ]),
         ).resolves.toEqual('0x')
         await expect(
           publicResolver.read.dnsRecord([
             targetNode,
-            keccak256(dnsEncodeName('b.eth')),
+            keccak256(dnsEncodeName('b.dot')),
             1,
           ]),
         ).resolves.toEqual('0x')
         await expect(
           publicResolver.read.dnsRecord([
             targetNode,
-            keccak256(dnsEncodeName('eth')),
+            keccak256(dnsEncodeName('dot')),
             6,
           ]),
         ).resolves.toEqual('0x')

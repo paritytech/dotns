@@ -53,7 +53,7 @@ export const unwrapTests = (loadFixture: LoadNameWrapperFixture) =>
       const { nameWrapper, accounts, testClient, actions } = await loadFixture()
 
       const parentLabel = 'unwrapped'
-      const parentName = `${parentLabel}.eth`
+      const parentName = `${parentLabel}.dot`
       const childLabel = 'sub'
       const childName = `${childLabel}.${parentName}`
 
@@ -253,11 +253,11 @@ export const unwrapTests = (loadFixture: LoadNameWrapperFixture) =>
         fuses: 0,
       })
 
-      await expectOwnerOf(`${label}.eth`).on(nameWrapper).toBe(accounts[0])
+      await expectOwnerOf(`${label}.dot`).on(nameWrapper).toBe(accounts[0])
 
       await expect(
         nameWrapper.write.unwrap([
-          namehash('eth'),
+          namehash('dot'),
           labelhash(label),
           accounts[0].address,
         ]),
@@ -304,7 +304,7 @@ export const unwrapTests = (loadFixture: LoadNameWrapperFixture) =>
         await loadFixture()
 
       const parentLabel = 'awesome'
-      const parentName = `${parentLabel}.eth`
+      const parentName = `${parentLabel}.dot`
       const childLabel = 'sub'
       const childName = `${childLabel}.${parentName}`
 
@@ -352,7 +352,7 @@ export const unwrapTests = (loadFixture: LoadNameWrapperFixture) =>
         await loadFixture()
 
       const parentLabel = 'awesome'
-      const parentName = `${parentLabel}.eth`
+      const parentName = `${parentLabel}.dot`
       const childLabel = 'sub'
       const childName = `${childLabel}.${parentName}`
 
@@ -421,7 +421,7 @@ export const unwrapTests = (loadFixture: LoadNameWrapperFixture) =>
         await loadFixture()
 
       const parentLabel = 'abc'
-      const parentName = `${parentLabel}.eth`
+      const parentName = `${parentLabel}.dot`
       const childLabel = 'sub'
       const childName = `${childLabel}.${parentName}`
 
@@ -468,7 +468,7 @@ export const unwrapTests = (loadFixture: LoadNameWrapperFixture) =>
         await loadFixture()
 
       const parentLabel = 'test'
-      const parentName = `${parentLabel}.eth`
+      const parentName = `${parentLabel}.dot`
       const childLabel = 'sub'
       const childName = `${childLabel}.${parentName}`
 

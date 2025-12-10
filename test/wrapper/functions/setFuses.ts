@@ -21,7 +21,7 @@ import {
 export const setFusesTests = (loadFixture: LoadNameWrapperFixture) => {
   describe('setFuses()', () => {
     const label = 'fuses'
-    const name = `${label}.eth`
+    const name = `${label}.dot`
 
     it.skip('cannot burn PARENT_CANNOT_CONTROL', async () => {
       const { nameWrapper, actions, accounts } = await loadFixture()

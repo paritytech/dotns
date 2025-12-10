@@ -43,7 +43,7 @@ describe('ResolverCaller', () => {
           it(title, async () => {
             const F = await connection.networkHelpers.loadFixture(fixture)
             const kp: KnownProfile = {
-              name: 'test.eth',
+              name: 'test.dot',
               addresses: [
                 {
                   coinType: COIN_TYPE_ETH,

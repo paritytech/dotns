@@ -27,7 +27,7 @@ async function fixture() {
     const account = accounts[i]
     await oldReverseResolver.write.setName([
       getReverseNodeHash(account.address),
-      `name-${i}.eth`,
+      `name-${i}.dot`,
     ])
   }
 
@@ -64,11 +64,11 @@ describe('L2ReverseRegistrarWithMigration', () => {
       const name = await oldReverseResolver.read.name([
         getReverseNodeHash(account.address),
       ])
-      expect(name).toBe(`name-${i}.eth`)
+      expect(name).toBe(`name-${i}.dot`)
       const newName = await l2ReverseRegistrar.read.nameForAddr([
         account.address,
       ])
-      expect(newName).toBe(`name-${i}.eth`)
+      expect(newName).toBe(`name-${i}.dot`)
     }
   })
 

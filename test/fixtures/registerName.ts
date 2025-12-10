@@ -15,11 +15,45 @@ type RegisterNameOptions = {
   data?: Hex[]
   reverseRecord?: ('ethereum' | 'default')[]
   referrer?: Hex
+  individualityType?: number
 }
 
 const ReverseRecord = {
   ethereum: 1,
   default: 2,
+}
+
+// IndividualityType enum values
+const IndividualityType = {
+  NONE: 0,                  // 9+ chars - first come, first served
+  PERSON_LIGHT: 1,          // 6+ chars + .XX (2 digits) - Light verification
+  PROOF_OF_PERSONHOOD: 2,   // 6+ chars - Full personhood proof
+  GOVERNANCE: 3,            // <6 chars - Governance only
+}
+
+// Helper function to determine appropriate individuality type based on label
+const getIndividualityTypeForLabel = (label: string): number => {
+  // Simple UTF-8 character count
+  const charCount = [...label].length
+
+  // Check if it has .XX pattern (a dot + 2 digits at the end)
+  const hasPersonLightFormat = /\.\d{2}$/.test(label)
+
+  if (charCount < 6) {
+    // Less than 6 chars - Governance (but tests should rarely use this)
+    // For testing, we'll allow it, but it may require governance approval
+    return IndividualityType.GOVERNANCE
+  } else if (charCount >= 6 && charCount <= 8) {
+    // 6-8 chars
+    if (hasPersonLightFormat) {
+      return IndividualityType.PERSON_LIGHT
+    } else {
+      return IndividualityType.PROOF_OF_PERSONHOOD
+    }
+  } else {
+    // 9+ chars
+    return IndividualityType.NONE
+  }
 }
 
 export const getDefaultRegistrationOptionsWithConnection =
@@ -33,6 +67,7 @@ export const getDefaultRegistrationOptionsWithConnection =
     data,
     reverseRecord,
     referrer,
+    individualityType,
   }: RegisterNameOptions) => ({
     label,
     ownerAddress: await (async () => {
@@ -48,6 +83,7 @@ export const getDefaultRegistrationOptionsWithConnection =
     data: data ?? [],
     reverseRecord: reverseRecord ?? [],
     referrer: referrer ?? zeroHash,
+    individualityType: individualityType ?? getIndividualityTypeForLabel(label)
   })
 
 export const getRegisterNameParameters = ({
@@ -59,6 +95,7 @@ export const getRegisterNameParameters = ({
   data,
   reverseRecord,
   referrer,
+  individualityType,
 }: Required<RegisterNameOptions>) => {
   const immutable = {
     label,
@@ -72,6 +109,7 @@ export const getRegisterNameParameters = ({
       0,
     ),
     referrer,
+    individualityType,
   } as const
   return immutable as Mutable<typeof immutable>
 }

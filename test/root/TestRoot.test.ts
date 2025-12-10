@@ -15,7 +15,7 @@ async function fixture() {
   await root.write.setController([accounts[0].address, true])
   await ensRegistry.write.setSubnodeOwner([
     zeroHash,
-    labelhash('eth'),
+    labelhash('dot'),
     root.address,
   ])
   await ensRegistry.write.setOwner([zeroHash, root.address])
@@ -29,10 +29,10 @@ describe('Root', () => {
     it('should allow controllers to set subnodes', async () => {
       const { ensRegistry, root, accounts } = await loadFixture()
 
-      await root.write.setSubnodeOwner([labelhash('eth'), accounts[1].address])
+      await root.write.setSubnodeOwner([labelhash('dot'), accounts[1].address])
 
       await expect(
-        ensRegistry.read.owner([namehash('eth')]),
+        ensRegistry.read.owner([namehash('dot')]),
       ).resolves.toEqualAddress(accounts[1].address)
     })
 
@@ -40,7 +40,7 @@ describe('Root', () => {
       const { root, accounts } = await loadFixture()
 
       await expect(
-        root.write.setSubnodeOwner([labelhash('eth'), accounts[1].address], {
+        root.write.setSubnodeOwner([labelhash('dot'), accounts[1].address], {
           account: accounts[1],
         }),
       ).toBeRevertedWithString('Controllable: Caller is not a controller')
@@ -49,10 +49,10 @@ describe('Root', () => {
     it('should not allow setting a locked TLD', async () => {
       const { root, accounts } = await loadFixture()
 
-      await root.write.lock([labelhash('eth')])
+      await root.write.lock([labelhash('dot')])
 
       await expect(
-        root.write.setSubnodeOwner([labelhash('eth'), accounts[1].address]),
+        root.write.setSubnodeOwner([labelhash('dot'), accounts[1].address]),
       ).toBeRevertedWithoutReason()
     })
   })

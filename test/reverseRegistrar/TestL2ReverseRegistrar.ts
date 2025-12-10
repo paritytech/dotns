@@ -148,7 +148,7 @@ describe('L2ReverseRegistrar', () => {
     async function setNameFixture() {
       const initial = await connection.networkHelpers.loadFixture(fixture)
 
-      const name = 'myname.eth'
+      const name = 'myname.dot'
 
       return {
         ...initial,
@@ -182,7 +182,7 @@ describe('L2ReverseRegistrar', () => {
     async function setNameForAddrFixture() {
       const initial = await connection.networkHelpers.loadFixture(fixture)
 
-      const name = 'myname.eth'
+      const name = 'myname.dot'
 
       return {
         ...initial,
@@ -233,7 +233,7 @@ describe('L2ReverseRegistrar', () => {
       const initial = await connection.networkHelpers.loadFixture(fixture)
       const { l2ReverseRegistrar, accounts } = initial
 
-      const name = 'myname.eth'
+      const name = 'myname.dot'
       const functionSelector = toFunctionSelector(
         l2ReverseRegistrar.abi.find(
           (f) =>
@@ -615,7 +615,7 @@ describe('L2ReverseRegistrar', () => {
       const initial = await connection.networkHelpers.loadFixture(fixture)
       const { l2ReverseRegistrar } = initial
 
-      const name = 'ownable.eth'
+      const name = 'ownable.dot'
       const functionSelector = toFunctionSelector(
         l2ReverseRegistrar.abi.find(
           (f) =>
