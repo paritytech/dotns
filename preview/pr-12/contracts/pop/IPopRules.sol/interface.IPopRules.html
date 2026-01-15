@@ -38,10 +38,10 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-16735adc.js";
+            window.path_to_searchindex_js = "../../../searchindex-f290b432.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../../toc-233aee54.js"></script>
+        <script src="../../../toc-7aa7ff08.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,7 +181,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/daf1885b98bb8a3443d36a1a2110d2872aa3a725/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/8ebdbcbfe8c161c1d0374fe3167277b32e575204/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IPopRules</p>
 <p>Proof of personhood interface defining DotNS price calculation, PoP-tier requirements, and base-name reservation rules</p>
@@ -193,7 +193,10 @@ Names are evaluated according to the following rules:
 • Length ≥ 9 without trailing digits: PopFull required
 • Length ≥ 9 with 2 trailing digits: NoStatus (open)
 Trailing digits beyond 2 are invalid. Internal digits do not affect classification.
-Reservation rules apply to a label stripped of trailing digits.</p>
+Reservation rules apply to a label stripped of trailing digits.
+Its also important to note that for Pop Full there are no restrictions to name registrations any
+Character combination is valid, the same is valid for Light and No status users with the exception of
+Requiring 2 suffix digits appended to the username being registered</p>
 <p>The pricing applied is mainly for POP No status users as measure to prevent spam</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
@@ -344,11 +347,10 @@ It mainly applies to no status users</p>
 </div>
 <h3 id="pricewithoutcheck"><a class="header" href="#pricewithoutcheck">priceWithoutCheck</a></h3>
 <p>Calculates price with PoP and reservation validation</p>
-<p>We currently revert on names considered as reserved for Governance
+<p>We currently dont revert on names considered as reserved for Governance
 The price we apply here is merely for spam protection and is insignificant
 It mainly applies to no status users</p>
-<p>THis function is the same as @custom:function priceWithCheck
-We just implmeneted this one such that prices for statuses can be fetched without reverting</p>
+<p>This function is the same as @custom:function priceWithCheck</p>
 <pre><code class="language-solidity">function priceWithoutCheck(
     string calldata name,
     address userAddress
@@ -611,7 +613,7 @@ This replaces per-name PoP assignments</p>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../../../contracts/pop/IPopOracle.sol/interface.IPopOracle.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../../contracts/pop/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -625,7 +627,7 @@ This replaces per-name PoP assignments</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../../../contracts/pop/IPopOracle.sol/interface.IPopOracle.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../../contracts/pop/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
