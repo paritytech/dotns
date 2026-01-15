@@ -38,7 +38,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-f290b432.js";
+            window.path_to_searchindex_js = "searchindex-fd5ddd90.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-7aa7ff08.js"></script>
@@ -198,12 +198,12 @@
 </code></pre>
 <h2 id="contracts"><a class="header" href="#contracts">Contracts</a></h2>
 <h3 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller"><code>DotnsRegistrarController</code></a></h3>
-<p>Commit–reveal controller that validates commitments, enforces oracle checks, and orchestrates registration side effects (minting, registry wiring, reverse record, Store writes, refunds).</p>
+<p>Commit–reveal controller that validates commitments, enforces pop rules checks, and orchestrates registration side effects (minting, registry wiring, reverse record, Store writes, refunds).</p>
 <h3 id="dotnsregistrar"><a class="header" href="#dotnsregistrar"><code>DotnsRegistrar</code></a></h3>
 <p>ERC721-backed registrar that mints ownership of label IDs (labelhashes). Minting is restricted to authorised controllers.</p>
 <h3 id="dotnsregistry"><a class="header" href="#dotnsregistry"><code>DotnsRegistry</code></a></h3>
 <p>Forward registry mapping node → <code>(owner, resolver)</code> and supporting subnode creation. Privileged node wiring is restricted to the configured registrar controller.</p>
-<h3 id="poporacle"><a class="header" href="#poporacle"><code>PopOracle</code></a></h3>
+<h3 id="poprules"><a class="header" href="#poprules"><code>PopRules</code></a></h3>
 <p>PoP-aware name classification and pricing. Enforces base-name reservation rules derived from Lite-eligible registrations.</p>
 <h3 id="dotnsreverseresolver"><a class="header" href="#dotnsreverseresolver"><code>DotnsReverseResolver</code></a></h3>
 <p>Reverse records mapping address → primary name. Writes are restricted to an authorised registrar/controller.</p>
