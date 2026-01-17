@@ -1,0 +1,11 @@
+error: fuzz parameters must be simple identifiers (e.g. `value: u32`)
+ --> tests/ui/non_ident_pattern.rs:4:16
+  |
+4 | fn bad_pattern((_a, _b): (u32, u32)) {
+  |                ^^^^^^^^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+ --> tests/ui/non_ident_pattern.rs:6:2
+  |
+6 | }
+  |  ^ consider adding a `main` function to `$DIR/tests/ui/non_ident_pattern.rs`

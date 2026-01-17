@@ -1,0 +1,11 @@
+error: #[ink_fuzzer::fuzz] does not support async functions
+ --> tests/ui/async_fn.rs:4:1
+  |
+4 | async fn bad_async(_x: u32) {
+  | ^^^^^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+ --> tests/ui/async_fn.rs:6:2
+  |
+6 | }
+  |  ^ consider adding a `main` function to `$DIR/tests/ui/async_fn.rs`

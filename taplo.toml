@@ -1,0 +1,20 @@
+[formatting]
+align_entries = false
+align_comments = true
+array_trailing_comma = true
+array_auto_expand = true
+array_auto_collapse = false
+compact_arrays = false
+compact_inline_tables = false
+column_width = 100
+indent_tables = false
+indent_entries = false
+reorder_keys = false
+trailing_newline = true
+
+[[rule]]
+include = ["**/Cargo.toml"]
+keys = ["dependencies", "dev-dependencies", "build-dependencies"]
+
+[rule.formatting]
+reorder_keys = true

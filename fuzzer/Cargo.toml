@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/fuzz-examples",
+  "crates/ink-fuzzer",
+  "crates/ink-fuzzer-macros",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+ink = { version = "6.0.0-beta.1", default-features = false, features = [ "unstable-hostfn" ] }
+proc-macro2 = "1.0.105"
+quote = "1.0.43"
+syn = { version = "2.0.114", features = [ "full" ] }
+trybuild = { version = "1.0.114" }
+proptest = { version = "=1.9.0", features = [ "attr-macro" ] }
