@@ -27,12 +27,6 @@ In Solidity land, fuzzing became “default” partly because it was cheap to us
 
 ink! development is moving quickly, but fuzzing ergonomics are still uneven. The goal here is to lower the friction so writing invariants as tests becomes routine.
 
-## Status and roadmap
-
-This is aimed at stateless fuzzing over message inputs inside `#[ink::test]` workflows.
-
-A natural next step is stateful fuzzing: generating sequences of calls and checking invariants across evolving contract state. The plan is to add this later. It is not part of the current design.
-
 ## Installation
 
 Add `ink-fuzzer` as a dev-dependency in your ink! contract crate.
