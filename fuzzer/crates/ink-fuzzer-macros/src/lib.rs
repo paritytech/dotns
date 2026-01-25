@@ -103,14 +103,18 @@ pub fn fuzz(attribute_tokens: TokenStream, item_tokens: TokenStream) -> TokenStr
     // A stable, user-callable, no-arg entrypoint for running the property test wrapper.
     let runner_function_identifier = format_ident!("run_{}", original_function_identifier);
 
-    // Collect identifier patterns so we can call the internal helper as:
-    // __ink_fuzzer_internal_name(arg1, arg2, ...)
+    // Collect identifier patterns and types so we can:
+    // 1. Generate strategies for each argument type: any::<Type>()
+    // 2. Call the internal helper as: __ink_fuzzer_internal_name(arg1, arg2, ...)
     let mut function_argument_identifiers: Vec<syn::Ident> = Vec::new();
+    let mut function_argument_types: Vec<syn::Type> = Vec::new();
+
     for function_input in user_function.sig.inputs.iter() {
         match function_input {
             syn::FnArg::Typed(typed_argument) => match &*typed_argument.pat {
                 syn::Pat::Ident(identifier_pattern) => {
                     function_argument_identifiers.push(identifier_pattern.ident.clone());
+                    function_argument_types.push((*typed_argument.ty).clone());
                 }
                 other_pattern => {
                     return syn::Error::new(
@@ -135,35 +139,63 @@ pub fn fuzz(attribute_tokens: TokenStream, item_tokens: TokenStream) -> TokenStr
     // Rename the user function to an internal helper symbol.
     user_function.sig.ident = internal_function_identifier.clone();
 
-    let configured_cases: usize = parsed_arguments.cases.unwrap_or(256);
-    let cases_literal = syn::LitInt::new(
-        &configured_cases.to_string(),
-        proc_macro2::Span::call_site(),
-    );
+    let configured_cases: u32 = parsed_arguments.cases.unwrap_or(256) as u32;
 
-    // Wrapper must keep the same inputs so proptest can generate values for them.
-    let wrapper_function_inputs = user_function.sig.inputs.clone();
+    // Build the strategy tuple for proptest. Each argument type gets an any::<T>() strategy.
+    // For zero arguments, we use Just(()) as a placeholder strategy.
+    let strategy_tuple = if function_argument_types.is_empty() {
+        quote! { ::ink_fuzzer::proptest::strategy::Just(()) }
+    } else {
+        let strategies = function_argument_types.iter().map(|ty| {
+            quote! { ::ink_fuzzer::proptest::arbitrary::any::<#ty>() }
+        });
+        quote! { (#(#strategies),*) }
+    };
+
+    // Build the destructure pattern for extracting generated values from the strategy.
+    // Single arguments don't need tuple wrapping.
+    let destructure_pattern = if function_argument_identifiers.is_empty() {
+        quote! { _ }
+    } else if function_argument_identifiers.len() == 1 {
+        let id = &function_argument_identifiers[0];
+        quote! { #id }
+    } else {
+        quote! { (#(#function_argument_identifiers),*) }
+    };
 
     let expanded_tokens = quote! {
         // Internal helper containing the original user code.
         #user_function
 
-        // Property test wrapper. proptest generates inputs for the wrapper signature,
-        // then we initialize ink!'s off-chain env per case and call the internal helper.
-        #[::ink_fuzzer::proptest::property_test(
-            config = ::ink_fuzzer::proptest::test_runner::Config {
-                cases: #cases_literal,
+        // Property test wrapper. We manually use TestRunner instead of #[property_test]
+        // so that all proptest paths go through ::ink_fuzzer::proptest::, allowing users
+        // to only depend on ink-fuzzer without an explicit proptest dependency.
+        #[test]
+        fn #original_function_identifier() {
+            use ::ink_fuzzer::proptest::strategy::Strategy;
+            use ::ink_fuzzer::proptest::test_runner::{TestError, TestRunner, Config};
+
+            let config = Config {
+                cases: #configured_cases,
                 failure_persistence: ::core::option::Option::None,
-                ..::ink_fuzzer::proptest::test_runner::Config::default()
-            }
-        )]
-        fn #original_function_identifier(#wrapper_function_inputs) {
-            ::ink::env::test::run_test::<::ink::env::DefaultEnvironment, _>(
-                |_accounts| -> ::core::result::Result<(), ::ink::env::Error> {
-                    #internal_function_identifier(#(#function_argument_identifiers),*);
-                    Ok(())
-                }
-            ).expect("ink_fuzzer: failed to initialize ink off-chain test environment");
+                max_shrink_iters: 4,
+                ..Config::default()
+            };
+
+            let mut runner = TestRunner::new(config);
+
+            let strategy = #strategy_tuple;
+
+            runner.run(&strategy, |#destructure_pattern| {
+                // Initialize ink!'s off-chain env per case and call the internal helper.
+                ::ink::env::test::run_test::<::ink::env::DefaultEnvironment, _>(
+                    |_accounts| -> ::core::result::Result<(), ::ink::env::Error> {
+                        #internal_function_identifier(#(#function_argument_identifiers),*);
+                        Ok(())
+                    }
+                ).expect("ink_fuzzer: failed to initialize ink off-chain test environment");
+                Ok(())
+            }).expect(&format!("Test failed: {}", stringify!(#original_function_identifier)));
         }
 
         // No-arg entrypoint for consumers that want to trigger the fuzz campaign explicitly

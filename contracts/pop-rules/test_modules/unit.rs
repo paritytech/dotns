@@ -1,5 +1,5 @@
-use crate::pop_rules::PopRules;
-use crate::popbase::{PopRulesBase, PopStatus};
+use crate::base_pop_rules::{BaseDotnsPopRules, PopStatus};
+use crate::dotns_pop_rules::DotnsPopRules;
 use ink::prelude::string::String;
 use ink::H160;
 
@@ -11,10 +11,10 @@ fn set_caller(account: H160) {
     ink::env::test::set_caller(account);
 }
 
-fn setup_pop_rules() -> PopRules {
+fn setup_pop_rules() -> DotnsPopRules {
     let acc = accounts();
     set_caller(acc.alice);
-    PopRules::new(1_000_000)
+    DotnsPopRules::new(1_000_000)
 }
 
 #[ink::test]

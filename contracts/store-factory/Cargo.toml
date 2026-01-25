@@ -1,14 +1,12 @@
 [package]
-name = "dotns-pop-rules"
+name = "dotns-store-factory"
 version = "0.1.0"
 authors = [ "[your_name] <[your_email]>" ]
 edition = "2021"
 
 [dependencies]
-dotns-utils = { path = "../utils" }
-ink = { version = "6.0.0-beta.1", default-features = false, features = [
-  "unstable-hostfn",
-] }
+dotns-store = { path = "../store", default-features = false, features = [ "ink-as-dependency" ] }
+ink = { version = "6.0.0-beta.1", default-features = false, features = [ "unstable-hostfn" ] }
 
 [dev-dependencies]
 ink-fuzzer = { path = "../../fuzzer/crates/ink-fuzzer" }
@@ -19,7 +17,7 @@ path = "lib.rs"
 
 [features]
 default = [ "std" ]
-std = [ "ink/std" ]
+std = [ "ink/std", "dotns-store/std" ]
 ink-as-dependency = [  ]
 e2e-tests = [  ]
 

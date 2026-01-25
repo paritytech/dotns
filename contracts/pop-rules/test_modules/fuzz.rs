@@ -2,8 +2,8 @@ use ink::prelude::string::String;
 use ink::prelude::vec::Vec;
 use ink::H160;
 
-use crate::pop_rules::PopRules;
-use crate::popbase::{PopRulesBase, PopStatus};
+use crate::base_pop_rules::{BaseDotnsPopRules, PopStatus};
+use crate::dotns_pop_rules::DotnsPopRules;
 
 use ink_fuzzer::{fuzz, Context};
 
@@ -19,10 +19,10 @@ fn set_environment_block_timestamp(timestamp: u64) {
     ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(timestamp);
 }
 
-fn create_contract(starting_price: u128) -> PopRules {
+fn create_contract(starting_price: u128) -> DotnsPopRules {
     let accounts = default_accounts();
     set_environment_caller(accounts.alice);
-    PopRules::new(starting_price)
+    DotnsPopRules::new(starting_price)
 }
 
 fn ascii_lowercase_string(input_bytes: &[u8]) -> String {
@@ -117,13 +117,13 @@ fn compute_base_length_and_trailing_digits(name: &String) -> (usize, usize) {
 
 #[fuzz(cases = 256)]
 fn fuzz_classify_rejects_more_than_two_trailing_digits(
-    fuzz_context: Context,
+    context: Context,
     base_bytes: Vec<u8>,
     trailing_digits_seed: u8,
     digit_value_seed: u8,
 ) {
-    let fuzz_context = fuzz_context;
-    fuzz_context.apply();
+    let context = context;
+    context.apply();
 
     let base_string = ascii_lowercase_string(&base_bytes);
     let name =
@@ -143,13 +143,13 @@ fn fuzz_classify_rejects_more_than_two_trailing_digits(
 
 #[fuzz(cases = 512)]
 fn fuzz_classify_matches_expected_matrix(
-    fuzz_context: Context,
+    context: Context,
     base_bytes: Vec<u8>,
     trailing_digits_seed: u8,
     digit_value_seed: u8,
 ) {
-    let fuzz_context = fuzz_context;
-    fuzz_context.apply();
+    let context = context;
+    context.apply();
 
     // We need to force base length between 1 and 20 to cover all branches.
     let base_string_full = ascii_lowercase_string(&base_bytes);
@@ -182,13 +182,9 @@ fn fuzz_classify_matches_expected_matrix(
 }
 
 #[fuzz(cases = 256)]
-fn fuzz_price_bounds_and_shape(
-    fuzz_context: Context,
-    starting_price_factor: u8,
-    name_bytes: Vec<u8>,
-) {
-    let fuzz_context = fuzz_context;
-    fuzz_context.apply();
+fn fuzz_price_bounds_and_shape(context: Context, starting_price_factor: u8, name_bytes: Vec<u8>) {
+    let context = context;
+    context.apply();
 
     let starting_price = 1_000u128 * (1 + (starting_price_factor as u128));
     let contract = create_contract(starting_price);
@@ -217,14 +213,14 @@ fn fuzz_price_bounds_and_shape(
 
 #[fuzz(cases = 256)]
 fn fuzz_price_monotonic_for_mid_range(
-    fuzz_context: Context,
+    context: Context,
     starting_price_factor: u8,
     base_bytes: Vec<u8>,
     length_a_seed: u8,
     length_b_seed: u8,
 ) {
-    let fuzz_context = fuzz_context;
-    fuzz_context.apply();
+    let context = context;
+    context.apply();
 
     let starting_price = 1_000u128 * (1 + (starting_price_factor as u128));
     let contract = create_contract(starting_price);
@@ -267,12 +263,12 @@ fn fuzz_price_monotonic_for_mid_range(
 
 #[fuzz(cases = 128)]
 fn fuzz_reservation_blocks_non_owner_in_price_with_check(
-    fuzz_context: Context,
+    context: Context,
     base_bytes: Vec<u8>,
     digit_value_seed: u8,
 ) {
-    let fuzz_context = fuzz_context;
-    fuzz_context.apply();
+    let context = context;
+    context.apply();
 
     let accounts = default_accounts();
     let mut contract = create_contract(1_000_000);
@@ -314,12 +310,12 @@ fn fuzz_reservation_blocks_non_owner_in_price_with_check(
 
 #[fuzz(cases = 128)]
 fn fuzz_reservation_owner_can_continue_pricing_checks(
-    fuzz_context: Context,
+    context: Context,
     base_bytes: Vec<u8>,
     digit_value_seed: u8,
 ) {
-    let fuzz_context = fuzz_context;
-    fuzz_context.apply();
+    let context = context;
+    context.apply();
 
     let accounts = default_accounts();
     let mut contract = create_contract(1_000_000);
@@ -360,13 +356,13 @@ fn fuzz_reservation_owner_can_continue_pricing_checks(
 
 #[fuzz(cases = 128)]
 fn fuzz_reservation_expires_allows_others(
-    fuzz_context: Context,
+    context: Context,
     base_bytes: Vec<u8>,
     digit_value_seed: u8,
     time_seed: u64,
 ) {
-    let fuzz_context = fuzz_context;
-    fuzz_context.apply();
+    let context = context;
+    context.apply();
 
     let accounts = default_accounts();
     let mut contract = create_contract(1_000_000);

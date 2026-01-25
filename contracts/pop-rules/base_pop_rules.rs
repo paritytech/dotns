@@ -147,7 +147,7 @@ pub enum PopRulesError {
 /// The pricing applied is mainly for PoP NoStatus users as a measure to
 /// prevent spam.
 #[ink::trait_definition]
-pub trait PopRulesBase {
+pub trait BaseDotnsPopRules {
     /// Sets the Proof-of-Personhood (PoP) tier for the caller's profile.
     ///
     /// Once set, this PoP status applies to all registrations by this user.

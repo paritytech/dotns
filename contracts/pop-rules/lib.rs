@@ -1,18 +1,17 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
-#[macro_use]
-mod utils;
-pub mod popbase;
-
 #[cfg(test)]
-mod test_modules;
+pub mod test_modules;
+
+pub mod base_pop_rules;
 
 #[ink::contract]
-pub mod pop_rules {
-    use crate::popbase::{
-        Classification, PopRulesBase, PopRulesError, PopStatus, PriceWithMeta, Reservation,
+pub mod dotns_pop_rules {
+    use crate::base_pop_rules::{
+        BaseDotnsPopRules, Classification, PopRulesError, PopStatus, PriceWithMeta, Reservation,
         ReservationStatus,
     };
+    use dotns_utils::require;
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
     use ink::storage::Mapping;
@@ -72,7 +71,7 @@ pub mod pop_rules {
     /// - Do not change field types
     /// - Add new fields at the end only
     #[ink(storage)]
-    pub struct PopRules {
+    pub struct DotnsPopRules {
         /// Contract owner address.
         owner: H160,
         /// Wei price for names with 9 characters and up.
@@ -85,7 +84,7 @@ pub mod pop_rules {
         registry_controller: H160,
     }
 
-    impl PopRules {
+    impl DotnsPopRules {
         /// Initializes the contract with pricing parameters.
         ///
         /// # Arguments
@@ -257,7 +256,7 @@ pub mod pop_rules {
         }
     }
 
-    impl PopRulesBase for PopRules {
+    impl BaseDotnsPopRules for DotnsPopRules {
         #[ink(message)]
         fn set_user_pop_status(&mut self, status: PopStatus) {
             let caller = self.env().caller();

@@ -10,10 +10,10 @@ CONTRACT_DIRS := $(wildcard contracts/*/)
 FUZZER_DIR := fuzzer
 
 define RUN_IF_CARGO_TOML
-	@if [ -f "$(1)/Cargo.toml" ]; then \
-		echo "$(2) $(1)"; \
-		(cd "$(1)" && $(3)); \
-	fi
+if [ -f "$(1)/Cargo.toml" ]; then \
+	echo "$(2) $(1)"; \
+	(cd "$(1)" && $(3)); \
+fi
 endef
 
 ensure-toolchain:
@@ -31,13 +31,13 @@ contracts-fmt-check: contracts-fmt-rs-check contracts-fmt-toml-check
 contracts-fmt-rs:
 	@echo "Formatting contracts Rust files..."
 	@for dir in $(CONTRACT_DIRS); do \
-		$(call RUN_IF_CARGO_TOML,$$dir,Formatting,(cargo +stable fmt)); \
+		$(call RUN_IF_CARGO_TOML,$$dir,Formatting,cargo +stable fmt); \
 	done
 
 contracts-fmt-rs-check:
 	@echo "Checking contracts Rust formatting..."
 	@for dir in $(CONTRACT_DIRS); do \
-		$(call RUN_IF_CARGO_TOML,$$dir,Checking,(cargo +stable fmt --check)); \
+		$(call RUN_IF_CARGO_TOML,$$dir,Checking,cargo +stable fmt --check); \
 	done
 
 contracts-fmt-toml:
@@ -55,19 +55,19 @@ contracts-lint-toml:
 contracts-build: ensure-toolchain
 	@echo "Building contracts with $(TOOLCHAIN)..."
 	@for dir in $(CONTRACT_DIRS); do \
-		$(call RUN_IF_CARGO_TOML,$$dir,Building,(RUSTUP_TOOLCHAIN=$(TOOLCHAIN) pop build --release)); \
+		$(call RUN_IF_CARGO_TOML,$$dir,Building,RUSTUP_TOOLCHAIN=$(TOOLCHAIN) pop build --release); \
 	done
 
 contracts-test: ensure-toolchain
 	@echo "Testing contracts with $(TOOLCHAIN)..."
 	@for dir in $(CONTRACT_DIRS); do \
-		$(call RUN_IF_CARGO_TOML,$$dir,Testing,(RUSTUP_TOOLCHAIN=$(TOOLCHAIN) pop test)); \
+		$(call RUN_IF_CARGO_TOML,$$dir,Testing,RUSTUP_TOOLCHAIN=$(TOOLCHAIN) pop test); \
 	done
 
 contracts-clean:
 	@echo "Cleaning contracts..."
 	@for dir in $(CONTRACT_DIRS); do \
-		$(call RUN_IF_CARGO_TOML,$$dir,Cleaning,(cargo clean)); \
+		$(call RUN_IF_CARGO_TOML,$$dir,Cleaning,cargo clean); \
 	done
 
 contracts-check: contracts-fmt-check contracts-lint-toml contracts-test
@@ -81,11 +81,11 @@ fuzzer-fmt-check: fuzzer-fmt-rs-check fuzzer-fmt-toml-check
 
 fuzzer-fmt-rs:
 	@echo "Formatting fuzzer Rust files..."
-	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Formatting,(cargo +stable fmt))
+	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Formatting,cargo +stable fmt)
 
 fuzzer-fmt-rs-check:
 	@echo "Checking fuzzer Rust formatting..."
-	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Checking,(cargo +stable fmt --check))
+	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Checking,cargo +stable fmt --check)
 
 fuzzer-fmt-toml:
 	@echo "Formatting fuzzer TOML files..."
@@ -101,15 +101,15 @@ fuzzer-lint-toml:
 
 fuzzer-build: ensure-toolchain
 	@echo "Building fuzzer with $(TOOLCHAIN)..."
-	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Building,(RUSTUP_TOOLCHAIN=$(TOOLCHAIN) cargo build))
+	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Building,RUSTUP_TOOLCHAIN=$(TOOLCHAIN) cargo build)
 
 fuzzer-test: ensure-toolchain
 	@echo "Testing fuzzer with $(TOOLCHAIN)..."
-	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Testing,(RUSTUP_TOOLCHAIN=$(TOOLCHAIN) cargo test))
+	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Testing,RUSTUP_TOOLCHAIN=$(TOOLCHAIN) cargo test)
 
 fuzzer-clean:
 	@echo "Cleaning fuzzer..."
-	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Cleaning,(cargo clean))
+	@$(call RUN_IF_CARGO_TOML,$(FUZZER_DIR),Cleaning,cargo clean)
 
 fuzzer-check: fuzzer-fmt-check fuzzer-lint-toml fuzzer-test
 	@echo "Fuzzer checks passed!"
@@ -117,7 +117,7 @@ fuzzer-check: fuzzer-fmt-check fuzzer-lint-toml fuzzer-test
 install-tools:
 	@echo "Installing formatting tools..."
 	@cargo install taplo-cli
-	@rustup component add rustfmt
+	@rustup component add rustfmt --toolchain stable
 	@echo "Tools installed!"
 
 help:
