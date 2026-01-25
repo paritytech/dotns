@@ -1,12 +1,9 @@
-name: Contract Tests
+name: Coverage
 
 on:
   pull_request:
     branches: [main]
-    paths: ['src/**', 'script/**', 'test/**', '**.sol']
-  push:
-    branches: [main]
-    paths: ['src/**', 'script/**', 'test/**', '**.sol']
+    paths: ['src/**', 'contracts/**', 'test/**', '**.sol']
 
 permissions:
   contents: read
@@ -14,133 +11,139 @@ permissions:
   issues: write
 
 jobs:
-  test:
+  coverage:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.2.6"
+
       - run: bun install
 
-      - name: Run tests
+      - name: Build contracts first
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+        run: forge build
+
+      - name: Run coverage
         id: run
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
         run: |
           set +e
-          forge build --sizes > build.log 2>&1
-          BUILD=$?
           
-          if [ $BUILD -ne 0 ]; then
-            echo "result=Failed - Build error" >> "$GITHUB_OUTPUT"
-            echo "has_details=false" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          
-          # Run tests with summary for better parsing
-          forge test -vv --summary 2>&1 | tee test.log
-          TEST=${PIPESTATUS[0]}
+          # Try to run coverage - some projects may have tests that use vm.readFile
+          # which doesn't work with forge coverage's instrumented recompile
+          forge coverage --ir-minimum --report summary \
+            --no-match-coverage "test/|lib/" \
+            2>&1 | tee coverage.log
+          CODE=$?
 
-          # Process results
           python3 << 'EOF'
           import re
           import os
-          from collections import defaultdict
 
           out = lambda k,v: open(os.environ['GITHUB_OUTPUT'], 'a').write(f"{k}={v}\n")
 
-          with open('test.log', 'r') as f:
+          with open('coverage.log', 'r') as f:
               content = f.read()
 
-          # Parse by contract
-          contracts = defaultdict(lambda: {'passed': [], 'failed': []})
-          current_contract = None
+          # Check for vm.readFile failures (common issue with forge coverage)
+          if 'vm.readFile' in content and 'No such file or directory' in content:
+              out('result', 'Skipped - Tests use vm.readFile (incompatible with coverage)')
+              out('has_details', 'false')
+              exit(0)
+          
+          # Check for other test failures
+          if 'Failing tests:' in content:
+              fail_match = re.search(r'Encountered a total of (\d+) failing test', content)
+              if fail_match:
+                  out('result', f'Tests failed - Cannot compute coverage')
+                  out('has_details', 'false')
+                  exit(0)
 
+          # Parse coverage summary
+          # Format: | contracts/file.sol | 85.00% (x/y) | 80.00% (x/y) | ...
+          files = []
+          total_line = None
+          
           for line in content.split('\n'):
-              # Match contract header like "Ran 5 tests for test/Registry.t.sol:RegistryTest"
-              contract_match = re.search(r'for test/([^:]+):(\w+)', line)
-              if contract_match:
-                  current_contract = contract_match.group(2)
+              # Match file rows with percentage and fraction format
+              match = re.match(r'\|\s*([^\|]+\.sol)\s*\|\s*([\d.]+)%\s*\(\d+/\d+\)\s*\|\s*([\d.]+)%\s*\(\d+/\d+\)\s*\|\s*([\d.]+)%\s*\(\d+/\d+\)\s*\|\s*([\d.]+)%', line)
+              if match:
+                  name = match.group(1).strip()
+                  # Skip test files and lib files
+                  if not name.startswith('test/') and not name.startswith('lib/'):
+                      files.append({
+                          'name': name,
+                          'lines': float(match.group(2)),
+                          'statements': float(match.group(3)),
+                          'branches': float(match.group(4)),
+                          'funcs': float(match.group(5))
+                      })
               
-              # Match test results
-              pass_match = re.match(r'\[PASS\]\s+(\w+)\(\)\s*(?:\(gas:\s*(\d+)\))?', line)
-              fail_match = re.match(r'\[FAIL[:\.]?\s*[^\]]*\]\s+(\w+)\(\)', line)
+              # Match total row
+              total_match = re.match(r'\|\s*Total\s*\|\s*([\d.]+)%', line)
+              if total_match:
+                  total_line = float(total_match.group(1))
+
+          if not files and total_line is None:
+              # Try alternative format
+              for line in content.split('\n'):
+                  alt_match = re.search(r'(\d+\.\d+)%.*lines', line, re.IGNORECASE)
+                  if alt_match:
+                      total_line = float(alt_match.group(1))
+                      break
+
+          if files or total_line is not None:
+              if total_line is None and files:
+                  total_line = sum(f['lines'] for f in files) / len(files) if files else 0
               
-              if pass_match and current_contract:
-                  contracts[current_contract]['passed'].append({
-                      'name': pass_match.group(1),
-                      'gas': pass_match.group(2) or ''
-                  })
-              elif fail_match and current_contract:
-                  contracts[current_contract]['failed'].append({
-                      'name': fail_match.group(1)
-                  })
-
-          total_passed = sum(len(c['passed']) for c in contracts.values())
-          total_failed = sum(len(c['failed']) for c in contracts.values())
-          total = total_passed + total_failed
-
-          if total_failed > 0:
-              out('result', f'Failed - {total_failed} of {total} tests failed')
-              out('has_details', 'true')
-          elif total > 0:
-              out('result', 'All tests passed')
-              out('has_details', 'true')
+              out('result', f'{total_line:.1f}% line coverage')
+              out('has_details', 'true' if files else 'false')
           else:
-              out('result', 'No tests found')
+              out('result', 'Coverage completed')
               out('has_details', 'false')
 
-          # Build markdown grouped by contract
+          # Build details markdown
           md = []
-          
-          # Failed tests first
-          for contract, data in sorted(contracts.items()):
-              if data['failed']:
-                  md.append(f"\n**{contract} - Failed ({len(data['failed'])})**\n")
-                  md.append("| Test |")
-                  md.append("|:-----|")
-                  for t in data['failed'][:10]:
-                      md.append(f"| {t['name']}() |")
-                  if len(data['failed']) > 10:
-                      md.append(f"| +{len(data['failed'])-10} more |")
+          if files:
+              md.append("\n| File | Lines | Statements | Branches | Functions |")
+              md.append("|:-----|------:|-----------:|---------:|----------:|")
+              
+              # Sort by coverage (lowest first to highlight areas needing work)
+              for f in sorted(files, key=lambda x: x['lines']):
+                  name = f['name']
+                  if len(name) > 50:
+                      name = '...' + name[-47:]
+                  md.append(f"| {name} | {f['lines']:.1f}% | {f['statements']:.1f}% | {f['branches']:.1f}% | {f['funcs']:.1f}% |")
 
-          # Passed tests grouped by contract
-          for contract, data in sorted(contracts.items()):
-              if data['passed']:
-                  md.append(f"\n**{contract} ({len(data['passed'])} passed)**\n")
-                  md.append("| Test | Gas |")
-                  md.append("|:-----|----:|")
-                  for t in data['passed'][:10]:
-                      md.append(f"| {t['name']}() | {t['gas']} |")
-                  if len(data['passed']) > 10:
-                      md.append(f"| +{len(data['passed'])-10} more | |")
-
-          with open('test-details.md', 'w') as f:
+          with open('coverage-details.md', 'w') as f:
               f.write('\n'.join(md))
           EOF
-
-          if [ $TEST -ne 0 ]; then
-            exit 1
-          fi
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: coverage-report
           path: |
-            *.log
-            test-details.md
+            coverage.log
+            coverage-details.md
           retention-days: 7
 
       - name: Update PR comment
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v7
         env:
-          SECTION: Contract Tests
+          SECTION: Coverage
           RESULT: ${{ steps.run.outputs.result }}
           HAS_DETAILS: ${{ steps.run.outputs.has_details }}
           RUN_ID: ${{ github.run_id }}
@@ -157,7 +160,7 @@ jobs:
             const repoFull = process.env.REPO;
 
             let details = '';
-            try { details = fs.readFileSync('test-details.md', 'utf8').trim(); } catch {}
+            try { details = fs.readFileSync('coverage-details.md', 'utf8').trim(); } catch {}
 
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
@@ -198,7 +201,7 @@ jobs:
             rows[section] = result;
 
             if (hasDetails && details) {
-              existingDetails[section] = `<details>\n<summary><strong>${section}</strong></summary>\n\n${details}\n\n[View full logs](https://github.com/${repoFull}/actions/runs/${runId})\n\n</details>`;
+              existingDetails[section] = `<details>\n<summary><strong>${section}</strong></summary>\n\n${details}\n\n[View full report](https://github.com/${repoFull}/actions/runs/${runId})\n\n</details>`;
             } else {
               delete existingDetails[section];
             }

@@ -1,201 +1,234 @@
-name: 4naly3er Static Analysis
+name: 4naly3er Analysis
 
 on:
   pull_request:
-    branches:
-      - main
-      - develop
-    paths:
-      - 'contracts/**.sol'
-      - 'foundry.toml'
-      - 'remappings.txt'
-      - '.github/workflows/4naly3er.yml'
+    branches: [main, develop]
+    paths: ['src/**', 'contracts/**', 'foundry.toml', 'remappings.txt']
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
-  analyse:
+  analyze:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
 
-      - name: Install dependencies
-        run: forge install
+      - env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+        run: forge install && forge build --build-info
 
-      - name: Build contracts
-        run: forge build --build-info
-
-      - name: Checkout 4naly3er
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           repository: Picodes/4naly3er
           path: .4naly3er
 
-      - name: Remove problematic detector
-        run: rm -f .4naly3er/src/issues/NC/uselessOverride.ts
+      - run: rm -f .4naly3er/src/issues/NC/uselessOverride.ts
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'yarn'
+          node-version: "18"
+          cache: yarn
           cache-dependency-path: .4naly3er/yarn.lock
 
-      - name: Install 4naly3er dependencies
-        working-directory: .4naly3er
-        run: yarn install 
+      - working-directory: .4naly3er
+        run: yarn install
 
       - name: Run 4naly3er
         continue-on-error: true
         run: |
           cd .4naly3er
-          yarn analyze "../contracts" "" "${{ github.server_url }}/${{ github.repository }}" || true
-          cd ..
+          if [ -d "../src" ]; then
+            yarn analyze "../src" "" "${{ github.server_url }}/${{ github.repository }}" || true
+          elif [ -d "../contracts" ]; then
+            yarn analyze "../contracts" "" "${{ github.server_url }}/${{ github.repository }}" || true
+          fi
 
-      - name: Process 4naly3er output
-        if: always()
+      - name: Process results
+        id: run
         run: |
           python3 << 'EOF'
-          import os
-          import re
+          import os, re
+          from collections import defaultdict
 
-          report_path = '.4naly3er/report.md'
-          output_path = '4naly3er-results.md'
+          out = lambda k,v: open(os.environ['GITHUB_OUTPUT'], 'a').write(f"{k}={v}\n")
 
-          if not os.path.exists(report_path):
-              print("ERROR: report.md not found")
-              with open(output_path, 'w') as f:
-                  f.write('# 4naly3er Analysis Results\n\n4naly3er did not generate a report file.\n')
-              exit(0)
-
-          try:
-              with open(report_path, 'r', encoding='utf-8') as f:
-                  content = f.read()
-                  
-              if not content.strip():
-                  print("ERROR: report.md is empty")
-                  with open(output_path, 'w') as f:
-                      f.write('# 4naly3er Analysis Results\n\nReport file is empty.\n')
-                  exit(0)
-
-              # Extract summary statistics if present
-              lines = content.split('\n')
-              summary_lines = []
-              detail_start = 0
-              
-              for i, line in enumerate(lines):
-                  if line.strip().startswith('##') and i < 50:
-                      summary_lines.append(line)
-                  if '## Details' in line or '## Issues' in line:
-                      detail_start = i
-                      break
-
-              # Count issue types
-              issue_counts = {}
-              for line in lines:
-                  # Match patterns like "### Low Risk Issues" or "### NC-"
-                  match = re.search(r'###\s*(Low|Medium|High|Gas|NC|Informational)', line, re.IGNORECASE)
-                  if match:
-                      category = match.group(1).capitalize()
-                      if category not in issue_counts:
-                          issue_counts[category] = 0
-                      issue_counts[category] += 1
-
-              output = ['# 4naly3er Analysis Results\n']
-              
-              if issue_counts:
-                  total = sum(issue_counts.values())
-                  output.append(f'**Total Issue Categories:** {total}\n')
-                  output.append('## Summary\n')
-                  output.append('| Category | Count |')
-                  output.append('|----------|-------|')
-                  for category, count in sorted(issue_counts.items()):
-                      output.append(f'| {category} | {count} |')
-                  output.append('\n---\n')
-              
-              # Add full report
-              output.append(content)
-              
-              final_output = '\n'.join(output)
-              
-              # Truncate if too large (GitHub comment limit)
-              max_length = 65000
-              if len(final_output) > max_length:
-                  final_output = final_output[:max_length] + '\n\n... (report truncated, see artifacts for full report)'
-              
-              with open(output_path, 'w', encoding='utf-8') as f:
-                  f.write(final_output)
-              
-              print(f"Successfully processed report ({len(content)} characters)")
+          possible_paths = ['.4naly3er/report.md', 'report.md']
+          path = next((p for p in possible_paths if os.path.exists(p)), None)
           
-          except Exception as e:
-              print(f"ERROR: Failed to process report: {e}")
-              with open(output_path, 'w') as f:
-                  f.write(f'# 4naly3er Analysis Results\n\nFailed to process report: {str(e)}\n')
+          if not path:
+              out('result', 'Failed - No report generated')
+              out('has_issues', 'false')
               exit(0)
+
+          content = open(path, 'r', encoding='utf-8').read()
+          if not content.strip():
+              out('result', 'Failed - Empty report')
+              out('has_issues', 'false')
+              exit(0)
+
+          findings = defaultdict(list)
+          
+          # Match table rows like: | [GAS-1](#GAS-1) | description | 6 |
+          pattern = r'\|\s*\[([A-Z]+)-(\d+)\]\([^)]*\)\s*\|\s*([^|]+)\|\s*(\d+)\s*\|'
+          
+          for m in re.finditer(pattern, content):
+              cat, num, title, instances = m.groups()
+              finding_id = f'{cat}-{num}'
+              if not any(f['id'] == finding_id for f in findings[cat]):
+                  findings[cat].append({
+                      'id': finding_id,
+                      'title': title.strip()[:70].replace('|', '-'),
+                      'inst': instances.strip()
+                  })
+
+          total = sum(len(v) for v in findings.values())
+          h = len(findings.get('H',[]))
+          m = len(findings.get('M',[]))
+          l = len(findings.get('L',[]))
+          g = len(findings.get('GAS',[]))
+          nc = len(findings.get('NC',[]))
+
+          if total == 0:
+              out('result', 'No issues found')
+              out('has_issues', 'false')
+          else:
+              parts = []
+              if h: parts.append(f'{h} high')
+              if m: parts.append(f'{m} medium')
+              if l: parts.append(f'{l} low')
+              if g: parts.append(f'{g} gas')
+              if nc: parts.append(f'{nc} info')
+              out('result', f'Found {total} issues: {", ".join(parts)}')
+              out('has_issues', 'true')
+
+          md = []
+          for cat in ['H','M','L','GAS','NC']:
+              items = findings.get(cat, [])
+              if not items: continue
+              full_name = {'H':'High','M':'Medium','L':'Low','GAS':'Gas','NC':'Informational'}[cat]
+              md.append(f"\n**{full_name} ({len(items)})**\n")
+              md.append("| ID | Finding | Instances |")
+              md.append("|:---|:--------|:---------:|")
+              for x in items[:15]:
+                  md.append(f"| {x['id']} | {x['title']} | {x['inst']} |")
+              if len(items) > 15:
+                  md.append(f"| | +{len(items)-15} more | |")
+
+          with open('4naly3er-details.md', 'w') as f:
+              f.write('\n'.join(md))
           EOF
 
-      - name: Comment PR with results
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            
-            if (!fs.existsSync('4naly3er-results.md')) {
-              core.setFailed('4naly3er-results.md does not exist');
-              return;
-            }
-            
-            const markdown = fs.readFileSync('4naly3er-results.md', 'utf8');
-            const commentBody = `${markdown}\n\n---\nAnalysis: ${context.sha.substring(0, 7)}`;
-            
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            
-            const botComment = comments.find(comment => 
-              comment.user.login === 'github-actions[bot]' &&
-              comment.body.includes('4naly3er Analysis Results')
-            );
-            
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: commentBody
-              });
-              console.log('Updated existing comment');
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: commentBody
-              });
-              console.log('Created new comment');
-            }
-
-      - name: Upload 4naly3er report
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: 4naly3er-report
           path: |
             .4naly3er/report.md
-            4naly3er-results.md
+            4naly3er-details.md
           retention-days: 30
+
+      - name: Update PR comment
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          SECTION: 4naly3er Analysis
+          RESULT: ${{ steps.run.outputs.result }}
+          HAS_ISSUES: ${{ steps.run.outputs.has_issues }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = "<!-- ci-summary -->";
+            const detailsMarker = "<!-- details-section -->";
+            const section = process.env.SECTION;
+            const result = process.env.RESULT || 'Unknown';
+            const hasIssues = process.env.HAS_ISSUES === 'true';
+            const runId = process.env.RUN_ID;
+            const repoFull = process.env.REPO;
+
+            let details = '';
+            try { details = fs.readFileSync('4naly3er-details.md', 'utf8').trim(); } catch {}
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+
+            const existing = comments.find(c =>
+              c.user?.login === "github-actions[bot]" && c.body?.includes(marker)
+            );
+
+            let rows = {};
+            let existingDetails = {};
+            
+            if (existing?.body) {
+              const parts = existing.body.split(detailsMarker);
+              const tableSection = parts[0] || '';
+              
+              const lines = tableSection.split('\n');
+              for (const line of lines) {
+                const match = line.match(/^\| ([^|]+) \| ([^|]+) \|$/);
+                if (match) {
+                  const name = match[1].trim();
+                  if (name && name !== 'Check' && !name.startsWith(':')) {
+                    rows[name] = match[2].trim();
+                  }
+                }
+              }
+              
+              const detailsRegex = /<details>\s*<summary><strong>([^<]+)<\/strong><\/summary>([\s\S]*?)<\/details>/g;
+              let detailMatch;
+              while ((detailMatch = detailsRegex.exec(existing.body)) !== null) {
+                existingDetails[detailMatch[1].trim()] = detailMatch[0];
+              }
+            }
+
+            rows[section] = result;
+
+            if (hasIssues && details) {
+              existingDetails[section] = `<details>\n<summary><strong>${section}</strong></summary>\n\n${details}\n\n[View full report](https://github.com/${repoFull}/actions/runs/${runId})\n\n</details>`;
+            } else {
+              delete existingDetails[section];
+            }
+
+            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests', 'Coverage', 'Documentation', 'Format & Lint', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const sortedKeys = Object.keys(rows).sort((a, b) => {
+              const ai = order.indexOf(a), bi = order.indexOf(b);
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+            });
+
+            let table = `| Check | Result |\n|:------|:-------|\n`;
+            for (const key of sortedKeys) {
+              table += `| ${key} | ${rows[key]} |\n`;
+            }
+
+            const detailsOrder = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests', 'Coverage'];
+            const sortedDetails = Object.keys(existingDetails).sort((a, b) => {
+              const ai = detailsOrder.indexOf(a), bi = detailsOrder.indexOf(b);
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+            });
+
+            let body = `${marker}\n## CI Summary\n\n${table}`;
+            
+            if (sortedDetails.length > 0) {
+              body += `\n${detailsMarker}\n\n---\n\n${sortedDetails.map(k => existingDetails[k]).join('\n\n')}`;
+            }
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

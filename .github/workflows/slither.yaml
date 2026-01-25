@@ -1,193 +1,211 @@
-name: Slither Static Analysis
+name: Slither Analysis
 
 on:
   pull_request:
-    branches:
-      - main
-      - develop
-    paths:
-      - 'contracts/**.sol'
-      - 'foundry.toml'
-      - '.github/workflows/slither.yml'
+    branches: [main, develop]
+    paths: ['contracts/**', 'src/**', 'foundry.toml']
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
-  analyse:
+  analyze:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-
-      - name: Install dependencies
-        run: forge install
-
-      - name: Build contracts
-        run: forge build --build-info
-
-      - name: Install Slither
-        run: pip3 install slither-analyzer
+      - env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+        run: forge install && forge build --build-info
+      - run: pip3 install slither-analyzer
 
       - name: Run Slither
         continue-on-error: true
         run: |
-          slither . \
-            --json slither-report.json \
-            --filter-paths "lib/|test/" \
-            --exclude-dependencies \
-            --compile-force-framework foundry \
-            || true
+          slither . --json slither.json --filter-paths "lib/|test/" \
+            --exclude-dependencies --compile-force-framework foundry || true
 
-      - name: Process Slither output
-        if: always()
+      - name: Process results
+        id: run
         run: |
           python3 << 'EOF'
-          import json
-          import os
+          import json, os
           from collections import defaultdict
 
-          if not os.path.exists('slither-report.json'):
-              print("ERROR: slither-report.json not found")
-              with open('slither-results.md', 'w') as f:
-                  f.write('# Slither Analysis Results\n\nSlither did not generate a report file.\n')
+          out = lambda k,v: open(os.environ['GITHUB_OUTPUT'], 'a').write(f"{k}={v}\n")
+
+          if not os.path.exists('slither.json'):
+              out('result', 'Failed - No report generated')
+              out('total', '0')
+              out('has_issues', 'false')
               exit(0)
 
-          try:
-              with open('slither-report.json', 'r') as f:
-                  content = f.read()
-                  if not content.strip():
-                      print("ERROR: slither-report.json is empty")
-                      with open('slither-results.md', 'w') as f:
-                          f.write('# Slither Analysis Results\n\nSlither report file is empty.\n')
-                      exit(0)
-                  data = json.loads(content)
-          except json.JSONDecodeError as e:
-              print(f"ERROR: Invalid JSON: {e}")
-              with open('slither-results.md', 'w') as f:
-                  f.write(f'# Slither Analysis Results\n\nFailed to parse Slither report: {str(e)}\n')
-              exit(0)
-
+          data = json.load(open('slither.json'))
           findings = defaultdict(list)
-          
-          for result in data.get('results', {}).get('detectors', []):
-              severity = result.get('impact', 'Informational').capitalize()
-              findings[severity].append({
-                  'check': result.get('check', 'Unknown'),
-                  'description': result.get('description', '').strip(),
-                  'confidence': result.get('confidence', 'Unknown').capitalize(),
-                  'elements': result.get('elements', [])
+
+          for d in data.get('results', {}).get('detectors', []):
+              sev = d.get('impact', 'Info').capitalize()
+              loc = ''
+              for e in d.get('elements', [])[:1]:
+                  sm = e.get('source_mapping', {})
+                  if sm.get('filename_short') and sm.get('lines'):
+                      loc = f"{sm['filename_short']}:{sm['lines'][0]}"
+              findings[sev].append({
+                  'check': d.get('check', '?'),
+                  'desc': d.get('description', '')[:100].replace('|', '-').replace('\n', ' '),
+                  'loc': loc
               })
 
-          severity_order = ['High', 'Medium', 'Low', 'Informational', 'Optimization']
-          
-          output = ['# Slither Analysis Results\n']
-          total_issues = sum(len(v) for v in findings.values())
-          
-          if total_issues == 0:
-              output.append('No issues detected.\n')
-          else:
-              output.append(f'**Total Issues:** {total_issues}\n')
-              output.append('## Summary\n')
-              output.append('| Severity | Count |')
-              output.append('|----------|-------|')
-              
-              for severity in severity_order:
-                  count = len(findings.get(severity, []))
-                  if count > 0:
-                      output.append(f'| {severity} | {count} |')
-              
-              output.append('\n## Details\n')
-              
-              for severity in severity_order:
-                  issues = findings.get(severity, [])
-                  if not issues:
-                      continue
-                  
-                  output.append(f'\n### {severity} ({len(issues)})\n')
-                  output.append('| Check | Description | Confidence | Location |')
-                  output.append('|-------|-------------|------------|----------|')
-                  
-                  for issue in issues:
-                      check = issue['check'].replace('|', '\\|')
-                      desc = issue['description'].replace('\n', ' ').replace('|', '\\|')[:150]
-                      if len(issue['description']) > 150:
-                          desc += '...'
-                      confidence = issue['confidence']
-                      
-                      locations = []
-                      for elem in issue['elements'][:2]:
-                          if 'source_mapping' in elem:
-                              loc = elem['source_mapping'].get('filename_short', '')
-                              line = elem['source_mapping'].get('lines', [])
-                              if loc and line:
-                                  locations.append(f"{loc}:{line[0] if line else '?'}")
-                      
-                      location = '<br>'.join(locations) if locations else 'N/A'
-                      output.append(f'| {check} | {desc} | {confidence} | {location} |')
+          total = sum(len(v) for v in findings.values())
+          h = len(findings.get('High',[]))
+          m = len(findings.get('Medium',[]))
+          l = len(findings.get('Low',[]))
+          i = len(findings.get('Informational',[]))
 
-          with open('slither-results.md', 'w') as f:
-              f.write('\n'.join(output))
-          
-          print(f"Successfully generated report with {total_issues} issues")
+          if total == 0:
+              out('result', 'Passed - No issues found')
+              out('total', '0')
+              out('has_issues', 'false')
+          else:
+              parts = []
+              if h: parts.append(f'{h} high')
+              if m: parts.append(f'{m} medium')
+              if l: parts.append(f'{l} low')
+              if i: parts.append(f'{i} info')
+              out('result', f'Found {total} issues: {", ".join(parts)}')
+              out('total', str(total))
+              out('has_issues', 'true')
+
+          md = []
+          for sev in ['High','Medium','Low','Informational']:
+              items = findings.get(sev, [])
+              if not items: continue
+              md.append(f"\n**{sev} ({len(items)})**\n")
+              md.append("| Check | Description | Location |")
+              md.append("|:------|:------------|:---------|")
+              for x in items[:10]:
+                  md.append(f"| {x['check']} | {x['desc']} | {x['loc']} |")
+              if len(items) > 10:
+                  md.append(f"| | +{len(items)-10} more | |")
+
+          open('slither-details.md', 'w').write('\n'.join(md))
           EOF
 
-      - name: Comment PR with results
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            
-            if (!fs.existsSync('slither-results.md')) {
-              core.setFailed('slither-results.md does not exist');
-              return;
-            }
-            
-            const markdown = fs.readFileSync('slither-results.md', 'utf8');
-            const commentBody = `${markdown}\n\n---\nAnalysis: ${context.sha.substring(0, 7)}`;
-            
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            
-            const botComment = comments.find(comment => 
-              comment.user.login === 'github-actions[bot]' &&
-              comment.body.includes('Slither Analysis Results')
-            );
-            
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: commentBody
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: commentBody
-              });
-            }
-
-      - name: Upload Slither report
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: slither-report
           path: |
-            slither-report.json
-            slither-results.md
+            slither.json
+            slither-details.md
           retention-days: 30
+
+      - name: Update PR comment
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          SECTION: Slither Analysis
+          RESULT: ${{ steps.run.outputs.result }}
+          HAS_ISSUES: ${{ steps.run.outputs.has_issues }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = "<!-- ci-summary -->";
+            const detailsMarker = "<!-- details-section -->";
+            const section = process.env.SECTION;
+            const result = process.env.RESULT || 'Unknown';
+            const hasIssues = process.env.HAS_ISSUES === 'true';
+            const runId = process.env.RUN_ID;
+            const repoFull = process.env.REPO;
+
+            let details = '';
+            try { details = fs.readFileSync('slither-details.md', 'utf8').trim(); } catch {}
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+
+            const existing = comments.find(c =>
+              c.user?.login === "github-actions[bot]" && c.body?.includes(marker)
+            );
+
+            // Parse existing data
+            let rows = {};
+            let existingDetails = {};
+            
+            if (existing?.body) {
+              // Split into table and details sections
+              const parts = existing.body.split(detailsMarker);
+              const tableSection = parts[0] || '';
+              
+              // Parse table rows - only match lines with exactly 2 cells after Check|Result header
+              const lines = tableSection.split('\n');
+              for (const line of lines) {
+                const match = line.match(/^\| ([^|]+) \| ([^|]+) \|$/);
+                if (match) {
+                  const name = match[1].trim();
+                  if (name && name !== 'Check' && !name.startsWith(':')) {
+                    rows[name] = match[2].trim();
+                  }
+                }
+              }
+              
+              // Parse existing details
+              const detailsRegex = /<details>\s*<summary><strong>([^<]+)<\/strong><\/summary>([\s\S]*?)<\/details>/g;
+              let detailMatch;
+              while ((detailMatch = detailsRegex.exec(existing.body)) !== null) {
+                existingDetails[detailMatch[1].trim()] = detailMatch[0];
+              }
+            }
+
+            // Update this section's row
+            rows[section] = result;
+
+            // Build table
+            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests', 'Coverage', 'Documentation', 'Format & Lint', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const sortedKeys = Object.keys(rows).sort((a, b) => {
+              const ai = order.indexOf(a), bi = order.indexOf(b);
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+            });
+
+            let table = `| Check | Result |\n|:------|:-------|\n`;
+            for (const key of sortedKeys) {
+              table += `| ${key} | ${rows[key]} |\n`;
+            }
+
+            // Update details
+            if (hasIssues && details) {
+              existingDetails[section] = `<details>\n<summary><strong>${section}</strong></summary>\n\n${details}\n\n[View full report](https://github.com/${repoFull}/actions/runs/${runId})\n\n</details>`;
+            } else {
+              delete existingDetails[section];
+            }
+
+            // Build details section
+            const detailsOrder = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests', 'Coverage'];
+            const sortedDetails = Object.keys(existingDetails).sort((a, b) => {
+              const ai = detailsOrder.indexOf(a), bi = detailsOrder.indexOf(b);
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+            });
+
+            let body = `${marker}\n## CI Summary\n\n${table}`;
+            
+            if (sortedDetails.length > 0) {
+              body += `\n${detailsMarker}\n\n---\n\n${sortedDetails.map(k => existingDetails[k]).join('\n\n')}`;
+            }
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

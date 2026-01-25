@@ -1,171 +1,127 @@
-name: Format & Lint Solidity Contracts
+name: Format & Lint
 
 on:
   pull_request:
-    paths:
-      - 'src/**'
-      - 'script/**'
-      - 'test/**'
-      - '**.sol'
+    paths: ['src/**', 'script/**', 'test/**', '**.sol']
 
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
-  check-contracts:
-    name: Format & Lint Checks
+  check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Foundry toolchain
-        uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-
-      - name: Setup Bun runtime
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - run: bun install
 
-      - name: Install project dependencies
-        run: bun install
-
-      - name: Check Solidity formatting
+      - name: Check formatting
         id: format
         continue-on-error: true
-        run: |
-          forge fmt --check > format-output.txt 2>&1 || echo "FORMAT_FAILED=true" >> $GITHUB_ENV
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+        run: forge fmt --check > format.log 2>&1 || echo "FORMAT_FAILED=true" >> $GITHUB_ENV
 
       - name: Build contracts
         id: build
         continue-on-error: true
-        run: |
-          forge build --sizes > build-output.txt 2>&1 || echo "BUILD_FAILED=true" >> $GITHUB_ENV
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+        run: forge build --sizes > build.log 2>&1 || echo "BUILD_FAILED=true" >> $GITHUB_ENV
 
-      - name: Generate check report
+      - name: Prepare result
+        id: run
         if: always()
         run: |
-          python3 << 'EOF'
-          import os
+          if [ "${FORMAT_FAILED:-}" = "true" ] && [ "${BUILD_FAILED:-}" = "true" ]; then
+            echo "result=Failed - Formatting and build errors" >> "$GITHUB_OUTPUT"
+          elif [ "${FORMAT_FAILED:-}" = "true" ]; then
+            echo "result=Failed - Formatting errors found" >> "$GITHUB_OUTPUT"
+          elif [ "${BUILD_FAILED:-}" = "true" ]; then
+            echo "result=Failed - Build errors" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=Passed - Code formatted correctly" >> "$GITHUB_OUTPUT"
+          fi
 
-          format_failed = os.environ.get('FORMAT_FAILED') == 'true'
-          build_failed = os.environ.get('BUILD_FAILED') == 'true'
-
-          format_status = '❌' if format_failed else '✅'
-          build_status = '❌' if build_failed else '✅'
-
-          output = ['# Solidity Quality Checks\n']
-          output.append('| Check | Status |')
-          output.append('|-------|--------|')
-          output.append(f'| Formatting | {format_status} |')
-          output.append(f'| Compilation | {build_status} |')
-          output.append('')
-
-          # Add formatting issues if any
-          if format_failed:
-              output.append('## Formatting Issues\n')
-              output.append('The following files need formatting:\n')
-              output.append('```')
-              if os.path.exists('format-output.txt'):
-                  with open('format-output.txt', 'r') as f:
-                      output.append(f.read().strip())
-              output.append('```\n')
-              output.append('**Fix:** Run `forge fmt` locally to format your contracts.\n')
-
-          # Add compilation issues if any
-          if build_failed:
-              output.append('## Compilation Errors\n')
-              output.append('```')
-              if os.path.exists('build-output.txt'):
-                  with open('build-output.txt', 'r') as f:
-                      content = f.read()
-                      # Extract error lines or last 150 lines
-                      lines = content.split('\n')
-                      error_lines = [l for l in lines if 'Error' in l or 'error' in l]
-                      if error_lines:
-                          # Get context around errors
-                          error_content = []
-                          for i, line in enumerate(lines):
-                              if 'Error' in line or 'error' in line:
-                                  start = max(0, i - 2)
-                                  end = min(len(lines), i + 6)
-                                  error_content.extend(lines[start:end])
-                          output.append('\n'.join(error_content[:150]))
-                      else:
-                          output.append('\n'.join(lines[-150:]))
-              output.append('```\n')
-              output.append('**Action required:** Fix compilation errors before merging.\n')
-
-          # Add success message if all passed
-          if not format_failed and not build_failed:
-              output.append('\n---\n')
-              output.append('✨ All checks passed! Your contracts are properly formatted and compile successfully.')
-
-          with open('check-report.md', 'w') as f:
-              f.write('\n'.join(output))
-
-          print(f"Report generated - Format: {'FAILED' if format_failed else 'PASSED'}, Build: {'FAILED' if build_failed else 'PASSED'}")
-          EOF
-
-      - name: Comment PR with results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/github-script@v7
         with:
-          script: |
-            const fs = require('fs');
-            
-            if (!fs.existsSync('check-report.md')) {
-              console.log('No check report found');
-              return;
-            }
-            
-            const report = fs.readFileSync('check-report.md', 'utf8');
-            const commentBody = `${report}\n\n---\n*Commit: ${context.sha.substring(0, 7)}*`;
-            
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            
-            const botComment = comments.find(comment => 
-              comment.user.login === 'github-actions[bot]' &&
-              comment.body.includes('Solidity Quality Checks')
-            );
-            
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: commentBody
-              });
-              console.log('Updated existing check comment');
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: commentBody
-              });
-              console.log('Created new check comment');
-            }
-
-      - name: Upload outputs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: check-outputs
-          path: |
-            format-output.txt
-            build-output.txt
+          name: lint-logs
+          path: '*.log'
           retention-days: 7
 
-      - name: Fail workflow if checks failed
+      - name: Update PR comment
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          SECTION: Format & Lint
+          RESULT: ${{ steps.run.outputs.result }}
+        with:
+          script: |
+            const marker = "<!-- ci-summary -->";
+            const detailsMarker = "<!-- details-section -->";
+            const section = process.env.SECTION;
+            const result = process.env.RESULT || 'Unknown';
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+
+            const existing = comments.find(c =>
+              c.user?.login === "github-actions[bot]" && c.body?.includes(marker)
+            );
+
+            let rows = {};
+            let detailsSection = '';
+            
+            if (existing?.body) {
+              const parts = existing.body.split(detailsMarker);
+              const tableSection = parts[0] || '';
+              if (parts[1]) detailsSection = `\n${detailsMarker}${parts[1]}`;
+              
+              const lines = tableSection.split('\n');
+              for (const line of lines) {
+                const match = line.match(/^\| ([^|]+) \| ([^|]+) \|$/);
+                if (match) {
+                  const name = match[1].trim();
+                  if (name && name !== 'Check' && !name.startsWith(':')) {
+                    rows[name] = match[2].trim();
+                  }
+                }
+              }
+            }
+
+            rows[section] = result;
+
+            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests', 'Coverage', 'Documentation', 'Format & Lint', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const sortedKeys = Object.keys(rows).sort((a, b) => {
+              const ai = order.indexOf(a), bi = order.indexOf(b);
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+            });
+
+            let table = `| Check | Result |\n|:------|:-------|\n`;
+            for (const key of sortedKeys) {
+              table += `| ${key} | ${rows[key]} |\n`;
+            }
+
+            const body = `${marker}\n## CI Summary\n\n${table}${detailsSection}`;
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Fail if checks failed
         if: env.FORMAT_FAILED == 'true' || env.BUILD_FAILED == 'true'
-        run: |
-          echo "One or more checks failed"
-          exit 1
+        run: exit 1

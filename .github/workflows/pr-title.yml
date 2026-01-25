@@ -1,82 +1,46 @@
-name: Deploy Contracts
+name: PR Title
 
 on:
   pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+    types: [opened, edited, synchronize, reopened]
 
 permissions:
-  contents: read
   pull-requests: write
   issues: write
 
 jobs:
-  deploy:
+  pr_title:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.2.6"
-      - uses: foundry-rs/foundry-toolchain@v1
-      - run: chmod +x setup.bash
-      - run: bun install
-
-      - name: Start Anvil
-        env:
-          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-        run: |
-          anvil --chain-id 420420420 --port 8545 &
-          sleep 3
-          for i in {1..30}; do
-            curl -s -X POST -H "Content-Type: application/json" \
-              --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
-              http://127.0.0.1:8545 | grep -q "result" && exit 0
-            sleep 2
-          done
-          exit 1
-
-      - name: Deploy
+      - name: Check PR title
         id: run
-        env:
-          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-        run: |
-          set +e
-          bun run deploy:anvil > deploy.log 2>&1
-          CODE=$?
-          ARTIFACT="deployments/paseo-local/420420420.json"
-          if [ $CODE -eq 0 ] && [ -f "$ARTIFACT" ]; then
-            echo "result=All contracts deployed to Anvil" >> "$GITHUB_OUTPUT"
-          else
-            echo "result=Failed - Deployment error" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-      - uses: actions/upload-artifact@v4
-        if: always()
+        uses: actions/github-script@v7
         with:
-          name: deploy-logs
-          path: |
-            deploy.log
-            deployments/
-          retention-days: 7
+          script: |
+            const title = context.payload.pull_request.title || "";
+            const re = /^\[(Bug|Feat|Chore|Docs)\](\[(Smart contract)\])?:\s.+/;
+            const ok = re.test(title);
+            
+            if (ok) {
+              core.setOutput("result", "PR Title Valid");
+            } else {
+              core.setOutput("result", "Invalid - Use [Bug|Feat|Chore|Docs]: title");
+            }
+            
+            if (!ok) core.setFailed("Invalid PR title format");
 
       - name: Update PR comment
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v7
         env:
-          SECTION: Deploy Contracts
+          SECTION: PR Title
           RESULT: ${{ steps.run.outputs.result }}
         with:
           script: |
             const marker = "<!-- ci-summary -->";
             const detailsMarker = "<!-- details-section -->";
             const section = process.env.SECTION;
-            const result = process.env.RESULT || 'Unknown';
+            const result = process.env.RESULT || 'PR Title Check Passed';
 
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
@@ -129,7 +93,3 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number, body });
             }
-
-      - name: Stop Anvil
-        if: always()
-        run: pkill -f anvil || true

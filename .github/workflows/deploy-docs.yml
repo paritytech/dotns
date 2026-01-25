@@ -1,0 +1,208 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "contracts/**", "**.sol", "foundry.toml"]
+  pull_request:
+    branches: [main]
+    paths: ["src/**", "contracts/**", "**.sol", "foundry.toml"]
+  pull_request_target:
+    types: [closed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - run: forge install
+      - run: forge build
+
+      - name: Generate docs
+        id: docs
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+        run: |
+          if ! forge doc --build --out docs-output 2>&1 | tee docs.log; then
+            echo "success=false" >> "$GITHUB_OUTPUT"
+            echo "error=forge doc failed" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -d "docs-output/book" ]; then
+            touch docs-output/book/.nojekyll
+            COUNT=$(find docs-output/book -name "*.html" | wc -l | tr -d ' ')
+            echo "success=true" >> "$GITHUB_OUTPUT"
+            echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          else
+            echo "success=false" >> "$GITHUB_OUTPUT"
+            echo "error=No documentation generated" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Copy diagrams into doc/src
+        if: steps.docs.outputs.success == 'true'
+        run: |
+          # Expects a repo-level ./diagrams directory.
+          # Copies into the mdBook source tree (docs-output/src) as requested.
+          # Also copies into the built site (docs-output/book) so assets are served even if build already ran.
+          if [ -d "diagrams" ]; then
+            mkdir -p docs-output/src
+
+            rm -rf docs-output/src/diagrams
+            cp -R diagrams docs-output/src/diagrams
+
+            mkdir -p docs-output/book/diagrams
+            rm -rf docs-output/book/diagrams
+            cp -R diagrams docs-output/book/diagrams
+          else
+            echo "No ./diagrams directory found; skipping copy."
+          fi
+
+      - name: Set deploy path and URL
+        id: path
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_NUM="${{ github.event.pull_request.number }}"
+            echo "target=preview/pr-${PR_NUM}" >> "$GITHUB_OUTPUT"
+            echo "url=https://${OWNER}.github.io/${REPO_NAME}/preview/pr-${PR_NUM}/" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=." >> "$GITHUB_OUTPUT"
+            echo "url=https://${OWNER}.github.io/${REPO_NAME}/" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare result
+        id: run
+        run: |
+          if [ "${{ steps.docs.outputs.success }}" = "true" ]; then
+            COUNT="${{ steps.docs.outputs.count }}"
+            URL="${{ steps.path.outputs.url }}"
+            echo "result=Passed - ${COUNT} pages generated - [View Docs](${URL})" >> "$GITHUB_OUTPUT"
+          else
+            ERROR="${{ steps.docs.outputs.error }}"
+            echo "result=Failed - ${ERROR}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docs
+          path: |
+            docs-output/
+            docs.log
+          retention-days: 7
+
+      - name: Deploy to GitHub Pages
+        if: steps.docs.outputs.success == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./docs-output/book
+          destination_dir: ${{ steps.path.outputs.target }}
+          keep_files: true
+
+      - name: Update PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          SECTION: Documentation
+          RESULT: ${{ steps.run.outputs.result }}
+        with:
+          script: |
+            const marker = "<!-- ci-summary -->";
+            const detailsMarker = "<!-- details-section -->";
+            const section = process.env.SECTION;
+            const result = process.env.RESULT || 'Unknown';
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+
+            const existing = comments.find(c =>
+              c.user?.login === "github-actions[bot]" && c.body?.includes(marker)
+            );
+
+            let rows = {};
+            let detailsSection = '';
+
+            if (existing?.body) {
+              const parts = existing.body.split(detailsMarker);
+              const tableSection = parts[0] || '';
+              if (parts[1]) detailsSection = `\n${detailsMarker}${parts[1]}`;
+
+              const lines = tableSection.split('\n');
+              for (const line of lines) {
+                const match = line.match(/^\| ([^|]+) \| ([^|]+) \|$/);
+                if (match) {
+                  const name = match[1].trim();
+                  if (name && name !== 'Check' && !name.startsWith(':')) {
+                    rows[name] = match[2].trim();
+                  }
+                }
+              }
+            }
+
+            rows[section] = result;
+
+            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests', 'Coverage', 'Documentation', 'Format & Lint', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const sortedKeys = Object.keys(rows).sort((a, b) => {
+              const ai = order.indexOf(a), bi = order.indexOf(b);
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+            });
+
+            let table = `| Check | Result |\n|:------|:-------|\n`;
+            for (const key of sortedKeys) {
+              table += `| ${key} | ${rows[key]} |\n`;
+            }
+
+            const body = `${marker}\n## CI Summary\n\n${table}${detailsSection}`;
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - if: steps.docs.outputs.success != 'true'
+        run: exit 1
+
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+      - run: |
+          DIR="preview/pr-${{ github.event.pull_request.number }}"
+          [ -d "$DIR" ] || exit 0
+          rm -rf "$DIR"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Clean up preview for PR #${{ github.event.pull_request.number }}" || true
+          git push
