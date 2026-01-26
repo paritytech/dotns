@@ -13,7 +13,15 @@ contract PopRulesTests is BaseDotns {
         assertEq(classificationMessage, "Reserved for Governance");
     }
 
-    function test_classify_poplite() public view {
+    function test_classify_governance_suffix() public view {
+        (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
+            popRules.classifyName("hello01");
+
+        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.Reserved));
+        assertEq(classificationMessage, "Reserved for Governance");
+    }
+
+    function test_classify_lite_requires() public view {
         (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
             popRules.classifyName("lights01");
 
@@ -21,7 +29,7 @@ contract PopRulesTests is BaseDotns {
         assertEq(classificationMessage, "Requires Light personhood verification");
     }
 
-    function test_classify_popfull() public view {
+    function test_classify_full_requires() public view {
         (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
             popRules.classifyName("alicebob");
 
@@ -29,7 +37,15 @@ contract PopRulesTests is BaseDotns {
         assertEq(classificationMessage, "Requires Full personhood verification");
     }
 
-    function test_classify_nostatus() public view {
+    function test_classify_full_suffix() public view {
+        (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
+            popRules.classifyName("alicebo1");
+
+        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.PopFull));
+        assertEq(classificationMessage, "Requires Full personhood verification");
+    }
+
+    function test_classify_nostatus_available() public view {
         (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
             popRules.classifyName("longnamehere01");
 
@@ -53,7 +69,7 @@ contract PopRulesTests is BaseDotns {
         popRules.priceWithCheck("alicebob", ed);
     }
 
-    function test_popfull_user_can_access_poplite_name() public {
+    function test_price_with_check_full_allowed_for_lite() public {
         vm.prank(ed);
         popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
 
@@ -65,16 +81,25 @@ contract PopRulesTests is BaseDotns {
 
     function test_base_reservation_blocks_others() public {
         vm.prank(owner);
-        popRules.updateDotRegistry(address(this));
+        popRules.updateEthRegistry(address(this));
 
         popRules.reserveBaseName("lights01", leonardo);
 
-        (bool isReserved, address reservationOwner, uint64 expiryTimestamp) =
+        (bool isReservedInitial, address reservationOwnerInitial, uint64 expiryTimestampInitial) =
             popRules.isBaseNameReserved("lights");
 
-        assertTrue(isReserved);
-        assertEq(reservationOwner, leonardo);
-        assertEq(expiryTimestamp, uint64(block.timestamp + 12 weeks));
+        assertTrue(isReservedInitial);
+        assertEq(reservationOwnerInitial, leonardo);
+        assertEq(expiryTimestampInitial, uint64(block.timestamp + 12 weeks));
+
+        popRules.reserveBaseName("lights01", tiago);
+
+        (bool isReservedAfter, address reservationOwnerAfter, uint64 expiryTimestampAfter) =
+            popRules.isBaseNameReserved("lights");
+
+        assertTrue(isReservedAfter);
+        assertEq(reservationOwnerAfter, leonardo);
+        assertEq(expiryTimestampAfter, expiryTimestampInitial);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -84,15 +109,17 @@ contract PopRulesTests is BaseDotns {
         popRules.priceWithCheck("lights", tiago);
     }
 
-    function test_price_without_check_returns_price_for_reserved() public {
+    function test_price_without_check_reserved() public {
         vm.prank(owner);
-        popRules.updateDotRegistry(address(this));
+        popRules.updateEthRegistry(address(this));
 
         popRules.reserveBaseName("lights01", leonardo);
 
         IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithoutCheck("lights", tiago);
 
         assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.Reserved));
+        assertEq(priceMetadata.message, "Base name reserved for original Lite registrant");
+
         assertEq(priceMetadata.price, popRules.price("lights"));
     }
 }

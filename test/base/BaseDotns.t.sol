@@ -30,6 +30,11 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 ///      - DotnsContentResolver: resolver used for content records
 ///      - PopRules: PoP rules and spam-pricing oracle
 ///      - DotnsRegistrarController: commit–reveal controller orchestrating registration flow
+///
+/// @dev Testing conventions:
+///      - `setUp()` warps time to a deterministic timestamp and funds pre-defined users.
+///      - Deployments are executed under `owner` as the admin address.
+///      - Addresses are labeled to improve trace readability.
 abstract contract BaseDotns is Test {
     /// @notice Test user account: ed.
     address public ed;
@@ -123,8 +128,7 @@ abstract contract BaseDotns is Test {
         address dotnsRegistryAddress = Upgrades.deployUUPSProxy(
             "DotnsRegistry.sol:DotnsRegistry",
             abi.encodeCall(
-                DotnsRegistry.initialize,
-                (IDotnsReverseResolver(dotnsReverseResolverAddress), storeFactory)
+                DotnsRegistry.initialize, (IDotnsReverseResolver(dotnsReverseResolverAddress))
             )
         );
         dotnsRegistry = DotnsRegistry(dotnsRegistryAddress);
@@ -174,10 +178,8 @@ abstract contract BaseDotns is Test {
         );
         dotnsRegistrarController = DotnsRegistrarController(dotnsRegistrarControllerAddress);
         vm.label(dotnsRegistrarControllerAddress, "DotnsRegistrarController");
-        dotnsReverseResolver.updateRegistrar(
-            IDotnsRegistrarController(dotnsRegistrarControllerAddress)
-        );
-        popRules.updateDotRegistry(dotnsRegistrarControllerAddress);
+        dotnsReverseResolver.updateRegistrar(dotnsRegistrarControllerAddress);
+        popRules.updateEthRegistry(dotnsRegistrarControllerAddress);
         dotnsRegistrar.addController(IDotnsRegistrarController(dotnsRegistrarControllerAddress));
         dotnsRegistry.updateRegistrarController(
             IDotnsRegistrarController(dotnsRegistrarControllerAddress)
@@ -321,21 +323,17 @@ abstract contract BaseDotns is Test {
         store = Store(address(storeFactory.deploy()));
         // Must be authorised before the store is handed to the user.
         store.authorizeDotnsController(address(dotnsRegistrarController));
-        store.authorizeDotnsController(address(dotnsRegistry));
+
         vm.stopPrank();
     }
 
-    /// @notice Computes keccak256("dotns.registered", labelhash)
-    /// @param labelhash keccak256(label).
-    /// @return key Store key used for DotNS-written registration entry.
-    function _storeKey(bytes32 labelhash) internal pure returns (bytes32 key) {
-        assembly {
-            let pointer := mload(0x40)
-            // bytes32("dotns.registered")
-            mstore(pointer, 0x646f746e732e7265676973746572656400000000000000000000000000000000)
-            mstore(add(pointer, 0x20), labelhash)
-            key := keccak256(pointer, 0x40)
-        }
+    /// @notice Computes the Store key used for DotNS registration entries.
+    /// @param labelHash keccak256(bytes(label)) for the registered label.
+    /// @return key The derived bytes32 key used in Store for the given label.
+    function _storeKey(bytes32 labelHash) internal pure returns (bytes32 key) {
+        // casting to 'bytes32' nothing is unsafe about this
+        // forge-lint: disable-next-line(unsafe-typecast)
+        key = keccak256(abi.encodePacked(bytes32("dotns.registered"), labelHash));
     }
 
     /// @notice Checks whether a string array contains a given string.

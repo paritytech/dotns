@@ -9,9 +9,6 @@ import {
 import {IDotnsRegistry} from "./IDotnsRegistry.sol";
 import {IDotnsRegistrarController} from "../registrars/IDotnsRegistrarController.sol";
 import {IDotnsReverseResolver} from "../resolvers/IDotnsReverseResolver.sol";
-import {IStoreFactory} from "../store/IStoreFactory.sol";
-import {Store} from "../store/Store.sol";
-import {StoreUtils} from "../utils/StoreUtils.sol";
 
 /// @title Dot Registry
 /// @notice Upgradeable on-chain registry for hierarchical name ownership and resolution.
@@ -20,28 +17,18 @@ import {StoreUtils} from "../utils/StoreUtils.sol";
 ///      performed by a designated `registrarController`.
 /// @custom:security-contact admin@parity.io
 contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistry {
-    using StoreUtils for IStoreFactory;
-
     /// @notice Mapping of node identifiers to records.
     mapping(bytes32 node => Record record) private records;
 
-    /// @notice Address authorised to perform privileged ownership writes.
+    /// @notice Address authorised to perform privileged ownership writes
     /// @dev Typically the DotnsRegistrarController proxy address.
     IDotnsRegistrarController public registrarController;
-
-    /// @notice DotNS Reverse Resolver.
+    /// @notice DotNS Reverse Resolver
     IDotnsReverseResolver public reverseResolver;
-
-    /// @notice Factory for per-user Store instances.
-    IStoreFactory public storeFactory;
-
-    /// @notice Key prefix for DotNS-written Store entries ("dotns.registered").
-    // forge-lint: disable-next-line(unsafe-typecast)
-    bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered");
 
     /// @dev Reserved storage space to allow for layout changes in the future.
     // forge-lint: disable-next-line(mixed-case-variable)
-    uint256[49] private __gap;
+    uint256[50] private __gap;
 
     /// @notice Restricts access to the current owner of `node`.
     /// @param node Node identifier.
@@ -63,19 +50,11 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
 
     /// @notice Initializes the registry.
     /// @param _reverseResolver Address of the DotNS reverse resolver contract.
-    /// @param _factory The store factory used for per-user deployment stores.
     /// @dev Sets the deployer as the owner and initializes the root node (bytes32(0)).
     ///      Root node owner is set to the initializer caller.
-    function initialize(
-        IDotnsReverseResolver _reverseResolver,
-        IStoreFactory _factory
-    )
-        external
-        initializer
-    {
+    function initialize(IDotnsReverseResolver _reverseResolver) external initializer {
         __Ownable_init(msg.sender);
         reverseResolver = _reverseResolver;
-        storeFactory = _factory;
         records[bytes32(0)] = Record({owner: msg.sender, resolver: address(0), exists: true});
     }
 
@@ -123,7 +102,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         records[subnode] =
             Record({owner: newOwner, resolver: address(reverseResolver), exists: true});
 
-        _writeSubnodeToStore(record, labelhash);
+        registrarController.writeSubnodeToStore(record);
 
         emit NewOwner(parentNode, labelhash, newOwner);
     }
@@ -169,34 +148,6 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         return records[node].exists;
     }
 
-    /// @notice Writes subnode registration to the owner's Store.
-    /// @dev Acquires or deploys a Store for the owner, then writes the full subnode name.
-    /// @param record Subnode record containing owner and label information.
-    /// @param labelhash Precomputed keccak256 hash of the sublabel.
-    function _writeSubnodeToStore(SubnodeRecord calldata record, bytes32 labelhash) internal {
-        address[] memory controllers = new address[](1);
-        controllers[0] = address(this);
-        Store store = storeFactory.getOrCreateStore(controllers, record.owner);
-
-        bytes32 storeKey = _storeKey(labelhash);
-        string memory fullName = string.concat(record.subLabel, ".", record.parentLabel, ".dot");
-
-        store.setValueFor(record.owner, storeKey, fullName);
-    }
-
-    /// @notice Computes keccak256("dotns.registered", labelhash).
-    /// @param labelhash keccak256(label).
-    /// @return key Store key used for DotNS-written registration entry.
-    function _storeKey(bytes32 labelhash) internal pure returns (bytes32 key) {
-        bytes32 prefix = DOTNS_REGISTERED_KEY;
-        assembly {
-            let pointer := mload(0x40)
-            mstore(pointer, prefix)
-            mstore(add(pointer, 0x20), labelhash)
-            key := keccak256(pointer, 0x40)
-        }
-    }
-
     /// @notice Internal authorisation check for node ownership.
     /// @param node Node identifier.
     function _authorised(bytes32 node) internal view {
@@ -208,10 +159,10 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         require(IDotnsRegistrarController(msg.sender) == registrarController, NotAuthorised());
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
+    /// @notice Returns implementation version
+    /// @return versionString Current version string
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.2.0";
+        versionString = "1.0.0";
     }
 
     /// @inheritdoc UUPSUpgradeable

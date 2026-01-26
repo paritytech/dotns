@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 import {IDotnsRegistrarController} from "../registrars/IDotnsRegistrarController.sol";
-import {IStoreFactory} from "../store/IStoreFactory.sol";
 
 /// @title Dot Registry Interface
 /// @notice Minimal on-chain registry for hierarchical name ownership and resolution.

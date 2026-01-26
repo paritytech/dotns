@@ -7,15 +7,9 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 import {PopRules, IPopRules} from "../contracts/pop/PopRules.sol";
 import {DotnsRegistrar, IDotnsRegistrar} from "../contracts/registrars/DotnsRegistrar.sol";
-import {
-    DotnsRegistrarController,
-    IDotnsRegistrarController
-} from "../contracts/registrars/DotnsRegistrarController.sol";
+import {DotnsRegistrarController, IDotnsRegistrarController} from "../contracts/registrars/DotnsRegistrarController.sol";
 import {DotnsRegistry, IDotnsRegistry} from "../contracts/registry/DotnsRegistry.sol";
-import {
-    DotnsReverseResolver,
-    IDotnsReverseResolver
-} from "../contracts/resolvers/DotnsReverseResolver.sol";
+import {DotnsReverseResolver, IDotnsReverseResolver} from "../contracts/resolvers/DotnsReverseResolver.sol";
 import {DotnsContentResolver} from "../contracts/resolvers/DotnsContentResolver.sol";
 import {DotnsResolver} from "../contracts/resolvers/DotnsResolver.sol";
 import {StoreFactory, IStoreFactory} from "../contracts/store/StoreFactory.sol";
@@ -72,10 +66,7 @@ contract DotnsDeployer is BaseDeployer {
 
         // DotnsRegistry
         address dotnsRegistryProxy = Upgrades.deployUUPSProxy(
-            "DotnsRegistry.sol:DotnsRegistry",
-            abi.encodeCall(
-                DotnsRegistry.initialize, (IDotnsReverseResolver(dotnsReverseResolverProxy),storeFactory)
-            )
+            "DotnsRegistry.sol:DotnsRegistry", abi.encodeCall(DotnsRegistry.initialize, (IDotnsReverseResolver(dotnsReverseResolverProxy)))
         );
         dotnsRegistry = DotnsRegistry(dotnsRegistryProxy);
         vm.label(dotnsRegistryProxy, "DotnsRegistry");
@@ -128,12 +119,10 @@ contract DotnsDeployer is BaseDeployer {
         logDeployment("DotnsRegistrarController", dotnsRegistrarControllerProxy);
 
         // Wire dependencies
-        dotnsReverseResolver.updateRegistrar(IDotnsRegistrarController(dotnsRegistrarControllerProxy));
-        popRules.updateDotRegistry(dotnsRegistrarControllerProxy);
+        dotnsReverseResolver.updateRegistrar(dotnsRegistrarControllerProxy);
+        popRules.updateEthRegistry(dotnsRegistrarControllerProxy);
         dotnsRegistrar.addController(IDotnsRegistrarController(dotnsRegistrarControllerProxy));
-        dotnsRegistry.updateRegistrarController(
-            IDotnsRegistrarController(dotnsRegistrarControllerProxy)
-        );
+        dotnsRegistry.updateRegistrarController(IDotnsRegistrarController(dotnsRegistrarControllerProxy));
 
         vm.stopBroadcast();
 

@@ -29,10 +29,6 @@ interface IStoreFactory {
     /// @return The IStore instance deployed by the specified address, or zero address if none exists
     function getDeployedStore(address who) external view returns (IStore);
 
-    /// @notice Retrieves all deployed stores
-    /// @return An array of all IStore instances deployed via this factory
-    function getAllDeployedStores() external view returns (IStore[] memory);
-
     /// @notice Emitted when a store is successfully deployed
     /// @param owner The address that deployed and owns the store
     /// @param store The address of the newly deployed store contract

@@ -1,4 +1,4 @@
-name: Deploy Contracts and Verify artifacts
+name: Deploy Contracts
 
 on:
   pull_request:
@@ -14,231 +14,69 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo (with submodules)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Make scripts executable
-        run: chmod +x setup.bash
-
-      - name: Install dependencies
-        run: bun install
+          bun-version: "1.2.6"
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: chmod +x setup.bash
+      - run: bun install
 
       - name: Start Anvil
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
         run: |
-          anvil --chain-id 420420420 --port 8545 > anvil.log 2>&1 &
+          anvil --chain-id 420420420 --port 8545 &
           sleep 3
-
-      - name: Wait for RPC to be ready
-        id: rpc_wait
-        run: |
-          set +e
           for i in {1..30}; do
-            if curl -s -X POST -H "Content-Type: application/json" \
+            curl -s -X POST -H "Content-Type: application/json" \
               --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
-              http://127.0.0.1:8545 | grep -q "result"; then
-              echo "RPC ready"
-              echo "result=RPC ready" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
+              http://127.0.0.1:8545 | grep -q "result" && exit 0
             sleep 2
           done
-          echo "result=Failed - RPC connection timeout" >> "$GITHUB_OUTPUT"
           exit 1
 
-      - name: Deploy contracts
-        id: deploy
-        if: steps.rpc_wait.outcome == 'success'
+      - name: Deploy
+        id: run
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
         run: |
           set +e
           bun run deploy:anvil > deploy.log 2>&1
-          DEPLOY_EXIT=$?
-          
-          if [ $DEPLOY_EXIT -eq 0 ]; then
-            echo "result=Deployment successful" >> "$GITHUB_OUTPUT"
-            echo "has_details=false" >> "$GITHUB_OUTPUT"
+          CODE=$?
+          ARTIFACT="deployments/paseo-local/420420420.json"
+          if [ $CODE -eq 0 ] && [ -f "$ARTIFACT" ]; then
+            echo "result=All contracts deployed to Anvil" >> "$GITHUB_OUTPUT"
           else
             echo "result=Failed - Deployment error" >> "$GITHUB_OUTPUT"
-            echo "has_details=true" >> "$GITHUB_OUTPUT"
-            
-            # Extract error details
-            python3 << 'EOF'
-          import re
-          import os
-          
-          def extract_errors(log_content):
-              errors = []
-              lines = log_content.split('\n')
-              
-              # Look for common error patterns
-              error_patterns = [
-                  r'Error:(.+)',
-                  r'error:(.+)',
-                  r'FAIL:(.+)',
-                  r'Revert:(.+)',
-                  r'reverted with reason string:(.+)',
-                  r'Transaction reverted:(.+)',
-                  r'script failed:(.+)',
-              ]
-              
-              in_stack_trace = False
-              stack_lines = []
-              
-              for i, line in enumerate(lines):
-                  # Check for error patterns
-                  for pattern in error_patterns:
-                      match = re.search(pattern, line, re.IGNORECASE)
-                      if match:
-                          error_msg = match.group(1).strip()
-                          if error_msg and len(error_msg) > 5:
-                              errors.append(f"- {error_msg}")
-                  
-                  # Capture stack traces
-                  if 'at ' in line and ('(' in line or '.sol' in line):
-                      if not in_stack_trace:
-                          in_stack_trace = True
-                          stack_lines.append("\n**Stack Trace:**\n```")
-                      stack_lines.append(line.strip())
-                  elif in_stack_trace and (line.strip() == '' or 'Error' in line):
-                      stack_lines.append("```")
-                      in_stack_trace = False
-              
-              if in_stack_trace:
-                  stack_lines.append("```")
-              
-              return errors, stack_lines
-          
-          try:
-              with open('deploy.log', 'r') as f:
-                  log_content = f.read()
-              
-              errors, stack_trace = extract_errors(log_content)
-              
-              md_lines = ["### Deployment Failed\n"]
-              
-              if errors:
-                  md_lines.append("**Errors Found:**\n")
-                  for error in errors[:10]:  # Limit to 10 errors
-                      md_lines.append(error)
-                  if len(errors) > 10:
-                      md_lines.append(f"\n*+{len(errors)-10} more errors*")
-              
-              if stack_trace:
-                  md_lines.extend(stack_trace)
-              
-              # Add full log excerpt (last 50 lines)
-              log_lines = log_content.split('\n')
-              if len(log_lines) > 50:
-                  md_lines.append("\n**Last 50 lines of output:**\n```")
-                  md_lines.extend(log_lines[-50:])
-                  md_lines.append("```")
-              else:
-                  md_lines.append("\n**Full output:**\n```")
-                  md_lines.extend(log_lines)
-                  md_lines.append("```")
-              
-              with open('deploy-error.md', 'w') as f:
-                  f.write('\n'.join(md_lines))
-          except Exception as e:
-              with open('deploy-error.md', 'w') as f:
-                  f.write(f"### Error parsing logs\n\n{str(e)}")
-          EOF
-            
-            cat deploy-error.md
             exit 1
           fi
 
-      - name: Verify deployment artifact exists
-        id: verify
-        if: steps.deploy.outcome == 'success'
-        run: |
-          set +e
-          if [ -f deployments/paseo-local/420420420.json ]; then
-            echo "result=Artifacts verified" >> "$GITHUB_OUTPUT"
-            echo "Deployment artifact exists"
-          else
-            echo "result=Failed - Artifact not found" >> "$GITHUB_OUTPUT"
-            echo "has_details=true" >> "$GITHUB_OUTPUT"
-            echo "### Missing Deployment Artifact" > deploy-error.md
-            echo "" >> deploy-error.md
-            echo "Expected file \`deployments/paseo-local/420420420.json\` was not created." >> deploy-error.md
-            echo "" >> deploy-error.md
-            echo "**Files in deployments directory:**" >> deploy-error.md
-            echo "\`\`\`" >> deploy-error.md
-            ls -la deployments/ 2>&1 || echo "Directory does not exist" >> deploy-error.md
-            echo "\`\`\`" >> deploy-error.md
-            exit 1
-          fi
-
-      - name: Set final result
-        id: result
+      - uses: actions/upload-artifact@v4
         if: always()
-        run: |
-          if [ "${{ steps.rpc_wait.outcome }}" != "success" ]; then
-            echo "result=Failed - RPC connection timeout" >> "$GITHUB_OUTPUT"
-            echo "has_details=false" >> "$GITHUB_OUTPUT"
-          elif [ "${{ steps.deploy.outcome }}" != "success" ]; then
-            echo "result=${{ steps.deploy.outputs.result }}" >> "$GITHUB_OUTPUT"
-            echo "has_details=${{ steps.deploy.outputs.has_details }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ steps.verify.outcome }}" != "success" ]; then
-            echo "result=${{ steps.verify.outputs.result }}" >> "$GITHUB_OUTPUT"
-            echo "has_details=${{ steps.verify.outputs.has_details }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "result=Deployment successful" >> "$GITHUB_OUTPUT"
-            echo "has_details=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: deployment-logs
+          name: deploy-logs
           path: |
-            *.log
-            deploy-error.md
+            deploy.log
             deployments/
           retention-days: 7
-
-      - name: Stop Anvil
-        if: always()
-        run: pkill -f anvil || true
 
       - name: Update PR comment
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         env:
           SECTION: Deploy Contracts
-          RESULT: ${{ steps.result.outputs.result }}
-          HAS_DETAILS: ${{ steps.result.outputs.has_details }}
-          RUN_ID: ${{ github.run_id }}
-          REPO: ${{ github.repository }}
+          RESULT: ${{ steps.run.outputs.result }}
         with:
           script: |
-            const fs = require('fs');
             const marker = "<!-- ci-summary -->";
             const detailsMarker = "<!-- details-section -->";
             const section = process.env.SECTION;
             const result = process.env.RESULT || 'Unknown';
-            const hasDetails = process.env.HAS_DETAILS === 'true';
-            const runId = process.env.RUN_ID;
-            const repoFull = process.env.REPO;
-
-            let details = '';
-            try { 
-              details = fs.readFileSync('deploy-error.md', 'utf8').trim(); 
-            } catch {}
 
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
@@ -252,11 +90,12 @@ jobs:
             );
 
             let rows = {};
-            let existingDetails = {};
+            let detailsSection = '';
             
             if (existing?.body) {
               const parts = existing.body.split(detailsMarker);
               const tableSection = parts[0] || '';
+              if (parts[1]) detailsSection = `\n${detailsMarker}${parts[1]}`;
               
               const lines = tableSection.split('\n');
               for (const line of lines) {
@@ -268,21 +107,9 @@ jobs:
                   }
                 }
               }
-              
-              const detailsRegex = /<details>\s*<summary><strong>([^<]+)<\/strong><\/summary>([\s\S]*?)<\/details>/g;
-              let detailMatch;
-              while ((detailMatch = detailsRegex.exec(existing.body)) !== null) {
-                existingDetails[detailMatch[1].trim()] = detailMatch[0];
-              }
             }
 
             rows[section] = result;
-
-            if (hasDetails && details) {
-              existingDetails[section] = `<details>\n<summary><strong>${section}</strong></summary>\n\n${details}\n\n[View full logs](https://github.com/${repoFull}/actions/runs/${runId})\n\n</details>`;
-            } else {
-              delete existingDetails[section];
-            }
 
             const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests', 'Coverage', 'Documentation', 'Format & Lint', 'Deploy Contracts', 'PR Title', 'Labels'];
             const sortedKeys = Object.keys(rows).sort((a, b) => {
@@ -295,20 +122,14 @@ jobs:
               table += `| ${key} | ${rows[key]} |\n`;
             }
 
-            const detailsOrder = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests', 'Coverage', 'Deploy Contracts'];
-            const sortedDetails = Object.keys(existingDetails).sort((a, b) => {
-              const ai = detailsOrder.indexOf(a), bi = detailsOrder.indexOf(b);
-              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-            });
-
-            let body = `${marker}\n## CI Summary\n\n${table}`;
-            
-            if (sortedDetails.length > 0) {
-              body += `\n${detailsMarker}\n\n---\n\n${sortedDetails.map(k => existingDetails[k]).join('\n\n')}`;
-            }
+            const body = `${marker}\n## CI Summary\n\n${table}${detailsSection}`;
 
             if (existing) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number, body });
             }
+
+      - name: Stop Anvil
+        if: always()
+        run: pkill -f anvil || true

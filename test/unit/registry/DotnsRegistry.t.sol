@@ -24,38 +24,75 @@ contract DotnsRegistryTests is BaseDotns {
                 IDotnsRegistrarController(makeAddr("new_registrar_controller_alt"));
         }
 
-        vm.startPrank(owner);
-
         vm.expectEmit(true, true, false, false, address(dotnsRegistry));
         emit IDotnsRegistry.RegistrarControllerUpdated(
             oldRegistrarController, newRegistrarController
         );
 
+        vm.prank(owner);
         dotnsRegistry.updateRegistrarController(newRegistrarController);
 
-        vm.stopPrank();
-
         assertEq(address(dotnsRegistry.registrarController()), address(newRegistrarController));
+    }
+
+    function test_owner_can_rotate_registrar_controller_multiple_times() public {
+        address firstRegistrarController = makeAddr("first_registrar_controller");
+        address secondRegistrarController = makeAddr("second_registrar_controller");
+
+        if (firstRegistrarController == secondRegistrarController) {
+            secondRegistrarController = makeAddr("second_registrar_controller_alt");
+        }
+
+        vm.prank(owner);
+        dotnsRegistry.updateRegistrarController(IDotnsRegistrarController(firstRegistrarController));
+        assertEq(address(dotnsRegistry.registrarController()), firstRegistrarController);
+
+        vm.prank(owner);
+        dotnsRegistry.updateRegistrarController(
+            IDotnsRegistrarController(secondRegistrarController)
+        );
+        assertEq(address(dotnsRegistry.registrarController()), secondRegistrarController);
     }
 
     function test_registrar_controller_sets_owner_emits_event_and_sets_resolver() public {
         bytes32 node = keccak256("node_b");
         address resolverAddress = address(dotnsReverseResolver);
 
-        vm.startPrank(owner);
+        vm.prank(owner);
         dotnsRegistry.updateRegistrarController(dotnsRegistrarController);
-        vm.stopPrank();
 
         vm.expectEmit(true, false, false, true, address(dotnsRegistry));
         emit IDotnsRegistry.NodeTransferred(node, ed);
 
-        vm.startPrank(address(dotnsRegistrarController));
+        vm.prank(address(dotnsRegistrarController));
         dotnsRegistry.setOwner(node, ed, resolverAddress);
-        vm.stopPrank();
 
         assertEq(dotnsRegistry.owner(node), ed);
         assertTrue(dotnsRegistry.recordExists(node));
         assertEq(dotnsRegistry.resolver(node), resolverAddress);
+    }
+
+    function test_registrar_controller_sets_owner_for_multiple_nodes() public {
+        bytes32 firstNode = keccak256("first_node");
+        bytes32 secondNode = keccak256("second_node");
+        address resolverAddress = address(dotnsReverseResolver);
+
+        vm.prank(owner);
+        dotnsRegistry.updateRegistrarController(dotnsRegistrarController);
+
+        vm.startPrank(address(dotnsRegistrarController));
+        dotnsRegistry.setOwner(firstNode, ed, resolverAddress);
+        dotnsRegistry.setOwner(secondNode, tiago, resolverAddress);
+        vm.stopPrank();
+
+        assertEq(dotnsRegistry.owner(firstNode), ed);
+        assertEq(dotnsRegistry.owner(secondNode), tiago);
+
+        assertTrue(dotnsRegistry.recordExists(firstNode));
+        assertTrue(dotnsRegistry.recordExists(secondNode));
+
+        assertEq(dotnsRegistry.resolver(firstNode), resolverAddress);
+        assertEq(dotnsRegistry.resolver(secondNode), resolverAddress);
     }
 
     function test_node_owner_creates_subnode_emits_event_and_returns_expected_subnode() public {
@@ -75,9 +112,8 @@ contract DotnsRegistryTests is BaseDotns {
         vm.expectEmit(true, true, false, true, address(dotnsRegistry));
         emit IDotnsRegistry.NewOwner(parentNode, subLabelHash, ed);
 
-        vm.startPrank(owner);
+        vm.prank(owner);
         bytes32 returnedSubnode = dotnsRegistry.setSubnodeOwner(subnodeRecord);
-        vm.stopPrank();
 
         assertEq(returnedSubnode, expectedSubnode);
         assertEq(dotnsRegistry.owner(returnedSubnode), ed);
@@ -100,16 +136,14 @@ contract DotnsRegistryTests is BaseDotns {
             parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: ed
         });
 
-        vm.startPrank(owner);
+        vm.prank(owner);
         dotnsRegistry.setSubnodeOwner(subnodeRecord);
-        vm.stopPrank();
 
         vm.expectEmit(true, false, false, true, address(dotnsRegistry));
         emit IDotnsRegistry.NewResolver(node, newResolver);
 
-        vm.startPrank(ed);
+        vm.prank(ed);
         dotnsRegistry.setResolver(node, newResolver);
-        vm.stopPrank();
 
         assertEq(dotnsRegistry.resolver(node), newResolver);
     }
@@ -129,17 +163,15 @@ contract DotnsRegistryTests is BaseDotns {
             parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: ed
         });
 
-        vm.startPrank(owner);
+        vm.prank(owner);
         dotnsRegistry.setSubnodeOwner(subnodeRecord);
-        vm.stopPrank();
 
-        vm.startPrank(ed);
+        vm.prank(ed);
         dotnsRegistry.setResolver(node, newResolver);
         assertEq(dotnsRegistry.resolver(node), newResolver);
 
+        vm.prank(ed);
         dotnsRegistry.setResolver(node, address(0));
-        vm.stopPrank();
-
         assertEq(dotnsRegistry.resolver(node), address(0));
     }
 
@@ -157,9 +189,8 @@ contract DotnsRegistryTests is BaseDotns {
             parentNode: parentNode, subLabel: childLabel, parentLabel: parentLabel, owner: tiago
         });
 
-        vm.startPrank(ed);
+        vm.prank(ed);
         bytes32 returnedChildNode = dotnsRegistry.setSubnodeOwner(subnodeRecord);
-        vm.stopPrank();
 
         assertEq(returnedChildNode, expectedChildNode);
         assertEq(dotnsRegistry.owner(expectedChildNode), tiago);

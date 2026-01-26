@@ -13,9 +13,6 @@ contract StoreFactory is IStoreFactory {
     /// @notice Maps owner addresses to their deployed store contracts
     /// @dev Zero address indicates no store has been deployed for that address
     mapping(address owner => IStore store) private _deployedStores;
-    /// @notice Array of all deployed store contracts
-    /// @dev Its possible that some user will have duplicated stores if they transfer ownership
-    IStore[] private _allStores;
 
     /// @inheritdoc IStoreFactory
     function deploy() external returns (IStore) {
@@ -25,7 +22,6 @@ contract StoreFactory is IStoreFactory {
         _deployedStores[msg.sender] = IStore(address(newStore));
         newStore.transferOwnership(msg.sender);
         require(newStore.owner() == msg.sender, InvalidOwnership(address(newStore)));
-        _allStores.push(IStore(address(newStore)));
         emit StoreDeployed(msg.sender, newStore);
         return newStore;
     }
@@ -48,10 +44,5 @@ contract StoreFactory is IStoreFactory {
     /// @inheritdoc IStoreFactory
     function getDeployedStore(address who) external view returns (IStore) {
         return _deployedStores[who];
-    }
-
-    /// @inheritdoc IStoreFactory
-    function getAllDeployedStores() external view override returns (IStore[] memory) {
-        return _allStores;
     }
 }

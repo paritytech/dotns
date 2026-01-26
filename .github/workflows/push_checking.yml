@@ -1,12 +1,12 @@
-name: Run Solidity Tests
+name: Contract Tests
 
 on:
   pull_request:
     branches: [main]
-    paths: ["src/**", "script/**", "test/**", "**.sol"]
+    paths: ['src/**', 'script/**', 'test/**', '**.sol']
   push:
     branches: [main]
-    paths: ["src/**", "script/**", "test/**", "**.sol"]
+    paths: ['src/**', 'script/**', 'test/**', '**.sol']
 
 permissions:
   contents: read
@@ -34,127 +34,93 @@ jobs:
           set +e
           forge build --sizes > build.log 2>&1
           BUILD=$?
-
+          
           if [ $BUILD -ne 0 ]; then
             echo "result=Failed - Build error" >> "$GITHUB_OUTPUT"
             echo "has_details=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-
+          
+          # Run tests with summary for better parsing
           forge test -vv --summary 2>&1 | tee test.log
           TEST=${PIPESTATUS[0]}
 
+          # Process results
           python3 << 'EOF'
-          import os
           import re
-          from collections import OrderedDict
+          import os
+          from collections import defaultdict
 
-          def out(k, v):
-              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-                  f.write(f"{k}={v}\n")
+          out = lambda k,v: open(os.environ['GITHUB_OUTPUT'], 'a').write(f"{k}={v}\n")
 
-          with open("test.log", "r", encoding="utf-8", errors="ignore") as f:
+          with open('test.log', 'r') as f:
               content = f.read()
 
-          header_re = re.compile(
-              r"(?:^|\s)(?:Running|Ran)\s+\d+\s+tests?\s+for\s+(test/[^\s:]+):([A-Za-z0-9_]+)\s*$"
-          )
-          suite_result_re = re.compile(r"^\s*Suite result:\s*(.+)\s*$")
-          test_line_re = re.compile(
-              r"^\s*\[(PASS|FAIL[^\]]*)\]\s+([A-Za-z0-9_]+)\(\)(?:\s*\(([^)]*)\))?.*$"
-          )
+          # Parse by contract
+          contracts = defaultdict(lambda: {'passed': [], 'failed': []})
+          current_contract = None
 
-          suites = OrderedDict()
-          current_suite = None
-
-          for raw in content.splitlines():
-              line = raw.rstrip("\n")
-
-              hm = header_re.search(line)
-              if hm:
-                  file_path = hm.group(1)
-                  contract = hm.group(2)
-                  current_suite = f"{file_path}:{contract}"
-                  if current_suite not in suites:
-                      suites[current_suite] = {
-                          "file": file_path,
-                          "contract": contract,
-                          "tests": [],
-                          "suite_result": None,
-                      }
-                  continue
-
-              tm = test_line_re.match(line)
-              if tm and current_suite:
-                  tag = tm.group(1)
-                  test_name = tm.group(2)
-                  outcome = "PASS" if tag == "PASS" else "FAIL"
-                  error = ""
-                  if outcome == "FAIL":
-                      err = tag
-                      if err.startswith("FAIL"):
-                          err = err[4:].lstrip(": .").strip()
-                      error = err
-                  suites[current_suite]["tests"].append({
-                      "name": test_name,
-                      "outcome": outcome,
-                      "error": error,
+          for line in content.split('\n'):
+              # Match contract header like "Ran 5 tests for test/Registry.t.sol:RegistryTest"
+              contract_match = re.search(r'for test/([^:]+):(\w+)', line)
+              if contract_match:
+                  current_contract = contract_match.group(2)
+              
+              # Match test results
+              pass_match = re.match(r'\[PASS\]\s+(\w+)\(\)\s*(?:\(gas:\s*(\d+)\))?', line)
+              fail_match = re.match(r'\[FAIL[:\.]?\s*[^\]]*\]\s+(\w+)\(\)', line)
+              
+              if pass_match and current_contract:
+                  contracts[current_contract]['passed'].append({
+                      'name': pass_match.group(1),
+                      'gas': pass_match.group(2) or ''
                   })
-                  continue
+              elif fail_match and current_contract:
+                  contracts[current_contract]['failed'].append({
+                      'name': fail_match.group(1)
+                  })
 
-              sm = suite_result_re.match(line)
-              if sm and current_suite:
-                  suites[current_suite]["suite_result"] = f"Suite result: {sm.group(1).strip()}"
-                  continue
-
-          total_passed = 0
-          total_failed = 0
-          total_skipped = 0
-
-          md = []
-          md.append("## Contract test results\n")
-
-          for _, s in suites.items():
-              md.append(f"### {s['contract']} ({s['file']})\n")
-              md.append("| Test name | Outcome | Error |")
-              md.append("|:--|:--:|:--|")
-
-              passed = 0
-              failed = 0
-
-              for t in s["tests"]:
-                  name = t["name"]
-                  outcome = t["outcome"]
-                  error = (t["error"] or "").replace("|", "\\|")
-                  md.append(f"| {name} | {outcome} | {error} |")
-                  if outcome == "PASS":
-                      passed += 1
-                      total_passed += 1
-                  else:
-                      failed += 1
-                      total_failed += 1
-
-              md.append("")
-              if s["suite_result"]:
-                  md.append(s["suite_result"])
-              else:
-                  md.append(f"Suite result: {'ok' if failed == 0 else 'failed'}. {passed} passed; {failed} failed; {total_skipped} skipped;")
-              md.append("")
-
-          total = total_passed + total_failed + total_skipped
+          total_passed = sum(len(c['passed']) for c in contracts.values())
+          total_failed = sum(len(c['failed']) for c in contracts.values())
+          total = total_passed + total_failed
 
           if total_failed > 0:
-              out("result", f"Failed - {total_failed} of {total} tests failed")
-              out("has_details", "true")
+              out('result', f'Failed - {total_failed} of {total} tests failed')
+              out('has_details', 'true')
           elif total > 0:
-              out("result", f"All tests passed ({total} total)")
-              out("has_details", "true")
+              out('result', 'All tests passed')
+              out('has_details', 'true')
           else:
-              out("result", "No tests found")
-              out("has_details", "false")
+              out('result', 'No tests found')
+              out('has_details', 'false')
 
-          with open("test-details.md", "w", encoding="utf-8") as f:
-              f.write("\n".join(md))
+          # Build markdown grouped by contract
+          md = []
+          
+          # Failed tests first
+          for contract, data in sorted(contracts.items()):
+              if data['failed']:
+                  md.append(f"\n**{contract} - Failed ({len(data['failed'])})**\n")
+                  md.append("| Test |")
+                  md.append("|:-----|")
+                  for t in data['failed'][:10]:
+                      md.append(f"| {t['name']}() |")
+                  if len(data['failed']) > 10:
+                      md.append(f"| +{len(data['failed'])-10} more |")
+
+          # Passed tests grouped by contract
+          for contract, data in sorted(contracts.items()):
+              if data['passed']:
+                  md.append(f"\n**{contract} ({len(data['passed'])} passed)**\n")
+                  md.append("| Test | Gas |")
+                  md.append("|:-----|----:|")
+                  for t in data['passed'][:10]:
+                      md.append(f"| {t['name']}() | {t['gas']} |")
+                  if len(data['passed']) > 10:
+                      md.append(f"| +{len(data['passed'])-10} more | |")
+
+          with open('test-details.md', 'w') as f:
+              f.write('\n'.join(md))
           EOF
 
           if [ $TEST -ne 0 ]; then
@@ -206,11 +172,11 @@ jobs:
 
             let rows = {};
             let existingDetails = {};
-
+            
             if (existing?.body) {
               const parts = existing.body.split(detailsMarker);
               const tableSection = parts[0] || '';
-
+              
               const lines = tableSection.split('\n');
               for (const line of lines) {
                 const match = line.match(/^\| ([^|]+) \| ([^|]+) \|$/);
@@ -221,7 +187,7 @@ jobs:
                   }
                 }
               }
-
+              
               const detailsRegex = /<details>\s*<summary><strong>([^<]+)<\/strong><\/summary>([\s\S]*?)<\/details>/g;
               let detailMatch;
               while ((detailMatch = detailsRegex.exec(existing.body)) !== null) {
@@ -255,7 +221,7 @@ jobs:
             });
 
             let body = `${marker}\n## CI Summary\n\n${table}`;
-
+            
             if (sortedDetails.length > 0) {
               body += `\n${detailsMarker}\n\n---\n\n${sortedDetails.map(k => existingDetails[k]).join('\n\n')}`;
             }

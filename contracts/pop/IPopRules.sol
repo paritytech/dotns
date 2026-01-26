@@ -146,9 +146,9 @@ interface IPopRules {
     /// @return isBase stating if the name is base or not
     function isBaseName(string calldata name) external pure returns (bool isBase);
 
-    /// @notice allows the Owner to update the dot registry
-    /// @param dotRegistry the address of the new registry
-    function updateDotRegistry(address dotRegistry) external;
+    /// @notice allows the Owner to update the dot/eth registry
+    /// @param ethReg the address of the new registry
+    function updateEthRegistry(address ethReg) external;
 
     /// @notice Sets the Proof-of-Personhood (PoP) tier for the caller's profile
     /// @param status The PoP tier to assign to the user (NoStatus, PopLite, or PopFull)

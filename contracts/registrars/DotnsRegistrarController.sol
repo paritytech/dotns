@@ -19,7 +19,6 @@ import {IDotnsRegistrarController} from "./IDotnsRegistrarController.sol";
 import {Store} from "../store/Store.sol";
 import {IStore} from "../store/IStore.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
-import {StoreUtils} from "../utils/StoreUtils.sol";
 
 /// @title DotNS Registrar Controller
 /// @notice Allocates .dot labels using a commit–reveal scheme.
@@ -42,7 +41,6 @@ contract DotnsRegistrarController is
     IDotnsRegistrarController
 {
     using StringUtils for *;
-    using StoreUtils for IStoreFactory;
 
     /// @notice Namehash of the .dot TLD.
     bytes32 private constant DOT_NODE =
@@ -217,10 +215,7 @@ contract DotnsRegistrarController is
             );
         }
 
-        address[] memory controllers = new address[](2);
-        controllers[0] = address(this);
-        controllers[1] = address(dotnsRegistry);
-        Store store = storeFactory.getOrCreateStore(controllers, registration.owner);
+        Store store = _getOrCreateStore(registration.owner);
 
         bytes32 storeKey = _storeKey(labelhash);
         store.setValueFor(registration.owner, storeKey, string.concat(registration.label, ".dot"));
@@ -269,10 +264,8 @@ contract DotnsRegistrarController is
         reverseResolver.setReverseName(
             registration.owner, string.concat(registration.label, ".dot")
         );
-        address[] memory controllers = new address[](2);
-        controllers[0] = address(this);
-        controllers[1] = address(dotnsRegistry);
-        Store store = storeFactory.getOrCreateStore(controllers, registration.owner);
+
+        Store store = _getOrCreateStore(registration.owner);
 
         bytes32 storeKey = _storeKey(labelhash);
         store.setValueFor(registration.owner, storeKey, string.concat(registration.label, ".dot"));
@@ -280,10 +273,59 @@ contract DotnsRegistrarController is
         emit NameRegistered(registration.label, labelhash, registration.owner, 0, address(store));
     }
 
+    /// @inheritdoc IDotnsRegistrarController
+    function writeSubnodeToStore(IDotnsRegistry.SubnodeRecord calldata record)
+        public
+        override
+        onlyRegistry
+    {
+        Store store = _getOrCreateStore(record.owner);
+
+        bytes32 labelhash = _labelhash(record.subLabel);
+        bytes32 storeKey = _storeKey(labelhash);
+
+        store.setValueFor(
+            record.owner,
+            storeKey,
+            string.concat(
+                string.concat(record.subLabel, string.concat(".", record.parentLabel)), ".dot"
+            )
+        );
+    }
+
     /// @inheritdoc ERC165Upgradeable
     function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
         return interfaceId == type(IDotnsRegistrarController).interfaceId
             || super.supportsInterface(interfaceId);
+    }
+
+    /// @notice Returns the Store for `owner`, deploying/mapping one if needed.
+    /// @dev Unifies Store acquisition across `register`, `registerReserved`, and `writeSubnodeToStore`.
+    ///      Handles three cases:
+    ///      1) Store already mapped to `owner` in the factory.
+    ///      2) Store mapped to this controller in the factory (migrate mapping to `owner`).
+    ///      3) No store exists (deploy under controller, authorize controller, transfer store ownership,
+    ///         then move factory mapping to `owner`).
+    ///.     There should be a non-rentrant modifer here but we dont see a scenario where the resulting
+    ///      Store can call this function again
+    /// @param owner Target Store owner address.
+    /// @return store The resolved Store instance.
+    function _getOrCreateStore(address owner) internal returns (Store store) {
+        IStore existing = storeFactory.getDeployedStore(owner);
+        if (address(existing) != address(0)) return Store(address(existing));
+
+        IStore controllerMapped = storeFactory.getDeployedStore(address(this));
+        if (address(controllerMapped) != address(0)) {
+            storeFactory.transferOwnership(owner);
+            IStore moved = storeFactory.getDeployedStore(owner);
+            require(address(moved) != address(0), IStoreFactory.InvalidTransfer(owner));
+            return Store(address(moved));
+        }
+
+        store = Store(address(storeFactory.deploy()));
+        store.authorizeDotnsController(address(this));
+        store.transferOwnership(owner);
+        storeFactory.transferOwnership(owner);
     }
 
     /// @notice Computes keccak256(label)
@@ -326,7 +368,7 @@ contract DotnsRegistrarController is
     /// @notice Returns implementation version
     /// @return versionString Current version string
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.1.0";
+        versionString = "1.0.0";
     }
 
     /// @notice Internal check enforcing registry-only access.

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
-import {IDotnsRegistrarController} from "../registrars/IDotnsRegistrarController.sol";
 
 /// @title Dot Reverse Resolver Interface
 /// @notice Interface for writing and reading reverse name records for addresses.
@@ -9,19 +8,15 @@ import {IDotnsRegistrarController} from "../registrars/IDotnsRegistrarController
 /// @custom:security-contact admin@parity.io
 interface IDotnsReverseResolver {
     /// @notice Thrown when a caller is not authorised to modify reverse records.
-    /// @param caller The address attempting the modification.
-    error NotRegistrarController(address caller);
+    error NotRegistrar();
 
     /// @notice Thrown when an invalid registrar address is provided.
-    error InvalidRegistrarController();
+    error InvalidRegistrar();
 
     /// @notice Emitted when the registrar address is updated.
     /// @param oldRegistrar Previous registrar.
     /// @param newRegistrar New registrar.
-    event RegistrarUpdated(
-        IDotnsRegistrarController indexed oldRegistrar,
-        IDotnsRegistrarController indexed newRegistrar
-    );
+    event RegistrarUpdated(address indexed oldRegistrar, address indexed newRegistrar);
 
     /// @notice Emitted when a name is associated with an address
     /// @param addr The address for which the reverse name is being set.
@@ -43,7 +38,7 @@ interface IDotnsReverseResolver {
 
     /// @notice Updates the registrar address authorised to write reverse records.
     /// @dev Implementations should restrict this to an admin/owner.
-    /// @param newRegistrar The new registrar controller address.
-    /// @custom:reverts InvalidRegistrarController if `newRegistrar` is the zero address.
-    function updateRegistrar(IDotnsRegistrarController newRegistrar) external;
+    /// @param newRegistrar The new registrar address.
+    /// @custom:reverts InvalidRegistrar if `newRegistrar` is the zero address.
+    function updateRegistrar(address newRegistrar) external;
 }

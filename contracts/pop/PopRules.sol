@@ -41,7 +41,7 @@ contract PopRules is
         0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
 
     /// @notice Authorized registry controller address
-    address public dotRegistryController;
+    address public ethRegistryController;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
     // forge-lint: disable-next-line(mixed-case-variable)
@@ -138,9 +138,9 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function updateDotRegistry(address newRegistry) external override onlyOwner {
-        emit RegistryUpdated(dotRegistryController, newRegistry);
-        dotRegistryController = newRegistry;
+    function updateEthRegistry(address newRegistry) external override onlyOwner {
+        emit RegistryUpdated(ethRegistryController, newRegistry);
+        ethRegistryController = newRegistry;
     }
 
     /// @inheritdoc IPopRules
@@ -342,6 +342,6 @@ contract PopRules is
     /// @notice Ensures the caller is the authorized registry controller
     /// @dev Done this way to reduce code size
     function _onlyRegistry() internal view {
-        require(msg.sender == dotRegistryController, NotRegistry());
+        require(msg.sender == ethRegistryController, NotRegistry());
     }
 }

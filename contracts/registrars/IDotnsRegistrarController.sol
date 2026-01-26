@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
+
 /// @title DotNS Registrar Controller Interface
 /// @notice Interface for registering .dot labels using a commit–reveal scheme.
 /// @dev This interface defines allocation only. Forward resolution, reverse lookup, pricing mechanics,
@@ -118,4 +120,13 @@ interface IDotnsRegistrarController {
     /// @dev Can only be called by owner
     /// @param registration Registration parameters.
     function registerReserved(Registration calldata registration) external;
+
+    /// @notice Writes a newly created subnode to the user's Store.
+    /// @dev This function is intended to be called **only by the registry**.
+    /// @dev  Writes the computed `<sub>.<parent>.dot` value into the Store owned by `record.owner`.
+    ///      It updates the user's Store with the subnode information so that all subnodes
+    ///      for a user can be queried in real-time.
+    ///      The Store must already exist for the `newOwner`. If the Store write fails, the call should revert.
+    /// @param record SubnodeRecord to write to the Store.
+    function writeSubnodeToStore(IDotnsRegistry.SubnodeRecord calldata record) external;
 }
