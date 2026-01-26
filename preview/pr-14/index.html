@@ -38,7 +38,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4f92397a.js";
+            window.path_to_searchindex_js = "searchindex-e4b6146f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-2dfc82ea.js"></script>
@@ -231,6 +231,25 @@
 </tbody>
 </table>
 </div>
+<h3 id="mental-model-for-new-features"><a class="header" href="#mental-model-for-new-features">Mental model for new features</a></h3>
+<p>Treat the chain as the database. Assume no servers and no indexers. If a feature needs an offchain service to be usable, it is not a DotNS feature.</p>
+<p>This has a practical implication: every feature must come with an explicit query path. A client should be able to start from a small set of known contracts and find everything it needs with a bounded number of calls.</p>
+<p>Rules of thumb:</p>
+<ul>
+<li>State is the source of truth. Events are for observability.</li>
+<li>Discovery must be deterministic. If something is created, store where to find it.</li>
+<li>Avoid “scan and reconstruct”. Do not require replaying logs from genesis to recover user state.</li>
+<li>Prefer simple keys. <code>node</code>, <code>labelhash</code>, <code>owner</code>, <code>commitment</code> should be enough to locate related data.</li>
+<li>If you need lists, make them enumerable onchain with pagination. Do not assume an indexer will build the list.</li>
+<li>If a rule matters for funds or correctness, enforce it onchain. Offchain checks are optional UX.</li>
+</ul>
+<p>A quick checklist for a PR adding a feature:</p>
+<ul>
+<li>Where is the canonical state stored?</li>
+<li>From which known contract can a client discover it?</li>
+<li>What are the exact view functions needed to read it without scanning?</li>
+<li>How does a client list relevant items (if listing is required), and how is it paginated?</li>
+</ul>
 <h3 id="build"><a class="header" href="#build">Build</a></h3>
 <pre><code class="language-bash">forge build
 </code></pre>
