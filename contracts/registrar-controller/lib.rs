@@ -524,6 +524,11 @@ pub mod dotns_registrar_controller {
             &mut self,
             registration: Registration,
         ) -> Result<(), RegistrarControllerError> {
+            require!(
+                self.env().caller() == self.owner,
+                RegistrarControllerError::NotOwner
+            );
+
             let label = registration.label.clone();
 
             require!(
