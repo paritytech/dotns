@@ -102,7 +102,8 @@ pub enum RegistrarControllerError {
     /// Thrown when label is too short (< 3 characters).
     LabelTooShort,
 
-    Testing {
+    /// Thrown when the registrar contract call fails.
+    RegistrarCallFailed {
         error: RegistrarError,
     },
 }

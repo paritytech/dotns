@@ -461,7 +461,7 @@ pub mod dotns_registrar_controller {
             let token_id = U256::from_big_endian(labelhash.as_bytes());
             self.dotns_registrar
                 .register(token_id, registration.owner)
-                .map_err(|error| RegistrarControllerError::Testing { error })?;
+                .map_err(|error| RegistrarControllerError::RegistrarCallFailed { error })?;
 
             let node = self.namehash(labelhash);
             self.dotns_registry
