@@ -2,7 +2,7 @@
 name = "dotns-utils"
 version = "0.1.0"
 authors = [ "Siphamandla Mjoli <siphamandla@parity.io>" ]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 dotns-store = { path = "../store", default-features = false, features = [ "ink-as-dependency" ] }
