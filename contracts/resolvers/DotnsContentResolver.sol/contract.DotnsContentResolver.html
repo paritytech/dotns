@@ -38,10 +38,10 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-e4b6146f.js";
+            window.path_to_searchindex_js = "../../../searchindex-2f2e8d78.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../../toc-2dfc82ea.js"></script>
+        <script src="../../../toc-ba2d40b3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,11 +181,11 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="dotnscontentresolver"><a class="header" href="#dotnscontentresolver">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/baf1da5ef36f5bdb0f3900ee4a90df6a90936634/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b700103285587d0fded6f47ee631aca94910f02b/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
-DotNS Content Resolver</p>
+Dotns Content Resolver</p>
 <p>Implements <code>IDotnsContentResolver</code> interface with content hash, text records, and operator approvals</p>
 <p>Stores opaque content hash bytes and text key-value pairs per node
 Authorisation enforced via DotNS registry ownership or approved operators</p>
@@ -197,15 +197,15 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">IDotnsRegistry public registry
 </code></pre>
 <h3 id="contenthashes"><a class="header" href="#contenthashes">contenthashes</a></h3>
-<p>Node → content hash mapping</p>
+<p>Stores all content hash mappings</p>
 <pre><code class="language-solidity">mapping(bytes32 node =&gt; bytes contentHash) private contenthashes
 </code></pre>
 <h3 id="textrecords"><a class="header" href="#textrecords">textRecords</a></h3>
-<p>Node → (key → value) text records</p>
+<p>Stores all text records</p>
 <pre><code class="language-solidity">mapping(bytes32 node =&gt; mapping(string key =&gt; string value)) private textRecords
 </code></pre>
 <h3 id="operators"><a class="header" href="#operators">operators</a></h3>
-<p>Owner → operator → approval mapping</p>
+<p>Store all approval mapping</p>
 <pre><code class="language-solidity">mapping(address owner =&gt; mapping(address operator =&gt; bool approved)) private operators
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>

@@ -38,10 +38,10 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-e4b6146f.js";
+            window.path_to_searchindex_js = "../../../searchindex-2f2e8d78.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../../toc-2dfc82ea.js"></script>
+        <script src="../../../toc-ba2d40b3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,9 +181,9 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/baf1da5ef36f5bdb0f3900ee4a90df6a90936634/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b700103285587d0fded6f47ee631aca94910f02b/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-DotNS Registrar Controller Interface</p>
+Dotns Registrar Controller</p>
 <p>Interface for registering .dot labels using a commit–reveal scheme.</p>
 <p>This interface defines allocation only. Forward resolution, reverse lookup, pricing mechanics,
 PoP validation, and store writing are handled by external contracts.</p>
@@ -196,7 +196,7 @@ PoP validation, and store writing are handled by external contracts.</p>
 <ul>
 <li>Implementations write the successfully registered name into the user’s Store
 to create an immutable onchain record of the name registration.</li>
-<li>This store serves as a quick lookup for all names registered</li>
+<li>This store serves as a quick lookup for all names registered.</li>
 </ul>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
@@ -290,7 +290,6 @@ security-contact: admin@parity.io</p>
 <h3 id="registerreserved"><a class="header" href="#registerreserved">registerReserved</a></h3>
 <p>Registers a name after the commitment delay.</p>
 <p>Registration parameters must match the committed values.</p>
-<p>Can only be called by owner</p>
 <pre><code class="language-solidity">function registerReserved(Registration calldata registration) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -443,7 +442,6 @@ security-contact: admin@parity.io</p>
 </code></pre>
 <h3 id="invalidstore"><a class="header" href="#invalidstore">InvalidStore</a></h3>
 <p>Thrown when an invalid Store instance is encountered.</p>
-<p>This usually means the store has not been deployed for the user.</p>
 <pre><code class="language-solidity">error InvalidStore();
 </code></pre>
 <h3 id="notregistry"><a class="header" href="#notregistry">NotRegistry</a></h3>
@@ -471,7 +469,7 @@ security-contact: admin@parity.io</p>
 <tr><td><code>label</code></td><td><code>string</code></td><td>Label being registered (e.g. “alice”).</td></tr>
 <tr><td><code>owner</code></td><td><code>address</code></td><td>Address that will own the registered name.</td></tr>
 <tr><td><code>secret</code></td><td><code>bytes32</code></td><td>Secret used to bind the commitment.</td></tr>
-<tr><td><code>reserved</code></td><td><code>bool</code></td><td>Whether the name is reserved, This means the name is the default name assigned that resolvers will point to.</td></tr>
+<tr><td><code>reserved</code></td><td><code>bool</code></td><td>Whether the name is reserved.</td></tr>
 </tbody>
 </table>
 </div>

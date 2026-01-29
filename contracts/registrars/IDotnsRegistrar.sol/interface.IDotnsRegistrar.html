@@ -38,10 +38,10 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-e4b6146f.js";
+            window.path_to_searchindex_js = "../../../searchindex-2f2e8d78.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../../toc-2dfc82ea.js"></script>
+        <script src="../../../toc-ba2d40b3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,13 +181,11 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/baf1da5ef36f5bdb0f3900ee4a90df6a90936634/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b700103285587d0fded6f47ee631aca94910f02b/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
-DotNS Registrar Interface</p>
-<p><strong>Author:</strong>
-DotNS</p>
+Dotns Registrar</p>
 <p>ERC721-backed ownership for DotNS names with controller-gated registration.</p>
 <p>This interface is intentionally minimal and deliberately policy-free.
 It provides:</p>
@@ -245,7 +243,7 @@ Registration mints the ERC721 token to <code>owner</code>.</p>
 </div>
 <h3 id="addcontroller"><a class="header" href="#addcontroller">addController</a></h3>
 <p>Adds an authorised controller.</p>
-<p>Can only be called by an owner</p>
+<p>Callable only by the contract owner.</p>
 <pre><code class="language-solidity">function addController(IDotnsRegistrarController controller) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -261,7 +259,7 @@ Registration mints the ERC721 token to <code>owner</code>.</p>
 </div>
 <h3 id="removecontroller"><a class="header" href="#removecontroller">removeController</a></h3>
 <p>Removes an authorised controller.</p>
-<p>Can only be called by an owner</p>
+<p>Callable only by the contract owner.</p>
 <pre><code class="language-solidity">function removeController(IDotnsRegistrarController controller) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -334,7 +332,7 @@ Registration mints the ERC721 token to <code>owner</code>.</p>
 <tr><th>Name</th><th>Type</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier derived from the label.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier derived from the node.</td></tr>
 </tbody>
 </table>
 </div>
@@ -353,12 +351,6 @@ Registration mints the ERC721 token to <code>owner</code>.</p>
 </tbody>
 </table>
 </div>
-<h3 id="notallowed"><a class="header" href="#notallowed">NotAllowed</a></h3>
-<p>Thrown when any of the transfer functions are called</p>
-<p>We do this to prevent any transfer of NFTs given their
-They are tied to a wallets POP</p>
-<pre><code class="language-solidity">error NotAllowed();
-</code></pre>
 
                     </main>
 
