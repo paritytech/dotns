@@ -1,0 +1,30 @@
+[package]
+name = "dotns-reverse-resolver"
+version = "0.1.0"
+authors = [ "Siphamandla Mjoli <siphamandla@parity.io>" ]
+edition = "2024"
+
+[dependencies]
+dotns-utils = { path = "../utils" }
+ink = { version = "6.0.0-beta.1", default-features = false, features = [ "unstable-hostfn" ] }
+
+[dev-dependencies]
+ink-fuzzer = { path = "../../fuzzer/crates/ink-fuzzer" }
+ink_e2e = { version = "6.0.0-beta.1" }
+
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = [ "std" ]
+std = [ "ink/std" ]
+ink-as-dependency = [  ]
+e2e-tests = [  ]
+
+[profile.release]
+panic = "abort"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [ 'cfg(ink_abi, values("ink", "sol", "all"))' ]

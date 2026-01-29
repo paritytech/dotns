@@ -1,0 +1,28 @@
+[package]
+name = "fuzz-examples"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = [ "example-flipper" ]
+
+std = [ "ink/std" ]
+example-flipper = [ "std" ]
+example-erc20 = [ "std" ]
+
+ink-as-dependency = [  ]
+
+[dependencies]
+ink = { workspace = true, default-features = false }
+
+[dev-dependencies]
+ink-fuzzer = { path = "../ink-fuzzer" }
+proptest = { workspace = true, features = [ "attr-macro" ] }
+
+[lints.rust]
+unexpected_cfgs = "allow"

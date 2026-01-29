@@ -1,0 +1,50 @@
+[package]
+name = "dotns-registry"
+version = "0.1.0"
+authors = [ "Siphamandla Mjoli <siphamandla@parity.io>" ]
+edition = "2024"
+
+[dependencies]
+ink = { version = "6.0.0-beta.1", default-features = false, features = [ "unstable-hostfn" ] }
+scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
+  "derive",
+] }
+scale-info = { version = "2", default-features = false, features = [ "derive" ] }
+
+dotns-reverse-resolver = { path = "../reverse-resolver", default-features = false, features = [
+  "ink-as-dependency",
+] }
+dotns-store = { path = "../store", default-features = false, features = [ "ink-as-dependency" ] }
+dotns-store-factory = { path = "../store-factory", default-features = false, features = [
+  "ink-as-dependency",
+] }
+dotns-utils = { path = "../utils", default-features = false }
+
+
+[dev-dependencies]
+ink-fuzzer = { path = "../../fuzzer/crates/ink-fuzzer" }
+ink_e2e = { version = "6.0.0-beta.1" }
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = [ "std" ]
+std = [
+  "ink/std",
+  "scale/std",
+  "scale-info/std",
+  "dotns-utils/std",
+  "dotns-reverse-resolver/std",
+  "dotns-store/std",
+  "dotns-store-factory/std",
+]
+ink-as-dependency = [  ]
+e2e-tests = [  ]
+
+[profile.release]
+panic = "abort"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [ 'cfg(ink_abi, values("ink", "sol", "all"))' ]

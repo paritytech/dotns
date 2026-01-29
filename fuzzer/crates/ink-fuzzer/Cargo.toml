@@ -1,0 +1,23 @@
+[package]
+name = "ink-fuzzer"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Property-based fuzz testing helpers for ink! v6 unit tests"
+repository = "https://example.invalid/ink-fuzzer"
+
+[features]
+default = [ "std" ]
+std = [ "ink/std", "proptest/std" ]
+
+[dependencies]
+ink = { workspace = true, default-features = false }
+ink-fuzzer-macros = { path = "../ink-fuzzer-macros", version = "0.1.0" }
+proptest = { workspace = true, features = [ "attr-macro" ] }
+
+[dev-dependencies]
+trybuild = { workspace = true }
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [ 'cfg(ink_abi, values("ink", "sol", "all"))' ]

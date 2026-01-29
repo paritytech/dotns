@@ -1,0 +1,25 @@
+# Rust / Cargo build artifacts (any crate anywhere)
+target/
+**/target/
+
+
+
+# Cargo fmt backups
+**/*.rs.bk
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Optional local junk
+*.swp
+*.swo
+*.tmp
+.env
+
+# Cargo.lock policy:
+# - keep Cargo.lock for binaries/apps
+# - ignore for libraries if you prefer
+Cargo.lock
+contracts/pop-rules/target/
+.DS_Store

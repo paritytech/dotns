@@ -1,0 +1,29 @@
+[package]
+name = "dotns-utils"
+version = "0.1.0"
+authors = [ "Siphamandla Mjoli <siphamandla@parity.io>" ]
+edition = "2024"
+
+[dependencies]
+dotns-store = { path = "../store", default-features = false, features = [ "ink-as-dependency" ] }
+dotns-store-factory = { path = "../store-factory", default-features = false, features = [
+  "ink-as-dependency",
+] }
+hex-literal = { version = "1.1.0" }
+ink = { version = "6.0.0-beta.1", default-features = false, features = [ "unstable-hostfn" ] }
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = [ "std" ]
+std = [ "ink/std" ]
+ink-as-dependency = [  ]
+e2e-tests = [  ]
+
+[profile.release]
+panic = "abort"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [ 'cfg(ink_abi, values("ink", "sol", "all"))' ]
