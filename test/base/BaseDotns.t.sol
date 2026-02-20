@@ -348,6 +348,20 @@ abstract contract BaseDotns is Test {
         }
     }
 
+    /// @notice Computes keccak256("dotns.registered", parentNode, labelhash)
+    /// @param parentNode The parent node hash.
+    /// @param labelhash keccak256(label).
+    /// @return key Store key used for DotNS-written subnode registration entry.
+    function _subnodeStoreKey(bytes32 parentNode, bytes32 labelhash) internal pure returns (bytes32 key) {
+        assembly {
+            let pointer := mload(0x40)
+            mstore(pointer, 0x646f746e732e7265676973746572656400000000000000000000000000000000)
+            mstore(add(pointer, 0x20), parentNode)
+            mstore(add(pointer, 0x40), labelhash)
+            key := keccak256(pointer, 0x60)
+        }
+    }
+
     /// @notice Checks whether a string array contains a given string.
     /// @dev Compares by keccak256(bytes(string)) to avoid costly byte-by-byte comparisons.
     /// @param array The array to search.

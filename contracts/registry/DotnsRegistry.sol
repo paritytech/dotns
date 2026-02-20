@@ -196,22 +196,24 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
 
         Store store = storeFactory.getOrCreateStore(controllers, record.owner);
 
-        bytes32 storeKey = _storeKey(labelhash);
+        bytes32 storeKey = _storeKey(record.parentNode, labelhash);
         string memory fullName = string.concat(record.subLabel, ".", record.parentLabel, ".dot");
 
         store.setValueFor(record.owner, storeKey, fullName);
     }
 
-    /// @notice Computes keccak256("dotns.registered", labelhash).
+    /// @notice Computes keccak256("dotns.registered", parentNode, labelhash).
+    /// @param parentNode The parent node hash.
     /// @param labelhash keccak256(label).
-    /// @return key Store key used for DotNS-written registration entry.
-    function _storeKey(bytes32 labelhash) internal pure returns (bytes32 key) {
+    /// @return key Store key used for DotNS-written subnode registration entry.
+    function _storeKey(bytes32 parentNode, bytes32 labelhash) internal pure returns (bytes32 key) {
         bytes32 prefix = DOTNS_REGISTERED_KEY;
         assembly {
             let pointer := mload(0x40)
             mstore(pointer, prefix)
-            mstore(add(pointer, 0x20), labelhash)
-            key := keccak256(pointer, 0x40)
+            mstore(add(pointer, 0x20), parentNode)
+            mstore(add(pointer, 0x40), labelhash)
+            key := keccak256(pointer, 0x60)
         }
     }
 

@@ -6,6 +6,7 @@ import {IPopRules} from "../../contracts/pop/IPopRules.sol";
 import {IDotnsRegistry} from "../../contracts/registry/IDotnsRegistry.sol";
 import {IDotnsContentResolver} from "../../contracts/resolvers/IDotnsContentResolver.sol";
 import {IDotnsRegistrarController} from "../../contracts/registrars/IDotnsRegistrarController.sol";
+import {Store} from "../../contracts/store/Store.sol";
 
 contract BasicDotnsIntegrationReverts is BaseDotns {
     string internal constant NAME_POPFULL = "waytall1";
@@ -106,6 +107,51 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
 
         vm.expectRevert(abi.encodeWithSelector(IDotnsRegistry.NodeAlreadyExists.selector, subnode));
         dotnsRegistry.setSubnodeOwner(subnodeRecord);
+        vm.stopPrank();
+    }
+
+    /// @notice Verifies that the same sublabel can be registered under different
+    ///         parent domains by the same owner, now that store keys are scoped
+    ///         by (parentNode, labelhash) instead of labelhash alone.
+    function test_revert_same_sublabel_under_different_parents_locked() public {
+        address parentOwner = ed;
+
+        // 1. Set PoP status and register two base domains owned by ed
+        vm.prank(parentOwner);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+        _commitAndRegister("domaina01", parentOwner, true);
+        _commitAndRegister("domainb01", parentOwner, true);
+
+        bytes32 parentNodeA = _namehash(dotNode, keccak256(bytes("domaina01")));
+        bytes32 parentNodeB = _namehash(dotNode, keccak256(bytes("domainb01")));
+
+        // 2. Ensure store exists for ed
+        Store store = _ensureStoreFor(parentOwner);
+
+        // 3. Create subname "api" under domaina01 — should succeed
+        IDotnsRegistry.SubnodeRecord memory subnodeA = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNodeA, subLabel: "api", parentLabel: "domaina01", owner: parentOwner
+        });
+
+        vm.startPrank(parentOwner);
+        dotnsRegistry.setSubnodeOwner(subnodeA);
+
+        // 4. Verify the store key for parentA is locked
+        bytes32 apiLabelhash = keccak256(bytes("api"));
+        bytes32 keyA = _subnodeStoreKey(parentNodeA, apiLabelhash);
+        assertTrue(store.isLocked(parentOwner, keyA), "store key A should be locked after first subname");
+
+        // 5. Create subname "api" under domainb01 — should also succeed (keys are now distinct)
+        IDotnsRegistry.SubnodeRecord memory subnodeB = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNodeB, subLabel: "api", parentLabel: "domainb01", owner: parentOwner
+        });
+
+        dotnsRegistry.setSubnodeOwner(subnodeB);
+
+        // 6. Verify the store key for parentB is also locked and differs from keyA
+        bytes32 keyB = _subnodeStoreKey(parentNodeB, apiLabelhash);
+        assertTrue(store.isLocked(parentOwner, keyB), "store key B should be locked after second subname");
+        assertTrue(keyA != keyB, "store keys for different parents must be distinct");
         vm.stopPrank();
     }
 
