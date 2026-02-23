@@ -1,4 +1,7 @@
 services:
+  # ETH RPC adapter against the zombienet People chain (with personhood precompile)
+  # Start the People chain first with zombienet, then run this adapter:
+  #   zombienet --provider native spawn ./runtimes/next-people-paseo/zombienet/small_network.toml
   eth-rpc:
     platform: linux/amd64
     build:
@@ -10,6 +13,31 @@ services:
       RUST_LOG: "info,eth-rpc=debug,error"
     ports:
       - "8545:8545"
+    command:
+      - "--node-rpc-url"
+      - "ws://host.docker.internal:9910"
+      - "--rpc-port"
+      - "8545"
+      - "--rpc-external"
+      - "--rpc-cors"
+      - "all"
+      - "--cache-size"
+      - "2048"
+      - "--index-last-n-blocks"
+      - "20000"
+
+  # ETH RPC adapter against Paseo Asset Hub (production deployment)
+  eth-rpc-paseo:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: dockerfile
+    image: revive-eth-rpc
+    container_name: revive-eth-rpc-paseo
+    environment:
+      RUST_LOG: "info,eth-rpc=debug,error"
+    ports:
+      - "8546:8545"
     command:
       - "--node-rpc-url"
       - "wss://sys.turboflakes.io/asset-hub-paseo"

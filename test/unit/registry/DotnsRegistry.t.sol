@@ -168,4 +168,28 @@ contract DotnsRegistryTests is BaseDotns {
         assertTrue(dotnsRegistry.recordExists(expectedChildNode));
         assertEq(dotnsRegistry.resolver(expectedChildNode), address(dotnsReverseResolver));
     }
+
+    function test_same_sublabel_under_different_parents_owned_by_same_address() public {
+        string memory parentLabelA = "alphaomega";
+        string memory parentLabelB = "bravobro";
+        bytes32 parentNodeA = _register(parentLabelA, owner, IPopRules.PopStatus.PopFull);
+        bytes32 parentNodeB = _register(parentLabelB, owner, IPopRules.PopStatus.PopFull);
+
+        _ensureStoreFor(ed);
+
+        string memory subLabel = "app";
+
+        IDotnsRegistry.SubnodeRecord memory recordA = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNodeA, subLabel: subLabel, parentLabel: parentLabelA, owner: ed
+        });
+
+        IDotnsRegistry.SubnodeRecord memory recordB = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNodeB, subLabel: subLabel, parentLabel: parentLabelB, owner: ed
+        });
+
+        vm.startPrank(owner);
+        dotnsRegistry.setSubnodeOwner(recordA);
+        dotnsRegistry.setSubnodeOwner(recordB);
+        vm.stopPrank();
+    }
 }

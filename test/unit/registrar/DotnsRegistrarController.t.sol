@@ -61,8 +61,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         string memory nameLabel = "web2summit";
         address nameOwner = ed;
 
+        _setPersonhoodStatus(nameOwner, IPopRules.PopStatus.PopFull);
+
         vm.startPrank(nameOwner);
-        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
 
         IStore ownerStoreInterface = storeFactory.deploy();
         Store ownerStore = Store(address(ownerStoreInterface));
@@ -98,8 +99,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         string memory nameLabel = "lights01";
         address nameOwner = ed;
 
+        _setPersonhoodStatus(nameOwner, IPopRules.PopStatus.PopLite);
+
         vm.startPrank(nameOwner);
-        popRules.setUserPopStatus(IPopRules.PopStatus.PopLite);
 
         bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "lite"));
         IDotnsRegistrarController.Registration memory registration =
@@ -177,9 +179,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     }
 
     function test_registration_reverts_unauthorized_store() public {
+        _setPersonhoodStatus(ed, IPopRules.PopStatus.PopFull);
+
         vm.startPrank(ed);
         storeFactory.deploy();
-        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
 
         string memory label = "myname";
         bytes32 secret = keccak256(abi.encodePacked(label, ed, block.timestamp));

@@ -11,6 +11,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {IPopRules} from "./IPopRules.sol";
+import {IPersonhood} from "./IPersonhood.sol";
 
 /// @title PopRules
 /// @notice Implements DotNS pricing with PoP-tier validation and base-name reservations
@@ -27,8 +28,9 @@ contract PopRules is
     /// @notice Wei price for names with 9 characters and up
     uint256 public startingPrice;
 
-    /// @notice Tracks PoP status per user/profile
-    mapping(address => PopStatus) public userPopStatus;
+    /// @notice Personhood precompile providing trustless on-chain PoP verification
+    IPersonhood internal constant PERSONHOOD =
+        IPersonhood(0x000000000000000000000000000000000a010000);
 
     /// @notice Active reservations for base names
     mapping(string baseName => Reservation reservation) public reservations;
@@ -72,10 +74,15 @@ contract PopRules is
         _popRulesInit(_startingPrice);
     }
 
-    /// @inheritdoc IPopRules
-    function setUserPopStatus(PopStatus status) external override {
-        userPopStatus[msg.sender] = status;
-        emit UserPopStatusSet(msg.sender, status);
+    /// @notice Resolves the PoP tier for an account by querying the personhood precompile.
+    /// @param account The address to check.
+    /// @return popStatus The PoP tier derived from the on-chain personhood status.
+    function _getPopStatus(address account) internal view returns (PopStatus popStatus) {
+        uint8 raw = PERSONHOOD.personhoodStatus(account);
+        if (raw == 2) return PopStatus.PopFull;
+        if (raw == 1) return PopStatus.PopLite;
+        // raw == 0 (None) or 3 (Demoted) both map to NoStatus
+        return PopStatus.NoStatus;
     }
 
     /// @inheritdoc IPopRules
@@ -187,7 +194,7 @@ contract PopRules is
         _enforceReservationRules(name, userAddress);
 
         (PopStatus requiredStatus, string memory classification) = classifyName(name);
-        PopStatus userStatus = userPopStatus[userAddress];
+        PopStatus userStatus = _getPopStatus(userAddress);
 
         metadata.price = userStatus == PopStatus.NoStatus ? price(name) : 0;
         metadata.status = requiredStatus;
@@ -227,7 +234,7 @@ contract PopRules is
         returns (PriceWithMeta memory metadata)
     {
         (PopStatus requiredStatus, string memory classification) = classifyName(name);
-        PopStatus userStatus = userPopStatus[userAddress];
+        PopStatus userStatus = _getPopStatus(userAddress);
 
         metadata.price = userStatus == PopStatus.NoStatus ? price(name) : 0;
         metadata.status = requiredStatus;

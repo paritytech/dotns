@@ -11,6 +11,7 @@ import {IDotnsReverseResolver} from "../../../contracts/resolvers/IDotnsReverseR
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IStoreFactory} from "../../../contracts/store/IStoreFactory.sol";
 import {DotnsRegistrar} from "../../../contracts/registrars/DotnsRegistrar.sol";
+import {IPersonhood} from "../../../contracts/pop/IPersonhood.sol";
 
 /// @title Registrar Controller Handler
 /// @notice Handler contract that executes bounded random actions against the controller.
@@ -99,6 +100,9 @@ contract RegistrarControllerHandler is Test {
         maxCommitmentAge = _controller.maxCommitmentAge();
     }
 
+    /// @notice Precompile address for the on-chain Personhood status oracle.
+    address internal constant PERSONHOOD_PRECOMPILE = 0x000000000000000000000000000000000a010000;
+
     /// @notice Adds an actor with a specific PoP status.
     /// @param actor The actor address.
     /// @param status The PoP status to assign.
@@ -107,8 +111,14 @@ contract RegistrarControllerHandler is Test {
         actorStatus[actor] = status;
 
         if (status != IPopRules.PopStatus.NoStatus) {
-            vm.prank(actor);
-            popRules.setUserPopStatus(status);
+            uint8 raw;
+            if (status == IPopRules.PopStatus.PopFull) raw = 2;
+            else if (status == IPopRules.PopStatus.PopLite) raw = 1;
+            vm.mockCall(
+                PERSONHOOD_PRECOMPILE,
+                abi.encodeCall(IPersonhood.personhoodStatus, (actor)),
+                abi.encode(raw)
+            );
         }
     }
 

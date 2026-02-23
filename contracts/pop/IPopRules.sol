@@ -38,12 +38,6 @@ interface IPopRules {
     /// @param newReg New address to set
     event RegistryUpdated(address indexed oldReg, address indexed newReg);
 
-    /// @notice Emitted when a user's PoP status is updated
-    /// @dev This is temporary until we have a Precompile for accessing PoP status
-    /// @param user Address of the user
-    /// @param status New PoP tier assigned
-    event UserPopStatusSet(address indexed user, PopStatus status);
-
     /// @notice Thrown when a name violates PoP-tier or reservation requirements
     /// @param reason Human-readable explanation of the failure condition
     error PopError(string reason);
@@ -149,13 +143,6 @@ interface IPopRules {
     /// @notice allows the Owner to update the dot registry
     /// @param dotRegistry the address of the new registry
     function updateDotRegistry(address dotRegistry) external;
-
-    /// @notice Sets the Proof-of-Personhood (PoP) tier for the caller's profile
-    /// @param status The PoP tier to assign to the user (NoStatus, PopLite, or PopFull)
-    /// @dev Once set, this PoP status applies to all registrations by this user
-    ///      This replaces per-name PoP assignments
-    /// @dev This is temporary until we have a Precompile for accessing PoP status
-    function setUserPopStatus(PopStatus status) external;
 
     /// @notice Calculates registration cost
     /// @param name Domain label to price

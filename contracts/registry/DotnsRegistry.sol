@@ -135,7 +135,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         records[subnode] =
             Record({owner: newOwner, resolver: address(reverseResolver), exists: true});
 
-        _writeSubnodeToStore(record, labelhash);
+        _writeSubnodeToStore(record, subnode);
 
         emit NewOwner(parentNode, labelhash, newOwner);
     }

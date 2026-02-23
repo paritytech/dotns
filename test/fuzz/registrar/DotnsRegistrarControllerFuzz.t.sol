@@ -9,9 +9,7 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         address registrant = ed;
         string memory nameLabel = _labelNoStatusPriced(bound(salt, 0, 64));
 
-        vm.startPrank(registrant);
-        popRules.setUserPopStatus(IPopRules.PopStatus.NoStatus);
-        vm.stopPrank();
+        // NoStatus is the default — no precompile status needed
 
         IDotnsRegistrarController.Registration memory registration =
             _commitFor(nameLabel, registrant, true);
@@ -45,9 +43,7 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         address registrant = tiago;
         string memory nameLabel = _labelPriceZero(bound(salt, 0, 64));
 
-        vm.startPrank(registrant);
-        popRules.setUserPopStatus(IPopRules.PopStatus.PopLite);
-        vm.stopPrank();
+        _setPersonhoodStatus(registrant, IPopRules.PopStatus.PopLite);
 
         IDotnsRegistrarController.Registration memory registration =
             _commitFor(nameLabel, registrant, false);
@@ -82,13 +78,8 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         address payer = leonardo;
         string memory nameLabel = _labelPopfull(bound(salt, 0, 64));
 
-        vm.startPrank(nameOwner);
-        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
-        vm.stopPrank();
-
-        vm.startPrank(payer);
-        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
-        vm.stopPrank();
+        _setPersonhoodStatus(nameOwner, IPopRules.PopStatus.PopFull);
+        _setPersonhoodStatus(payer, IPopRules.PopStatus.PopFull);
 
         IDotnsRegistrarController.Registration memory registration =
             _commitFor(nameLabel, nameOwner, true, payer);

@@ -19,6 +19,7 @@ import {
 import {Store} from "../../contracts/store/Store.sol";
 import {StoreFactory, IStoreFactory} from "../../contracts/store/StoreFactory.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {IPersonhood} from "../../contracts/pop/IPersonhood.sol";
 
 /// @title BaseDotns
 /// @notice Common Foundry test base for deploying a DotNS stack behind UUPS proxies.
@@ -31,16 +32,18 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 ///      - PopRules: PoP rules and spam-pricing oracle
 ///      - DotnsRegistrarController: commit–reveal controller orchestrating registration flow
 abstract contract BaseDotns is Test {
-    /// @notice Test user account: ed.
+    /// @notice Genesis PopFull account
+    address internal constant ADDR_POP_FULL = 0x1111111111111111111111111111111111111111;
+
+    /// @notice Genesis PopLite account
+    address internal constant ADDR_POP_LITE = 0x2222222222222222222222222222222222222222;
+
+    /// @notice Genesis Demoted account
+    address internal constant ADDR_DEMOTED = 0x3333333333333333333333333333333333333333;
+
     address public ed;
-
-    /// @notice Test user account: leonardo.
     address public leonardo;
-
-    /// @notice Test user account: tiago.
     address public tiago;
-
-    /// @notice Test user account: owner/admin used to deploy and configure contracts.
     address public owner;
 
     /// @notice Default native balance allocated to test users.
@@ -90,7 +93,16 @@ abstract contract BaseDotns is Test {
     bytes32 private constant DOT_NODE =
         0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
 
+    /// @notice Precompile address for the on-chain Personhood status oracle.
+    address internal constant PERSONHOOD_PRECOMPILE = 0x000000000000000000000000000000000a010000;
+
+    /// @notice Fork identifier for the local People chain node.
+    uint256 public forkId;
+
     function setUp() public virtual noGasMetering {
+        forkId = vm.createSelectFork("paseo_local");
+        _bridgePersonhoodPrecompile();
+
         vm.warp(365 days);
 
         ed = _createUser("ed");
@@ -182,7 +194,52 @@ abstract contract BaseDotns is Test {
         );
 
         vm.stopPrank();
+
+        vm.label(PERSONHOOD_PRECOMPILE, "PersonhoodPrecompile");
+
         vm.warp(block.timestamp + 365 days);
+    }
+
+    /// @notice Seeds `vm.mockCall` entries for the Personhood precompile.
+    /// @dev The native precompile at 0x0A010000 is unreachable from Forge's EVM.
+    ///      Genesis accounts mirror the People chain state; catch-all returns NoStatus.
+    function _bridgePersonhoodPrecompile() internal {
+        vm.mockCall(
+            PERSONHOOD_PRECOMPILE,
+            abi.encodeCall(IPersonhood.personhoodStatus, (ADDR_POP_FULL)),
+            abi.encode(uint8(2))
+        );
+        vm.mockCall(
+            PERSONHOOD_PRECOMPILE,
+            abi.encodeCall(IPersonhood.personhoodStatus, (ADDR_POP_LITE)),
+            abi.encode(uint8(1))
+        );
+        vm.mockCall(
+            PERSONHOOD_PRECOMPILE,
+            abi.encodeCall(IPersonhood.personhoodStatus, (ADDR_DEMOTED)),
+            abi.encode(uint8(3))
+        );
+        vm.mockCall(
+            PERSONHOOD_PRECOMPILE,
+            abi.encodeWithSelector(IPersonhood.personhoodStatus.selector),
+            abi.encode(uint8(0))
+        );
+    }
+
+    /// @notice Overrides the precompile mock for a specific account.
+    /// @param account The address whose personhood status to set.
+    /// @param status The desired PoP tier.
+    function _setPersonhoodStatus(address account, IPopRules.PopStatus status) internal {
+        uint8 raw;
+        if (status == IPopRules.PopStatus.PopFull) raw = 2;
+        else if (status == IPopRules.PopStatus.PopLite) raw = 1;
+        // NoStatus maps to raw 0 (default)
+
+        vm.mockCall(
+            PERSONHOOD_PRECOMPILE,
+            abi.encodeCall(IPersonhood.personhoodStatus, (account)),
+            abi.encode(raw)
+        );
     }
 
     /// @notice Computes an namehash for `parent` and `label`.
@@ -291,13 +348,26 @@ abstract contract BaseDotns is Test {
         dotnsRegistrarController.register{value: requiredPayment}(registration);
     }
 
-    /// @notice Registers `label` for `labelOwner` under the requested PoP status and returns its node
-    /// @dev For NoStatus, no status is set on the oracle.
-    ///      For PopLite/PopFull, status is set for `(labelOwner, label)` before commit–reveal.
-    /// @param label The label to register (without the `.dot` suffix)
-    /// @param labelOwner The address that will own the registered label
-    /// @param status The PoP status to set for this label (NoStatus skips setting)
-    /// @return node The node identifier for `<label>.dot`
+    /// @notice Asserts the precompile returns the expected PoP tier for `account`.
+    /// @param account The address to query.
+    /// @param status The expected PoP tier.
+    function _assertPersonhoodStatus(address account, IPopRules.PopStatus status) internal view {
+        uint8 raw;
+        if (status == IPopRules.PopStatus.PopFull) raw = 2;
+        else if (status == IPopRules.PopStatus.PopLite) raw = 1;
+        // NoStatus and Reserved both map to raw 0
+
+        uint8 actual = IPersonhood(PERSONHOOD_PRECOMPILE).personhoodStatus(account);
+        assertEq(actual, raw, "Personhood status mismatch");
+    }
+
+    /// @notice Registers `label` for `labelOwner` under the requested PoP status and returns its node.
+    /// @dev For NoStatus, the default precompile state (returns 0) is used.
+    ///      For PopLite/PopFull, the precompile status is set before commit–reveal.
+    /// @param label The label to register (without the `.dot` suffix).
+    /// @param labelOwner The address that will own the registered label.
+    /// @param status The PoP status to set for this label (NoStatus skips setting).
+    /// @return node The node identifier for `<label>.dot`.
     function _register(
         string memory label,
         address labelOwner,
@@ -307,8 +377,7 @@ abstract contract BaseDotns is Test {
         returns (bytes32 node)
     {
         if (status != IPopRules.PopStatus.NoStatus) {
-            vm.prank(labelOwner);
-            popRules.setUserPopStatus(status);
+            _setPersonhoodStatus(labelOwner, status);
         }
 
         _commitAndRegister(label, labelOwner, true);

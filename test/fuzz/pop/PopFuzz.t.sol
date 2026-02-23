@@ -9,8 +9,7 @@ contract PopRulesFuzzTest is BaseDotns {
         length = bound(length, 6, 8);
         string memory nameLabel = string(abi.encodePacked(_makeAlpha(seed, length), "01"));
 
-        vm.prank(ed);
-        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+        _setPersonhoodStatus(ed, IPopRules.PopStatus.PopFull);
 
         IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck(nameLabel, ed);
 
@@ -22,8 +21,7 @@ contract PopRulesFuzzTest is BaseDotns {
         length = bound(length, 9, 14);
         string memory nameLabel = string(abi.encodePacked(_makeAlpha(seed, length), "01"));
 
-        vm.prank(ed);
-        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+        _setPersonhoodStatus(ed, IPopRules.PopStatus.PopFull);
 
         IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck(nameLabel, ed);
 
@@ -34,10 +32,11 @@ contract PopRulesFuzzTest is BaseDotns {
     function testFuzz_nostatus_user_cannot_access_popfull(uint256 seed) public {
         string memory nameLabel = _makeAlpha(seed, 8);
 
-        vm.prank(ed);
-        popRules.setUserPopStatus(IPopRules.PopStatus.NoStatus);
-
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPopRules.PopError.selector, "Requires Full Personhood verification"
+            )
+        );
         popRules.priceWithCheck(nameLabel, ed);
     }
 
@@ -53,10 +52,11 @@ contract PopRulesFuzzTest is BaseDotns {
 
         IPopRules.PopStatus userStatus = IPopRules.PopStatus(bound(statusSeed, 0, 3));
 
-        vm.prank(ed);
-        popRules.setUserPopStatus(userStatus);
+        _setPersonhoodStatus(ed, userStatus);
 
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(IPopRules.PopError.selector, "Reserved for Governance")
+        );
         popRules.priceWithCheck(nameLabel, ed);
     }
 
@@ -75,7 +75,11 @@ contract PopRulesFuzzTest is BaseDotns {
         assertTrue(isReserved);
         assertEq(reservedFor, leonardo);
 
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPopRules.PopError.selector, "Base name reserved for original Lite registrant"
+            )
+        );
         popRules.priceWithCheck(baseName, tiago);
     }
 
