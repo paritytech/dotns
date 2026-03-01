@@ -171,9 +171,79 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.prank(ed);
         vm.expectRevert(
-            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, ed)
+            abi.encodeWithSelector(IDotnsRegistrarController.NotWhiteListedOrOwner.selector, ed)
         );
         dotnsRegistrarController.registerReserved(registration);
+    }
+
+    function test_whitelistaddress_reverts_non_owner() public {
+        vm.prank(ed);
+        vm.expectRevert(
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, ed)
+        );
+        dotnsRegistrarController.whiteListAddress(ed, true);
+    }
+
+    function test_whitelisted_can_register_reserved() public {
+        string memory nameLabel = "reserved01";
+        address nameOwner = ed;
+
+        vm.prank(owner);
+        dotnsRegistrarController.whiteListAddress(ed, true);
+        assertTrue(dotnsRegistrarController.isWhiteListed(ed));
+
+        vm.startPrank(ed);
+
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "whitelisted"));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        dotnsRegistrarController.commit(commitment);
+
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        dotnsRegistrarController.registerReserved(registration);
+        vm.stopPrank();
+
+        bytes32 labelHash = keccak256(bytes(nameLabel));
+        bytes32 node = _namehash(dotNode, labelHash);
+
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), nameOwner);
+        assertEq(dotnsRegistry.owner(node), nameOwner);
+    }
+
+    function test_removed_from_whitelist_cannot_register_reserved() public {
+        string memory nameLabel = "reserved02";
+        address nameOwner = ed;
+
+        vm.startPrank(owner);
+        dotnsRegistrarController.whiteListAddress(ed, true);
+        dotnsRegistrarController.whiteListAddress(ed, false);
+        vm.stopPrank();
+
+        assertFalse(dotnsRegistrarController.isWhiteListed(ed));
+
+        vm.startPrank(ed);
+
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "removed"));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        dotnsRegistrarController.commit(commitment);
+
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsRegistrarController.NotWhiteListedOrOwner.selector, ed)
+        );
+        dotnsRegistrarController.registerReserved(registration);
+        vm.stopPrank();
     }
 
     function test_registration_reverts_unauthorized_store() public {

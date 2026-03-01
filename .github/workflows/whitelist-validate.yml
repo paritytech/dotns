@@ -1,0 +1,125 @@
+name: Validate Whitelist Request
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  validate:
+    if: contains(github.event.issue.labels.*.name, 'whitelist-request')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract address from issue body
+        id: extract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || "";
+            const addressMatch = body.match(/### Address\s*\n\s*(.+)/);
+
+            if (!addressMatch) {
+              core.setFailed("Could not extract address from issue body");
+              return;
+            }
+
+            const address = addressMatch[1].trim();
+            core.setOutput("address", address);
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install validation dependencies
+        run: npm install --no-save viem@^2.43.1 @polkadot/util-crypto@^14.0.1
+
+      - name: Validate address
+        id: validate
+        env:
+          ADDRESS: ${{ steps.extract.outputs.address }}
+        run: |
+          node << 'SCRIPT'
+          const { isAddress, getAddress } = require("viem");
+          const { decodeAddress, encodeAddress } = require("@polkadot/util-crypto");
+
+          const address = process.env.ADDRESS;
+
+          let type = "unknown";
+          let valid = false;
+          let checksummed = address;
+          let message = "";
+
+          if (isAddress(address)) {
+            type = "evm";
+            valid = true;
+            checksummed = getAddress(address);
+            message = `EVM (H160) address detected: \`${checksummed}\``;
+          } else {
+            try {
+              const decoded = decodeAddress(address);
+              const recoded = encodeAddress(decoded, 42);
+              if (address === recoded) {
+                type = "substrate";
+                valid = true;
+                message = `Substrate (SS58) address detected: \`${address}\`\n\n> The contract requires an EVM (H160) address. Please provide the corresponding EVM address or a maintainer will resolve it before approval.`;
+              }
+            } catch {}
+          }
+
+          if (!valid) {
+            message = `\`${address}\` is not a valid EVM or Substrate address.`;
+          }
+
+          const fs = require("fs");
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `type=${type}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `valid=${valid}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `checksummed=${checksummed}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `message=${message.replace(/\n/g, "%0A")}\n`);
+          SCRIPT
+
+      - name: Comment validation result
+        uses: actions/github-script@v7
+        env:
+          VALID: ${{ steps.validate.outputs.valid }}
+          MESSAGE: ${{ steps.validate.outputs.message }}
+          ADDR_TYPE: ${{ steps.validate.outputs.type }}
+        with:
+          script: |
+            const valid = process.env.VALID === "true";
+            const message = process.env.MESSAGE.replace(/%0A/g, "\n");
+            const type = process.env.ADDR_TYPE;
+
+            const icon = valid ? ":white_check_mark:" : ":x:";
+            const status = valid ? "Valid" : "Invalid";
+
+            const body = [
+              `### ${icon} Address Validation: ${status}`,
+              "",
+              message,
+              "",
+              valid && type === "evm"
+                ? "This address is ready for whitelisting. A maintainer will review and apply the `whitelist-approved` label to proceed."
+                : "",
+            ].filter(Boolean).join("\n");
+
+            const { owner, repo } = context.repo;
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: context.payload.issue.number,
+              body,
+            });
+
+            if (!valid) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: context.payload.issue.number,
+                labels: ["needs-info"],
+              });
+            }

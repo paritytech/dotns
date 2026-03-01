@@ -77,12 +77,24 @@ contract DotnsRegistrarController is
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered");
 
+    /// @notice Whitelist for addresses allowed to call `registerReserved`.
+    mapping(address user => bool isWhiteListed) public whiteList;
+
     /// @dev Reserved storage space to allow for layout changes in the future.
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     /// @notice Restricts calls to the forward registry contract.
     modifier onlyRegistry() {
         _onlyRegistry();
+        _;
+    }
+
+    /// @notice Restricts calls to whitelisted addresses or the owner.
+    /// @dev This is used to gate the `registerReserved` function, which allows registering reserved names
+    ///      without PoP checks or payment. This is necessary to allow the owner to register reserved names
+    ///      for users who are already known and verified and dont need Pop checks.
+    modifier onlyWhiteListedOrOwner() {
+        _onlyWhiteListedOrOwner();
         _;
     }
 
@@ -241,7 +253,22 @@ contract DotnsRegistrarController is
     }
 
     /// @inheritdoc IDotnsRegistrarController
-    function registerReserved(Registration calldata registration) external override onlyOwner {
+    function isWhiteListed(address who) external view override returns (bool) {
+        return whiteList[who];
+    }
+
+    /// @inheritdoc IDotnsRegistrarController
+    function whiteListAddress(address who, bool whiteListStatus) external override onlyOwner {
+        whiteList[who] = whiteListStatus;
+        emit WhiteListed(who, whiteListStatus);
+    }
+
+    /// @inheritdoc IDotnsRegistrarController
+    function registerReserved(Registration calldata registration)
+        external
+        override
+        onlyWhiteListedOrOwner
+    {
         require(available(registration.label), NameNotAvailable(registration.label));
 
         bytes32 labelhash = _labelhash(registration.label);
@@ -325,7 +352,12 @@ contract DotnsRegistrarController is
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.1.0";
+        versionString = "1.2.0";
+    }
+
+    /// @notice Internal check enforcing whitelist-or-owner access.
+    function _onlyWhiteListedOrOwner() internal view {
+        require(whiteList[msg.sender] || msg.sender == owner(), NotWhiteListedOrOwner(msg.sender));
     }
 
     /// @notice Internal check enforcing registry-only access.

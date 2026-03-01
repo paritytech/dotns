@@ -47,6 +47,14 @@ interface IDotnsRegistrarController {
         address store
     );
 
+    /// @notice Emitted when a name is registered through the reserved registration function.
+    /// @param who The address being whitelisted
+    /// @param whiteListStatus Whether the address was added or removed from the whitelist.
+    event WhiteListed(address indexed who, bool indexed whiteListStatus);
+
+    /// @notice Thrown when the caller is not whitelisted or the owner.
+    /// @param caller The address that attempted the call.
+    error NotWhiteListedOrOwner(address caller);
     /// @notice Thrown when an unexpired commitment already exists.
     /// @param commitment Commitment hash.
     error UnexpiredCommitmentExists(bytes32 commitment);
@@ -115,4 +123,15 @@ interface IDotnsRegistrarController {
     /// @dev Registration parameters must match the committed values.
     /// @param registration Registration parameters.
     function registerReserved(Registration calldata registration) external;
+
+    /// @notice Checks if the given address is whitelisted to call `registerReserved`.
+    /// @param who Address to check.
+    /// @return isWhiteListed True if the address is whitelisted.
+    function isWhiteListed(address who) external view returns (bool isWhiteListed);
+
+    /// @notice Adds or removes an address from the whitelist for `registerReserved`.
+    /// @param who Address to update.
+    /// @param whiteListStatus True to add to whitelist, false to remove.
+    /// @custom:reverts NotOwner if caller is not the contract owner.
+    function whiteListAddress(address who, bool whiteListStatus) external;
 }

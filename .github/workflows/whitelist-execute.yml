@@ -1,0 +1,115 @@
+name: Execute Whitelist On-Chain
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  whitelist:
+    if: github.event.label.name == 'whitelist-approved'
+    runs-on: ubuntu-latest
+    env:
+      CONTROLLER_ADDRESS: "0xd09e0F1c1E6CE8Cf40df929ef4FC778629573651"
+      RPC_URL: "https://services.polkadothub-rpc.com/testnet"
+
+    steps:
+      - name: Extract address from issue body
+        id: extract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || "";
+            const addressMatch = body.match(/### Address\s*\n\s*(.+)/);
+
+            if (!addressMatch) {
+              core.setFailed("Could not extract address from issue body");
+              return;
+            }
+
+            const address = addressMatch[1].trim();
+
+            const evmRegex = /^0x[0-9a-fA-F]{40}$/;
+            if (!evmRegex.test(address)) {
+              core.setFailed("Address is not a valid EVM (H160) address. Substrate addresses must be converted before approval.");
+              return;
+            }
+
+            core.setOutput("address", address);
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Call whiteListAddress on-chain
+        id: execute
+        env:
+          DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
+          ADDRESS: ${{ steps.extract.outputs.address }}
+        run: |
+          TX_HASH=$(cast send "$CONTROLLER_ADDRESS" \
+            "whiteListAddress(address,bool)" \
+            "$ADDRESS" true \
+            --rpc-url "$RPC_URL" \
+            --private-key "$DOTNS_ADMIN_KEY" \
+            --json | jq -r '.transactionHash')
+
+          echo "tx_hash=$TX_HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Verify whitelisting
+        id: verify
+        env:
+          ADDRESS: ${{ steps.extract.outputs.address }}
+        run: |
+          RESULT=$(cast call "$CONTROLLER_ADDRESS" \
+            "isWhiteListed(address)(bool)" \
+            "$ADDRESS" \
+            --rpc-url "$RPC_URL")
+
+          echo "result=$RESULT" >> "$GITHUB_OUTPUT"
+
+      - name: Comment and close issue on success
+        if: success()
+        uses: actions/github-script@v7
+        env:
+          TX_HASH: ${{ steps.execute.outputs.tx_hash }}
+          ADDRESS: ${{ steps.extract.outputs.address }}
+          VERIFIED: ${{ steps.verify.outputs.result }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            const txHash = process.env.TX_HASH;
+            const address = process.env.ADDRESS;
+            const verified = process.env.VERIFIED;
+
+            const body = [
+              "### :white_check_mark: Address Whitelisted",
+              "",
+              `**Address:** \`${address}\``,
+              `**Transaction:** \`${txHash}\``,
+              `**On-chain verified:** \`isWhiteListed\` = \`${verified}\``,
+            ].join("\n");
+
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            await github.rest.issues.update({ owner, repo, issue_number, state: "closed" });
+
+      - name: Comment on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+
+            const body = [
+              "### :x: Whitelisting Failed",
+              "",
+              "The on-chain transaction failed. Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.",
+              "",
+              "The `whitelist-approved` label has been kept so the workflow can be re-triggered after fixing the issue.",
+            ].join("\n");
+
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });

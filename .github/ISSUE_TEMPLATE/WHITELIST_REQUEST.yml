@@ -1,0 +1,40 @@
+name: Whitelist Request
+description: Request to be whitelisted for reserved name registration
+title: "[Whitelist]: "
+labels: ["whitelist-request"]
+
+body:
+  - type: input
+    id: address
+    attributes:
+      label: Address
+      description: The EVM (0x…) or Substrate (SS58) address to whitelist.
+      placeholder: "0x1234… or 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: address_type
+    attributes:
+      label: Address Type
+      options:
+        - EVM (H160)
+        - Substrate (SS58)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      placeholder: Why do you need whitelisting? Describe your use case for reserved name registration.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      placeholder: Any other relevant information (e.g. related governance proposal, organization).
+    validations:
+      required: false
