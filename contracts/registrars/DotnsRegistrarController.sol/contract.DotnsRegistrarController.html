@@ -38,7 +38,7 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-2f2e8d78.js";
+            window.path_to_searchindex_js = "../../../searchindex-a086cdc0.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../../toc-ba2d40b3.js"></script>
@@ -181,7 +181,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b700103285587d0fded6f47ee631aca94910f02b/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/68564fc351cbbc71107856b0eae4986e95b7337f/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -197,7 +197,7 @@ from the ERC721 registrar for authorisation.</li>
 </ul>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
+<h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
 <h3 id="dot_node"><a class="header" href="#dot_node">DOT_NODE</a></h3>
 <p>Namehash of the .dot TLD.</p>
 <pre><code class="language-solidity">bytes32 private constant DOT_NODE =
@@ -207,6 +207,13 @@ security-contact: admin@parity.io</p>
 <p>Upper bound for commitment validity to cap storage griefing risk.</p>
 <pre><code class="language-solidity">uint256 public constant MAX_ALLOWED_COMMITMENT_AGE = 7 days
 </code></pre>
+<h3 id="dotns_registered_key"><a class="header" href="#dotns_registered_key">DOTNS_REGISTERED_KEY</a></h3>
+<p>Key prefix for Dotns-written Store immutable entries (“dotns.registered”).
+casting to ‘bytes32’ is safe because this is safe
+forge-lint: disable-next-line(unsafe-typecast)</p>
+<pre><code class="language-solidity">bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered")
+</code></pre>
+<h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="dotnsregistrar"><a class="header" href="#dotnsregistrar">dotnsRegistrar</a></h3>
 <p>Base registrar responsible for minting name ownership.</p>
 <pre><code class="language-solidity">IDotnsRegistrar public dotnsRegistrar
@@ -238,12 +245,6 @@ security-contact: admin@parity.io</p>
 <h3 id="commitments"><a class="header" href="#commitments">commitments</a></h3>
 <p>Stores Mapping of commitment hashes to timestamp committed.</p>
 <pre><code class="language-solidity">mapping(bytes32 hash =&gt; uint256 timestamp) public commitments
-</code></pre>
-<h3 id="dotns_registered_key"><a class="header" href="#dotns_registered_key">DOTNS_REGISTERED_KEY</a></h3>
-<p>Key prefix for Dotns-written Store immutable entries (“dotns.registered”).
-casting to ‘bytes32’ is safe because this is safe
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered")
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in the future.</p>
@@ -381,7 +382,7 @@ oz-upgrades-unsafe-allow: constructor</p>
 <h3 id="registerreserved"><a class="header" href="#registerreserved">registerReserved</a></h3>
 <p>Registers a name after the commitment delay.</p>
 <p>Registration parameters must match the committed values.</p>
-<pre><code class="language-solidity">function registerReserved(Registration calldata registration) external override;
+<pre><code class="language-solidity">function registerReserved(Registration calldata registration) external override onlyOwner;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper">
