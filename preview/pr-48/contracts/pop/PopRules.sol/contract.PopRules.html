@@ -38,7 +38,7 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-a1f3085c.js";
+            window.path_to_searchindex_js = "../../../searchindex-a086cdc0.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../../toc-ba2d40b3.js"></script>
@@ -181,7 +181,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="poprules"><a class="header" href="#poprules">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/d2f0730740edf1d8e31fc2b688bc9a986cb0cc66/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/5dcd170dfe86cdf0fbe0ce6473100c5c3e6cba17/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -189,6 +189,16 @@ PopRules</p>
 <p>Implements DotNS pricing with PoP-tier validation and base-name reservations</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
+<h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
+<h3 id="max_reservation_time"><a class="header" href="#max_reservation_time">MAX_RESERVATION_TIME</a></h3>
+<p>Maximum time a base name can be reserved</p>
+<pre><code class="language-solidity">uint256 public constant MAX_RESERVATION_TIME = 12 weeks
+</code></pre>
+<h3 id="dot_node"><a class="header" href="#dot_node">DOT_NODE</a></h3>
+<p>Namehash of .dot TLD</p>
+<pre><code class="language-solidity">bytes32 private constant DOT_NODE =
+    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce
+</code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="startingprice"><a class="header" href="#startingprice">startingPrice</a></h3>
 <p>Wei price for names with 9 characters and up</p>
@@ -201,15 +211,6 @@ security-contact: admin@parity.io</p>
 <h3 id="reservations"><a class="header" href="#reservations">reservations</a></h3>
 <p>Active reservations for base names</p>
 <pre><code class="language-solidity">mapping(string baseName =&gt; Reservation reservation) public reservations
-</code></pre>
-<h3 id="max_reservation_time"><a class="header" href="#max_reservation_time">MAX_RESERVATION_TIME</a></h3>
-<p>Maximum time a base name can be reserved</p>
-<pre><code class="language-solidity">uint256 public constant MAX_RESERVATION_TIME = 12 weeks
-</code></pre>
-<h3 id="dot_node"><a class="header" href="#dot_node">DOT_NODE</a></h3>
-<p>Namehash of .dot TLD</p>
-<pre><code class="language-solidity">bytes32 private constant DOT_NODE =
-    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce
 </code></pre>
 <h3 id="dotregistrycontroller"><a class="header" href="#dotregistrycontroller">dotRegistryController</a></h3>
 <p>Authorized registry controller address</p>
