@@ -38,7 +38,7 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-947838fe.js";
+            window.path_to_searchindex_js = "../../../searchindex-c067f905.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../../toc-755c45f4.js"></script>
@@ -181,7 +181,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/087e1fb6f0b75a648d17f91655ea576b057a1885/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/a90d736d704cead1f5a2588994c2ac7f4b6f041a/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Registrar Controller</p>
 <p>Interface for registering .dot labels using a commit–reveal scheme.</p>
@@ -303,6 +303,50 @@ security-contact: admin@parity.io</p>
 </tbody>
 </table>
 </div>
+<h3 id="iswhitelisted"><a class="header" href="#iswhitelisted">isWhiteListed</a></h3>
+<p>Checks if the given address is whitelisted to call <code>registerReserved</code>.</p>
+<pre><code class="language-solidity">function isWhiteListed(address who) external view returns (bool isWhiteListed);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>who</code></td><td><code>address</code></td><td>Address to check.</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>isWhiteListed</code></td><td><code>bool</code></td><td>True if the address is whitelisted.</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="whitelistaddress"><a class="header" href="#whitelistaddress">whiteListAddress</a></h3>
+<p>Adds or removes an address from the whitelist for <code>registerReserved</code>.</p>
+<p><strong>Note:</strong>
+reverts: NotOwner if caller is not the contract owner.</p>
+<pre><code class="language-solidity">function whiteListAddress(address who, bool whiteListStatus) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>who</code></td><td><code>address</code></td><td>Address to update.</td></tr>
+<tr><td><code>whiteListStatus</code></td><td><code>bool</code></td><td>True to add to whitelist, false to remove.</td></tr>
+</tbody>
+</table>
+</div>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
 <h3 id="namecommitted"><a class="header" href="#namecommitted">NameCommitted</a></h3>
 <p>Emitted when a commitment is submitted.</p>
@@ -344,7 +388,38 @@ security-contact: admin@parity.io</p>
 </tbody>
 </table>
 </div>
+<h3 id="whitelisted"><a class="header" href="#whitelisted">WhiteListed</a></h3>
+<p>Emitted when an address is added to or removed from the whitelist.</p>
+<pre><code class="language-solidity">event WhiteListed(address indexed who, bool indexed whiteListStatus);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>who</code></td><td><code>address</code></td><td>The address being whitelisted.</td></tr>
+<tr><td><code>whiteListStatus</code></td><td><code>bool</code></td><td>Whether the address was added or removed from the whitelist.</td></tr>
+</tbody>
+</table>
+</div>
 <h2 id="errors"><a class="header" href="#errors">Errors</a></h2>
+<h3 id="notwhitelistedorowner"><a class="header" href="#notwhitelistedorowner">NotWhiteListedOrOwner</a></h3>
+<p>Thrown when the caller is not whitelisted or the owner.</p>
+<pre><code class="language-solidity">error NotWhiteListedOrOwner(address caller);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>caller</code></td><td><code>address</code></td><td>The address that attempted the call.</td></tr>
+</tbody>
+</table>
+</div>
 <h3 id="unexpiredcommitmentexists"><a class="header" href="#unexpiredcommitmentexists">UnexpiredCommitmentExists</a></h3>
 <p>Thrown when an unexpired commitment already exists.</p>
 <pre><code class="language-solidity">error UnexpiredCommitmentExists(bytes32 commitment);
