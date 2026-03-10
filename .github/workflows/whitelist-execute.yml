@@ -3,6 +3,8 @@ name: Execute Whitelist On-Chain
 on:
   issues:
     types: [labeled]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -10,13 +12,28 @@ permissions:
 
 jobs:
   whitelist:
-    if: github.event.label.name == 'whitelist-approved' && contains(github.event.issue.labels.*.name, 'whitelist-request')
+    if: |
+      (github.event_name == 'issues' && github.event.label.name == 'whitelist-approved' && contains(github.event.issue.labels.*.name, 'whitelist-request')) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/retry') && contains(github.event.issue.labels.*.name, 'whitelist-approved') && contains(github.event.issue.labels.*.name, 'whitelist-request') && (github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'COLLABORATOR' || github.event.comment.user.login == github.event.issue.user.login))
     runs-on: ubuntu-latest
     env:
       CONTROLLER_ADDRESS: "0xd09e0F1c1E6CE8Cf40df929ef4FC778629573651"
       RPC_URL: "https://services.polkadothub-rpc.com/testnet"
+      SUBSTRATE_RPC_URL: "https://asset-hub-paseo-rpc.n.dwellir.com"
+      BLOCKSCOUT_URL: "https://blockscout-testnet.polkadot.io"
 
     steps:
+      - name: Acknowledge retry
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              ...context.repo,
+              comment_id: context.payload.comment.id,
+              content: "rocket",
+            });
+
       - name: Extract address from issue body
         id: extract
         uses: actions/github-script@v7
@@ -30,26 +47,236 @@ jobs:
               return;
             }
 
-            const address = addressMatch[1].trim();
+            core.setOutput("address", addressMatch[1].trim());
 
-            const evmRegex = /^0x[0-9a-fA-F]{40}$/;
-            if (!evmRegex.test(address)) {
-              core.setFailed("Address is not a valid EVM (H160) address. Substrate addresses must be converted before approval.");
-              return;
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install address resolution dependencies
+        run: npm install --no-save @polkadot/util-crypto@^14.0.1
+
+      - name: Resolve and verify address
+        id: resolve
+        env:
+          ADDRESS: ${{ steps.extract.outputs.address }}
+        run: |
+          node << 'SCRIPT'
+          const { decodeAddress, encodeAddress, xxhashAsHex, blake2AsHex } = require("@polkadot/util-crypto");
+          const fs = require("fs");
+
+          const address = process.env.ADDRESS;
+          const rpcUrl = process.env.SUBSTRATE_RPC_URL;
+          const evmRegex = /^0x[0-9a-fA-F]{40}$/;
+
+          function output(key, value) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
+          }
+
+          // EVM address submitted directly — no conversion or mapping check needed
+          if (evmRegex.test(address)) {
+            output("evm_address", address);
+            output("was_converted", "false");
+            output("original_address", address);
+            output("is_mapped", "true");
+            process.exit(0);
+          }
+
+          // Validate Substrate (SS58) address
+          let decoded;
+          try {
+            decoded = decodeAddress(address);
+            const recoded = encodeAddress(decoded, 42);
+            if (address !== recoded) {
+              console.error("Address is not a valid SS58 (prefix 42) or EVM address.");
+              process.exit(1);
+            }
+          } catch (e) {
+            console.error(`Invalid address format: ${e.message}`);
+            process.exit(1);
+          }
+
+          (async () => {
+            // Convert Substrate → EVM via ReviveApi_address runtime call
+            const hexBytes = Buffer.from(decoded).toString("hex");
+
+            const addrResponse = await fetch(rpcUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 1,
+                method: "state_call",
+                params: ["ReviveApi_address", "0x" + hexBytes],
+              }),
+            });
+
+            const addrResult = await addrResponse.json();
+
+            if (addrResult.error) {
+              console.error(`RPC error resolving address: ${JSON.stringify(addrResult.error)}`);
+              process.exit(1);
             }
 
-            core.setOutput("address", address);
+            const evmAddress = addrResult.result;
+            if (!evmRegex.test(evmAddress)) {
+              console.error(`Unexpected EVM address from RPC: ${evmAddress}`);
+              process.exit(1);
+            }
+
+            console.log(`Resolved Substrate ${address} → EVM ${evmAddress}`);
+
+            // Check if account is mapped on-chain via Revive.OriginalAccount storage
+            const palletHash = xxhashAsHex("Revive", 128).slice(2);
+            const storageHash = xxhashAsHex("OriginalAccount", 128).slice(2);
+            const evmBytes = Buffer.from(evmAddress.slice(2), "hex");
+            const keyHash = blake2AsHex(evmBytes, 128).slice(2);
+            const storageKey = "0x" + palletHash + storageHash + keyHash + evmAddress.slice(2).toLowerCase();
+
+            const storageResponse = await fetch(rpcUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 2,
+                method: "state_getStorage",
+                params: [storageKey],
+              }),
+            });
+
+            const storageResult = await storageResponse.json();
+            const isMapped = storageResult.result !== null && storageResult.result !== undefined;
+
+            console.log(`Account mapping status: ${isMapped ? "mapped" : "NOT mapped"}`);
+
+            output("evm_address", evmAddress);
+            output("was_converted", "true");
+            output("original_address", address);
+            output("is_mapped", String(isMapped));
+          })();
+          SCRIPT
+
+      - name: Comment if account not mapped
+        if: steps.resolve.outputs.is_mapped == 'false'
+        uses: actions/github-script@v7
+        env:
+          ORIGINAL_ADDRESS: ${{ steps.resolve.outputs.original_address }}
+          EVM_ADDRESS: ${{ steps.resolve.outputs.evm_address }}
+        with:
+          script: |
+            const marker = "<!-- dotns-whitelist-bot -->";
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            const author = context.payload.issue.user.login;
+            const original = process.env.ORIGINAL_ADDRESS;
+            const evm = process.env.EVM_ADDRESS;
+
+            const section = [
+              "",
+              "---",
+              "",
+              "### Account Not Mapped",
+              "",
+              `@${author} Your Substrate address \`${original}\` has not been mapped to its EVM address (\`${evm}\`) on-chain yet.`,
+              "",
+              "Before your address can be whitelisted you need to map your account. Install the [DotNS CLI](https://github.com/paritytech/dotns-sdk/releases) and run:",
+              "",
+              "```bash",
+              `dotns account map --rpc wss://services.polkadothub-rpc.com/testnet -m "<your mnemonic>"`,
+              "```",
+              "",
+              "Run `dotns account --help` for all authentication options (keystore, key URI, etc.).",
+              "",
+              "Once your account is mapped, comment `/retry` on this issue to try again.",
+            ].join("\n");
+
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: existing.body + section });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: marker + section });
+            }
+
+            core.setFailed("Account not mapped on-chain");
 
       - name: Install Foundry
+        if: steps.resolve.outputs.is_mapped == 'true'
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          cache: true
+
+      - name: Check if already whitelisted
+        if: steps.resolve.outputs.is_mapped == 'true'
+        id: precheck
+        env:
+          ADDRESS: ${{ steps.resolve.outputs.evm_address }}
+        run: |
+          RESULT=$(cast call "$CONTROLLER_ADDRESS" \
+            "isWhiteListed(address)(bool)" \
+            "$ADDRESS" \
+            --rpc-url "$RPC_URL")
+
+          echo "already_whitelisted=$RESULT" >> "$GITHUB_OUTPUT"
+
+      - name: Comment if already whitelisted
+        if: steps.resolve.outputs.is_mapped == 'true' && steps.precheck.outputs.already_whitelisted == 'true'
+        uses: actions/github-script@v7
+        env:
+          ADDRESS: ${{ steps.resolve.outputs.evm_address }}
+          ORIGINAL_ADDRESS: ${{ steps.resolve.outputs.original_address }}
+          WAS_CONVERTED: ${{ steps.resolve.outputs.was_converted }}
+        with:
+          script: |
+            const marker = "<!-- dotns-whitelist-bot -->";
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            const address = process.env.ADDRESS;
+            const originalAddress = process.env.ORIGINAL_ADDRESS;
+            const wasConverted = process.env.WAS_CONVERTED === "true";
+            const explorerUrl = process.env.BLOCKSCOUT_URL;
+
+            const lines = [
+              "",
+              "---",
+              "",
+              "### Already Whitelisted",
+              "",
+            ];
+
+            if (wasConverted) {
+              lines.push(`**Substrate Address:** \`${originalAddress}\``);
+              lines.push(`**Mapped EVM Address:** \`${address}\``);
+            } else {
+              lines.push(`**Address:** \`${address}\``);
+            }
+
+            lines.push("");
+            lines.push(`This address is already whitelisted on-chain. No action needed.`);
+            lines.push("");
+            lines.push(`[View on Blockscout](${explorerUrl}/address/${address})`);
+
+            const section = lines.join("\n");
+
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: existing.body + section });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: marker + section });
+            }
+
+            await github.rest.issues.update({ owner, repo, issue_number, state: "closed" });
 
       - name: Call whiteListAddress on-chain
+        if: steps.resolve.outputs.is_mapped == 'true' && steps.precheck.outputs.already_whitelisted != 'true'
         id: execute
         env:
-          # Private key for the contract owner/admin wallet, stored as a GitHub Actions secret.
-          # Used to sign the whiteListAddress transaction on-chain.
           DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
-          ADDRESS: ${{ steps.extract.outputs.address }}
+          ADDRESS: ${{ steps.resolve.outputs.evm_address }}
         run: |
           TX_HASH=$(cast send "$CONTROLLER_ADDRESS" \
             "whiteListAddress(address,bool)" \
@@ -61,9 +288,10 @@ jobs:
           echo "tx_hash=$TX_HASH" >> "$GITHUB_OUTPUT"
 
       - name: Verify whitelisting
+        if: steps.resolve.outputs.is_mapped == 'true' && steps.precheck.outputs.already_whitelisted != 'true'
         id: verify
         env:
-          ADDRESS: ${{ steps.extract.outputs.address }}
+          ADDRESS: ${{ steps.resolve.outputs.evm_address }}
         run: |
           RESULT=$(cast call "$CONTROLLER_ADDRESS" \
             "isWhiteListed(address)(bool)" \
@@ -73,45 +301,84 @@ jobs:
           echo "result=$RESULT" >> "$GITHUB_OUTPUT"
 
       - name: Comment and close issue on success
-        if: success()
+        if: success() && steps.resolve.outputs.is_mapped == 'true' && steps.precheck.outputs.already_whitelisted != 'true'
         uses: actions/github-script@v7
         env:
           TX_HASH: ${{ steps.execute.outputs.tx_hash }}
-          ADDRESS: ${{ steps.extract.outputs.address }}
+          ADDRESS: ${{ steps.resolve.outputs.evm_address }}
+          ORIGINAL_ADDRESS: ${{ steps.resolve.outputs.original_address }}
+          WAS_CONVERTED: ${{ steps.resolve.outputs.was_converted }}
           VERIFIED: ${{ steps.verify.outputs.result }}
         with:
           script: |
+            const marker = "<!-- dotns-whitelist-bot -->";
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
             const txHash = process.env.TX_HASH;
             const address = process.env.ADDRESS;
+            const originalAddress = process.env.ORIGINAL_ADDRESS;
+            const wasConverted = process.env.WAS_CONVERTED === "true";
             const verified = process.env.VERIFIED;
+            const explorerUrl = process.env.BLOCKSCOUT_URL;
 
-            const body = [
+            const lines = [
+              "",
+              "---",
+              "",
               "### Address Whitelisted",
               "",
-              `**Address:** \`${address}\``,
-              `**Transaction:** \`${txHash}\``,
-              `**On-chain verified:** \`isWhiteListed\` = \`${verified}\``,
-            ].join("\n");
+            ];
 
-            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            if (wasConverted) {
+              lines.push(`**Substrate Address:** \`${originalAddress}\``);
+              lines.push(`**Mapped EVM Address:** \`${address}\``);
+            } else {
+              lines.push(`**Address:** \`${address}\``);
+            }
+
+            lines.push(`**Transaction:** [\`${txHash}\`](${explorerUrl}/tx/${txHash})`);
+            lines.push(`**On-chain verified:** \`isWhiteListed\` = \`${verified}\``);
+            lines.push("");
+            lines.push(`[View on Blockscout](${explorerUrl}/address/${address})`);
+
+            const section = lines.join("\n");
+
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: existing.body + section });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: marker + section });
+            }
+
             await github.rest.issues.update({ owner, repo, issue_number, state: "closed" });
 
       - name: Comment on failure
-        if: failure()
+        if: failure() && steps.resolve.outputs.is_mapped != 'false'
         uses: actions/github-script@v7
         with:
           script: |
+            const marker = "<!-- dotns-whitelist-bot -->";
             const { owner, repo } = context.repo;
             const issue_number = context.payload.issue.number;
 
-            const body = [
+            const section = [
+              "",
+              "---",
+              "",
               "### Whitelisting Failed",
               "",
               "The on-chain transaction failed. Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.",
               "",
-              "The `whitelist-approved` label has been kept so the workflow can be re-triggered after fixing the issue.",
+              "Comment `/retry` on this issue to try again.",
             ].join("\n");
 
-            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: existing.body + section });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: marker + section });
+            }

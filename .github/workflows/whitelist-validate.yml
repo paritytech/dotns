@@ -12,6 +12,8 @@ jobs:
   validate:
     if: contains(github.event.issue.labels.*.name, 'whitelist-request')
     runs-on: ubuntu-latest
+    env:
+      SUBSTRATE_RPC_URL: "https://asset-hub-paseo-rpc.n.dwellir.com"
 
     steps:
       - name: Extract address from issue body
@@ -49,50 +51,120 @@ jobs:
         run: |
           node << 'SCRIPT'
           const { isAddress, getAddress } = require("viem");
-          const { decodeAddress, encodeAddress } = require("@polkadot/util-crypto");
+          const { decodeAddress, encodeAddress, xxhashAsHex, blake2AsHex } = require("@polkadot/util-crypto");
 
           const address = process.env.ADDRESS;
+          const rpcUrl = process.env.SUBSTRATE_RPC_URL;
           const selectedType = process.env.ADDRESS_TYPE;
 
           let type = "unknown";
           let valid = false;
           let checksummed = address;
+          let evmMapped = "";
+          let isMapped = false;
           let message = "";
 
-          if (isAddress(address)) {
-            type = "evm";
-            valid = true;
-            checksummed = getAddress(address);
-            if (selectedType && selectedType.includes("SS58")) {
-              message = `You selected **Substrate (SS58)** but provided an EVM address: \`${checksummed}\`\n\nThis looks like a valid EVM address so we will proceed with it.`;
-            } else {
-              message = `EVM (H160) address detected: \`${checksummed}\``;
-            }
-          } else {
-            try {
-              const decoded = decodeAddress(address);
-              const recoded = encodeAddress(decoded, 42);
-              if (address === recoded) {
-                type = "substrate";
-                valid = true;
-                if (selectedType && selectedType.includes("H160")) {
-                  message = `You selected **EVM (H160)** but provided a Substrate address: \`${address}\`\n\n> The contract requires an EVM (H160) address. Please update the issue with your EVM address.`;
-                } else {
-                  message = `Substrate (SS58) address detected: \`${address}\`\n\n> The contract requires an EVM (H160) address. Please provide the corresponding EVM address or a maintainer will resolve it before approval.`;
-                }
+          async function resolveEvmAddress(ss58Address) {
+            const decoded = decodeAddress(ss58Address);
+            const hexBytes = Buffer.from(decoded).toString("hex");
+            const response = await fetch(rpcUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 1,
+                method: "state_call",
+                params: ["ReviveApi_address", "0x" + hexBytes],
+              }),
+            });
+            const result = await response.json();
+            if (result.error) throw new Error(JSON.stringify(result.error));
+            return result.result;
+          }
+
+          async function checkAccountMapped(evmAddr) {
+            const palletHash = xxhashAsHex("Revive", 128).slice(2);
+            const storageHash = xxhashAsHex("OriginalAccount", 128).slice(2);
+            const evmBytes = Buffer.from(evmAddr.slice(2), "hex");
+            const keyHash = blake2AsHex(evmBytes, 128).slice(2);
+            const storageKey = "0x" + palletHash + storageHash + keyHash + evmAddr.slice(2).toLowerCase();
+
+            const response = await fetch(rpcUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 2,
+                method: "state_getStorage",
+                params: [storageKey],
+              }),
+            });
+            const result = await response.json();
+            return result.result !== null && result.result !== undefined;
+          }
+
+          (async () => {
+            if (isAddress(address)) {
+              type = "evm";
+              valid = true;
+              isMapped = true;
+              checksummed = getAddress(address);
+              if (selectedType && selectedType.includes("SS58")) {
+                message = `You selected **Substrate (SS58)** but provided an EVM address: \`${checksummed}\`\n\nThis looks like a valid EVM address so we will proceed with it.`;
+              } else {
+                message = `EVM (H160) address detected: \`${checksummed}\``;
               }
-            } catch {}
-          }
+            } else {
+              try {
+                const decoded = decodeAddress(address);
+                const recoded = encodeAddress(decoded, 42);
+                if (address === recoded) {
+                  type = "substrate";
+                  valid = true;
 
-          if (!valid) {
-            message = `\`${address}\` is not a valid EVM or Substrate address.`;
-          }
+                  try {
+                    evmMapped = await resolveEvmAddress(address);
+                  } catch (e) {
+                    console.error(`EVM resolution failed: ${e.message}`);
+                  }
 
-          const fs = require("fs");
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `type=${type}\n`);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `valid=${valid}\n`);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `checksummed=${checksummed}\n`);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `message=${message.replace(/\n/g, "%0A")}\n`);
+                  if (evmMapped) {
+                    try {
+                      isMapped = await checkAccountMapped(evmMapped);
+                    } catch (e) {
+                      console.error(`Mapping check failed: ${e.message}`);
+                    }
+                  }
+
+                  const evmLine = evmMapped
+                    ? `\n\n**Mapped EVM address:** \`${evmMapped}\``
+                    : "";
+
+                  const mappingWarning = evmMapped && !isMapped
+                    ? `\n\n> **Account not mapped on-chain.** You must map your account before your address can be whitelisted (see instructions below).`
+                    : "";
+
+                  if (selectedType && selectedType.includes("H160")) {
+                    message = `You selected **EVM (H160)** but provided a Substrate address: \`${address}\`${evmLine}${mappingWarning}\n\n> The EVM address will be resolved automatically upon approval.`;
+                  } else {
+                    message = `Substrate (SS58) address detected: \`${address}\`${evmLine}${mappingWarning}\n\n> The EVM address will be resolved automatically upon approval.`;
+                  }
+                }
+              } catch {}
+            }
+
+            if (!valid) {
+              message = `\`${address}\` is not a valid EVM or Substrate address.`;
+            }
+
+            const fs = require("fs");
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `type=${type}\n`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `valid=${valid}\n`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `checksummed=${checksummed}\n`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `evm_mapped=${evmMapped}\n`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `is_mapped=${isMapped}\n`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `message=${message.replace(/\n/g, "%0A")}\n`);
+          })();
           SCRIPT
 
       - name: Comment validation result
@@ -101,23 +173,44 @@ jobs:
           VALID: ${{ steps.validate.outputs.valid }}
           MESSAGE: ${{ steps.validate.outputs.message }}
           ADDR_TYPE: ${{ steps.validate.outputs.type }}
+          IS_MAPPED: ${{ steps.validate.outputs.is_mapped }}
         with:
           script: |
+            const marker = "<!-- dotns-whitelist-bot -->";
             const valid = process.env.VALID === "true";
             const message = process.env.MESSAGE.replace(/%0A/g, "\n");
             const type = process.env.ADDR_TYPE;
+            const isMapped = process.env.IS_MAPPED === "true";
+            const author = context.payload.issue.user.login;
 
             const status = valid ? "Valid" : "Invalid";
 
-            const body = [
-              `### Address Validation: ${status}`,
+            const lines = [
+              marker,
+              `### Address Validation — ${status}`,
               "",
               message,
               "",
-              valid && type === "evm"
-                ? "This address is ready for whitelisting. A maintainer will review and apply the `whitelist-approved` label to proceed."
-                : "",
-            ].filter(Boolean).join("\n");
+            ];
+
+            if (valid && type === "substrate" && !isMapped) {
+              lines.push(`@${author} Your account is **not mapped on-chain**. Before your address can be whitelisted you need to map it.`);
+              lines.push("");
+              lines.push("Install the [DotNS CLI](https://github.com/paritytech/dotns-sdk/releases) and run:");
+              lines.push("");
+              lines.push("```bash");
+              lines.push("dotns account map --rpc wss://services.polkadothub-rpc.com/testnet -m \"<your mnemonic>\"");
+              lines.push("```");
+              lines.push("");
+              lines.push("Run `dotns account --help` for all authentication options.");
+              lines.push("");
+            }
+
+            if (valid) {
+              lines.push("This address is ready for whitelisting. A maintainer will review and apply the `whitelist-approved` label to proceed.");
+            }
+
+            const body = lines.filter(Boolean).join("\n");
 
             const { owner, repo } = context.repo;
             await github.rest.issues.createComment({
