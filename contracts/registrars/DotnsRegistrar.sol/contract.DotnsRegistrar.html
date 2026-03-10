@@ -38,7 +38,7 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-a5bf61c9.js";
+            window.path_to_searchindex_js = "../../../searchindex-6587b74e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../../toc-38da3cf0.js"></script>
@@ -181,7 +181,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="dotnsregistrar"><a class="header" href="#dotnsregistrar">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/49d3645bccc7a2b288543f6553463c5164943328/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/16eee1e889fa54e1268478808f3591425f1949b7/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="/contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -191,12 +191,17 @@ Dotns Registrar</p>
 Transfers are supported to allow ownership changes without registry hooks.</p>
 <p>Store writes on transfer:
 When an ERC721 name token is transferred between non-zero addresses (i.e. not mint or burn),
-the registrar reads the label from the sender’s Store and writes it to the recipient’s Store.
+the registrar writes the label to the recipient’s Store using the label stored in <code>_labels</code>.
 This ensures the recipient’s Store contains a record of every name they have received.
 Stores are immutable (locked by DotNS controllers), so the sender’s entry is not removed.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
+<h3 id="dot_node"><a class="header" href="#dot_node">DOT_NODE</a></h3>
+<p>Namehash of the .dot TLD node.</p>
+<pre><code class="language-solidity">bytes32 private constant DOT_NODE =
+    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce
+</code></pre>
 <h3 id="key_store_factory"><a class="header" href="#key_store_factory">KEY_STORE_FACTORY</a></h3>
 <p>Well-known protocol registry key for the store factory.
 casting to ‘bytes32’ is safe because the string fits in 32 bytes.
@@ -228,15 +233,24 @@ without storing individual references.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="_labelhashes"><a class="header" href="#_labelhashes">_labelhashes</a></h3>
-<p>Mapping from token ID to the labelhash stored at registration time.</p>
-<p>Required because the token ID is <code>uint256(namehash(DOT_NODE, labelhash))</code>, a one-way
-derivation that cannot be reversed. The labelhash is needed at transfer time to compute
-the Store key and read the label string from the sender’s Store.</p>
+<p>DEPRECATED as of v1.2.0: Previously stored labelhashes per token ID.</p>
+<p>Retained for UUPS storage layout compatibility. No longer written to.
+The labelhash is now derived on-the-fly from <code>_labels[tokenId]</code> via <code>keccak256(bytes(label))</code>.
+REMOVE this mapping when deploying to a new environment (fresh deploy, not upgrade).</p>
+<p><strong>Note:</strong>
+oz-retyped-from: mapping(uint256 =&gt; bytes32)</p>
 <pre><code class="language-solidity">mapping(uint256 tokenId =&gt; bytes32 labelhash) private _labelhashes
+</code></pre>
+<h3 id="_labels"><a class="header" href="#_labels">_labels</a></h3>
+<p>Human-readable label per token ID. Single source of truth for name data.</p>
+<p>Stored at registration time. Used during transfers to write the label directly
+to the recipient’s Store without needing to read from the sender’s Store.
+The labelhash can always be derived as <code>keccak256(bytes(label))</code>.</p>
+<pre><code class="language-solidity">mapping(uint256 tokenId =&gt; string label) private _labels
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in the future.</p>
-<pre><code class="language-solidity">uint256[48] private __gap
+<pre><code class="language-solidity">uint256[47] private __gap
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlycontroller"><a class="header" href="#onlycontroller">onlyController</a></h3>
@@ -343,12 +357,12 @@ oz-upgrades-unsafe-allow: constructor</p>
 <h3 id="register"><a class="header" href="#register">register</a></h3>
 <p>Registers a name permanently.</p>
 <p>Callable only by an authorised controller.
-Registration mints the ERC721 token to <code>owner</code> and stores the labelhash
-for use during transfer store writes.</p>
+Registration mints the ERC721 token to <code>owner</code> and stores both the human-readable
+label and its keccak256 hash for use during transfer store writes.</p>
 <pre><code class="language-solidity">function register(
     uint256 id,
     address owner,
-    bytes32 labelhash
+    string calldata label
 )
     external
     override
@@ -363,7 +377,26 @@ for use during transfer store writes.</p>
 <tbody>
 <tr><td><code>id</code></td><td><code>uint256</code></td><td>Token identifier.</td></tr>
 <tr><td><code>owner</code></td><td><code>address</code></td><td>Owner of the name.</td></tr>
-<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>keccak256 of the label string, stored for transfer-time store writes.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The human-readable label string (e.g. “alice”).</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="synclabel"><a class="header" href="#synclabel">syncLabel</a></h3>
+<p>Syncs a label to the internal labels mapping for a token.</p>
+<p>Callable only by the token owner. The label is verified cryptographically
+against the token identifier. Reverts if the label is already set.
+TODO: We need to remove this before a fresh deployment</p>
+<pre><code class="language-solidity">function syncLabel(uint256 tokenId, string calldata label) external override;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The human-readable label string (e.g. “alice”).</td></tr>
 </tbody>
 </table>
 </div>
@@ -404,7 +437,7 @@ for use during transfer store writes.</p>
 <tr><th>Name</th><th>Type</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>&lt;none&gt;</code></td><td><code>bool</code></td><td>exists True if the token exists.</td></tr>
+<tr><td><code>&lt;none&gt;</code></td><td><code>bool</code></td><td>True if the token exists.</td></tr>
 </tbody>
 </table>
 </div>
@@ -413,8 +446,8 @@ for use during transfer store writes.</p>
 <pre><code class="language-solidity">function _onlyController() internal view;
 </code></pre>
 <h3 id="_update"><a class="header" href="#_update">_update</a></h3>
-<p>Additionally writes the transferred label to the recipient’s Store when both <code>from</code>
-and <code>to</code> are non-zero and a protocol registry has been configured.</p>
+<p>Additionally ensures the recipient has a Store and writes the transferred label
+to it when both <code>from</code> and <code>to</code> are non-zero and a protocol registry has been configured.</p>
 <pre><code class="language-solidity">function _update(
     address to,
     uint256 tokenId,
@@ -424,11 +457,13 @@ and <code>to</code> are non-zero and a protocol registry has been configured.</p
     override
     returns (address from);
 </code></pre>
-<h3 id="_writetorecipientstore"><a class="header" href="#_writetorecipientstore">_writeToRecipientStore</a></h3>
-<p>Reads the label from the sender’s Store and writes it to the recipient’s Store.</p>
-<p>Silently returns (no revert) if the store factory is not set, the sender has no store,
-or the label cannot be read. This ensures transfers never fail due to missing stores.</p>
-<pre><code class="language-solidity">function _writeToRecipientStore(address from, address to, bytes32 labelhash) internal;
+<h3 id="_syncrecipientstore"><a class="header" href="#_syncrecipientstore">_syncRecipientStore</a></h3>
+<p>Ensures the recipient has a Store and writes the label to it if available.</p>
+<p>Deploys a Store for the recipient via <code>getOrCreateStore</code> when one does not exist,
+then writes the label entry if <code>_labels[tokenId]</code> is populated and the key
+does not already have a value (locked entries are skipped).
+Silently returns if the store factory is not set.</p>
+<pre><code class="language-solidity">function _syncRecipientStore(address to, uint256 tokenId) internal;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper">
@@ -437,9 +472,8 @@ or the label cannot be read. This ensures transfers never fail due to missing st
 <tr><th>Name</th><th>Type</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>from</code></td><td><code>address</code></td><td>Address of the current token owner (sender).</td></tr>
-<tr><td><code>to</code></td><td><code>address</code></td><td>Address of the new token owner (recipient).</td></tr>
-<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>keccak256 of the label, used to compute the Store key.</td></tr>
+<tr><td><code>to</code></td><td><code>address</code></td><td>Address of the transfer recipient.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The transferred token identifier.</td></tr>
 </tbody>
 </table>
 </div>
