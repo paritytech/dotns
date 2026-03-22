@@ -38,10 +38,10 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-f1dbdb77.js";
+            window.path_to_searchindex_js = "../../../searchindex-b0420022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../../toc-1017a555.js"></script>
+        <script src="../../../toc-6385a06a.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,7 +181,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="poprulesold"><a class="header" href="#poprulesold">PopRulesOld</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/f617fb74e339a3e6bc37cc960307cdcc9dfa8389/contracts/pop/PopRulesOld.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f1603beda8827f7ce9ce21ebe54791e3b3417c8b/contracts/pop/PopRulesOld.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -230,7 +230,7 @@ oz-upgrades-unsafe-allow: constructor</p>
 <pre><code class="language-solidity">function reserveBaseName(string calldata, address) external override;
 </code></pre>
 <h3 id="updatedotregistry"><a class="header" href="#updatedotregistry">updateDotRegistry</a></h3>
-<pre><code class="language-solidity">function updateDotRegistry(address newRegistry) external override onlyOwner;
+<pre><code class="language-solidity">function updateDotRegistry(address newRegistry) external onlyOwner;
 </code></pre>
 <h3 id="isbasename"><a class="header" href="#isbasename">isBaseName</a></h3>
 <pre><code class="language-solidity">function isBaseName(string calldata) public pure override returns (bool);
