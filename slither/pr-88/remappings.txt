@@ -1,7 +1,0 @@
-@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
-@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
-forge-std/=lib/forge-std/src/
-halmos-cheatcodes/=lib/halmos-cheatcodes/src/
-openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/
-openzeppelin-contracts/=lib/openzeppelin-contracts/
-openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src/
