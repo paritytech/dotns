@@ -1,0 +1,392 @@
+No files changed, compilation skipped
+
+Ran 14 tests for test/unit/registry/DotnsRegistry.t.sol:DotnsRegistryTests
+[PASS] test_node_owner_can_clear_resolver_to_zero() (gas: 2189439)
+[PASS] test_node_owner_creates_nested_subnode_with_canonical_parent_path() (gas: 3101884)
+[PASS] test_node_owner_creates_subnode_emits_event_and_returns_expected_subnode() (gas: 2186614)
+[PASS] test_node_owner_sets_resolver_emits_event_and_persists() (gas: 2187349)
+[PASS] test_owner_updates_protocol_registry_emits_event_and_persists() (gas: 30289)
+[PASS] test_registrar_controller_sets_owner_emits_event_and_sets_resolver() (gas: 158215)
+[PASS] test_revert_subnode_owner_with_dotted_sublabel() (gas: 1234333)
+[PASS] test_revert_subnode_owner_with_empty_sublabel() (gas: 1232095)
+[PASS] test_revert_subnode_owner_with_parent_label_mismatch() (gas: 1256762)
+[PASS] test_revert_subnode_owner_with_uppercase_parent_label() (gas: 1236687)
+[PASS] test_revert_subnode_owner_with_uppercase_sublabel() (gas: 1233093)
+[PASS] test_root_record_is_initialized_and_owned_by_owner() (gas: 19715)
+[PASS] test_same_sublabel_under_different_parents_owned_by_same_address() (gas: 2546357)
+[PASS] test_subnode_owner_creates_nested_subnode_under_owned_parent() (gas: 2183577)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 18.00s (12.68ms CPU time)
+
+Ran 5 tests for test/intergration/BasicDotns.reverts.t.sol:BasicDotnsIntegrationReverts
+[PASS] test_revert_cannot_create_same_subdomain_twice() (gas: 1384545)
+[PASS] test_revert_non_owner_cannot_create_subdomain_under_someone_elses_name() (gas: 1245674)
+[PASS] test_revert_poplite_cannot_register_nostatus_name() (gas: 134985)
+[PASS] test_revert_poplite_cannot_register_popfull_required() (gas: 128964)
+[PASS] test_revert_unapproved_cannot_set_contenthash() (gas: 1251804)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 18.01s (3.25ms CPU time)
+
+Ran 2 tests for test/unit/resolver/DotnsResolver.t.sol:DotnsResolverTests
+[PASS] test_setaddress_emits_event_and_persists() (gas: 1270836)
+[PASS] test_setaddress_overwrites_previous_value() (gas: 1281108)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 18.96s (1.71ms CPU time)
+
+Ran 4 tests for test/intergration/BasicDotns.t.sol:BasicDotnsIntegration
+[PASS] test_nostatus_end_to_end() (gas: 3995438)
+[PASS] test_popfull_end_to_end() (gas: 4007680)
+[PASS] test_poplite_end_to_end() (gas: 4054129)
+[PASS] test_third_party_reserved_registration_preserves_existing_reverse() (gas: 1717983)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 18.96s (12.12ms CPU time)
+
+Ran 3 tests for test/unit/resolver/DotnsContentResolver.t.sol:DotnsContentResolverTests
+[PASS] test_operator_can_modify_records() (gas: 1302360)
+[PASS] test_set_contenthash() (gas: 1316084)
+[PASS] test_set_text() (gas: 1271447)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 16.63s (2.62ms CPU time)
+
+Ran 4 tests for test/unit/resolver/DotnsReverseResolver.t.sol:DotnsReverseResolverTests
+[PASS] test_nameof_returns_empty_when_unset() (gas: 16366)
+[PASS] test_register_overwrites_existing_reverse_record() (gas: 1460576)
+[PASS] test_register_sets_reverse_record_for_owner() (gas: 1228686)
+[PASS] test_updateprotocolregistry_emits_event_and_persists() (gas: 28385)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 16.98s (2.74ms CPU time)
+
+Ran 5 tests for test/unit/registrar/DotnsRegistrar.t.sol:DotnsRegistrarTests
+[PASS] test_add_controller() (gas: 46028)
+[PASS] test_approvals_work() (gas: 154454)
+[PASS] test_available_before_after_register() (gas: 96025)
+[PASS] test_register_mints_to_owner() (gas: 95752)
+[PASS] test_remove_controller() (gas: 35129)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 16.99s (788.22µs CPU time)
+
+Ran 8 tests for test/fuzz/pop/PopFuzz.t.sol:PopRulesFuzzTest
+[PASS] testFuzz_expired_reservation_rolls_forward_to_next_lite_registrant(uint256) (runs: 256, μ: 103252, ~: 103252)
+[PASS] testFuzz_governance_names_always_revert(uint256,uint256,uint8) (runs: 256, μ: 51206, ~: 57673)
+Logs:
+  Bound result 3
+  Bound result 3
+
+[PASS] testFuzz_mixed_case_names_are_rejected(uint256) (runs: 256, μ: 47885, ~: 47885)
+[PASS] testFuzz_nostatus_user_cannot_access_popfull(uint256) (runs: 256, μ: 37404, ~: 37404)
+[PASS] testFuzz_popfull_user_can_access_nostatus(uint256,uint256) (runs: 256, μ: 66089, ~: 66003)
+Logs:
+  Bound result 9
+
+[PASS] testFuzz_popfull_user_can_access_poplite(uint256,uint256) (runs: 256, μ: 61045, ~: 61098)
+Logs:
+  Bound result 6
+
+[PASS] testFuzz_price_without_check_returns_price(uint256,uint256) (runs: 256, μ: 41897, ~: 43336)
+Logs:
+  Bound result 13
+
+[PASS] testFuzz_reservation_blocks_other_users(uint256) (runs: 256, μ: 95997, ~: 95997)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 17.50s (724.51ms CPU time)
+
+Ran 30 tests for test/unit/registrar/DotnsRegistrarController.t.sol:DotnsRegistrarControllerTest
+[PASS] test_available_reverts_for_dotted_label() (gas: 15939)
+[PASS] test_available_reverts_for_empty_label() (gas: 15203)
+[PASS] test_available_state_transitions() (gas: 1243728)
+[PASS] test_commit_allows_recommit_after_expiry() (gas: 54259)
+[PASS] test_commit_sets_timestamp() (gas: 45468)
+[PASS] test_mint_does_not_trigger_store_write() (gas: 1248302)
+[PASS] test_register_does_not_overwrite_third_party_reverse_record() (gas: 1465899)
+[PASS] test_register_popfull_wires_all_records() (gas: 1181784)
+[PASS] test_register_poplite_reserves_base_name() (gas: 1254743)
+[PASS] test_register_reverts_for_dotted_label() (gas: 52022)
+[PASS] test_registerreserved_revertnon_owner() (gas: 57484)
+[PASS] test_registerreserved_writes_to_store() (gas: 1188199)
+[PASS] test_registration_reverts_unauthorized_store() (gas: 1068603)
+[PASS] test_removed_from_whitelist_cannot_register_reserved() (gas: 67136)
+[PASS] test_safe_transfer_writes_to_store() (gas: 2172859)
+[PASS] test_syncLabel_reverts_already_set() (gas: 1240815)
+[PASS] test_syncLabel_reverts_for_dotted_label() (gas: 81575)
+[PASS] test_syncLabel_reverts_for_non_owner() (gas: 81760)
+[PASS] test_syncLabel_reverts_for_uppercase_label() (gas: 79503)
+[PASS] test_syncLabel_reverts_wrong_label() (gas: 84455)
+[PASS] test_syncLabel_sets_label_for_owner() (gas: 1102599)
+[PASS] test_transfer_back_skips_locked_entry() (gas: 2195924)
+[PASS] test_transfer_clears_primary_reverse_name_when_current_name_is_moved() (gas: 2177766)
+[PASS] test_transfer_deploys_store_without_label() (gas: 963561)
+[PASS] test_transfer_succeeds_when_sender_has_no_store() (gas: 1097303)
+[PASS] test_transfer_succeeds_without_protocol_registry() (gas: 1264764)
+[PASS] test_transfer_via_approved_operator_writes_to_store() (gas: 2196124)
+[PASS] test_transfer_writes_label_and_creates_store() (gas: 2181083)
+[PASS] test_whitelistaddress_reverts_non_owner() (gas: 20356)
+[PASS] test_whitelisted_can_register_reserved() (gas: 1209313)
+Suite result: ok. 30 passed; 0 failed; 0 skipped; finished in 16.86s (15.23ms CPU time)
+
+Ran 10 tests for test/unit/pop/PopRules.t.sol:PopRulesTests
+[PASS] test_base_reservation_blocks_others() (gas: 90953)
+[PASS] test_base_reservation_rolls_forward_after_expiry() (gas: 110255)
+[PASS] test_classify_governance() (gas: 18320)
+[PASS] test_classify_nostatus() (gas: 21517)
+[PASS] test_classify_popfull() (gas: 19198)
+[PASS] test_classify_poplite() (gas: 19886)
+[PASS] test_popfull_user_can_access_poplite_name() (gas: 53570)
+[PASS] test_price_with_check_revert_full_needed() (gas: 30429)
+[PASS] test_price_with_check_revert_governance() (gas: 29165)
+[PASS] test_price_without_check_returns_price_for_reserved() (gas: 90783)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 16.86s (1.73ms CPU time)
+
+Ran 7 tests for test/unit/store/Store.t.sol:StoreTests
+[PASS] test_deletevalue_clears_and_emits() (gas: 756618)
+[PASS] test_setvalue_stores_and_emits() (gas: 775255)
+[PASS] test_setvaluefor_authorized_store_writes_for_user() (gas: 801177)
+[PASS] test_setvaluefor_by_dotnscontroller_locks_key() (gas: 826812)
+[PASS] test_setvaluefor_reverts_when_not_authorized() (gas: 699305)
+[PASS] test_unauthorize_store_blocks_setvaluefor() (gas: 704715)
+[PASS] test_values_appends_on_overwrite_and_survives_delete() (gas: 783056)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 16.89s (1.74ms CPU time)
+
+Ran 6 tests for test/fuzz/registrar/DotnsRegistrarControllerFuzz.t.sol:DotnsRegistrarControllerFuzzTest
+[PASS] testFuzz_register_accepts_overpayment_when_price_is_zero(uint256,uint256) (runs: 256, μ: 1252126, ~: 1252126)
+Logs:
+  Bound result 23
+  Bound result 883022455832
+
+[PASS] testFuzz_register_refunds_overpayment(uint256,uint256) (runs: 256, μ: 1244953, ~: 1244875)
+Logs:
+  Bound result 23
+  Bound result 883022455832
+
+[PASS] testFuzz_register_refunds_to_payer_not_owner_when_registering_for_other(uint256,uint256) (runs: 256, μ: 1246412, ~: 1246412)
+Logs:
+  Bound result 23
+  Bound result 883022455832
+
+[PASS] testFuzz_third_party_registration_does_not_overwrite_owner_reverse(uint256) (runs: 256, μ: 1468036, ~: 1468110)
+Logs:
+  Bound result 25
+
+[PASS] testFuzz_transfer_clears_sender_primary_reverse(uint256) (runs: 256, μ: 2162509, ~: 2162582)
+Logs:
+  Bound result 56
+
+[PASS] testFuzz_transfer_writes_label_to_recipient_store(uint256) (runs: 256, μ: 2163833, ~: 2163906)
+Logs:
+  Bound result 56
+
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 18.61s (1.63s CPU time)
+
+Ran 4 tests for test/unit/store/StoreFactory.t.sol:StoreFactoryTests
+[PASS] test_deploy_reverts_when_already_deployed() (gas: 766712)
+[PASS] test_transferownership_moves_mapping_and_emits() (gas: 783996)
+[PASS] test_transferownership_reverts_when_caller_has_no_store() (gas: 16560)
+[PASS] test_transferownership_reverts_when_new_owner_already_has_store() (gas: 1503493)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 16.77s (1.94ms CPU time)
+
+Ran 9 tests for test/invariant/registrar/DotnsRegistrarControllerInvariant.t.sol:DotnsRegistrarControllerInvariantTest
+[PASS] invariant_consumed_commitments_deleted() (runs: 256, calls: 128000, reverts: 48962)
+
+╭----------------------------+-------------------------+-------+---------+----------╮
+| Contract                   | Selector                | Calls | Reverts | Discards |
++===================================================================================+
+| RegistrarControllerHandler | addActor                | 18054 | 12547   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | advanceTime             | 18295 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | chainTransfer           | 18285 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitAndRegister       | 18200 | 18200   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitOnly              | 18629 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | registerWithOverpayment | 18215 | 18215   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | transferName            | 18322 | 0       | 0        |
+╰----------------------------+-------------------------+-------+---------+----------╯
+
+[PASS] invariant_current_owners_have_label_in_store() (runs: 256, calls: 128000, reverts: 48963)
+
+╭----------------------------+-------------------------+-------+---------+----------╮
+| Contract                   | Selector                | Calls | Reverts | Discards |
++===================================================================================+
+| RegistrarControllerHandler | addActor                | 18054 | 12548   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | advanceTime             | 18295 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | chainTransfer           | 18285 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitAndRegister       | 18200 | 18200   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitOnly              | 18629 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | registerWithOverpayment | 18215 | 18215   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | transferName            | 18322 | 0       | 0        |
+╰----------------------------+-------------------------+-------+---------+----------╯
+
+[PASS] invariant_no_stuck_funds() (runs: 256, calls: 128000, reverts: 48962)
+
+╭----------------------------+-------------------------+-------+---------+----------╮
+| Contract                   | Selector                | Calls | Reverts | Discards |
++===================================================================================+
+| RegistrarControllerHandler | addActor                | 18054 | 12547   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | advanceTime             | 18295 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | chainTransfer           | 18285 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitAndRegister       | 18200 | 18200   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitOnly              | 18629 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | registerWithOverpayment | 18215 | 18215   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | transferName            | 18322 | 0       | 0        |
+╰----------------------------+-------------------------+-------+---------+----------╯
+
+[PASS] invariant_ownership_consistency() (runs: 256, calls: 128000, reverts: 48963)
+
+╭----------------------------+-------------------------+-------+---------+----------╮
+| Contract                   | Selector                | Calls | Reverts | Discards |
++===================================================================================+
+| RegistrarControllerHandler | addActor                | 18054 | 12548   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | advanceTime             | 18295 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | chainTransfer           | 18285 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitAndRegister       | 18200 | 18200   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitOnly              | 18629 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | registerWithOverpayment | 18215 | 18215   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | transferName            | 18322 | 0       | 0        |
+╰----------------------------+-------------------------+-------+---------+----------╯
+
+[PASS] invariant_registered_names_unavailable() (runs: 256, calls: 128000, reverts: 48959)
+
+╭----------------------------+-------------------------+-------+---------+----------╮
+| Contract                   | Selector                | Calls | Reverts | Discards |
++===================================================================================+
+| RegistrarControllerHandler | addActor                | 18054 | 12544   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | advanceTime             | 18295 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | chainTransfer           | 18285 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitAndRegister       | 18200 | 18200   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitOnly              | 18629 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | registerWithOverpayment | 18215 | 18215   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | transferName            | 18322 | 0       | 0        |
+╰----------------------------+-------------------------+-------+---------+----------╯
+
+[PASS] invariant_registration_count_consistent() (runs: 256, calls: 128000, reverts: 48960)
+
+╭----------------------------+-------------------------+-------+---------+----------╮
+| Contract                   | Selector                | Calls | Reverts | Discards |
++===================================================================================+
+| RegistrarControllerHandler | addActor                | 18054 | 12545   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | advanceTime             | 18295 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | chainTransfer           | 18285 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitAndRegister       | 18200 | 18200   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitOnly              | 18629 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | registerWithOverpayment | 18215 | 18215   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | transferName            | 18322 | 0       | 0        |
+╰----------------------------+-------------------------+-------+---------+----------╯
+
+[PASS] invariant_reserved_names_have_reverse_resolution() (runs: 256, calls: 128000, reverts: 48960)
+
+╭----------------------------+-------------------------+-------+---------+----------╮
+| Contract                   | Selector                | Calls | Reverts | Discards |
++===================================================================================+
+| RegistrarControllerHandler | addActor                | 18054 | 12545   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | advanceTime             | 18295 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | chainTransfer           | 18285 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitAndRegister       | 18200 | 18200   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitOnly              | 18629 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | registerWithOverpayment | 18215 | 18215   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | transferName            | 18322 | 0       | 0        |
+╰----------------------------+-------------------------+-------+---------+----------╯
+
+[PASS] invariant_store_entries_locked() (runs: 256, calls: 128000, reverts: 48961)
+
+╭----------------------------+-------------------------+-------+---------+----------╮
+| Contract                   | Selector                | Calls | Reverts | Discards |
++===================================================================================+
+| RegistrarControllerHandler | addActor                | 18054 | 12546   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | advanceTime             | 18295 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | chainTransfer           | 18285 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitAndRegister       | 18200 | 18200   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitOnly              | 18629 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | registerWithOverpayment | 18215 | 18215   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | transferName            | 18322 | 0       | 0        |
+╰----------------------------+-------------------------+-------+---------+----------╯
+
+[PASS] invariant_transfer_recipients_have_store_entries() (runs: 256, calls: 128000, reverts: 48960)
+
+╭----------------------------+-------------------------+-------+---------+----------╮
+| Contract                   | Selector                | Calls | Reverts | Discards |
++===================================================================================+
+| RegistrarControllerHandler | addActor                | 18054 | 12545   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | advanceTime             | 18295 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | chainTransfer           | 18285 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitAndRegister       | 18200 | 18200   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | commitOnly              | 18629 | 0       | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | registerWithOverpayment | 18215 | 18215   | 0        |
+|----------------------------+-------------------------+-------+---------+----------|
+| RegistrarControllerHandler | transferName            | 18322 | 0       | 0        |
+╰----------------------------+-------------------------+-------+---------+----------╯
+
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 124.61s (204.06s CPU time)
+
+╭---------------------------------------+--------+--------+---------╮
+| Test Suite                            | Passed | Failed | Skipped |
++===================================================================+
+| PopRulesFuzzTest                      | 8      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| DotnsRegistrarControllerFuzzTest      | 6      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| BasicDotnsIntegrationReverts          | 5      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| BasicDotnsIntegration                 | 4      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| DotnsRegistrarControllerInvariantTest | 9      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| PopRulesTests                         | 10     | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| DotnsRegistrarTests                   | 5      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| DotnsRegistrarControllerTest          | 30     | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| DotnsRegistryTests                    | 14     | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| DotnsContentResolverTests             | 3      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| DotnsResolverTests                    | 2      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| DotnsReverseResolverTests             | 4      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| StoreTests                            | 7      | 0      | 0       |
+|---------------------------------------+--------+--------+---------|
+| StoreFactoryTests                     | 4      | 0      | 0       |
+╰---------------------------------------+--------+--------+---------╯
+
