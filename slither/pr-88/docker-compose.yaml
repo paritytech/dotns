@@ -1,0 +1,25 @@
+services:
+  eth-rpc:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: dockerfile
+    image: revive-eth-rpc
+    container_name: revive-eth-rpc
+    environment:
+      RUST_LOG: "info,eth-rpc=debug,error"
+      RUST_BACKTRACE: "1"
+    ports:
+      - "8545:8545"
+    command:
+      - "--node-rpc-url"
+      - "wss://asset-hub-paseo-rpc.n.dwellir.com"
+      - "--rpc-port"
+      - "8545"
+      - "--rpc-external"
+      - "--rpc-cors"
+      - "all"
+      - "--cache-size"
+      - "2048"
+      - "--index-last-n-blocks"
+      - "20000"
