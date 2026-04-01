@@ -38,10 +38,10 @@
             const path_to_root = "../../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../../searchindex-563a8370.js";
+            window.path_to_searchindex_js = "../../../searchindex-64f892d6.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../../toc-38da3cf0.js"></script>
+        <script src="../../../toc-283d981b.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,22 +181,10 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p>Interface for the DotNS protocol-level address registry.</p>
-<p>Provides a centralised lookup for all DotNS contract addresses.
-Contracts query this registry instead of storing individual references,
-reducing storage fragmentation and simplifying upgrades.</p>
-<p>Well-known keys are defined as <code>bytes32</code> constants:</p>
-<ul>
-<li><code>REGISTRAR</code>       — ERC721 registrar backing name ownership.</li>
-<li><code>CONTROLLER</code>      — Registrar controller orchestrating commit-reveal registration.</li>
-<li><code>REGISTRY</code>        — Forward registry storing node ownership and resolver.</li>
-<li><code>REVERSE_RESOLVER</code> — Reverse resolver for address-to-name mapping.</li>
-<li><code>POP_RULES</code>       — PoP oracle enforcing eligibility and pricing.</li>
-<li><code>STORE_FACTORY</code>   — Factory for per-user Store instances.</li>
-</ul>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>

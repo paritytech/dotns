@@ -39,10 +39,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-563a8370.js";
+            window.path_to_searchindex_js = "searchindex-64f892d6.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-38da3cf0.js"></script>
+        <script src="toc-283d981b.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -266,7 +266,7 @@ forge test
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
 <p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements, and base-name reservation rules</p>
@@ -695,7 +695,7 @@ This replaces per-name PoP assignments</p>
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="poprules-1"><a class="header" href="#poprules-1">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -707,17 +707,6 @@ security-contact: admin@parity.io</p>
 <h3 id="max_reservation_time"><a class="header" href="#max_reservation_time">MAX_RESERVATION_TIME</a></h3>
 <p>Maximum time a base name can be reserved</p>
 <pre><code class="language-solidity">uint256 public constant MAX_RESERVATION_TIME = 12 weeks
-</code></pre>
-<h3 id="dot_node"><a class="header" href="#dot_node">DOT_NODE</a></h3>
-<p>Namehash of .dot TLD</p>
-<pre><code class="language-solidity">bytes32 private constant DOT_NODE =
-    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce
-</code></pre>
-<h3 id="key_controller"><a class="header" href="#key_controller">KEY_CONTROLLER</a></h3>
-<p>Well-known protocol registry key for the registrar controller.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_CONTROLLER = bytes32("controller")
 </code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="startingprice"><a class="header" href="#startingprice">startingPrice</a></h3>
@@ -1191,7 +1180,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="dotnsregistrar-1"><a class="header" href="#dotnsregistrar-1">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="/contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -1206,36 +1195,6 @@ This ensures the recipient’s Store contains a record of every name they have r
 Stores are immutable (locked by DotNS controllers), so the sender’s entry is not removed.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-1"><a class="header" href="#constants-1">Constants</a></h2>
-<h3 id="dot_node-1"><a class="header" href="#dot_node-1">DOT_NODE</a></h3>
-<p>Namehash of the .dot TLD node.</p>
-<pre><code class="language-solidity">bytes32 private constant DOT_NODE =
-    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce
-</code></pre>
-<h3 id="key_store_factory"><a class="header" href="#key_store_factory">KEY_STORE_FACTORY</a></h3>
-<p>Well-known protocol registry key for the store factory.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_STORE_FACTORY = bytes32("storeFactory")
-</code></pre>
-<h3 id="key_controller-1"><a class="header" href="#key_controller-1">KEY_CONTROLLER</a></h3>
-<p>Well-known protocol registry key for the registrar controller.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_CONTROLLER = bytes32("controller")
-</code></pre>
-<h3 id="key_registry"><a class="header" href="#key_registry">KEY_REGISTRY</a></h3>
-<p>Well-known protocol registry key for the forward registry.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REGISTRY = bytes32("registry")
-</code></pre>
-<h3 id="key_reverse_resolver"><a class="header" href="#key_reverse_resolver">KEY_REVERSE_RESOLVER</a></h3>
-<p>Well-known protocol registry key for the reverse resolver.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REVERSE_RESOLVER = bytes32("reverseResolver")
-</code></pre>
 <h2 id="state-variables-1"><a class="header" href="#state-variables-1">State Variables</a></h2>
 <h3 id="controllers"><a class="header" href="#controllers">controllers</a></h3>
 <p>Mapping of authorised controller addresses.</p>
@@ -1509,7 +1468,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="dotnsregistrarcontroller-1"><a class="header" href="#dotnsregistrarcontroller-1">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -1525,51 +1484,10 @@ from the ERC721 registrar for authorisation.</li>
 </ul>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-2"><a class="header" href="#constants-2">Constants</a></h2>
-<h3 id="dot_node-2"><a class="header" href="#dot_node-2">DOT_NODE</a></h3>
-<p>Namehash of the .dot TLD.</p>
-<pre><code class="language-solidity">bytes32 private constant DOT_NODE =
-    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce
-</code></pre>
+<h2 id="constants-1"><a class="header" href="#constants-1">Constants</a></h2>
 <h3 id="max_allowed_commitment_age"><a class="header" href="#max_allowed_commitment_age">MAX_ALLOWED_COMMITMENT_AGE</a></h3>
 <p>Upper bound for commitment validity to cap storage griefing risk.</p>
 <pre><code class="language-solidity">uint256 public constant MAX_ALLOWED_COMMITMENT_AGE = 7 days
-</code></pre>
-<h3 id="dotns_registered_key"><a class="header" href="#dotns_registered_key">DOTNS_REGISTERED_KEY</a></h3>
-<p>Key prefix for Dotns-written Store immutable entries (“dotns.registered”).
-casting to ‘bytes32’ is safe because this is safe
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered")
-</code></pre>
-<h3 id="key_registrar"><a class="header" href="#key_registrar">KEY_REGISTRAR</a></h3>
-<p>Well-known protocol registry key for the ERC721 registrar.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REGISTRAR = bytes32("registrar")
-</code></pre>
-<h3 id="key_registry-1"><a class="header" href="#key_registry-1">KEY_REGISTRY</a></h3>
-<p>Well-known protocol registry key for the forward registry.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REGISTRY = bytes32("registry")
-</code></pre>
-<h3 id="key_reverse_resolver-1"><a class="header" href="#key_reverse_resolver-1">KEY_REVERSE_RESOLVER</a></h3>
-<p>Well-known protocol registry key for the reverse resolver.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REVERSE_RESOLVER = bytes32("reverseResolver")
-</code></pre>
-<h3 id="key_pop_rules"><a class="header" href="#key_pop_rules">KEY_POP_RULES</a></h3>
-<p>Well-known protocol registry key for the PoP rules.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_POP_RULES = bytes32("popRules")
-</code></pre>
-<h3 id="key_store_factory-1"><a class="header" href="#key_store_factory-1">KEY_STORE_FACTORY</a></h3>
-<p>Well-known protocol registry key for the store factory.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_STORE_FACTORY = bytes32("storeFactory")
 </code></pre>
 <h2 id="state-variables-2"><a class="header" href="#state-variables-2">State Variables</a></h2>
 <h3 id="dotnsregistrar-2"><a class="header" href="#dotnsregistrar-2">dotnsRegistrar</a></h3>
@@ -1981,7 +1899,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -2273,7 +2191,7 @@ TODO: We need to remove this before a fresh deployment</p>
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Registrar Controller</p>
 <p>Interface for registering .dot labels using a commit–reveal scheme.</p>
@@ -2685,7 +2603,7 @@ reverts: NotOwner if caller is not the contract owner.</p>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="dotnsprotocolregistry"><a class="header" href="#dotnsprotocolregistry">DotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></p>
 <p><strong>Title:</strong>
@@ -2696,7 +2614,7 @@ Individual contracts query this registry instead of storing sibling references,
 reducing storage fragmentation and simplifying upgrades.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-3"><a class="header" href="#constants-3">Constants</a></h2>
+<h2 id="constants-2"><a class="header" href="#constants-2">Constants</a></h2>
 <h3 id="registrar"><a class="header" href="#registrar">REGISTRAR</a></h3>
 <p>Well-known key for the ERC721 registrar backing name ownership.
 casting to ‘bytes32’ is safe because the string fits in 32 bytes.
@@ -2833,7 +2751,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="dotnsregistry-2"><a class="header" href="#dotnsregistry-2">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -2848,41 +2766,6 @@ Authorisation for tokenised nodes follows ERC721 owner/approvals.</li>
 </ul>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-4"><a class="header" href="#constants-4">Constants</a></h2>
-<h3 id="dot_node-3"><a class="header" href="#dot_node-3">DOT_NODE</a></h3>
-<pre><code class="language-solidity">bytes32 private constant DOT_NODE =
-    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce
-</code></pre>
-<h3 id="dotns_registered_key-1"><a class="header" href="#dotns_registered_key-1">DOTNS_REGISTERED_KEY</a></h3>
-<p>Key prefix for Dotns-written Store immutable entries (“dotns.registered”).
-casting to ‘bytes32’ is safe because this is safe
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered")
-</code></pre>
-<h3 id="key_controller-2"><a class="header" href="#key_controller-2">KEY_CONTROLLER</a></h3>
-<p>Well-known protocol registry key for the registrar controller.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_CONTROLLER = bytes32("controller")
-</code></pre>
-<h3 id="key_registrar-1"><a class="header" href="#key_registrar-1">KEY_REGISTRAR</a></h3>
-<p>Well-known protocol registry key for the ERC721 registrar.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REGISTRAR = bytes32("registrar")
-</code></pre>
-<h3 id="key_reverse_resolver-2"><a class="header" href="#key_reverse_resolver-2">KEY_REVERSE_RESOLVER</a></h3>
-<p>Well-known protocol registry key for the reverse resolver.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REVERSE_RESOLVER = bytes32("reverseResolver")
-</code></pre>
-<h3 id="key_store_factory-2"><a class="header" href="#key_store_factory-2">KEY_STORE_FACTORY</a></h3>
-<p>Well-known protocol registry key for the store factory.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_STORE_FACTORY = bytes32("storeFactory")
-</code></pre>
 <h2 id="state-variables-4"><a class="header" href="#state-variables-4">State Variables</a></h2>
 <h3 id="records"><a class="header" href="#records">records</a></h3>
 <p>Mapping of node identifiers to records.</p>
@@ -3213,22 +3096,10 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p>Interface for the DotNS protocol-level address registry.</p>
-<p>Provides a centralised lookup for all DotNS contract addresses.
-Contracts query this registry instead of storing individual references,
-reducing storage fragmentation and simplifying upgrades.</p>
-<p>Well-known keys are defined as <code>bytes32</code> constants:</p>
-<ul>
-<li><code>REGISTRAR</code>       — ERC721 registrar backing name ownership.</li>
-<li><code>CONTROLLER</code>      — Registrar controller orchestrating commit-reveal registration.</li>
-<li><code>REGISTRY</code>        — Forward registry storing node ownership and resolver.</li>
-<li><code>REVERSE_RESOLVER</code> — Reverse resolver for address-to-name mapping.</li>
-<li><code>POP_RULES</code>       — PoP oracle enforcing eligibility and pricing.</li>
-<li><code>STORE_FACTORY</code>   — Factory for per-user Store instances.</li>
-</ul>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions-8"><a class="header" href="#functions-8">Functions</a></h2>
@@ -3300,7 +3171,7 @@ security-contact: admin@parity.io</p>
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="idotnsregistry"><a class="header" href="#idotnsregistry">IDotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dot Registry</p>
 <p>Minimal on-chain registry for hierarchical name ownership and resolution.</p>
@@ -3618,7 +3489,7 @@ For tokenised nodes, authorisation is based on ERC721 owner/approvals.</p>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="dotnscontentresolver-1"><a class="header" href="#dotnscontentresolver-1">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
@@ -3628,13 +3499,6 @@ Dotns Content Resolver</p>
 Authorisation enforced via DotNS registry ownership or approved operators</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-5"><a class="header" href="#constants-5">Constants</a></h2>
-<h3 id="key_registry-2"><a class="header" href="#key_registry-2">KEY_REGISTRY</a></h3>
-<p>Well-known protocol registry key for the forward registry.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REGISTRY = bytes32("registry")
-</code></pre>
 <h2 id="state-variables-5"><a class="header" href="#state-variables-5">State Variables</a></h2>
 <h3 id="registry-1"><a class="header" href="#registry-1">registry</a></h3>
 <p>DEPRECATED: Registry used for ownership checks.</p>
@@ -3887,7 +3751,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="dotnsresolver-1"><a class="header" href="#dotnsresolver-1">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
@@ -3897,13 +3761,6 @@ Dotns Resolver</p>
 Write access is restricted to the owner of the node as recorded in the DotNS registry.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-6"><a class="header" href="#constants-6">Constants</a></h2>
-<h3 id="key_registry-3"><a class="header" href="#key_registry-3">KEY_REGISTRY</a></h3>
-<p>Well-known protocol registry key for the forward registry.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REGISTRY = bytes32("registry")
-</code></pre>
 <h2 id="state-variables-6"><a class="header" href="#state-variables-6">State Variables</a></h2>
 <h3 id="registry-2"><a class="header" href="#registry-2">registry</a></h3>
 <p>DEPRECATED: Registry used to resolve node ownership.</p>
@@ -4060,7 +3917,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="dotnsreverseresolver-1"><a class="header" href="#dotnsreverseresolver-1">DotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></p>
 <p><strong>Title:</strong>
@@ -4070,19 +3927,6 @@ Dotns Reverse Resolver</p>
 Writes are restricted to an authorised registrar.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-7"><a class="header" href="#constants-7">Constants</a></h2>
-<h3 id="key_controller-3"><a class="header" href="#key_controller-3">KEY_CONTROLLER</a></h3>
-<p>Well-known protocol registry key for the registrar controller.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_CONTROLLER = bytes32("controller")
-</code></pre>
-<h3 id="key_registrar-2"><a class="header" href="#key_registrar-2">KEY_REGISTRAR</a></h3>
-<p>Well-known protocol registry key for the ERC721 registrar.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes.
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant KEY_REGISTRAR = bytes32("registrar")
-</code></pre>
 <h2 id="state-variables-7"><a class="header" href="#state-variables-7">State Variables</a></h2>
 <h3 id="reversenames"><a class="header" href="#reversenames">reverseNames</a></h3>
 <p>Mapping from address to its reverse name.
@@ -4216,7 +4060,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="idotnscontentresolver"><a class="header" href="#idotnscontentresolver">IDotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Content Resolver</p>
 <p>Defines storage and retrieval for content hash, text records, and operator approvals for DotNS nodes</p>
@@ -4458,7 +4302,7 @@ security-contact: admin@parity.io</p>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="idotnsresolver"><a class="header" href="#idotnsresolver">IDotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Resolver</p>
 <p>Defines forward-resolution address records for DotNS nodes</p>
@@ -4575,7 +4419,7 @@ security-contact: admin@parity.io</p>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="idotnsreverseresolver"><a class="header" href="#idotnsreverseresolver">IDotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Reverse Resolver</p>
 <p>Interface for writing and reading reverse name records for addresses.</p>
@@ -4704,7 +4548,7 @@ reverts: NotRegistrar if the caller is not authorised to write.</p>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="istore"><a class="header" href="#istore">IStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/store/IStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/store/IStore.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStore</p>
 <p>Interface defining a key-value storage for IPFS URIs scoped by user address.</p>
@@ -5178,7 +5022,7 @@ reverts: NotAuthorised if caller is not the owner.</p>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="istorefactory"><a class="header" href="#istorefactory">IStoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/store/IStoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/store/IStoreFactory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStoreFactory</p>
 <p>Interface defining factory functions for deploying and managing user-specific stores</p>
@@ -5338,7 +5182,7 @@ reverts: NotOwner if msg.sender is not the owner of the original contract</p>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="store"><a class="header" href="#store">Store</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/store/Store.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/store/Store.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/store/IStore.sol/interface.IStore.html">IStore</a>, Ownable</p>
 <p><strong>Title:</strong>
@@ -5726,7 +5570,7 @@ reverts: NotAuthorised if caller is not the owner.</p>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="storefactory-2"><a class="header" href="#storefactory-2">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
@@ -5821,12 +5665,37 @@ reverts: NotOwner if msg.sender is not the owner of the original contract</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="contents-5"><a class="header" href="#contents-5">Contents</a></h1>
 <ul>
+<li><a href="#dotnsconstants">DotnsConstants</a></li>
 <li><a href="#storeutils">StoreUtils</a></li>
 <li><a href="#stringutils">StringUtils</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><strong>Title:</strong>
+DotNS Constants</p>
+<p>Protocol-level invariants shared across DotNS contracts.</p>
+<p><strong>Note:</strong>
+security-contact: admin@parity.io</p>
+<h2 id="constants-3"><a class="header" href="#constants-3">Constants</a></h2>
+<h3 id="dot_node"><a class="header" href="#dot_node">DOT_NODE</a></h3>
+<p>Namehash of the .dot TLD node.</p>
+<p>keccak256(abi.encodePacked(bytes32(0), keccak256(“dot”)))</p>
+<pre><code class="language-solidity">bytes32 internal constant DOT_NODE =
+    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce
+</code></pre>
+<h3 id="tld"><a class="header" href="#tld">TLD</a></h3>
+<p>TLD suffix appended to labels when building full domain names.</p>
+<pre><code class="language-solidity">string internal constant TLD = ".dot"
+</code></pre>
+<h3 id="dotns_registered_key"><a class="header" href="#dotns_registered_key">DOTNS_REGISTERED_KEY</a></h3>
+<p>Store key prefix for DotNS registration entries.
+forge-lint: disable-next-line(unsafe-typecast)</p>
+<pre><code class="language-solidity">bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered")
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="storeutils"><a class="header" href="#storeutils">StoreUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/utils/StoreUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/utils/StoreUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Store Utilities Library</p>
 <p>Provides Store acquisition and management utilities for any contract that requires a store.</p>
@@ -5845,15 +5714,6 @@ Both must be transferred to the target owner for correct operation.</li>
 </ul>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-8"><a class="header" href="#constants-8">Constants</a></h2>
-<h3 id="dotns_registered_key-2"><a class="header" href="#dotns_registered_key-2">DOTNS_REGISTERED_KEY</a></h3>
-<p>Key prefix for DotNS-written Store immutable entries (“dotns.registered”).</p>
-<p>Used by all contracts that read or write registration labels to per-user Stores.
-The value is <code>bytes32("dotns.registered")</code> — safe because the string fits in 32 bytes.
-casting to ‘bytes32’ is safe because the string fits in 32 bytes
-forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered")
-</code></pre>
 <h2 id="functions-20"><a class="header" href="#functions-20">Functions</a></h2>
 <h3 id="storekey"><a class="header" href="#storekey">storeKey</a></h3>
 <p>Computes the Store key for a registered label.</p>
@@ -5994,7 +5854,7 @@ StoreFactory and Store are not upgradeable.</p>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="stringutils"><a class="header" href="#stringutils">StringUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2c9b325527429b3d428dbf60b8da70a0c8c26757/contracts/utils/StringUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b6ea51b415f223478259c4daccf82818883905ec/contracts/utils/StringUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 String Utilities Library</p>
 <p>Provides string manipulation utilities for DotNS contracts.</p>
