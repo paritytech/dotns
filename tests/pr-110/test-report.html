@@ -8,12 +8,12 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">DotNS Test Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-03-27 16:23 UTC | 17 suites</p>
+<p class="text-sm text-gray-500">Generated 2026-04-02 02:46 UTC | 16 suites</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">Status</p><p class="text-xl font-bold text-green-400">All Passed</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">133</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">133</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">127</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">127</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-gray-500">0</p></div>
 </div></div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
@@ -56,6 +56,34 @@
 </div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistryFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/registry/DotnsRegistryFuzz.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">3/3</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_non_parent_non_owner_cannot_reassign</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_parent_can_reassign_subnode_to_any_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reassignment_preserves_resolver</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">BasicDotnsIntegration</span><span class="ml-2 text-xs text-gray-500">test/intergration/BasicDotns.t.sol</span></div>
 <span class="text-sm font-mono text-green-400">4/4</span>
 </div>
@@ -89,49 +117,6 @@
 </div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsRegistryForkTest</span><span class="ml-2 text-xs text-gray-500">test/fork/DotnsRegistryFork.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">6/6</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_erc721_transfer_reverts_due_to_store_controller_gap</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_issue107_parent_can_set_resolver_via_setSubnodeResolver</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_parent_can_reassign_subnode_after_upgrade</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_root_record_intact_after_upgrade</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_tokenised_node_auth_unchanged_after_upgrade</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_version_is_1_3_0_after_upgrade</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsContentResolverTests</span><span class="ml-2 text-xs text-gray-500">test/unit/resolver/DotnsContentResolver.t.sol</span></div>
 <span class="text-sm font-mono text-green-400">3/3</span>
 </div>
@@ -153,34 +138,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_set_text</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsRegistryFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/registry/DotnsRegistryFuzz.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">3/3</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_non_parent_non_owner_cannot_reassign</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_parent_can_reassign_subnode_to_any_owner</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reassignment_preserves_resolver</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -389,6 +346,34 @@
 </div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistryInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registry/DotnsRegistryInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">3/3</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_parent_can_always_reassign_subnodes</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_subnode_owner_authorized</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_subnodes_always_exist</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsRegistrarControllerFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/registrar/DotnsRegistrarControllerFuzz.t.sol</span></div>
 <span class="text-sm font-mono text-green-400">6/6</span>
 </div>
@@ -425,34 +410,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">testFuzz_transfer_writes_label_to_recipient_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsRegistryInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registry/DotnsRegistryInvariant.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">3/3</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_parent_can_always_reassign_subnodes</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_subnode_owner_authorized</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_subnodes_always_exist</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
