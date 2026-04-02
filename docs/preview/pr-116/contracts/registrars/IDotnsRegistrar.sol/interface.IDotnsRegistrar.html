@@ -1,0 +1,423 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>IDotnsRegistrar</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../../favicon.svg">
+        <link rel="shortcut icon" href="../../../favicon.png">
+        <link rel="stylesheet" href="../../../css/variables.css">
+        <link rel="stylesheet" href="../../../css/general.css">
+        <link rel="stylesheet" href="../../../css/chrome.css">
+        <link rel="stylesheet" href="../../../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../../../highlight.css">
+        <link rel="stylesheet" href="../../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../../../book.css">
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../../../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item "><a href="../../../index.html">Home</a></li><li class="chapter-item affix "><li class="part-title">contracts</li><li class="chapter-item "><a href="../../../contracts/pop/index.html">❱ pop</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></li><li class="chapter-item "><a href="../../../contracts/pop/PopRules.sol/contract.PopRules.html">PopRules</a></li></ol></li><li class="chapter-item expanded "><a href="../../../contracts/registrars/index.html">❱ registrars</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/registrars/DotnsRegistrar.sol/contract.DotnsRegistrar.html">DotnsRegistrar</a></li><li class="chapter-item "><a href="../../../contracts/registrars/DotnsRegistrarController.sol/contract.DotnsRegistrarController.html">DotnsRegistrarController</a></li><li class="chapter-item expanded "><a href="../../../contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html" class="active">IDotnsRegistrar</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/registry/index.html">❱ registry</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/registry/DotnsProtocolRegistry.sol/contract.DotnsProtocolRegistry.html">DotnsProtocolRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/DotnsRegistry.sol/contract.DotnsRegistry.html">DotnsRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/resolvers/index.html">❱ resolvers</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsContentResolver.sol/contract.DotnsContentResolver.html">DotnsContentResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsResolver.sol/contract.DotnsResolver.html">DotnsResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsReverseResolver.sol/contract.DotnsReverseResolver.html">DotnsReverseResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/store/index.html">❱ store</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/store/IStore.sol/interface.IStore.html">IStore</a></li><li class="chapter-item "><a href="../../../contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></li><li class="chapter-item "><a href="../../../contracts/store/Store.sol/contract.Store.html">Store</a></li><li class="chapter-item "><a href="../../../contracts/store/StoreFactory.sol/contract.StoreFactory.html">StoreFactory</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/utils/index.html">❱ utils</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/utils/DotnsConstants.sol/library.DotnsConstants.html">DotnsConstants</a></li><li class="chapter-item "><a href="../../../contracts/utils/StoreUtils.sol/library.StoreUtils.html">StoreUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/StringUtils.sol/library.StringUtils.html">StringUtils</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title"></h1>
+
+                    <div class="right-buttons">
+                        <a href="../../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/paritytech/dotns" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
+<p><a href="https://github.com/paritytech/dotns/blob/e13a04347a8d1c4bc0ad57ad2d342781c61c111e/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><strong>Inherits:</strong>
+IERC721</p>
+<p><strong>Title:</strong>
+Dotns Registrar</p>
+<p>ERC721-backed ownership for DotNS names with controller-gated registration.</p>
+<p>This interface is intentionally minimal and deliberately policy-free.
+It provides:</p>
+<ul>
+<li>ERC721 ownership for registered name token IDs.</li>
+<li>Controller-gated registration.</li>
+</ul>
+<p><strong>Note:</strong>
+security-contact: admin@parity.io</p>
+<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
+<h3 id="available"><a class="header" href="#available">available</a></h3>
+<p>Returns whether a name is available for registration.</p>
+<p>A name is available if and only if it has not been registered yet.</p>
+<pre><code class="language-solidity">function available(uint256 id) external view returns (bool isAvailable);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>id</code></td><td><code>uint256</code></td><td>Token identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>isAvailable</code></td><td><code>bool</code></td><td>True if the name can be registered.</td></tr>
+</tbody></table>
+</div>
+<h3 id="register"><a class="header" href="#register">register</a></h3>
+<p>Registers a name permanently.</p>
+<p>Callable only by an authorised controller.
+Registration mints the ERC721 token to <code>owner</code> and stores both the human-readable
+label and its keccak256 hash for use during transfer store writes.</p>
+<pre><code class="language-solidity">function register(uint256 id, address owner, string calldata label) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>id</code></td><td><code>uint256</code></td><td>Token identifier.</td></tr>
+<tr><td><code>owner</code></td><td><code>address</code></td><td>Owner of the name.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The human-readable label string (e.g. "alice").</td></tr>
+</tbody></table>
+</div>
+<h3 id="addcontroller"><a class="header" href="#addcontroller">addController</a></h3>
+<p>Adds an authorised controller.</p>
+<p>Callable only by the contract owner.</p>
+<pre><code class="language-solidity">function addController(IDotnsRegistrarController controller) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>controller</code></td><td><code>IDotnsRegistrarController</code></td><td>Address to authorise.</td></tr>
+</tbody></table>
+</div>
+<h3 id="removecontroller"><a class="header" href="#removecontroller">removeController</a></h3>
+<p>Removes an authorised controller.</p>
+<p>Callable only by the contract owner.</p>
+<pre><code class="language-solidity">function removeController(IDotnsRegistrarController controller) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>controller</code></td><td><code>IDotnsRegistrarController</code></td><td>Address to deauthorise.</td></tr>
+</tbody></table>
+</div>
+<h3 id="updateprotocolregistry"><a class="header" href="#updateprotocolregistry">updateProtocolRegistry</a></h3>
+<p>Updates the protocol registry address.</p>
+<p>Callable only by the contract owner.</p>
+<p>TODO: This is temporary as we need to upgrade the contract we need to remember to remove this function
+If we deploy to a new environment</p>
+<pre><code class="language-solidity">function updateProtocolRegistry(IDotnsProtocolRegistry registry) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>registry</code></td><td><code>IDotnsProtocolRegistry</code></td><td>The address of the new protocol registry.</td></tr>
+</tbody></table>
+</div>
+<h3 id="synclabel"><a class="header" href="#synclabel">syncLabel</a></h3>
+<p>Syncs a label to the internal labels mapping for a token.</p>
+<p>Callable only by the token owner. The label is verified cryptographically
+against the token identifier. Reverts if the label is already set.
+TODO: We need to remove this before a fresh deployment</p>
+<pre><code class="language-solidity">function syncLabel(uint256 tokenId, string calldata label) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The human-readable label string (e.g. "alice").</td></tr>
+</tbody></table>
+</div>
+<h2 id="events"><a class="header" href="#events">Events</a></h2>
+<h3 id="nameregistered"><a class="header" href="#nameregistered">NameRegistered</a></h3>
+<p>Emitted when a name is registered.</p>
+<pre><code class="language-solidity">event NameRegistered(uint256 indexed id, address indexed owner);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>id</code></td><td><code>uint256</code></td><td>Token identifier.</td></tr>
+<tr><td><code>owner</code></td><td><code>address</code></td><td>Owner of the name.</td></tr>
+</tbody></table>
+</div>
+<h3 id="controlleradded"><a class="header" href="#controlleradded">ControllerAdded</a></h3>
+<p>Emitted when a controller is added.</p>
+<pre><code class="language-solidity">event ControllerAdded(IDotnsRegistrarController indexed controller);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>controller</code></td><td><code>IDotnsRegistrarController</code></td><td>Address granted controller permissions.</td></tr>
+</tbody></table>
+</div>
+<h3 id="controllerremoved"><a class="header" href="#controllerremoved">ControllerRemoved</a></h3>
+<p>Emitted when a controller is removed.</p>
+<pre><code class="language-solidity">event ControllerRemoved(IDotnsRegistrarController indexed controller);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>controller</code></td><td><code>IDotnsRegistrarController</code></td><td>Address whose controller permissions were revoked.</td></tr>
+</tbody></table>
+</div>
+<h3 id="protocolregistryupdated"><a class="header" href="#protocolregistryupdated">ProtocolRegistryUpdated</a></h3>
+<p>Emitted when the protocol registry is updated.</p>
+<pre><code class="language-solidity">event ProtocolRegistryUpdated(IDotnsProtocolRegistry indexed newRegistry);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>newRegistry</code></td><td><code>IDotnsProtocolRegistry</code></td><td>The address of the new protocol registry.</td></tr>
+</tbody></table>
+</div>
+<h3 id="labelsynced"><a class="header" href="#labelsynced">LabelSynced</a></h3>
+<p>Emitted when a label is synced to the labels mapping.</p>
+<pre><code class="language-solidity">event LabelSynced(uint256 indexed tokenId, string label);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The synced label string.</td></tr>
+</tbody></table>
+</div>
+<h2 id="errors"><a class="header" href="#errors">Errors</a></h2>
+<h3 id="namenotavailable"><a class="header" href="#namenotavailable">NameNotAvailable</a></h3>
+<p>Thrown when a name is already registered.</p>
+<pre><code class="language-solidity">error NameNotAvailable(uint256 tokenId);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier derived from the node.</td></tr>
+</tbody></table>
+</div>
+<h3 id="notcontroller"><a class="header" href="#notcontroller">NotController</a></h3>
+<p>Thrown when the caller is not an authorised controller.</p>
+<pre><code class="language-solidity">error NotController(address caller);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>caller</code></td><td><code>address</code></td><td>The caller address.</td></tr>
+</tbody></table>
+</div>
+<h3 id="nottokenowner"><a class="header" href="#nottokenowner">NotTokenOwner</a></h3>
+<p>Thrown when the caller is not the token owner.</p>
+<pre><code class="language-solidity">error NotTokenOwner(address caller, uint256 tokenId);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>caller</code></td><td><code>address</code></td><td>The caller address.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier.</td></tr>
+</tbody></table>
+</div>
+<h3 id="labelmismatch"><a class="header" href="#labelmismatch">LabelMismatch</a></h3>
+<p>Thrown when the label does not match the token identifier.</p>
+<pre><code class="language-solidity">error LabelMismatch(uint256 tokenId);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier.</td></tr>
+</tbody></table>
+</div>
+<h3 id="labelalreadyset"><a class="header" href="#labelalreadyset">LabelAlreadySet</a></h3>
+<p>Thrown when the label is already set for a token.</p>
+<pre><code class="language-solidity">error LabelAlreadySet(uint256 tokenId);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier.</td></tr>
+</tbody></table>
+</div>
+<h3 id="invalidlabel"><a class="header" href="#invalidlabel">InvalidLabel</a></h3>
+<p>Thrown when a label is not a canonical lowercase ASCII DNS label.</p>
+<pre><code class="language-solidity">error InvalidLabel();
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../../contracts/registrars/DotnsRegistrarController.sol/contract.DotnsRegistrarController.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../../../contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../../contracts/registrars/DotnsRegistrarController.sol/contract.DotnsRegistrarController.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../../../contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../../elasticlunr.min.js"></script>
+        <script src="../../../mark.min.js"></script>
+        <script src="../../../searcher.js"></script>
+
+        <script src="../../../clipboard.min.js"></script>
+        <script src="../../../highlight.js"></script>
+        <script src="../../../book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../../../solidity.min.js"></script>
+
+
+    </div>
+    </body>
+</html>
