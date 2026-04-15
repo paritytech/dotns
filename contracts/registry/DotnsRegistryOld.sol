@@ -10,8 +10,8 @@ import {IDotnsRegistry} from "./IDotnsRegistry.sol";
 import {IDotnsRegistrarController} from "../registrars/IDotnsRegistrarController.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IDotnsReverseResolver} from "../resolvers/IDotnsReverseResolver.sol";
-import {Store} from "../store/Store.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
+import {Store} from "../store/Store.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
 import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
 import {DotnsProtocolRegistry} from "./DotnsProtocolRegistry.sol";
@@ -26,7 +26,7 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 ///      - records[node].owner == address(0) means ownership is derived from the ERC721 registrar.
 ///      Authorisation for tokenised nodes follows ERC721 owner/approvals.
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistry {
+contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistry {
     using StoreUtils for IStoreFactory;
     using StringUtils for *;
 
@@ -144,14 +144,6 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     }
 
     /// @inheritdoc IDotnsRegistry
-    /// @dev A stale record from a reclaimed tokenised name is a legitimate overwrite:
-    ///      tokenised records use the sentinel owner pattern (owner == address(0)) and
-    ///      authority derives from the registrar's NFT. Subnode records hold an explicit
-    ///      owner and must not be overwritten via this path. The ERC721 ownership check
-    ///      below (`tokenOwner == newOwner`) is the authoritative guard.
-    ///      The resolver slot is cleared on the reclaim path by passing `address(0)` — this
-    ///      is the DNS delegation reset: no resolver is delegated until the new owner sets
-    ///      one, so standard resolution returns empty and stale records are unreachable.
     function setOwner(
         bytes32 node,
         address newOwner,
@@ -162,11 +154,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         onlyRegistrarController
     {
         require(newOwner != address(0), NotAllowed());
-
-        require(
-            !records[node].exists || records[node].owner == address(0), NodeAlreadyOwned(node)
-        );
-
+        require(!records[node].exists, NodeAlreadyOwned(node));
         IDotnsRegistrar registrar = IDotnsRegistrar(
             protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).REGISTRAR())
         );
@@ -347,7 +335,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.5.0";
+        versionString = "1.4.0";
     }
 
     /// @inheritdoc UUPSUpgradeable

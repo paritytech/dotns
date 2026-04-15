@@ -10,8 +10,8 @@ import {
     ERC721Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 
-import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
-import {IDotnsRegistrarController} from "./IDotnsRegistrarController.sol";
+import {IDotnsRegistrarOld} from "./IDotnsRegistrarOld.sol";
+import {IDotnsRegistrarControllerOld} from "./IDotnsRegistrarControllerOld.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsProtocolRegistry} from "../registry/DotnsProtocolRegistry.sol";
 
@@ -34,19 +34,19 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 ///      Stores are immutable (locked by DotNS controllers), so the sender's entry is not removed.
 ///
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistrar is
+contract DotnsRegistrarOld is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
     ERC721Upgradeable,
-    IDotnsRegistrar
+    IDotnsRegistrarOld
 {
     using StoreUtils for IStoreFactory;
     using StringUtils for *;
 
     /// @notice Mapping of authorised controller addresses.
     /// @dev Controllers may call `register`.
-    mapping(IDotnsRegistrarController controller => bool exists) public controllers;
+    mapping(IDotnsRegistrarControllerOld controller => bool exists) public controllers;
 
     /// @notice Protocol-level address registry for all DotNS contracts.
     /// @dev Used to resolve sibling contract addresses (store factory, controller, registry)
@@ -90,44 +90,31 @@ contract DotnsRegistrar is
         __ERC721_init(name, symbol);
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     // TODO: On fresh deploy (not upgrade), remove this function. Set protocolRegistry in initialize instead.
     function updateProtocolRegistry(IDotnsProtocolRegistry registry) external override onlyOwner {
         protocolRegistry = registry;
         emit ProtocolRegistryUpdated(registry);
     }
 
-    /// @inheritdoc IDotnsRegistrar
-    function addController(IDotnsRegistrarController controller) external onlyOwner {
+    /// @inheritdoc IDotnsRegistrarOld
+    function addController(IDotnsRegistrarControllerOld controller) external onlyOwner {
         controllers[controller] = true;
         emit ControllerAdded(controller);
     }
 
-    /// @inheritdoc IDotnsRegistrar
-    function removeController(IDotnsRegistrarController controller) external onlyOwner {
+    /// @inheritdoc IDotnsRegistrarOld
+    function removeController(IDotnsRegistrarControllerOld controller) external onlyOwner {
         controllers[controller] = false;
         emit ControllerRemoved(controller);
     }
 
-    /// @inheritdoc IDotnsRegistrar
-    /// @dev A token is available when it has never been minted, OR when it is held by the
-    ///      configured escrow (a NoStatus holder released the name back). In the latter case
-    ///      the registrar controller is expected to call `escrow.reclaim()` during registration
-    ///      to transfer custody to the new registrant.
+    /// @inheritdoc IDotnsRegistrarOld
     function available(uint256 id) public view override returns (bool isAvailable) {
-        if (!_exists(id)) return true;
-        address escrow = protocolRegistry.get(
-            DotnsProtocolRegistry(address(protocolRegistry)).NAME_ESCROW()
-        );
-        isAvailable = escrow != address(0) && _ownerOf(id) == escrow;
+        return !_exists(id);
     }
 
-    /// @inheritdoc IDotnsRegistrar
-    function exists(uint256 tokenId) external view override returns (bool tokenExists) {
-        tokenExists = _exists(tokenId);
-    }
-
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function register(
         uint256 id,
         address owner,
@@ -143,7 +130,7 @@ contract DotnsRegistrar is
         emit NameRegistered(id, owner);
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function syncLabel(uint256 tokenId, string calldata label) external override {
         require(_exists(tokenId), NameNotAvailable(tokenId));
         require(ownerOf(tokenId) == msg.sender, NotTokenOwner(msg.sender, tokenId));
@@ -171,7 +158,7 @@ contract DotnsRegistrar is
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.5.0";
+        versionString = "1.3.0";
     }
 
     /// @notice Checks whether a token ID exists.
@@ -183,7 +170,7 @@ contract DotnsRegistrar is
 
     /// @notice Internal function to check for controller access.
     function _onlyController() internal view {
-        require(controllers[IDotnsRegistrarController(msg.sender)], NotController(msg.sender));
+        require(controllers[IDotnsRegistrarControllerOld(msg.sender)], NotController(msg.sender));
     }
 
     /// @inheritdoc ERC721Upgradeable

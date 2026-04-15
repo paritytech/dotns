@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {IERC721} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import {IDotnsRegistrarController} from "./IDotnsRegistrarController.sol";
+import {IDotnsRegistrarControllerOld} from "./IDotnsRegistrarControllerOld.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 
 /// @title Dotns Registrar
@@ -12,7 +12,7 @@ import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 ///      - ERC721 ownership for registered name token IDs.
 ///      - Controller-gated registration.
 /// @custom:security-contact admin@parity.io
-interface IDotnsRegistrar is IERC721 {
+interface IDotnsRegistrarOld is IERC721 {
     /// @notice Thrown when a name is already registered.
     /// @param tokenId The token identifier derived from the node.
     error NameNotAvailable(uint256 tokenId);
@@ -44,11 +44,11 @@ interface IDotnsRegistrar is IERC721 {
 
     /// @notice Emitted when a controller is added.
     /// @param controller Address granted controller permissions.
-    event ControllerAdded(IDotnsRegistrarController indexed controller);
+    event ControllerAdded(IDotnsRegistrarControllerOld indexed controller);
 
     /// @notice Emitted when a controller is removed.
     /// @param controller Address whose controller permissions were revoked.
-    event ControllerRemoved(IDotnsRegistrarController indexed controller);
+    event ControllerRemoved(IDotnsRegistrarControllerOld indexed controller);
 
     /// @notice Emitted when the protocol registry is updated.
     /// @param newRegistry The address of the new protocol registry.
@@ -77,25 +77,12 @@ interface IDotnsRegistrar is IERC721 {
     /// @notice Adds an authorised controller.
     /// @dev Callable only by the contract owner.
     /// @param controller Address to authorise.
-    function addController(IDotnsRegistrarController controller) external;
+    function addController(IDotnsRegistrarControllerOld controller) external;
 
     /// @notice Removes an authorised controller.
     /// @dev Callable only by the contract owner.
     /// @param controller Address to deauthorise.
-    function removeController(IDotnsRegistrarController controller) external;
-
-    /// @notice Syncs a label to the internal labels mapping for a token.
-    /// @dev Callable only by the token owner. The label is verified cryptographically
-    ///      against the token identifier. Reverts if the label is already set.
-    ///      TODO: We need to remove this before a fresh deployment
-    /// @param tokenId The token identifier.
-    /// @param label The human-readable label string (e.g. "alice").
-    function syncLabel(uint256 tokenId, string calldata label) external;
-
-    /// @notice Returns whether a token currently exists (has been minted and not burned).
-    /// @param tokenId Token identifier.
-    /// @return tokenExists True if the token has an owner, false otherwise.
-    function exists(uint256 tokenId) external view returns (bool tokenExists);
+    function removeController(IDotnsRegistrarControllerOld controller) external;
 
     /// @notice Updates the protocol registry address.
     /// @dev Callable only by the contract owner.
@@ -104,4 +91,12 @@ interface IDotnsRegistrar is IERC721 {
     /// @param registry The address of the new protocol registry.
     // TODO: On fresh deploy (not upgrade), remove this function. Set protocolRegistry in initialize instead.
     function updateProtocolRegistry(IDotnsProtocolRegistry registry) external;
+
+    /// @notice Syncs a label to the internal labels mapping for a token.
+    /// @dev Callable only by the token owner. The label is verified cryptographically
+    ///      against the token identifier. Reverts if the label is already set.
+    ///      TODO: We need to remove this before a fresh deployment
+    /// @param tokenId The token identifier.
+    /// @param label The human-readable label string (e.g. "alice").
+    function syncLabel(uint256 tokenId, string calldata label) external;
 }

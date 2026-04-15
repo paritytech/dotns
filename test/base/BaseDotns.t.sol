@@ -22,8 +22,8 @@ import {
     DotnsProtocolRegistry,
     IDotnsProtocolRegistry
 } from "../../contracts/registry/DotnsProtocolRegistry.sol";
+import {DotnsNameEscrow, IDotnsNameEscrow} from "../../contracts/escrow/DotnsNameEscrow.sol";
 import {StoreUtils} from "../../contracts/utils/StoreUtils.sol";
-import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 /// @title BaseDotns
@@ -36,6 +36,7 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 ///      - DotnsContentResolver: resolver used for content records
 ///      - PopRules: PoP rules and spam-pricing oracle
 ///      - DotnsRegistrarController: commit–reveal controller orchestrating registration flow
+///      - DotnsNameEscrow: escrow for refundable deposits and name release lifecycle
 abstract contract BaseDotns is Test {
     /// @notice Test user account: ed.
     address public ed;
@@ -79,9 +80,15 @@ abstract contract BaseDotns is Test {
     /// @notice Deployed protocol registry instance.
     DotnsProtocolRegistry public protocolRegistry;
 
+    /// @notice Deployed name escrow instance.
+    DotnsNameEscrow public dotnsNameEscrow;
+
     /// @notice Rent price applied to PoP NoStatus users for spam resistance.
     /// @dev This value is passed into PopRules initialization in this base test.
     uint256 public constant RENT_PRICE = 2e15 wei;
+
+    /// @notice Default escrow cooldown used in tests.
+    uint256 public constant ESCROW_COOLDOWN = 7 days;
 
     /// @notice Zero hash constant
     bytes32 public constant ZERO_HASH = bytes32(0);
@@ -190,6 +197,17 @@ abstract contract BaseDotns is Test {
         protocolRegistry = DotnsProtocolRegistry(protocolRegistryAddress);
         vm.label(protocolRegistryAddress, "DotnsProtocolRegistry");
 
+        address dotnsNameEscrowAddress = Upgrades.deployUUPSProxy(
+            "DotnsNameEscrow.sol:DotnsNameEscrow",
+            abi.encodeCall(
+                DotnsNameEscrow.initialize,
+                (IDotnsProtocolRegistry(protocolRegistryAddress), ESCROW_COOLDOWN)
+            )
+        );
+        dotnsNameEscrow = DotnsNameEscrow(payable(dotnsNameEscrowAddress));
+        vm.label(dotnsNameEscrowAddress, "DotnsNameEscrow");
+
+        protocolRegistry.set(protocolRegistry.NAME_ESCROW(), dotnsNameEscrowAddress);
         protocolRegistry.set(protocolRegistry.REGISTRAR(), dotnsRegistrarAddress);
         protocolRegistry.set(protocolRegistry.CONTROLLER(), dotnsRegistrarControllerAddress);
         protocolRegistry.set(protocolRegistry.REGISTRY(), dotnsRegistryAddress);

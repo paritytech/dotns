@@ -17,7 +17,7 @@ import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 ///        to create an immutable onchain record of the name registration.
 ///      - This store serves as a quick lookup for all names registered.
 /// @custom:security-contact admin@parity.io
-interface IDotnsRegistrarController {
+interface IDotnsRegistrarControllerOld {
     /// @notice Parameters used to generate and reveal a commitment.
     /// @dev All fields must match exactly between commitment and reveal.
     /// @param label Label being registered (e.g. "alice").
@@ -53,11 +53,6 @@ interface IDotnsRegistrarController {
     /// @param who The address being whitelisted.
     /// @param whiteListStatus Whether the address was added or removed from the whitelist.
     event WhiteListed(address indexed who, bool indexed whiteListStatus);
-
-    /// @notice Emitted when controller-held native funds are migrated to escrow.
-    /// @param escrow Escrow address that received the funds.
-    /// @param amount Native amount migrated.
-    event NativeFundsMigrated(address indexed escrow, uint256 amount);
 
     /// @notice Thrown when the caller is not whitelisted or the owner.
     /// @param caller The address that attempted the call.
@@ -107,12 +102,6 @@ interface IDotnsRegistrarController {
     /// @notice Thrown when the caller is not the registry.
     error NotRegistry();
 
-    /// @notice Thrown when escrow is not configured in the protocol registry.
-    error EscrowNotConfigured();
-
-    /// @notice Thrown when native-fund migration to escrow fails.
-    error NativeFundsMigrationFailed();
-
     /// @notice Returns whether a label is available for registration.
     /// @param label Label to check.
     /// @return isAvailable True if the label can be registered.
@@ -160,10 +149,4 @@ interface IDotnsRegistrarController {
     /// @param registry The address of the new protocol registry.
     // TODO: On fresh deploy (not upgrade), remove this function. Set protocolRegistry in initialize instead.
     function updateProtocolRegistry(IDotnsProtocolRegistry registry) external;
-
-    /// @notice Migrates controller-held native funds into escrow.
-    /// @dev Callable only by the contract owner. Temporary upgrade-compatibility path for
-    ///      moving any pre-escrow controller balance into the new custody contract.
-    /// @param amount Native amount to migrate.
-    function migrateNativeFundsToEscrow(uint256 amount) external;
 }

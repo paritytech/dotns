@@ -15,7 +15,7 @@ import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
 ///      Individual contracts query this registry instead of storing sibling references,
 ///      reducing storage fragmentation and simplifying upgrades.
 /// @custom:security-contact admin@parity.io
-contract DotnsProtocolRegistry is
+contract DotnsProtocolRegistryOld is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
@@ -61,11 +61,6 @@ contract DotnsProtocolRegistry is
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 public constant CONTENT_RESOLVER = bytes32("contentResolver");
 
-    /// @notice Well-known key for the name escrow handling refundable deposits and reclaim.
-    /// casting to 'bytes32' is safe because the string fits in 32 bytes.
-    /// forge-lint: disable-next-line(unsafe-typecast)
-    bytes32 public constant NAME_ESCROW = bytes32("nameEscrow");
-
     /// @dev Internal mapping from well-known key to contract address.
     mapping(bytes32 key => address addr) private _addresses;
 
@@ -98,7 +93,7 @@ contract DotnsProtocolRegistry is
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.1.0";
+        versionString = "1.0.0";
     }
 
     /// @inheritdoc UUPSUpgradeable
