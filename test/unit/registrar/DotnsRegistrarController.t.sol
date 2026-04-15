@@ -106,7 +106,11 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         assertTrue(ownerStore.isLocked(nameOwner, storeKey));
     }
 
-    function test_register_poplite_reserves_base_name() public {
+    function test_register_poplite_does_not_side_effect_popRules_reservation() public {
+        // As of controller 1.5.0 the public `register` path no longer creates a side-effect
+        // `PopRules` reservation for PopLite users. PoP-driven reservations now flow through
+        // the gateway-only `reserveBaseName` entry point and live inside the controller's own
+        // reservation queue.
         string memory nameLabel = "lights01";
         address nameOwner = ed;
 
@@ -127,9 +131,8 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         dotnsRegistrarController.register{value: 0}(registration);
         vm.stopPrank();
 
-        (bool isReserved, address reservationOwner,) = popRules.isBaseNameReserved("lights");
-        assertTrue(isReserved);
-        assertEq(reservationOwner, nameOwner);
+        (bool isReserved,,) = popRules.isBaseNameReserved("lights");
+        assertFalse(isReserved);
     }
 
     function test_register_does_not_overwrite_third_party_reverse_record() public {
