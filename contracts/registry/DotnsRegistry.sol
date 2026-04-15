@@ -232,6 +232,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     {
         IStoreFactory factory = IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
         address[] memory controllers = RegistrationUtils.storeControllers(protocolRegistry);
+        // Side effect is writing the subnode entry into the owner's Store; returned instance is unused.
+        // slither-disable-next-line unused-return
         factory.writeToStore(controllers, storeOwner, node, fullName);
     }
 
