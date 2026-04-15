@@ -100,8 +100,7 @@ contract UpgradeEscrowSystem is BaseDeployer {
             )
         );
 
-        DotnsProtocolRegistry protocolRegistry =
-            DotnsProtocolRegistry(PROTOCOL_REGISTRY_PROXY);
+        DotnsProtocolRegistry protocolRegistry = DotnsProtocolRegistry(PROTOCOL_REGISTRY_PROXY);
         vm.startPrank(registryOwner);
         protocolRegistry.set(protocolRegistry.NAME_ESCROW(), escrowProxy);
         vm.stopPrank();
@@ -114,13 +113,10 @@ contract UpgradeEscrowSystem is BaseDeployer {
     /// @notice Post-upgrade verification checks.
     /// @param escrowProxy Address of the escrow proxy returned by `upgradeAll`.
     function verifyUpgrade(address escrowProxy) public view {
-        DotnsProtocolRegistry protocolRegistry =
-            DotnsProtocolRegistry(PROTOCOL_REGISTRY_PROXY);
+        DotnsProtocolRegistry protocolRegistry = DotnsProtocolRegistry(PROTOCOL_REGISTRY_PROXY);
         DotnsNameEscrow escrow = DotnsNameEscrow(payable(escrowProxy));
 
-        _requireVersion(
-            protocolRegistry.version(), PROTOCOL_REGISTRY_VERSION, "ProtocolRegistry"
-        );
+        _requireVersion(protocolRegistry.version(), PROTOCOL_REGISTRY_VERSION, "ProtocolRegistry");
         _requireVersion(DotnsRegistry(REGISTRY_PROXY).version(), REGISTRY_VERSION, "Registry");
         _requireVersion(DotnsRegistrar(REGISTRAR_PROXY).version(), REGISTRAR_VERSION, "Registrar");
         _requireVersion(

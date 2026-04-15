@@ -242,7 +242,15 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function reclaim(uint256 tokenId, address newOwner) external override onlyController nonReentrant {
+    function reclaim(
+        uint256 tokenId,
+        address newOwner
+    )
+        external
+        override
+        onlyController
+        nonReentrant
+    {
         ReleasePosition storage position = _positions[tokenId];
 
         require(position.released && position.claimed, NotReclaimable(tokenId));

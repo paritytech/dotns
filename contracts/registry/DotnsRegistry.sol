@@ -162,9 +162,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     {
         require(newOwner != address(0), NotAllowed());
 
-        require(
-            !records[node].exists || records[node].owner == address(0), NodeAlreadyOwned(node)
-        );
+        require(!records[node].exists || records[node].owner == address(0), NodeAlreadyOwned(node));
 
         IDotnsRegistrar registrar = IDotnsRegistrar(
             protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).REGISTRAR())

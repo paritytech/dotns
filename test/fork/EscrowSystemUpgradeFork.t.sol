@@ -151,14 +151,9 @@ contract EscrowSystemUpgradeForkTest is Test {
 
         // Escrow retains custody of the NFT until the next registrant reclaims it.
         assertEq(
-            registrar.ownerOf(tokenId),
-            address(escrow),
-            "escrow retains custody after withdraw"
+            registrar.ownerOf(tokenId), address(escrow), "escrow retains custody after withdraw"
         );
-        assertTrue(
-            registrar.available(tokenId),
-            "name available for reclaim via re-registration"
-        );
+        assertTrue(registrar.available(tokenId), "name available for reclaim via re-registration");
 
         // Subname ownership persists through the custody hand-off — the new parent owner
         // inherits parent authority and can reassign via setSubnodeOwner if desired.

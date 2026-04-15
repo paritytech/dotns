@@ -116,9 +116,8 @@ contract DotnsRegistrar is
     ///      to transfer custody to the new registrant.
     function available(uint256 id) public view override returns (bool isAvailable) {
         if (!_exists(id)) return true;
-        address escrow = protocolRegistry.get(
-            DotnsProtocolRegistry(address(protocolRegistry)).NAME_ESCROW()
-        );
+        address escrow =
+            protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).NAME_ESCROW());
         isAvailable = escrow != address(0) && _ownerOf(id) == escrow;
     }
 

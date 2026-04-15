@@ -115,8 +115,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
                 "Withdrawn token must be held by escrow"
             );
             assertTrue(
-                dotnsRegistrar.available(tokenId),
-                "Withdrawn token must be available for reclaim"
+                dotnsRegistrar.available(tokenId), "Withdrawn token must be available for reclaim"
             );
         }
     }
