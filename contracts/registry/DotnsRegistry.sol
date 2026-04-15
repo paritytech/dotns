@@ -148,10 +148,9 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     ///      tokenised records use the sentinel owner pattern (owner == address(0)) and
     ///      authority derives from the registrar's NFT. Subnode records hold an explicit
     ///      owner and must not be overwritten via this path. The ERC721 ownership check
-    ///      below (`tokenOwner == newOwner`) is the authoritative guard.
-    ///      The resolver slot is cleared on the reclaim path by passing `address(0)` — this
-    ///      is the DNS delegation reset: no resolver is delegated until the new owner sets
-    ///      one, so standard resolution returns empty and stale records are unreachable.
+    ///      below (`tokenOwner == newOwner`) is the authoritative guard. The resolver
+    ///      address passed by the controller is written into the record on every call,
+    ///      so a fresh registration replaces the prior resolver pointer atomically.
     function setOwner(
         bytes32 node,
         address newOwner,

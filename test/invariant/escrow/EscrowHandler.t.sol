@@ -227,8 +227,8 @@ contract EscrowHandler is Test {
 
     /// @notice Transfers a deposited token to a different actor.
     /// @dev Only deposited (pre-release) tokens are transferable; released tokens belong to
-    ///      escrow and finalised ones are burned. Ghost state is unaffected because refund
-    ///      rights are resolved at release time via `registrar.ownerOf`.
+    ///      escrow custody. Ghost state is unaffected because refund rights are resolved at
+    ///      release time via `registrar.ownerOf`.
     /// @param tokenSeed Seed for selecting which deposited token to transfer.
     /// @param actorSeed Seed for selecting the recipient.
     function transferDeposited(uint256 tokenSeed, uint256 actorSeed) external {
