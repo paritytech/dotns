@@ -244,6 +244,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
             protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).CONTROLLER());
         controllers[2] =
             protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).REGISTRAR());
+        // Side effect is writing the subnode entry into the owner's Store; returned instance is unused.
+        // slither-disable-next-line unused-return
         factory.writeToStore(controllers, storeOwner, node, fullName);
     }
 

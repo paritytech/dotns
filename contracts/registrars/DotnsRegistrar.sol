@@ -249,6 +249,8 @@ contract DotnsRegistrar is
 
         string memory label = _labels[tokenId];
         if (bytes(label).length == 0) {
+            // Side effect is deploying/updating the recipient's Store; returned instance is unused.
+            // slither-disable-next-line unused-return
             factory.getOrCreateStore(storeControllers, to);
             return;
         }
@@ -258,6 +260,8 @@ contract DotnsRegistrar is
             labelhash := keccak256(add(label, 0x20), mload(label))
         }
 
+        // Side effect is writing the label into the recipient's Store; returned instance is unused.
+        // slither-disable-next-line unused-return
         factory.writeToStore(
             storeControllers, to, labelhash, string.concat(label, DotnsConstants.TLD)
         );

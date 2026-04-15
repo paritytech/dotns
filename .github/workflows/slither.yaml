@@ -42,7 +42,7 @@ jobs:
       - name: Run Slither
         continue-on-error: true
         run: |
-          slither . --json slither.json --filter-paths "lib/|test/" \
+          slither . --json slither.json --filter-paths "lib/|test/|Old\\.sol$" \
             --exclude-dependencies --compile-force-framework foundry || true
 
       - name: Generate report

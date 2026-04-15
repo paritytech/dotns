@@ -192,6 +192,9 @@ contract DotnsRegistrarController is
 
     /// @inheritdoc IDotnsRegistrarController
     function commit(bytes32 commitment) external override {
+        // `== 0` distinguishes an unset commitment from an expired one. The value 0 is the
+        // mapping's default, not a manipulable timestamp, so the equality check is safe.
+        // slither-disable-next-line incorrect-equality
         require(
             commitments[commitment] == 0
                 || commitments[commitment] + maxCommitmentAge < block.timestamp,

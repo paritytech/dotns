@@ -46,7 +46,7 @@ library StringUtils {
         uint256 length = path.length;
         if (length == 0) return false;
 
-        uint256 start;
+        uint256 start = 0;
         for (uint256 i = 0; i < length; ++i) {
             if (path[i] != bytes1(0x2e)) continue;
             if (!_isDnsLabel(path, start, i)) return false;

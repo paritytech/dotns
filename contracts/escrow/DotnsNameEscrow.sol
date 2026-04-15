@@ -144,7 +144,7 @@ contract DotnsNameEscrow is
         if (end > length) end = length;
 
         tokenIds = new uint256[](end - start);
-        uint256 outIndex;
+        uint256 outIndex = 0;
         for (uint256 i = start; i < end; ++i) {
             tokenIds[outIndex] = _releasedTokens[i];
             unchecked {
