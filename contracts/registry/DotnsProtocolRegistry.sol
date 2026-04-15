@@ -61,6 +61,12 @@ contract DotnsProtocolRegistry is
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 public constant CONTENT_RESOLVER = bytes32("contentResolver");
 
+    /// @notice Well-known key for the privileged PoP gateway caller authorised to drive
+    ///         personhood-derived reservation and registration flows.
+    /// casting to 'bytes32' is safe because the string fits in 32 bytes.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 public constant POP_GATEWAY = bytes32("popGateway");
+
     /// @dev Internal mapping from well-known key to contract address.
     mapping(bytes32 key => address addr) private _addresses;
 

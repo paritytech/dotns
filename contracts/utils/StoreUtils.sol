@@ -37,6 +37,36 @@ library StoreUtils {
         }
     }
 
+    /// @notice Computes the Store key for a PoP-flow chat-key entry.
+    /// @dev Returns `keccak256(abi.encodePacked(DOTNS_CHAT_KEY, labelhash))`.
+    /// @param labelhash `keccak256(bytes(label))` of the username the chat key is scoped to.
+    /// @return key Store key under which the PoP chat key for this username is written.
+    function chatKeyStoreKey(bytes32 labelhash) internal pure returns (bytes32 key) {
+        bytes32 prefix = DotnsConstants.DOTNS_CHAT_KEY;
+        assembly {
+            let pointer := mload(0x40)
+            mstore(pointer, prefix)
+            mstore(add(pointer, 0x20), labelhash)
+            key := keccak256(pointer, 0x40)
+        }
+    }
+
+    /// @notice Computes the Store key for a PoP-flow lite-to-full username link entry.
+    /// @dev Returns `keccak256(abi.encodePacked(DOTNS_LITE_LINK_KEY, labelhash))`, where
+    ///      labelhash is the full-person username's labelhash. The stored value identifies
+    ///      the lite-person username the full-person chose to link to.
+    /// @param labelhash `keccak256(bytes(label))` of the full-person username.
+    /// @return key Store key under which the lite-to-full link is written.
+    function liteLinkStoreKey(bytes32 labelhash) internal pure returns (bytes32 key) {
+        bytes32 prefix = DotnsConstants.DOTNS_LITE_LINK_KEY;
+        assembly {
+            let pointer := mload(0x40)
+            mstore(pointer, prefix)
+            mstore(add(pointer, 0x20), labelhash)
+            key := keccak256(pointer, 0x40)
+        }
+    }
+
     /// @notice Returns the Store for `owner`, deploying one if needed.
     /// @dev Unifies Store acquisition across registration flows. Handles two cases:
     ///

@@ -16,4 +16,16 @@ library DotnsConstants {
     /// @notice Store key prefix for DotNS registration entries.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered");
+
+    /// @notice Store key prefix for PoP-flow chat-key entries associated with a username.
+    /// @dev The store key is derived as keccak256(DOTNS_CHAT_KEY ++ labelhash).
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant DOTNS_CHAT_KEY = bytes32("dotns.chatKey");
+
+    /// @notice Store key prefix for PoP-flow lite-to-full username link entries.
+    /// @dev The store key is derived as keccak256(DOTNS_LITE_LINK_KEY ++ labelhash),
+    ///      where labelhash is the full-person username's labelhash. The stored value
+    ///      is the lite-person username's labelhash that the full-person chose to link to.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant DOTNS_LITE_LINK_KEY = bytes32("dotns.liteLink");
 }
