@@ -74,4 +74,9 @@ library DotnsConstants {
     ///         by the PoP username flow (chat keys, lite => full links).
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant POP_RESOLVER = bytes32("popResolver");
+
+    /// @notice Well-known key for the name escrow holding refundable deposits and
+    ///         driving the release lifecycle for registered names.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant NAME_ESCROW = bytes32("nameEscrow");
 }

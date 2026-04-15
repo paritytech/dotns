@@ -7,10 +7,9 @@ import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IDotnsRegistry} from "./IDotnsRegistry.sol";
-import {IDotnsRegistrarController} from "../registrars/IDotnsRegistrarController.sol";
-import {IDotnsController} from "../registrars/IDotnsController.sol";
-import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
-import {DotnsRegistrar} from "../registrars/DotnsRegistrar.sol";
+import {IDotnsRegistrarControllerOld} from "../registrars/IDotnsRegistrarControllerOld.sol";
+import {IDotnsRegistrarOld} from "../registrars/IDotnsRegistrarOld.sol";
+import {DotnsRegistrarOld} from "../registrars/DotnsRegistrarOld.sol";
 import {IDotnsReverseResolver} from "../resolvers/IDotnsReverseResolver.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
@@ -28,7 +27,7 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 ///      - records[node].owner == address(0) means ownership is derived from the ERC721 registrar.
 ///      Authorisation for tokenised nodes follows ERC721 owner/approvals.
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistry {
+contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistry {
     using StoreUtils for IStoreFactory;
     using StringUtils for *;
 
@@ -38,12 +37,12 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice DEPRECATED: Address authorised to perform privileged node writes.
     /// @dev Retained for UUPS storage layout compatibility. Use protocolRegistry instead.
     /// TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.
-    IDotnsRegistrarController public registrarController;
+    IDotnsRegistrarControllerOld public registrarController;
 
     /// @notice DEPRECATED: ERC721 registrar backing base node ownership.
     /// @dev Retained for UUPS storage layout compatibility. Use protocolRegistry instead.
     /// TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.
-    IDotnsRegistrar public dotnsRegistrar;
+    IDotnsRegistrarOld public dotnsRegistrar;
 
     /// @notice DEPRECATED: DotNS reverse resolver.
     /// @dev Retained for UUPS storage layout compatibility. Use protocolRegistry instead.
@@ -85,7 +84,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @param _factory Store factory used for per-user deployment stores.
     // TODO: On fresh deploy (not upgrade), accept IDotnsProtocolRegistry and set protocolRegistry here.
     function initialize(
-        IDotnsRegistrar _registrar,
+        IDotnsRegistrarOld _registrar,
         IDotnsReverseResolver _reverseResolver,
         IStoreFactory _factory
     )
@@ -144,14 +143,6 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     }
 
     /// @inheritdoc IDotnsRegistry
-    /// @dev A stale record from a reclaimed tokenised name is a legitimate overwrite:
-    ///      tokenised records use the sentinel owner pattern (owner == address(0)) and
-    ///      authority derives from the registrar's NFT. Subnode records hold an explicit
-    ///      owner and must not be overwritten via this path. The ERC721 ownership check
-    ///      below (`tokenOwner == newOwner`) is the authoritative guard.
-    ///      The resolver slot is cleared on the reclaim path by passing `address(0)` — this
-    ///      is the DNS delegation reset: no resolver is delegated until the new owner sets
-    ///      one, so standard resolution returns empty and stale records are unreachable.
     function setOwner(
         bytes32 node,
         address newOwner,
@@ -163,7 +154,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     {
         require(newOwner != address(0), NotAllowed());
         require(!records[node].exists, NodeAlreadyOwned(node));
-        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstants.REGISTRAR));
         address tokenOwner = registrar.ownerOf(uint256(node));
         require(tokenOwner == newOwner, NotAuthorised());
 
@@ -205,7 +197,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         Record storage record = records[node];
         if (!record.exists) return address(0);
         if (record.owner != address(0)) return record.owner;
-        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstants.REGISTRAR));
         return registrar.ownerOf(uint256(node));
     }
 
@@ -283,7 +276,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
             return;
         }
 
-        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstants.REGISTRAR));
         uint256 tokenId = uint256(node);
         address tokenOwner = registrar.ownerOf(tokenId);
 
@@ -310,8 +304,11 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     ///      the registry carry a parallel list, and lets the commit-reveal and PoP
     ///      controllers coexist without a per-registry configuration change.
     function _onlyRegistrarController() internal view {
-        DotnsRegistrar registrar = DotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
-        require(registrar.controllers(IDotnsController(msg.sender)), NotAuthorised());
+        DotnsRegistrarOld registrar =
+            DotnsRegistrarOld(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        require(
+            registrar.controllers(IDotnsRegistrarControllerOld(msg.sender)), NotAuthorised()
+        );
     }
 
     /// @notice Returns implementation version.
