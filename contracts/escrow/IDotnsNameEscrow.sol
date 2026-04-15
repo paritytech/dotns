@@ -2,10 +2,10 @@
 pragma solidity ^0.8.30;
 
 /// @title Dotns Name Escrow Interface
-/// @notice Escrows refundable deposits for .dot registrations and manages name release.
+/// @notice Escrows refundable deposits for .dot registrations and manages the release lifecycle.
 /// @dev Canonical escrow state is keyed by tokenId. A token may be funded with a refundable
 ///      deposit, released into escrow, withdrawn after cooldown by the snapshotted recipient,
-///      and finalised by burning the token in the registrar.
+///      and reclaimed by a new registrant via the controller during re-registration.
 ///
 /// @custom:security-contact admin@parity.io
 interface IDotnsNameEscrow {
@@ -149,6 +149,10 @@ interface IDotnsNameEscrow {
     /// @notice Thrown when a refund transfer fails.
     /// @param tokenId Token identifier.
     error RefundFailed(uint256 tokenId);
+
+    /// @notice Thrown when escrow receives an ERC721 transfer from a non-registrar source.
+    /// @param caller Address that attempted the transfer.
+    error NotAcceptedTransfer(address caller);
 
     /// @notice Returns total amount of assets liabilities reserved for withdrawals.
     /// @param asset Asset address. `address(0)` denotes native token.

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
@@ -8,6 +10,16 @@ import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 contract ForceSender {
     constructor(address payable target) payable {
         selfdestruct(target);
+    }
+}
+
+/// @notice Standalone ERC721 used to verify the escrow refuses tokens not minted by the
+///         configured registrar.
+contract GhostNft is ERC721 {
+    constructor() ERC721("Ghost", "GHST") {}
+
+    function mint(address to, uint256 tokenId) external {
+        _safeMint(to, tokenId);
     }
 }
 
@@ -132,6 +144,40 @@ contract DotnsNameEscrowTest is BaseDotns {
         dotnsNameEscrow.deposit(
             IDotnsNameEscrow.DepositParams({tokenId: tokenId, asset: address(0), amount: 1 ether})
         );
+    }
+
+    /// @notice A foreign ERC721 transferred into escrow must be rejected.
+    /// @dev Without this guard a foreign NFT (or a registrar NFT moved outside the release
+    ///      flow) would become permanently stuck in escrow with no recovery path.
+    function test_revert_ghost_nft_transfer_into_escrow() public {
+        GhostNft ghost = new GhostNft();
+        uint256 ghostId = 42;
+        ghost.mint(ed, ghostId);
+
+        vm.prank(ed);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsNameEscrow.NotAcceptedTransfer.selector, address(ghost))
+        );
+        ghost.safeTransferFrom(ed, address(dotnsNameEscrow), ghostId);
+
+        assertEq(ghost.ownerOf(ghostId), ed, "ghost NFT must remain with the original owner");
+    }
+
+    /// @notice Pop-verified registrations pay no deposit, so release must always revert.
+    /// @dev Locks the protocol invariant: only NoStatus names can enter the escrow lifecycle.
+    function test_revert_pop_full_name_cannot_release() public {
+        string memory popLabel = "popfullname";
+        bytes32 node = _register(popLabel, ed, IPopRules.PopStatus.PopFull);
+        uint256 tokenId = uint256(node);
+
+        vm.prank(ed);
+        dotnsRegistrar.approve(address(dotnsNameEscrow), tokenId);
+
+        vm.prank(ed);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsNameEscrow.DepositNotConfigured.selector, tokenId)
+        );
+        dotnsNameEscrow.release(tokenId);
     }
 
     function test_revert_release_not_owner_or_approved() public {

@@ -263,7 +263,9 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IERC721Receiver
-    /// @notice Accepts safe ERC721 transfers into escrow.
+    /// @notice Accepts safe ERC721 transfers into escrow only from the configured registrar.
+    /// @dev Refusing arbitrary ERC721 transfers prevents foreign tokens (or registrar tokens
+    ///      transferred outside the release flow) from getting permanently stuck in escrow.
     /// @return selector IERC721Receiver selector.
     function onERC721Received(
         address,
@@ -272,10 +274,11 @@ contract DotnsNameEscrow is
         bytes calldata
     )
         external
-        pure
+        view
         override
         returns (bytes4 selector)
     {
+        require(msg.sender == address(_registrar()), NotAcceptedTransfer(msg.sender));
         selector = IERC721Receiver.onERC721Received.selector;
     }
 
