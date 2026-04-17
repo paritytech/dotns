@@ -32,20 +32,23 @@ interface IDotnsRegistrarController {
     }
 
     /// @notice Discriminant for the `Link` union supplied to `registerBaseName`.
-    /// @dev `None` means the caller is registering a standalone full-person username with a
-    ///      fresh chat key. `LiteUsername` means the caller is claiming a reserved username and
-    ///      linking it back to an earlier lite-person username.
+    /// @dev Selects the chat-key source for the full-person username. Orthogonal to
+    ///      whether the registration is a claim or standalone — that is derived from
+    ///      on-chain reservation state, not from this discriminant. `None` means the
+    ///      caller supplies a fresh chat key in `link.chatKey`. `LiteUsername` means
+    ///      the full-person username is linked to a prior lite-person username
+    ///      (`link.liteLabel`) and inherits its chat key.
     enum LinkKind {
         None,
         LiteUsername
     }
 
-    /// @notice Tagged union passed alongside full-person registrations.
+    /// @notice Tagged union selecting the chat-key source for a full-person registration.
     /// @dev When `kind == LinkKind.LiteUsername` the `liteLabel` field identifies the prior
     ///      lite-person username to link to and `chatKey` is ignored (the existing chat key
     ///      associated with the lite username is inherited). When `kind == LinkKind.None` the
-    ///      `chatKey` field carries the new chat key for the standalone registration and
-    ///      `liteLabel` is ignored.
+    ///      `chatKey` field carries the new chat key for the registration and `liteLabel` is
+    ///      ignored.
     /// @param kind Which branch of the union is populated.
     /// @param liteLabel Lite-person username label (only read when `kind == LiteUsername`).
     /// @param chatKey Chat key bytes (only read when `kind == None`).
@@ -184,11 +187,6 @@ interface IDotnsRegistrarController {
     /// @param user The address that attempted the operation.
     error NoActiveReservation(address user);
 
-    /// @notice Thrown when a claim is attempted by an account that is not the head of the queue.
-    /// @param user The address that attempted the claim.
-    /// @param labelhash Labelhash of the reserved name.
-    error NotHolder(address user, bytes32 labelhash);
-
     /// @notice Thrown when a reservation queue has reached its capacity.
     /// @param labelhash Labelhash of the reserved name.
     error QueueFull(bytes32 labelhash);
@@ -267,20 +265,38 @@ interface IDotnsRegistrarController {
     )
         external;
 
-    /// @notice Registers a full-person username on behalf of `user`, either by claiming a prior
-    ///         reservation or by registering a standalone name.
+    /// @notice Registers a full-person username on behalf of `user`.
     /// @dev Callable only by the PoP gateway registered in `DotnsProtocolRegistry.POP_GATEWAY`.
     ///      Bypasses commit-reveal and PoP pricing; every PoP-gateway registration is free.
-    ///      Path A (`link.kind == LinkKind.LiteUsername`): `label` must be the user's active
-    ///      reservation, the user must be at the queue head, and the reservation queue for
-    ///      `label` is wiped — every other waiter is evicted. The full-person username is
-    ///      linked to `link.liteLabel`.
-    ///      Path B (`link.kind == LinkKind.None`): any pending reservation the user holds is
-    ///      automatically relinquished, the username is minted, and `link.chatKey` is stored
-    ///      alongside it.
+    ///
+    ///      Two orthogonal axes decide behaviour:
+    ///
+    ///      1. Reservation axis (derived from state): if `user` holds the live head-of-queue
+    ///         reservation on `label`, this is a claim — the reservation queue for `label`
+    ///         is wiped and every other waiter is evicted. Otherwise this is a standalone
+    ///         registration and `label` must not be reserved by another user (reverts
+    ///         `LabelReservedForPop` when another account holds the live head).
+    ///
+    ///         SILENT RELINQUISH: on the standalone path, if `user` sits in any reservation
+    ///         queue — whether on a different label, or waiting behind the head on this one
+    ///         — that queue entry is removed automatically and no event is emitted. Callers
+    ///         must confirm the user intends to give up any pending reservation before
+    ///         invoking this function with a standalone label.
+    ///
+    ///      2. Chat-key axis (selected by `link.kind`): when `link.kind == None` the fresh
+    ///         `link.chatKey` is stored alongside the full-person username. When
+    ///         `link.kind == LiteUsername` the full-person username is linked to
+    ///         `link.liteLabel` and inherits the existing chat key from that lite-person
+    ///         entry; `link.chatKey` is ignored.
+    ///
+    ///      All four combinations are supported: {claim, standalone} × {fresh key, linked}.
+    ///      Emits `BaseNameClaimed` on the claim axis and `StandaloneNameRegistered` on the
+    ///      standalone axis. Emits `LiteToFullLinked` whenever `link.kind == LiteUsername`,
+    ///      independent of the reservation axis.
     /// @param label The full-person username label to register (without TLD).
     /// @param user The full-person account receiving the username.
-    /// @param link Tagged union describing claim-vs-standalone behaviour.
+    /// @param link Tagged union selecting the chat-key source (fresh vs. inherited from a
+    ///        prior lite-person username).
     function registerBaseName(string calldata label, address user, Link calldata link) external;
 
     /// @notice Permissionlessly removes expired entries from the head of a reservation queue.

@@ -7,6 +7,7 @@ import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IStore, Store} from "../../../contracts/store/Store.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {StoreUtils} from "../../../contracts/utils/StoreUtils.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 /// @title Gateway flow tests for DotnsRegistrarController 1.5.0
 /// @notice Covers the PoP-gateway entry points introduced by individuality#755:
@@ -117,7 +118,7 @@ contract DotnsRegistrarControllerGatewayTests is BaseDotns {
         assertEq(head, ed);
     }
 
-    // ---------- registerBaseName: Path A (claim reserved) ----------
+    // ---------- registerBaseName: claim reservation ----------
 
     function test_registerBaseName_pathA_claim_wipes_entire_queue() public {
         _reserveFor(ed, "lite01", hex"01", "alicebob");
@@ -164,19 +165,39 @@ contract DotnsRegistrarControllerGatewayTests is BaseDotns {
         assertEq(keccak256(bytes(stored)), keccak256(abi.encodePacked(expected)));
     }
 
-    function test_registerBaseName_pathA_reverts_when_user_has_no_reservation() public {
+    function test_registerBaseName_claim_with_fresh_chat_key_wipes_queue() public {
+        // ed reserves `alicebob`; then claims it providing a fresh chat key instead
+        // of inheriting one from a lite-person label.
+        _reserveFor(ed, "lite01", hex"01", "alicebob");
+        _reserveFor(tiago, "lite02", hex"02", "alicebob");
+
+        bytes memory chatKey = hex"cafebabe";
         IDotnsRegistrarController.Link memory link = IDotnsRegistrarController.Link({
-            kind: IDotnsRegistrarController.LinkKind.LiteUsername, liteLabel: "lite01", chatKey: ""
+            kind: IDotnsRegistrarController.LinkKind.None, liteLabel: "", chatKey: chatKey
         });
 
         vm.prank(popGateway);
-        vm.expectRevert(
-            abi.encodeWithSelector(IDotnsRegistrarController.NoActiveReservation.selector, ed)
-        );
         dotnsRegistrarController.registerBaseName("alicebob", ed, link);
+
+        bytes32 node = _nodeOf("alicebob");
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), ed);
+
+        bytes32 labelhash = keccak256(bytes("alicebob"));
+        Store store = Store(address(storeFactory.getDeployedStore(ed)));
+        assertEq(bytes(store.getValueFor(ed, StoreUtils.chatKeyStoreKey(labelhash))), chatKey);
+        // No lite link stored — claim + None does not inherit from a lite-person entry.
+        assertEq(bytes(store.getValueFor(ed, StoreUtils.liteLinkStoreKey(labelhash))).length, 0);
+
+        // Queue is wiped; tiago can reserve elsewhere.
+        _reserveFor(tiago, "lite03", hex"03", "wonder");
+        (, address wonderHolder) = dotnsRegistrarController.isReservedForClaim("wonder");
+        assertEq(wonderHolder, tiago);
     }
 
-    function test_registerBaseName_pathA_reverts_when_user_is_not_head() public {
+    function test_registerBaseName_non_head_waiter_cannot_claim() public {
+        // tiago is behind ed in the queue for `alicebob`; attempting to register
+        // `alicebob` is classified as a standalone attempt, which fails because ed
+        // holds the live head reservation.
         _reserveFor(ed, "lite01", hex"aa", "alicebob");
         _reserveFor(tiago, "lite02", hex"bb", "alicebob");
 
@@ -187,13 +208,13 @@ contract DotnsRegistrarControllerGatewayTests is BaseDotns {
         vm.prank(popGateway);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IDotnsRegistrarController.NotHolder.selector, tiago, keccak256(bytes("alicebob"))
+                IDotnsRegistrarController.LabelReservedForPop.selector, "alicebob"
             )
         );
         dotnsRegistrarController.registerBaseName("alicebob", tiago, link);
     }
 
-    // ---------- registerBaseName: Path B (standalone) ----------
+    // ---------- registerBaseName: standalone ----------
 
     function test_registerBaseName_pathB_standalone_without_prior_reservation() public {
         bytes memory chatKey = hex"deadbeef";
@@ -231,27 +252,61 @@ contract DotnsRegistrarControllerGatewayTests is BaseDotns {
         assertFalse(reserved);
     }
 
-    function test_registerBaseName_pathB_wipes_queue_when_self_standalone_on_reserved_label()
-        public
-    {
+    function test_registerBaseName_standalone_with_lite_link_silently_relinquishes() public {
+        // ed reserves `alicebob` via the lite registration, then registers a different
+        // label `wonderland01` as a standalone full-person username but still links it
+        // back to the earlier lite-person label. The prior `alicebob` reservation is
+        // silently dropped without emitting ReservationRelinquished.
         _reserveFor(ed, "lite01", hex"01", "alicebob");
-        _reserveFor(tiago, "lite02", hex"02", "alicebob");
 
         IDotnsRegistrarController.Link memory link = IDotnsRegistrarController.Link({
-            kind: IDotnsRegistrarController.LinkKind.None, liteLabel: "", chatKey: hex"aa"
+            kind: IDotnsRegistrarController.LinkKind.LiteUsername, liteLabel: "lite01", chatKey: ""
         });
 
+        vm.recordLogs();
         vm.prank(popGateway);
-        dotnsRegistrarController.registerBaseName("alicebob", ed, link);
+        dotnsRegistrarController.registerBaseName("wonderland01", ed, link);
 
-        // ed now owns the name.
-        bytes32 node = _nodeOf("alicebob");
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), ed);
+        // Standalone event fired, claim event did not, lite-link recorded.
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 standaloneSig =
+            keccak256("StandaloneNameRegistered(bytes32,address,string)");
+        bytes32 claimedSig = keccak256("BaseNameClaimed(bytes32,address,string)");
+        bytes32 linkedSig = keccak256("LiteToFullLinked(bytes32,bytes32)");
+        bytes32 relinquishedSig = keccak256("ReservationRelinquished(bytes32,address)");
+        bool sawStandalone;
+        bool sawLinked;
+        for (uint256 i = 0; i < logs.length; i++) {
+            bytes32 topic = logs[i].topics[0];
+            if (topic == claimedSig) revert("unexpected BaseNameClaimed");
+            if (topic == relinquishedSig) revert("silent relinquish should not emit");
+            if (topic == standaloneSig) sawStandalone = true;
+            if (topic == linkedSig) sawLinked = true;
+        }
+        assertTrue(sawStandalone);
+        assertTrue(sawLinked);
 
-        // Queue is cleared — tiago no longer holds an orphaned entry pointing at this label.
-        _reserveFor(tiago, "lite03", hex"03", "wonder");
-        (, address holder) = dotnsRegistrarController.isReservedForClaim("wonder");
-        assertEq(holder, tiago);
+        // Full name minted and lite link persisted; no fresh chat key.
+        bytes32 fullLabelhash = keccak256(bytes("wonderland01"));
+        Store store = Store(address(storeFactory.getDeployedStore(ed)));
+        string memory storedLink =
+            store.getValueFor(ed, StoreUtils.liteLinkStoreKey(fullLabelhash));
+        assertEq(
+            keccak256(bytes(storedLink)),
+            keccak256(abi.encodePacked(keccak256(bytes("lite01"))))
+        );
+        assertEq(
+            bytes(store.getValueFor(ed, StoreUtils.chatKeyStoreKey(fullLabelhash))).length, 0
+        );
+
+        // The earlier `alicebob` reservation has been silently dropped.
+        (bool reserved,) = dotnsRegistrarController.isReservedForClaim("alicebob");
+        assertFalse(reserved);
+
+        // ed can now reserve something new, confirming the per-user slot was released.
+        _reserveFor(ed, "lite02", hex"02", "newlabel");
+        (, address newHolder) = dotnsRegistrarController.isReservedForClaim("newlabel");
+        assertEq(newHolder, ed);
     }
 
     function test_registerBaseName_pathB_reverts_when_label_reserved_by_other_user() public {

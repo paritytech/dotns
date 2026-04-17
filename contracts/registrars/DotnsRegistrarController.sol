@@ -359,39 +359,41 @@ contract DotnsRegistrarController is
 
         _advanceExpiredHead(labelhash);
 
-        if (link.kind == LinkKind.LiteUsername) {
-            // Path A: claim a previously reserved username.
-            require(_userReservation[user] == labelhash, NoActiveReservation(user));
-            ReservationQueueMeta memory meta = _reservationMeta[labelhash];
-            require(
-                meta.head < meta.tail && _reservationEntries[labelhash][meta.head].owner == user,
-                NotHolder(user, labelhash)
-            );
+        // Reservation axis: `user` is claiming iff they hold the live head-of-queue
+        // reservation on `label`. Orthogonal to `link.kind`.
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        bool isClaim = _userReservation[user] == labelhash && meta.head < meta.tail
+            && _reservationEntries[labelhash][meta.head].owner == user;
 
-            bytes32 liteLabelhash = keccak256(bytes(link.liteLabel));
-
+        if (isClaim) {
             _clearQueue(labelhash);
-
-            _completeGatewayRegistration(user, label, labelhash, node, "", liteLabelhash);
-
-            emit BaseNameClaimed(labelhash, user, label);
-            emit LiteToFullLinked(labelhash, liteLabelhash);
         } else {
-            // Path B: standalone registration. Refuse if someone else holds an active
-            // reservation on this label. Otherwise wipe the user's own reservation (on
-            // this label or any other) so they start clean.
             _requireNotReservedByOther(label, labelhash, user);
-
-            bytes32 userReserved = _userReservation[user];
-            if (userReserved == labelhash) {
-                _clearQueue(labelhash);
-            } else if (userReserved != bytes32(0)) {
+            // Silent relinquish: any pending queue entry the user holds is removed.
+            if (_userReservation[user] != bytes32(0)) {
                 _removeUserFromQueue(user);
             }
+        }
 
-            _completeGatewayRegistration(user, label, labelhash, node, link.chatKey, bytes32(0));
+        // Chat-key axis: `link.kind` selects whether a fresh key is persisted or the
+        // entry is linked back to a prior lite-person username.
+        bytes memory chatKey;
+        bytes32 liteLabelhash;
+        if (link.kind == LinkKind.LiteUsername) {
+            liteLabelhash = keccak256(bytes(link.liteLabel));
+        } else {
+            chatKey = link.chatKey;
+        }
 
+        _completeGatewayRegistration(user, label, labelhash, node, chatKey, liteLabelhash);
+
+        if (isClaim) {
+            emit BaseNameClaimed(labelhash, user, label);
+        } else {
             emit StandaloneNameRegistered(labelhash, user, label);
+        }
+        if (link.kind == LinkKind.LiteUsername) {
+            emit LiteToFullLinked(labelhash, liteLabelhash);
         }
     }
 
