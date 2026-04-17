@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/bdd71b52491d64b1647c6875f83a2e5b4288caeb/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/754a280a3589b1678a1a1a8570ce1f8bb39b6c1e/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Registrar Controller</p>
 <p>Interface for registering .dot labels using a commit–reveal scheme.</p>
@@ -321,24 +321,38 @@ reservation per account is enforced and any prior reservation is relinquished.</
 </tbody></table>
 </div>
 <h3 id="registerbasename"><a class="header" href="#registerbasename">registerBaseName</a></h3>
-<p>Registers a full-person username on behalf of <code>user</code>, either by claiming a prior
-reservation or by registering a standalone name.</p>
+<p>Registers a full-person username on behalf of <code>user</code>.</p>
 <p>Callable only by the PoP gateway registered in <code>DotnsProtocolRegistry.POP_GATEWAY</code>.
 Bypasses commit-reveal and PoP pricing; every PoP-gateway registration is free.
-Path A (<code>link.kind == LinkKind.LiteUsername</code>): <code>label</code> must be the user's active
-reservation, the user must be at the queue head, and the reservation queue for
-<code>label</code> is wiped — every other waiter is evicted. The full-person username is
-linked to <code>link.liteLabel</code>.
-Path B (<code>link.kind == LinkKind.None</code>): any pending reservation the user holds is
-automatically relinquished, the username is minted, and <code>link.chatKey</code> is stored
-alongside it.</p>
+Two orthogonal axes decide behaviour:</p>
+<ol>
+<li>Reservation axis (derived from state): if <code>user</code> holds the live head-of-queue
+reservation on <code>label</code>, this is a claim — the reservation queue for <code>label</code>
+is wiped and every other waiter is evicted. Otherwise this is a standalone
+registration and <code>label</code> must not be reserved by another user (reverts
+<code>LabelReservedForPop</code> when another account holds the live head).
+SILENT RELINQUISH: on the standalone path, if <code>user</code> sits in any reservation
+queue — whether on a different label, or waiting behind the head on this one
+— that queue entry is removed automatically and no event is emitted. Callers
+must confirm the user intends to give up any pending reservation before
+invoking this function with a standalone label.</li>
+<li>Chat-key axis (selected by <code>link.kind</code>): when <code>link.kind == None</code> the fresh
+<code>link.chatKey</code> is stored alongside the full-person username. When
+<code>link.kind == LiteUsername</code> the full-person username is linked to
+<code>link.liteLabel</code> and inherits the existing chat key from that lite-person
+entry; <code>link.chatKey</code> is ignored.
+All four combinations are supported: {claim, standalone} × {fresh key, linked}.
+Emits <code>BaseNameClaimed</code> on the claim axis and <code>StandaloneNameRegistered</code> on the
+standalone axis. Emits <code>LiteToFullLinked</code> whenever <code>link.kind == LiteUsername</code>,
+independent of the reservation axis.</li>
+</ol>
 <pre><code class="language-solidity">function registerBaseName(string calldata label, address user, Link calldata link) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>label</code></td><td><code>string</code></td><td>The full-person username label to register (without TLD).</td></tr>
 <tr><td><code>user</code></td><td><code>address</code></td><td>The full-person account receiving the username.</td></tr>
-<tr><td><code>link</code></td><td><code>Link</code></td><td>Tagged union describing claim-vs-standalone behaviour.</td></tr>
+<tr><td><code>link</code></td><td><code>Link</code></td><td>Tagged union selecting the chat-key source (fresh vs. inherited from a prior lite-person username).</td></tr>
 </tbody></table>
 </div>
 <h3 id="expirereservation"><a class="header" href="#expirereservation">expireReservation</a></h3>
@@ -637,16 +651,6 @@ held by a different account.</p>
 <tr><td><code>user</code></td><td><code>address</code></td><td>The address that attempted the operation.</td></tr>
 </tbody></table>
 </div>
-<h3 id="notholder"><a class="header" href="#notholder">NotHolder</a></h3>
-<p>Thrown when a claim is attempted by an account that is not the head of the queue.</p>
-<pre><code class="language-solidity">error NotHolder(address user, bytes32 labelhash);
-</code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>user</code></td><td><code>address</code></td><td>The address that attempted the claim.</td></tr>
-<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the reserved name.</td></tr>
-</tbody></table>
-</div>
 <h3 id="queuefull"><a class="header" href="#queuefull">QueueFull</a></h3>
 <p>Thrown when a reservation queue has reached its capacity.</p>
 <pre><code class="language-solidity">error QueueFull(bytes32 labelhash);
@@ -687,12 +691,12 @@ on the same label.</p>
 </tbody></table>
 </div>
 <h3 id="link"><a class="header" href="#link">Link</a></h3>
-<p>Tagged union passed alongside full-person registrations.</p>
+<p>Tagged union selecting the chat-key source for a full-person registration.</p>
 <p>When <code>kind == LinkKind.LiteUsername</code> the <code>liteLabel</code> field identifies the prior
 lite-person username to link to and <code>chatKey</code> is ignored (the existing chat key
 associated with the lite username is inherited). When <code>kind == LinkKind.None</code> the
-<code>chatKey</code> field carries the new chat key for the standalone registration and
-<code>liteLabel</code> is ignored.</p>
+<code>chatKey</code> field carries the new chat key for the registration and <code>liteLabel</code> is
+ignored.</p>
 <pre><code class="language-solidity">struct Link {
     LinkKind kind;
     string liteLabel;
@@ -709,9 +713,12 @@ associated with the lite username is inherited). When <code>kind == LinkKind.Non
 <h2 id="enums"><a class="header" href="#enums">Enums</a></h2>
 <h3 id="linkkind"><a class="header" href="#linkkind">LinkKind</a></h3>
 <p>Discriminant for the <code>Link</code> union supplied to <code>registerBaseName</code>.</p>
-<p><code>None</code> means the caller is registering a standalone full-person username with a
-fresh chat key. <code>LiteUsername</code> means the caller is claiming a reserved username and
-linking it back to an earlier lite-person username.</p>
+<p>Selects the chat-key source for the full-person username. Orthogonal to
+whether the registration is a claim or standalone — that is derived from
+on-chain reservation state, not from this discriminant. <code>None</code> means the
+caller supplies a fresh chat key in <code>link.chatKey</code>. <code>LiteUsername</code> means
+the full-person username is linked to a prior lite-person username
+(<code>link.liteLabel</code>) and inherits its chat key.</p>
 <pre><code class="language-solidity">enum LinkKind {
     None,
     LiteUsername
