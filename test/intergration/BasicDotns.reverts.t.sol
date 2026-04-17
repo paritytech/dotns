@@ -9,38 +9,9 @@ import {IDotnsRegistrarController} from "../../contracts/registrars/IDotnsRegist
 
 contract BasicDotnsIntegrationReverts is BaseDotns {
     string internal constant NAME_POPFULL = "waytall1";
-    string internal constant NAME_POPLITE = "way2tall01";
-    string internal constant NAME_NOSTATUS = "kitesurfing01";
 
     bytes internal constant CID_A =
         hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-    function test_revert_poplite_cannot_register_nostatus_name() public {
-        string memory nameLabel = NAME_NOSTATUS;
-        address registrant = ed;
-
-        vm.startPrank(registrant);
-        popRules.setUserPopStatus(IPopRules.PopStatus.PopLite);
-
-        bytes32 secret = keccak256(abi.encodePacked(nameLabel, registrant, block.timestamp));
-        IDotnsRegistrarController.Registration memory registration =
-            IDotnsRegistrarController.Registration({
-                label: nameLabel, owner: registrant, secret: secret, reserved: false
-            });
-
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
-        dotnsRegistrarController.commit(commitment);
-
-        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPopRules.PopError.selector, "Personhood Lite cannot register base names"
-            )
-        );
-        dotnsRegistrarController.register(registration);
-        vm.stopPrank();
-    }
 
     function test_revert_poplite_cannot_register_popfull_required() public {
         string memory nameLabel = NAME_POPFULL;

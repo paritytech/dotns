@@ -63,6 +63,16 @@ contract PopRulesTests is BaseDotns {
         assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.PopFull));
     }
 
+    function test_poplite_user_can_access_nostatus_name() public {
+        vm.prank(ed);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopLite);
+
+        IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck("longnamehere01", ed);
+
+        assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.NoStatus));
+        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.PopLite));
+    }
+
     function test_base_reservation_blocks_others() public {
         vm.prank(owner);
         /// casting to 'bytes32' is safe because this is safe
