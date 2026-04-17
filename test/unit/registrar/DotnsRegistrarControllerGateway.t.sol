@@ -269,8 +269,7 @@ contract DotnsRegistrarControllerGatewayTests is BaseDotns {
 
         // Standalone event fired, claim event did not, lite-link recorded.
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 standaloneSig =
-            keccak256("StandaloneNameRegistered(bytes32,address,string)");
+        bytes32 standaloneSig = keccak256("StandaloneNameRegistered(bytes32,address,string)");
         bytes32 claimedSig = keccak256("BaseNameClaimed(bytes32,address,string)");
         bytes32 linkedSig = keccak256("LiteToFullLinked(bytes32,bytes32)");
         bytes32 relinquishedSig = keccak256("ReservationRelinquished(bytes32,address)");
@@ -289,15 +288,11 @@ contract DotnsRegistrarControllerGatewayTests is BaseDotns {
         // Full name minted and lite link persisted; no fresh chat key.
         bytes32 fullLabelhash = keccak256(bytes("wonderland01"));
         Store store = Store(address(storeFactory.getDeployedStore(ed)));
-        string memory storedLink =
-            store.getValueFor(ed, StoreUtils.liteLinkStoreKey(fullLabelhash));
+        string memory storedLink = store.getValueFor(ed, StoreUtils.liteLinkStoreKey(fullLabelhash));
         assertEq(
-            keccak256(bytes(storedLink)),
-            keccak256(abi.encodePacked(keccak256(bytes("lite01"))))
+            keccak256(bytes(storedLink)), keccak256(abi.encodePacked(keccak256(bytes("lite01"))))
         );
-        assertEq(
-            bytes(store.getValueFor(ed, StoreUtils.chatKeyStoreKey(fullLabelhash))).length, 0
-        );
+        assertEq(bytes(store.getValueFor(ed, StoreUtils.chatKeyStoreKey(fullLabelhash))).length, 0);
 
         // The earlier `alicebob` reservation has been silently dropped.
         (bool reserved,) = dotnsRegistrarController.isReservedForClaim("alicebob");
