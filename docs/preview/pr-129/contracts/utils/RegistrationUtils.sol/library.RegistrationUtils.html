@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="registrationutils"><a class="header" href="#registrationutils">RegistrationUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/28aea7c0c844af7f5ab655fd78dee4e4b891eb28/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/ce1afc98bb7938ea2dff4e84ea3cb9a66eaa7d26/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Registration Utilities Library</p>
 <p>Single canonical implementation of the "mint + forward-registry + store-write"
@@ -193,7 +193,7 @@ This library is deliberately minimal. It only performs the steps that every
 registration flow needs regardless of policy:</p>
 <ol>
 <li>Mint the ERC721 name token on the base registrar.</li>
-<li>Write the forward registry entry (node -&gt; owner + default resolver).</li>
+<li>Write the forward registry entry (node =&gt; owner + default resolver).</li>
 <li>Ensure a Store exists for the owner and write the registration entry.
 Flow-specific concerns (pricing, reverse-record setting, chat-key persistence,
 reservation queue mutation) stay inside the calling controller.</li>

@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/28aea7c0c844af7f5ab655fd78dee4e4b891eb28/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/ce1afc98bb7938ea2dff4e84ea3cb9a66eaa7d26/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
 <p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements, and base-name reservation rules</p>
@@ -227,6 +227,35 @@ security-contact: admin@parity.io</p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label with trailing digits removed</td></tr>
 <tr><td><code>user</code></td><td><code>address</code></td><td>The address receiving reservation rights</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservebasenameforpop"><a class="header" href="#reservebasenameforpop">reserveBaseNameForPop</a></h3>
+<p>Writes or refreshes a reservation for a bare base-name stem.</p>
+<p>Gateway-driven reservation path used by the PoP controller. Callable
+by any controller in the registrar's <code>controllers</code> set. Does not
+apply the lite-format classification that <code>reserveBaseName</code>
+enforces; the caller is expected to supply the bare stem directly.
+Reverts if the slot is already held by another user and still live
+so the caller's local bookkeeping and PopRules state stay in
+lockstep.</p>
+<pre><code class="language-solidity">function reserveBaseNameForPop(string calldata baseName, address user) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label to reserve (no trailing digits).</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The address receiving reservation rights.</td></tr>
+</tbody></table>
+</div>
+<h3 id="releasebasename"><a class="header" href="#releasebasename">releaseBaseName</a></h3>
+<p>Clears a reservation for a base-name stem.</p>
+<p>Callable by any controller in the registrar's <code>controllers</code> set. Used
+by the PoP controller when a reservation is claimed, relinquished, or
+a queue head promotion leaves the slot empty.</p>
+<pre><code class="language-solidity">function releaseBaseName(string calldata baseName) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label whose reservation should be cleared.</td></tr>
 </tbody></table>
 </div>
 <h3 id="getbasenamereservation"><a class="header" href="#getbasenamereservation">getBaseNameReservation</a></h3>
@@ -389,6 +418,15 @@ This replaces per-name PoP assignments</p>
 <tr><td><code>status</code></td><td><code>PopStatus</code></td><td>New PoP tier assigned</td></tr>
 </tbody></table>
 </div>
+<h3 id="basenamereleased"><a class="header" href="#basenamereleased">BaseNameReleased</a></h3>
+<p>Emitted when a base-name reservation is cleared.</p>
+<pre><code class="language-solidity">event BaseNameReleased(string indexed baseName);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label whose reservation was released.</td></tr>
+</tbody></table>
+</div>
 <h3 id="protocolregistryupdated"><a class="header" href="#protocolregistryupdated">ProtocolRegistryUpdated</a></h3>
 <p>Emitted when the protocol registry is updated.</p>
 <pre><code class="language-solidity">event ProtocolRegistryUpdated(IDotnsProtocolRegistry indexed newRegistry);
@@ -402,15 +440,6 @@ This replaces per-name PoP assignments</p>
 <h3 id="poperror"><a class="header" href="#poperror">PopError</a></h3>
 <p>Thrown when a name violates PoP-tier or reservation requirements</p>
 <pre><code class="language-solidity">error PopError(string reason);
-</code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>reason</code></td><td><code>string</code></td><td>Human-readable explanation of the failure condition</td></tr>
-</tbody></table>
-</div>
-<h3 id="genericerror"><a class="header" href="#genericerror">GenericError</a></h3>
-<p>Used to throw generic errors</p>
-<pre><code class="language-solidity">error GenericError(string reason);
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
