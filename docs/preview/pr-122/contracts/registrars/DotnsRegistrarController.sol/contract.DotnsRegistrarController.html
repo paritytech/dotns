@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -200,6 +200,11 @@ security-contact: admin@parity.io</p>
 <h3 id="max_allowed_commitment_age"><a class="header" href="#max_allowed_commitment_age">MAX_ALLOWED_COMMITMENT_AGE</a></h3>
 <p>Upper bound for commitment validity to cap storage griefing risk.</p>
 <pre><code class="language-solidity">uint256 public constant MAX_ALLOWED_COMMITMENT_AGE = 7 days
+</code></pre>
+<h3 id="max_reservation_queue"><a class="header" href="#max_reservation_queue">MAX_RESERVATION_QUEUE</a></h3>
+<p>Upper bound for the number of simultaneously queued reservations per label.</p>
+<p>Keeps <code>expireReservation</code> gas bounded.</p>
+<pre><code class="language-solidity">uint16 public constant MAX_RESERVATION_QUEUE = 64
 </code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="dotnsregistrar"><a class="header" href="#dotnsregistrar">dotnsRegistrar</a></h3>
@@ -252,9 +257,36 @@ TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.</p>
 <p>Protocol-level address registry for all DotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
+<h3 id="_reservationmeta"><a class="header" href="#_reservationmeta">_reservationMeta</a></h3>
+<p>Per-label queue metadata (head/tail pointers).</p>
+<pre><code class="language-solidity">mapping(bytes32 labelhash =&gt; ReservationQueueMeta meta) internal _reservationMeta
+</code></pre>
+<h3 id="_reservationentries"><a class="header" href="#_reservationentries">_reservationEntries</a></h3>
+<p>Per-label sparse entries keyed by monotonically-increasing index.</p>
+<pre><code class="language-solidity">mapping(bytes32 labelhash =&gt; mapping(uint64 index =&gt; ReservationEntry entry)) internal
+    _reservationEntries
+</code></pre>
+<h3 id="_userreservation"><a class="header" href="#_userreservation">_userReservation</a></h3>
+<p>Tracks which label each user currently holds a reservation for.</p>
+<p>A non-zero labelhash means the user is somewhere in the queue for that label.
+Enforces "one active reservation per account".</p>
+<pre><code class="language-solidity">mapping(address user =&gt; bytes32 labelhash) internal _userReservation
+</code></pre>
+<h3 id="_userreservationindex"><a class="header" href="#_userreservationindex">_userReservationIndex</a></h3>
+<p>Records the monotonic index at which a user's reservation lives within the
+queue, so non-head relinquishment can find it in O(1).</p>
+<pre><code class="language-solidity">mapping(address user =&gt; uint64 index) internal _userReservationIndex
+</code></pre>
+<h3 id="reservationduration"><a class="header" href="#reservationduration">reservationDuration</a></h3>
+<p>Duration (in seconds) after which a reservation entry is considered expired.</p>
+<p>Mirrors <code>pallet_resources::UsernameReservationDuration</code>. Configurable by governance
+via <code>setReservationDuration</code>.</p>
+<pre><code class="language-solidity">uint64 public reservationDuration
+</code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
-<p>Reserved storage space to allow for layout changes in the future.</p>
-<pre><code class="language-solidity">uint256[48] private __gap
+<p>Reserved storage space to allow for layout changes in the future.
+Shrunk from 48 by 5 slots added above (4 mappings + <code>reservationDuration</code>).</p>
+<pre><code class="language-solidity">uint256[43] private __gap
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlyregistry"><a class="header" href="#onlyregistry">onlyRegistry</a></h3>
@@ -267,6 +299,11 @@ TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.</p>
 without PoP checks or payment. This is necessary to allow the owner to register reserved names
 for users who are already known and verified and dont need Pop checks.</p>
 <pre><code class="language-solidity">modifier onlyWhiteListedOrOwner() ;
+</code></pre>
+<h3 id="onlygateway"><a class="header" href="#onlygateway">onlyGateway</a></h3>
+<p>Restricts calls to the privileged PoP gateway address stored in the protocol
+registry under <code>POP_GATEWAY</code>.</p>
+<pre><code class="language-solidity">modifier onlyGateway() ;
 </code></pre>
 <h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
 <p><strong>Note:</strong>
@@ -297,6 +334,19 @@ oz-upgrades-unsafe-allow: constructor</p>
 <tr><td><code>factory</code></td><td><code>IStoreFactory</code></td><td>Store factory used to resolve/deploy per-user stores.</td></tr>
 <tr><td><code>minAge</code></td><td><code>uint256</code></td><td>Minimum commitment age in seconds.</td></tr>
 <tr><td><code>maxAge</code></td><td><code>uint256</code></td><td>Maximum commitment age in seconds.</td></tr>
+</tbody></table>
+</div>
+<h3 id="initializev2"><a class="header" href="#initializev2">initializeV2</a></h3>
+<p>Initializer for the 1.5.0 upgrade.</p>
+<p>Callable exactly once via <code>upgradeToAndCall</code> to atomically install the new
+implementation and set the PoP reservation duration. Using a reinitializer avoids
+a race window where reservations would instantly appear expired between the
+upgrade and a follow-up <code>setReservationDuration</code> call.</p>
+<pre><code class="language-solidity">function initializeV2(uint64 _reservationDuration) external reinitializer(2);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>_reservationDuration</code></td><td><code>uint64</code></td><td>Initial reservation duration in seconds.</td></tr>
 </tbody></table>
 </div>
 <h3 id="available"><a class="header" href="#available">available</a></h3>
@@ -389,6 +439,123 @@ reverts: NotOwner if caller is not the contract owner.</p>
 <tr><td><code>registration</code></td><td><code>Registration</code></td><td>Registration parameters.</td></tr>
 </tbody></table>
 </div>
+<h3 id="reservebasename"><a class="header" href="#reservebasename">reserveBaseName</a></h3>
+<p>Registers a lite-person username on behalf of <code>user</code> and optionally enqueues a
+reservation for a base name the user intends to claim as a full person later.</p>
+<p>Callable only by the PoP gateway registered in <code>DotnsProtocolRegistry.POP_GATEWAY</code>.
+Bypasses commit-reveal and PoP pricing; every PoP-gateway registration is free.
+The lite-person username is minted immediately. If <code>reservedLabel</code> is non-empty the
+user is enqueued on the reservation queue for that label; at most one active
+reservation per account is enforced and any prior reservation is relinquished.</p>
+<pre><code class="language-solidity">function reserveBaseName(
+    string calldata label,
+    address user,
+    bytes calldata chatKey,
+    string calldata reservedLabel
+)
+    external
+    override
+    onlyGateway;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The lite-person username label to register (without TLD).</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The lite-person account receiving the username.</td></tr>
+<tr><td><code>chatKey</code></td><td><code>bytes</code></td><td>ECDH chat key bytes to persist alongside the username.</td></tr>
+<tr><td><code>reservedLabel</code></td><td><code>string</code></td><td>Optional base name to reserve for a future full-person claim. Pass the empty string to skip enqueueing a reservation.</td></tr>
+</tbody></table>
+</div>
+<h3 id="registerbasename"><a class="header" href="#registerbasename">registerBaseName</a></h3>
+<p>Registers a full-person username on behalf of <code>user</code>.</p>
+<p>Callable only by the PoP gateway registered in <code>DotnsProtocolRegistry.POP_GATEWAY</code>.
+Bypasses commit-reveal and PoP pricing; every PoP-gateway registration is free.
+Two orthogonal axes decide behaviour:</p>
+<ol>
+<li>Reservation axis (derived from state): if <code>user</code> holds the live head-of-queue
+reservation on <code>label</code>, this is a claim — the reservation queue for <code>label</code>
+is wiped and every other waiter is evicted. Otherwise this is a standalone
+registration and <code>label</code> must not be reserved by another user (reverts
+<code>LabelReservedForPop</code> when another account holds the live head).
+SILENT RELINQUISH: on the standalone path, if <code>user</code> sits in any reservation
+queue — whether on a different label, or waiting behind the head on this one
+— that queue entry is removed automatically and no event is emitted. Callers
+must confirm the user intends to give up any pending reservation before
+invoking this function with a standalone label.</li>
+<li>Chat-key axis (selected by <code>link.kind</code>): when <code>link.kind == None</code> the fresh
+<code>link.chatKey</code> is stored alongside the full-person username. When
+<code>link.kind == LiteUsername</code> the full-person username is linked to
+<code>link.liteLabel</code> and inherits the existing chat key from that lite-person
+entry; <code>link.chatKey</code> is ignored.
+All four combinations are supported: {claim, standalone} × {fresh key, linked}.
+Emits <code>BaseNameClaimed</code> on the claim axis and <code>StandaloneNameRegistered</code> on the
+standalone axis. Emits <code>LiteToFullLinked</code> whenever <code>link.kind == LiteUsername</code>,
+independent of the reservation axis.</li>
+</ol>
+<pre><code class="language-solidity">function registerBaseName(
+    string calldata label,
+    address user,
+    Link calldata link
+)
+    external
+    override
+    onlyGateway;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The full-person username label to register (without TLD).</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The full-person account receiving the username.</td></tr>
+<tr><td><code>link</code></td><td><code>Link</code></td><td>Tagged union selecting the chat-key source (fresh vs. inherited from a prior lite-person username).</td></tr>
+</tbody></table>
+</div>
+<h3 id="expirereservation"><a class="header" href="#expirereservation">expireReservation</a></h3>
+<p>Permissionlessly removes expired entries from the head of a reservation queue.</p>
+<p>Advances the queue head past every entry whose <code>joinedAt + reservationDuration</code>
+has elapsed. Bounded by queue length. Emits <code>ReservationExpired</code> per removed entry.</p>
+<pre><code class="language-solidity">function expireReservation(string calldata label) external override;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The reserved label whose queue should be compacted.</td></tr>
+</tbody></table>
+</div>
+<h3 id="relinquishreservation"><a class="header" href="#relinquishreservation">relinquishReservation</a></h3>
+<p>Lets the caller voluntarily drop their own active reservation.</p>
+<p>Removes the caller from whichever reservation queue they currently hold a slot in.
+If the caller is at the head, advances the head. Otherwise marks the caller's entry
+as removed in place. No-op if the caller has no active reservation (reverts
+<code>NoActiveReservation</code>).</p>
+<pre><code class="language-solidity">function relinquishReservation() external override;
+</code></pre>
+<h3 id="isreservedforclaim"><a class="header" href="#isreservedforclaim">isReservedForClaim</a></h3>
+<p>Returns whether a label currently has a live reservation at the queue head.</p>
+<p>An entry is considered live when it is at the head and has not yet expired.</p>
+<pre><code class="language-solidity">function isReservedForClaim(string calldata label)
+    external
+    view
+    override
+    returns (bool reserved, address holder);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The label to query.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>reserved</code></td><td><code>bool</code></td><td>True when a live head reservation exists.</td></tr>
+<tr><td><code>holder</code></td><td><code>address</code></td><td>The current head-of-queue account (zero when <code>reserved</code> is false).</td></tr>
+</tbody></table>
+</div>
+<h3 id="setreservationduration"><a class="header" href="#setreservationduration">setReservationDuration</a></h3>
+<p>Updates the reservation duration used to decide when queue entries expire.</p>
+<p>Callable only by the contract owner.</p>
+<pre><code class="language-solidity">function setReservationDuration(uint64 duration) external override onlyOwner;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>duration</code></td><td><code>uint64</code></td><td>New reservation duration in seconds.</td></tr>
+</tbody></table>
+</div>
 <h3 id="supportsinterface"><a class="header" href="#supportsinterface">supportsInterface</a></h3>
 <pre><code class="language-solidity">function supportsInterface(bytes4 interfaceId) public view override returns (bool);
 </code></pre>
@@ -446,6 +613,36 @@ reverts: NotOwner if caller is not the contract owner.</p>
 )
     internal;
 </code></pre>
+<h3 id="_completegatewayregistration"><a class="header" href="#_completegatewayregistration">_completeGatewayRegistration</a></h3>
+<p>Mints a label, wires forward registry, persists store entries, and writes
+PoP-flow chat-key and (optional) lite-link entries.</p>
+<p>Shared implementation for gateway-driven registration flows. Skips pricing,
+commit-reveal, and reverse-record setting entirely. The caller must have already
+validated the label via <code>_requireAvailableLabel</code> and checked reservation state.</p>
+<pre><code class="language-solidity">function _completeGatewayRegistration(
+    address user,
+    string calldata label,
+    bytes32 labelhash,
+    bytes32 node,
+    bytes memory chatKey,
+    bytes32 liteLabelhash
+)
+    internal;
+</code></pre>
+<h3 id="_requirenotreservedbyother"><a class="header" href="#_requirenotreservedbyother">_requireNotReservedByOther</a></h3>
+<p>Reverts when a label has a live (non-expired) reservation at the head of its
+queue held by an address other than <code>user</code>.</p>
+<p>Relinquished mid-queue slots (<code>owner == address(0)</code>) and expired heads are
+treated as absent. Intended to be called AFTER <code>_advanceExpiredHead</code> so that
+stale entries don't trigger false rejections.</p>
+<pre><code class="language-solidity">function _requireNotReservedByOther(
+    string calldata label,
+    bytes32 labelhash,
+    address user
+)
+    internal
+    view;
+</code></pre>
 <h3 id="version"><a class="header" href="#version">version</a></h3>
 <p>Returns implementation version.</p>
 <pre><code class="language-solidity">function version() external pure virtual returns (string memory versionString);
@@ -458,6 +655,47 @@ reverts: NotOwner if caller is not the contract owner.</p>
 <h3 id="_onlywhitelistedorowner"><a class="header" href="#_onlywhitelistedorowner">_onlyWhiteListedOrOwner</a></h3>
 <p>Internal check enforcing whitelist-or-owner access.</p>
 <pre><code class="language-solidity">function _onlyWhiteListedOrOwner() internal view;
+</code></pre>
+<h3 id="_onlygateway"><a class="header" href="#_onlygateway">_onlyGateway</a></h3>
+<p>Internal check enforcing PoP-gateway-only access.</p>
+<pre><code class="language-solidity">function _onlyGateway() internal view;
+</code></pre>
+<h3 id="_queuehead"><a class="header" href="#_queuehead">_queueHead</a></h3>
+<p>Returns the reservation entry at the head of the queue for <code>labelhash</code>.</p>
+<pre><code class="language-solidity">function _queueHead(bytes32 labelhash) internal view returns (ReservationEntry memory entry);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entry</code></td><td><code>ReservationEntry</code></td><td>Head entry. <code>entry.owner == address(0)</code> when the queue is empty.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_isexpired"><a class="header" href="#_isexpired">_isExpired</a></h3>
+<p>Returns whether a queue entry is expired relative to <code>block.timestamp</code>.</p>
+<pre><code class="language-solidity">function _isExpired(uint64 joinedAt) internal view returns (bool);
+</code></pre>
+<h3 id="_enqueuereservation"><a class="header" href="#_enqueuereservation">_enqueueReservation</a></h3>
+<p>Appends a new reservation entry to the tail of the queue for <code>labelhash</code>.</p>
+<p>Reverts if the queue is full or the user already holds a reservation.</p>
+<pre><code class="language-solidity">function _enqueueReservation(bytes32 labelhash, address user) internal;
+</code></pre>
+<h3 id="_clearqueue"><a class="header" href="#_clearqueue">_clearQueue</a></h3>
+<p>Wipes the entire reservation queue for <code>labelhash</code>.</p>
+<p>Used when a holder claims their reservation: every waiter is evicted and their
+per-user tracking state is cleared. Deletes entries as it walks so storage is
+released.</p>
+<pre><code class="language-solidity">function _clearQueue(bytes32 labelhash) internal;
+</code></pre>
+<h3 id="_advanceexpiredhead"><a class="header" href="#_advanceexpiredhead">_advanceExpiredHead</a></h3>
+<p>Advances the queue head past every expired entry at the head of the queue.</p>
+<p>Bounded by queue length. Emits <code>ReservationExpired</code> per removed entry.</p>
+<pre><code class="language-solidity">function _advanceExpiredHead(bytes32 labelhash) internal;
+</code></pre>
+<h3 id="_removeuserfromqueue"><a class="header" href="#_removeuserfromqueue">_removeUserFromQueue</a></h3>
+<p>Removes <code>user</code> from whichever reservation queue they currently occupy.</p>
+<p>If the user is at the head the head is advanced and further expired entries are
+compacted. Otherwise the entry is zeroed in place and the slot is left for the
+next head advance to clean up.</p>
+<pre><code class="language-solidity">function _removeUserFromQueue(address user) internal;
 </code></pre>
 <h3 id="updateprotocolregistry"><a class="header" href="#updateprotocolregistry">updateProtocolRegistry</a></h3>
 <p>Updates the protocol registry address.</p>
@@ -480,6 +718,25 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address) internal onlyOwner {}
 </code></pre>
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
+</code></pre>
+<h2 id="structs"><a class="header" href="#structs">Structs</a></h2>
+<h3 id="reservationentry"><a class="header" href="#reservationentry">ReservationEntry</a></h3>
+<p>Reservation queue entry: a user and the timestamp they joined the queue.</p>
+<p>Packs into a single storage slot (20 + 8 bytes).</p>
+<pre><code class="language-solidity">struct ReservationEntry {
+    address owner;
+    uint64 joinedAt;
+}
+</code></pre>
+<h3 id="reservationqueuemeta"><a class="header" href="#reservationqueuemeta">ReservationQueueMeta</a></h3>
+<p>Metadata describing the occupied range of a reservation queue.</p>
+<p>Uses monotonically increasing indices. Active entries occupy
+<code>[head, tail)</code>; <code>length = tail - head</code>. Slots past <code>head</code> are deleted as the
+head advances so garbage never accumulates.</p>
+<pre><code class="language-solidity">struct ReservationQueueMeta {
+    uint64 head;
+    uint64 tail;
+}
 </code></pre>
 
                     </main>

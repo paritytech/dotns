@@ -261,7 +261,7 @@ forge test
 <li><a href="contracts/pop/PopRules.sol/contract.PopRules.html">PopRules</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
 <p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements, and base-name reservation rules</p>
@@ -545,7 +545,7 @@ This replaces per-name PoP assignments</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="poprules-1"><a class="header" href="#poprules-1">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/pop/PopRules.sol//contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -878,7 +878,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <li><a href="contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrar-1"><a class="header" href="#dotnsregistrar-1">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="contracts/registrars/DotnsRegistrar.sol//contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -1093,7 +1093,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrarcontroller-1"><a class="header" href="#dotnsregistrarcontroller-1">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/registrars/DotnsRegistrarController.sol//contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -1113,6 +1113,11 @@ security-contact: admin@parity.io</p>
 <h3 id="max_allowed_commitment_age"><a class="header" href="#max_allowed_commitment_age">MAX_ALLOWED_COMMITMENT_AGE</a></h3>
 <p>Upper bound for commitment validity to cap storage griefing risk.</p>
 <pre><code class="language-solidity">uint256 public constant MAX_ALLOWED_COMMITMENT_AGE = 7 days
+</code></pre>
+<h3 id="max_reservation_queue"><a class="header" href="#max_reservation_queue">MAX_RESERVATION_QUEUE</a></h3>
+<p>Upper bound for the number of simultaneously queued reservations per label.</p>
+<p>Keeps <code>expireReservation</code> gas bounded.</p>
+<pre><code class="language-solidity">uint16 public constant MAX_RESERVATION_QUEUE = 64
 </code></pre>
 <h2 id="state-variables-2"><a class="header" href="#state-variables-2">State Variables</a></h2>
 <h3 id="dotnsregistrar-2"><a class="header" href="#dotnsregistrar-2">dotnsRegistrar</a></h3>
@@ -1165,9 +1170,36 @@ TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.</p>
 <p>Protocol-level address registry for all DotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
+<h3 id="_reservationmeta"><a class="header" href="#_reservationmeta">_reservationMeta</a></h3>
+<p>Per-label queue metadata (head/tail pointers).</p>
+<pre><code class="language-solidity">mapping(bytes32 labelhash =&gt; ReservationQueueMeta meta) internal _reservationMeta
+</code></pre>
+<h3 id="_reservationentries"><a class="header" href="#_reservationentries">_reservationEntries</a></h3>
+<p>Per-label sparse entries keyed by monotonically-increasing index.</p>
+<pre><code class="language-solidity">mapping(bytes32 labelhash =&gt; mapping(uint64 index =&gt; ReservationEntry entry)) internal
+    _reservationEntries
+</code></pre>
+<h3 id="_userreservation"><a class="header" href="#_userreservation">_userReservation</a></h3>
+<p>Tracks which label each user currently holds a reservation for.</p>
+<p>A non-zero labelhash means the user is somewhere in the queue for that label.
+Enforces "one active reservation per account".</p>
+<pre><code class="language-solidity">mapping(address user =&gt; bytes32 labelhash) internal _userReservation
+</code></pre>
+<h3 id="_userreservationindex"><a class="header" href="#_userreservationindex">_userReservationIndex</a></h3>
+<p>Records the monotonic index at which a user's reservation lives within the
+queue, so non-head relinquishment can find it in O(1).</p>
+<pre><code class="language-solidity">mapping(address user =&gt; uint64 index) internal _userReservationIndex
+</code></pre>
+<h3 id="reservationduration"><a class="header" href="#reservationduration">reservationDuration</a></h3>
+<p>Duration (in seconds) after which a reservation entry is considered expired.</p>
+<p>Mirrors <code>pallet_resources::UsernameReservationDuration</code>. Configurable by governance
+via <code>setReservationDuration</code>.</p>
+<pre><code class="language-solidity">uint64 public reservationDuration
+</code></pre>
 <h3 id="__gap-2"><a class="header" href="#__gap-2">__gap</a></h3>
-<p>Reserved storage space to allow for layout changes in the future.</p>
-<pre><code class="language-solidity">uint256[48] private __gap
+<p>Reserved storage space to allow for layout changes in the future.
+Shrunk from 48 by 5 slots added above (4 mappings + <code>reservationDuration</code>).</p>
+<pre><code class="language-solidity">uint256[43] private __gap
 </code></pre>
 <h2 id="functions-3"><a class="header" href="#functions-3">Functions</a></h2>
 <h3 id="onlyregistry-1"><a class="header" href="#onlyregistry-1">onlyRegistry</a></h3>
@@ -1180,6 +1212,11 @@ TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.</p>
 without PoP checks or payment. This is necessary to allow the owner to register reserved names
 for users who are already known and verified and dont need Pop checks.</p>
 <pre><code class="language-solidity">modifier onlyWhiteListedOrOwner() ;
+</code></pre>
+<h3 id="onlygateway"><a class="header" href="#onlygateway">onlyGateway</a></h3>
+<p>Restricts calls to the privileged PoP gateway address stored in the protocol
+registry under <code>POP_GATEWAY</code>.</p>
+<pre><code class="language-solidity">modifier onlyGateway() ;
 </code></pre>
 <h3 id="constructor-2"><a class="header" href="#constructor-2">constructor</a></h3>
 <p><strong>Note:</strong>
@@ -1210,6 +1247,19 @@ oz-upgrades-unsafe-allow: constructor</p>
 <tr><td><code>factory</code></td><td><code>IStoreFactory</code></td><td>Store factory used to resolve/deploy per-user stores.</td></tr>
 <tr><td><code>minAge</code></td><td><code>uint256</code></td><td>Minimum commitment age in seconds.</td></tr>
 <tr><td><code>maxAge</code></td><td><code>uint256</code></td><td>Maximum commitment age in seconds.</td></tr>
+</tbody></table>
+</div>
+<h3 id="initializev2"><a class="header" href="#initializev2">initializeV2</a></h3>
+<p>Initializer for the 1.5.0 upgrade.</p>
+<p>Callable exactly once via <code>upgradeToAndCall</code> to atomically install the new
+implementation and set the PoP reservation duration. Using a reinitializer avoids
+a race window where reservations would instantly appear expired between the
+upgrade and a follow-up <code>setReservationDuration</code> call.</p>
+<pre><code class="language-solidity">function initializeV2(uint64 _reservationDuration) external reinitializer(2);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>_reservationDuration</code></td><td><code>uint64</code></td><td>Initial reservation duration in seconds.</td></tr>
 </tbody></table>
 </div>
 <h3 id="available-1"><a class="header" href="#available-1">available</a></h3>
@@ -1302,6 +1352,123 @@ reverts: NotOwner if caller is not the contract owner.</p>
 <tr><td><code>registration</code></td><td><code>Registration</code></td><td>Registration parameters.</td></tr>
 </tbody></table>
 </div>
+<h3 id="reservebasename-2"><a class="header" href="#reservebasename-2">reserveBaseName</a></h3>
+<p>Registers a lite-person username on behalf of <code>user</code> and optionally enqueues a
+reservation for a base name the user intends to claim as a full person later.</p>
+<p>Callable only by the PoP gateway registered in <code>DotnsProtocolRegistry.POP_GATEWAY</code>.
+Bypasses commit-reveal and PoP pricing; every PoP-gateway registration is free.
+The lite-person username is minted immediately. If <code>reservedLabel</code> is non-empty the
+user is enqueued on the reservation queue for that label; at most one active
+reservation per account is enforced and any prior reservation is relinquished.</p>
+<pre><code class="language-solidity">function reserveBaseName(
+    string calldata label,
+    address user,
+    bytes calldata chatKey,
+    string calldata reservedLabel
+)
+    external
+    override
+    onlyGateway;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The lite-person username label to register (without TLD).</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The lite-person account receiving the username.</td></tr>
+<tr><td><code>chatKey</code></td><td><code>bytes</code></td><td>ECDH chat key bytes to persist alongside the username.</td></tr>
+<tr><td><code>reservedLabel</code></td><td><code>string</code></td><td>Optional base name to reserve for a future full-person claim. Pass the empty string to skip enqueueing a reservation.</td></tr>
+</tbody></table>
+</div>
+<h3 id="registerbasename"><a class="header" href="#registerbasename">registerBaseName</a></h3>
+<p>Registers a full-person username on behalf of <code>user</code>.</p>
+<p>Callable only by the PoP gateway registered in <code>DotnsProtocolRegistry.POP_GATEWAY</code>.
+Bypasses commit-reveal and PoP pricing; every PoP-gateway registration is free.
+Two orthogonal axes decide behaviour:</p>
+<ol>
+<li>Reservation axis (derived from state): if <code>user</code> holds the live head-of-queue
+reservation on <code>label</code>, this is a claim — the reservation queue for <code>label</code>
+is wiped and every other waiter is evicted. Otherwise this is a standalone
+registration and <code>label</code> must not be reserved by another user (reverts
+<code>LabelReservedForPop</code> when another account holds the live head).
+SILENT RELINQUISH: on the standalone path, if <code>user</code> sits in any reservation
+queue — whether on a different label, or waiting behind the head on this one
+— that queue entry is removed automatically and no event is emitted. Callers
+must confirm the user intends to give up any pending reservation before
+invoking this function with a standalone label.</li>
+<li>Chat-key axis (selected by <code>link.kind</code>): when <code>link.kind == None</code> the fresh
+<code>link.chatKey</code> is stored alongside the full-person username. When
+<code>link.kind == LiteUsername</code> the full-person username is linked to
+<code>link.liteLabel</code> and inherits the existing chat key from that lite-person
+entry; <code>link.chatKey</code> is ignored.
+All four combinations are supported: {claim, standalone} × {fresh key, linked}.
+Emits <code>BaseNameClaimed</code> on the claim axis and <code>StandaloneNameRegistered</code> on the
+standalone axis. Emits <code>LiteToFullLinked</code> whenever <code>link.kind == LiteUsername</code>,
+independent of the reservation axis.</li>
+</ol>
+<pre><code class="language-solidity">function registerBaseName(
+    string calldata label,
+    address user,
+    Link calldata link
+)
+    external
+    override
+    onlyGateway;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The full-person username label to register (without TLD).</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The full-person account receiving the username.</td></tr>
+<tr><td><code>link</code></td><td><code>Link</code></td><td>Tagged union selecting the chat-key source (fresh vs. inherited from a prior lite-person username).</td></tr>
+</tbody></table>
+</div>
+<h3 id="expirereservation"><a class="header" href="#expirereservation">expireReservation</a></h3>
+<p>Permissionlessly removes expired entries from the head of a reservation queue.</p>
+<p>Advances the queue head past every entry whose <code>joinedAt + reservationDuration</code>
+has elapsed. Bounded by queue length. Emits <code>ReservationExpired</code> per removed entry.</p>
+<pre><code class="language-solidity">function expireReservation(string calldata label) external override;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The reserved label whose queue should be compacted.</td></tr>
+</tbody></table>
+</div>
+<h3 id="relinquishreservation"><a class="header" href="#relinquishreservation">relinquishReservation</a></h3>
+<p>Lets the caller voluntarily drop their own active reservation.</p>
+<p>Removes the caller from whichever reservation queue they currently hold a slot in.
+If the caller is at the head, advances the head. Otherwise marks the caller's entry
+as removed in place. No-op if the caller has no active reservation (reverts
+<code>NoActiveReservation</code>).</p>
+<pre><code class="language-solidity">function relinquishReservation() external override;
+</code></pre>
+<h3 id="isreservedforclaim"><a class="header" href="#isreservedforclaim">isReservedForClaim</a></h3>
+<p>Returns whether a label currently has a live reservation at the queue head.</p>
+<p>An entry is considered live when it is at the head and has not yet expired.</p>
+<pre><code class="language-solidity">function isReservedForClaim(string calldata label)
+    external
+    view
+    override
+    returns (bool reserved, address holder);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The label to query.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>reserved</code></td><td><code>bool</code></td><td>True when a live head reservation exists.</td></tr>
+<tr><td><code>holder</code></td><td><code>address</code></td><td>The current head-of-queue account (zero when <code>reserved</code> is false).</td></tr>
+</tbody></table>
+</div>
+<h3 id="setreservationduration"><a class="header" href="#setreservationduration">setReservationDuration</a></h3>
+<p>Updates the reservation duration used to decide when queue entries expire.</p>
+<p>Callable only by the contract owner.</p>
+<pre><code class="language-solidity">function setReservationDuration(uint64 duration) external override onlyOwner;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>duration</code></td><td><code>uint64</code></td><td>New reservation duration in seconds.</td></tr>
+</tbody></table>
+</div>
 <h3 id="supportsinterface-1"><a class="header" href="#supportsinterface-1">supportsInterface</a></h3>
 <pre><code class="language-solidity">function supportsInterface(bytes4 interfaceId) public view override returns (bool);
 </code></pre>
@@ -1359,6 +1526,36 @@ reverts: NotOwner if caller is not the contract owner.</p>
 )
     internal;
 </code></pre>
+<h3 id="_completegatewayregistration"><a class="header" href="#_completegatewayregistration">_completeGatewayRegistration</a></h3>
+<p>Mints a label, wires forward registry, persists store entries, and writes
+PoP-flow chat-key and (optional) lite-link entries.</p>
+<p>Shared implementation for gateway-driven registration flows. Skips pricing,
+commit-reveal, and reverse-record setting entirely. The caller must have already
+validated the label via <code>_requireAvailableLabel</code> and checked reservation state.</p>
+<pre><code class="language-solidity">function _completeGatewayRegistration(
+    address user,
+    string calldata label,
+    bytes32 labelhash,
+    bytes32 node,
+    bytes memory chatKey,
+    bytes32 liteLabelhash
+)
+    internal;
+</code></pre>
+<h3 id="_requirenotreservedbyother"><a class="header" href="#_requirenotreservedbyother">_requireNotReservedByOther</a></h3>
+<p>Reverts when a label has a live (non-expired) reservation at the head of its
+queue held by an address other than <code>user</code>.</p>
+<p>Relinquished mid-queue slots (<code>owner == address(0)</code>) and expired heads are
+treated as absent. Intended to be called AFTER <code>_advanceExpiredHead</code> so that
+stale entries don't trigger false rejections.</p>
+<pre><code class="language-solidity">function _requireNotReservedByOther(
+    string calldata label,
+    bytes32 labelhash,
+    address user
+)
+    internal
+    view;
+</code></pre>
 <h3 id="version-2"><a class="header" href="#version-2">version</a></h3>
 <p>Returns implementation version.</p>
 <pre><code class="language-solidity">function version() external pure virtual returns (string memory versionString);
@@ -1371,6 +1568,47 @@ reverts: NotOwner if caller is not the contract owner.</p>
 <h3 id="_onlywhitelistedorowner"><a class="header" href="#_onlywhitelistedorowner">_onlyWhiteListedOrOwner</a></h3>
 <p>Internal check enforcing whitelist-or-owner access.</p>
 <pre><code class="language-solidity">function _onlyWhiteListedOrOwner() internal view;
+</code></pre>
+<h3 id="_onlygateway"><a class="header" href="#_onlygateway">_onlyGateway</a></h3>
+<p>Internal check enforcing PoP-gateway-only access.</p>
+<pre><code class="language-solidity">function _onlyGateway() internal view;
+</code></pre>
+<h3 id="_queuehead"><a class="header" href="#_queuehead">_queueHead</a></h3>
+<p>Returns the reservation entry at the head of the queue for <code>labelhash</code>.</p>
+<pre><code class="language-solidity">function _queueHead(bytes32 labelhash) internal view returns (ReservationEntry memory entry);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entry</code></td><td><code>ReservationEntry</code></td><td>Head entry. <code>entry.owner == address(0)</code> when the queue is empty.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_isexpired"><a class="header" href="#_isexpired">_isExpired</a></h3>
+<p>Returns whether a queue entry is expired relative to <code>block.timestamp</code>.</p>
+<pre><code class="language-solidity">function _isExpired(uint64 joinedAt) internal view returns (bool);
+</code></pre>
+<h3 id="_enqueuereservation"><a class="header" href="#_enqueuereservation">_enqueueReservation</a></h3>
+<p>Appends a new reservation entry to the tail of the queue for <code>labelhash</code>.</p>
+<p>Reverts if the queue is full or the user already holds a reservation.</p>
+<pre><code class="language-solidity">function _enqueueReservation(bytes32 labelhash, address user) internal;
+</code></pre>
+<h3 id="_clearqueue"><a class="header" href="#_clearqueue">_clearQueue</a></h3>
+<p>Wipes the entire reservation queue for <code>labelhash</code>.</p>
+<p>Used when a holder claims their reservation: every waiter is evicted and their
+per-user tracking state is cleared. Deletes entries as it walks so storage is
+released.</p>
+<pre><code class="language-solidity">function _clearQueue(bytes32 labelhash) internal;
+</code></pre>
+<h3 id="_advanceexpiredhead"><a class="header" href="#_advanceexpiredhead">_advanceExpiredHead</a></h3>
+<p>Advances the queue head past every expired entry at the head of the queue.</p>
+<p>Bounded by queue length. Emits <code>ReservationExpired</code> per removed entry.</p>
+<pre><code class="language-solidity">function _advanceExpiredHead(bytes32 labelhash) internal;
+</code></pre>
+<h3 id="_removeuserfromqueue"><a class="header" href="#_removeuserfromqueue">_removeUserFromQueue</a></h3>
+<p>Removes <code>user</code> from whichever reservation queue they currently occupy.</p>
+<p>If the user is at the head the head is advanced and further expired entries are
+compacted. Otherwise the entry is zeroed in place and the slot is left for the
+next head advance to clean up.</p>
+<pre><code class="language-solidity">function _removeUserFromQueue(address user) internal;
 </code></pre>
 <h3 id="updateprotocolregistry-3"><a class="header" href="#updateprotocolregistry-3">updateProtocolRegistry</a></h3>
 <p>Updates the protocol registry address.</p>
@@ -1394,8 +1632,27 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
+<h2 id="structs-1"><a class="header" href="#structs-1">Structs</a></h2>
+<h3 id="reservationentry"><a class="header" href="#reservationentry">ReservationEntry</a></h3>
+<p>Reservation queue entry: a user and the timestamp they joined the queue.</p>
+<p>Packs into a single storage slot (20 + 8 bytes).</p>
+<pre><code class="language-solidity">struct ReservationEntry {
+    address owner;
+    uint64 joinedAt;
+}
+</code></pre>
+<h3 id="reservationqueuemeta"><a class="header" href="#reservationqueuemeta">ReservationQueueMeta</a></h3>
+<p>Metadata describing the occupied range of a reservation queue.</p>
+<p>Uses monotonically increasing indices. Active entries occupy
+<code>[head, tail)</code>; <code>length = tail - head</code>. Slots past <code>head</code> are deleted as the
+head advances so garbage never accumulates.</p>
+<pre><code class="language-solidity">struct ReservationQueueMeta {
+    uint64 head;
+    uint64 tail;
+}
+</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -1584,7 +1841,7 @@ TODO: We need to remove this before a fresh deployment</p>
 <pre><code class="language-solidity">error InvalidLabel();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Registrar Controller</p>
 <p>Interface for registering .dot labels using a commit–reveal scheme.</p>
@@ -1700,6 +1957,113 @@ reverts: NotOwner if caller is not the contract owner.</p>
 <tr><td><code>registry</code></td><td><code>IDotnsProtocolRegistry</code></td><td>The address of the new protocol registry.</td></tr>
 </tbody></table>
 </div>
+<h3 id="reservebasename-3"><a class="header" href="#reservebasename-3">reserveBaseName</a></h3>
+<p>Registers a lite-person username on behalf of <code>user</code> and optionally enqueues a
+reservation for a base name the user intends to claim as a full person later.</p>
+<p>Callable only by the PoP gateway registered in <code>DotnsProtocolRegistry.POP_GATEWAY</code>.
+Bypasses commit-reveal and PoP pricing; every PoP-gateway registration is free.
+The lite-person username is minted immediately. If <code>reservedLabel</code> is non-empty the
+user is enqueued on the reservation queue for that label; at most one active
+reservation per account is enforced and any prior reservation is relinquished.</p>
+<pre><code class="language-solidity">function reserveBaseName(
+    string calldata label,
+    address user,
+    bytes calldata chatKey,
+    string calldata reservedLabel
+)
+    external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The lite-person username label to register (without TLD).</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The lite-person account receiving the username.</td></tr>
+<tr><td><code>chatKey</code></td><td><code>bytes</code></td><td>ECDH chat key bytes to persist alongside the username.</td></tr>
+<tr><td><code>reservedLabel</code></td><td><code>string</code></td><td>Optional base name to reserve for a future full-person claim. Pass the empty string to skip enqueueing a reservation.</td></tr>
+</tbody></table>
+</div>
+<h3 id="registerbasename-1"><a class="header" href="#registerbasename-1">registerBaseName</a></h3>
+<p>Registers a full-person username on behalf of <code>user</code>.</p>
+<p>Callable only by the PoP gateway registered in <code>DotnsProtocolRegistry.POP_GATEWAY</code>.
+Bypasses commit-reveal and PoP pricing; every PoP-gateway registration is free.
+Two orthogonal axes decide behaviour:</p>
+<ol>
+<li>Reservation axis (derived from state): if <code>user</code> holds the live head-of-queue
+reservation on <code>label</code>, this is a claim — the reservation queue for <code>label</code>
+is wiped and every other waiter is evicted. Otherwise this is a standalone
+registration and <code>label</code> must not be reserved by another user (reverts
+<code>LabelReservedForPop</code> when another account holds the live head).
+SILENT RELINQUISH: on the standalone path, if <code>user</code> sits in any reservation
+queue — whether on a different label, or waiting behind the head on this one
+— that queue entry is removed automatically and no event is emitted. Callers
+must confirm the user intends to give up any pending reservation before
+invoking this function with a standalone label.</li>
+<li>Chat-key axis (selected by <code>link.kind</code>): when <code>link.kind == None</code> the fresh
+<code>link.chatKey</code> is stored alongside the full-person username. When
+<code>link.kind == LiteUsername</code> the full-person username is linked to
+<code>link.liteLabel</code> and inherits the existing chat key from that lite-person
+entry; <code>link.chatKey</code> is ignored.
+All four combinations are supported: {claim, standalone} × {fresh key, linked}.
+Emits <code>BaseNameClaimed</code> on the claim axis and <code>StandaloneNameRegistered</code> on the
+standalone axis. Emits <code>LiteToFullLinked</code> whenever <code>link.kind == LiteUsername</code>,
+independent of the reservation axis.</li>
+</ol>
+<pre><code class="language-solidity">function registerBaseName(string calldata label, address user, Link calldata link) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The full-person username label to register (without TLD).</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The full-person account receiving the username.</td></tr>
+<tr><td><code>link</code></td><td><code>Link</code></td><td>Tagged union selecting the chat-key source (fresh vs. inherited from a prior lite-person username).</td></tr>
+</tbody></table>
+</div>
+<h3 id="expirereservation-1"><a class="header" href="#expirereservation-1">expireReservation</a></h3>
+<p>Permissionlessly removes expired entries from the head of a reservation queue.</p>
+<p>Advances the queue head past every entry whose <code>joinedAt + reservationDuration</code>
+has elapsed. Bounded by queue length. Emits <code>ReservationExpired</code> per removed entry.</p>
+<pre><code class="language-solidity">function expireReservation(string calldata label) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The reserved label whose queue should be compacted.</td></tr>
+</tbody></table>
+</div>
+<h3 id="relinquishreservation-1"><a class="header" href="#relinquishreservation-1">relinquishReservation</a></h3>
+<p>Lets the caller voluntarily drop their own active reservation.</p>
+<p>Removes the caller from whichever reservation queue they currently hold a slot in.
+If the caller is at the head, advances the head. Otherwise marks the caller's entry
+as removed in place. No-op if the caller has no active reservation (reverts
+<code>NoActiveReservation</code>).</p>
+<pre><code class="language-solidity">function relinquishReservation() external;
+</code></pre>
+<h3 id="isreservedforclaim-1"><a class="header" href="#isreservedforclaim-1">isReservedForClaim</a></h3>
+<p>Returns whether a label currently has a live reservation at the queue head.</p>
+<p>An entry is considered live when it is at the head and has not yet expired.</p>
+<pre><code class="language-solidity">function isReservedForClaim(string calldata label)
+    external
+    view
+    returns (bool reserved, address holder);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The label to query.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>reserved</code></td><td><code>bool</code></td><td>True when a live head reservation exists.</td></tr>
+<tr><td><code>holder</code></td><td><code>address</code></td><td>The current head-of-queue account (zero when <code>reserved</code> is false).</td></tr>
+</tbody></table>
+</div>
+<h3 id="setreservationduration-1"><a class="header" href="#setreservationduration-1">setReservationDuration</a></h3>
+<p>Updates the reservation duration used to decide when queue entries expire.</p>
+<p>Callable only by the contract owner.</p>
+<pre><code class="language-solidity">function setReservationDuration(uint64 duration) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>duration</code></td><td><code>uint64</code></td><td>New reservation duration in seconds.</td></tr>
+</tbody></table>
+</div>
 <h2 id="events-2"><a class="header" href="#events-2">Events</a></h2>
 <h3 id="namecommitted"><a class="header" href="#namecommitted">NameCommitted</a></h3>
 <p>Emitted when a commitment is submitted.</p>
@@ -1737,6 +2101,91 @@ reverts: NotOwner if caller is not the contract owner.</p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>who</code></td><td><code>address</code></td><td>The address being whitelisted.</td></tr>
 <tr><td><code>whiteListStatus</code></td><td><code>bool</code></td><td>Whether the address was added or removed from the whitelist.</td></tr>
+</tbody></table>
+</div>
+<h3 id="litenamereserved"><a class="header" href="#litenamereserved">LiteNameReserved</a></h3>
+<p>Emitted when a lite-person username is registered via the PoP gateway.</p>
+<pre><code class="language-solidity">event LiteNameReserved(bytes32 indexed labelhash, address indexed user, string label);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Keccak256 hash of the lite-person label.</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Address receiving the lite-person username.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Human-readable label.</td></tr>
+</tbody></table>
+</div>
+<h3 id="basenameclaimed"><a class="header" href="#basenameclaimed">BaseNameClaimed</a></h3>
+<p>Emitted when a full-person username is claimed out of an existing reservation.</p>
+<pre><code class="language-solidity">event BaseNameClaimed(bytes32 indexed labelhash, address indexed user, string label);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Keccak256 hash of the full-person label.</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Address receiving the full-person username.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Human-readable label.</td></tr>
+</tbody></table>
+</div>
+<h3 id="standalonenameregistered"><a class="header" href="#standalonenameregistered">StandaloneNameRegistered</a></h3>
+<p>Emitted when a standalone full-person username is registered via the PoP gateway.</p>
+<pre><code class="language-solidity">event StandaloneNameRegistered(bytes32 indexed labelhash, address indexed user, string label);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Keccak256 hash of the full-person label.</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Address receiving the full-person username.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Human-readable label.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservationqueued"><a class="header" href="#reservationqueued">ReservationQueued</a></h3>
+<p>Emitted when a reservation entry is added to the queue for a base name.</p>
+<pre><code class="language-solidity">event ReservationQueued(
+    bytes32 indexed reservedLabelhash, address indexed user, uint64 position
+);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>reservedLabelhash</code></td><td><code>bytes32</code></td><td>Keccak256 hash of the reserved base name.</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Address joining the reservation queue.</td></tr>
+<tr><td><code>position</code></td><td><code>uint64</code></td><td>Position in the queue at the time of joining (0 = active holder).</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservationexpired"><a class="header" href="#reservationexpired">ReservationExpired</a></h3>
+<p>Emitted when a reservation entry is removed due to expiry.</p>
+<pre><code class="language-solidity">event ReservationExpired(bytes32 indexed reservedLabelhash, address indexed user);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>reservedLabelhash</code></td><td><code>bytes32</code></td><td>Keccak256 hash of the reserved base name.</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Address whose entry was removed.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservationrelinquished"><a class="header" href="#reservationrelinquished">ReservationRelinquished</a></h3>
+<p>Emitted when a user voluntarily relinquishes their reservation.</p>
+<pre><code class="language-solidity">event ReservationRelinquished(bytes32 indexed reservedLabelhash, address indexed user);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>reservedLabelhash</code></td><td><code>bytes32</code></td><td>Keccak256 hash of the reserved base name.</td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Address whose reservation was removed.</td></tr>
+</tbody></table>
+</div>
+<h3 id="litetofulllinked"><a class="header" href="#litetofulllinked">LiteToFullLinked</a></h3>
+<p>Emitted when a full-person username is linked to a lite-person username.</p>
+<pre><code class="language-solidity">event LiteToFullLinked(bytes32 indexed fullLabelhash, bytes32 indexed liteLabelhash);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>fullLabelhash</code></td><td><code>bytes32</code></td><td>Keccak256 hash of the full-person label.</td></tr>
+<tr><td><code>liteLabelhash</code></td><td><code>bytes32</code></td><td>Keccak256 hash of the linked lite-person label.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservationdurationset"><a class="header" href="#reservationdurationset">ReservationDurationSet</a></h3>
+<p>Emitted when the reservation duration is updated.</p>
+<pre><code class="language-solidity">event ReservationDurationSet(uint64 duration);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>duration</code></td><td><code>uint64</code></td><td>New reservation duration in seconds.</td></tr>
 </tbody></table>
 </div>
 <h3 id="protocolregistryupdated-2"><a class="header" href="#protocolregistryupdated-2">ProtocolRegistryUpdated</a></h3>
@@ -1835,7 +2284,55 @@ reverts: NotOwner if caller is not the contract owner.</p>
 <p>Thrown when the caller is not the registry.</p>
 <pre><code class="language-solidity">error NotRegistry();
 </code></pre>
-<h2 id="structs-1"><a class="header" href="#structs-1">Structs</a></h2>
+<h3 id="notgateway"><a class="header" href="#notgateway">NotGateway</a></h3>
+<p>Thrown when the caller is not the PoP gateway.</p>
+<pre><code class="language-solidity">error NotGateway(address caller);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>caller</code></td><td><code>address</code></td><td>The address that attempted the call.</td></tr>
+</tbody></table>
+</div>
+<h3 id="labelreservedforpop"><a class="header" href="#labelreservedforpop">LabelReservedForPop</a></h3>
+<p>Thrown when a public registration targets a label with an active PoP reservation
+held by a different account.</p>
+<pre><code class="language-solidity">error LabelReservedForPop(string label);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The label that is reserved.</td></tr>
+</tbody></table>
+</div>
+<h3 id="noactivereservation"><a class="header" href="#noactivereservation">NoActiveReservation</a></h3>
+<p>Thrown when a user tries to claim or relinquish a reservation that they do not hold.</p>
+<pre><code class="language-solidity">error NoActiveReservation(address user);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The address that attempted the operation.</td></tr>
+</tbody></table>
+</div>
+<h3 id="queuefull"><a class="header" href="#queuefull">QueueFull</a></h3>
+<p>Thrown when a reservation queue has reached its capacity.</p>
+<pre><code class="language-solidity">error QueueFull(bytes32 labelhash);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the reserved name.</td></tr>
+</tbody></table>
+</div>
+<h3 id="alreadyreserved"><a class="header" href="#alreadyreserved">AlreadyReserved</a></h3>
+<p>Thrown when attempting to enqueue a user who already has an active reservation
+on the same label.</p>
+<pre><code class="language-solidity">error AlreadyReserved(address user, bytes32 labelhash);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The address that attempted to reserve.</td></tr>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the reserved name.</td></tr>
+</tbody></table>
+</div>
+<h2 id="structs-2"><a class="header" href="#structs-2">Structs</a></h2>
 <h3 id="registration"><a class="header" href="#registration">Registration</a></h3>
 <p>Parameters used to generate and reveal a commitment.</p>
 <p>All fields must match exactly between commitment and reveal.</p>
@@ -1853,7 +2350,42 @@ reverts: NotOwner if caller is not the contract owner.</p>
 <tr><td><code>secret</code></td><td><code>bytes32</code></td><td>Secret used to bind the commitment.</td></tr>
 <tr><td><code>reserved</code></td><td><code>bool</code></td><td>Whether the name is reserved.</td></tr>
 </tbody></table>
-</div><div style="break-before: page; page-break-before: always;"></div><h1 id="contents-2"><a class="header" href="#contents-2">Contents</a></h1>
+</div>
+<h3 id="link"><a class="header" href="#link">Link</a></h3>
+<p>Tagged union selecting the chat-key source for a full-person registration.</p>
+<p>When <code>kind == LinkKind.LiteUsername</code> the <code>liteLabel</code> field identifies the prior
+lite-person username to link to and <code>chatKey</code> is ignored (the existing chat key
+associated with the lite username is inherited). When <code>kind == LinkKind.None</code> the
+<code>chatKey</code> field carries the new chat key for the registration and <code>liteLabel</code> is
+ignored.</p>
+<pre><code class="language-solidity">struct Link {
+    LinkKind kind;
+    string liteLabel;
+    bytes chatKey;
+}
+</code></pre>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>kind</code></td><td><code>LinkKind</code></td><td>Which branch of the union is populated.</td></tr>
+<tr><td><code>liteLabel</code></td><td><code>string</code></td><td>Lite-person username label (only read when <code>kind == LiteUsername</code>).</td></tr>
+<tr><td><code>chatKey</code></td><td><code>bytes</code></td><td>Chat key bytes (only read when <code>kind == None</code>).</td></tr>
+</tbody></table>
+</div>
+<h2 id="enums-1"><a class="header" href="#enums-1">Enums</a></h2>
+<h3 id="linkkind"><a class="header" href="#linkkind">LinkKind</a></h3>
+<p>Discriminant for the <code>Link</code> union supplied to <code>registerBaseName</code>.</p>
+<p>Selects the chat-key source for the full-person username. Orthogonal to
+whether the registration is a claim or standalone — that is derived from
+on-chain reservation state, not from this discriminant. <code>None</code> means the
+caller supplies a fresh chat key in <code>link.chatKey</code>. <code>LiteUsername</code> means
+the full-person username is linked to a prior lite-person username
+(<code>link.liteLabel</code>) and inherits its chat key.</p>
+<pre><code class="language-solidity">enum LinkKind {
+    None,
+    LiteUsername
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="contents-2"><a class="header" href="#contents-2">Contents</a></h1>
 <ul>
 <li><a href="contracts/registry/DotnsProtocolRegistry.sol/contract.DotnsProtocolRegistry.html">DotnsProtocolRegistry</a></li>
 <li><a href="contracts/registry/DotnsRegistry.sol/contract.DotnsRegistry.html">DotnsRegistry</a></li>
@@ -1861,7 +2393,7 @@ reverts: NotOwner if caller is not the contract owner.</p>
 <li><a href="contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsprotocolregistry-1"><a class="header" href="#dotnsprotocolregistry-1">DotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsProtocolRegistry.sol//contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></p>
 <p><strong>Title:</strong>
@@ -1991,7 +2523,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistry-2"><a class="header" href="#dotnsregistry-2">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsRegistry.sol//contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -2244,7 +2776,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p>Interface for the DotNS protocol-level address registry.</p>
@@ -2294,7 +2826,7 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">error ZeroAddress();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistry"><a class="header" href="#idotnsregistry">IDotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dot Registry</p>
 <p>Minimal on-chain registry for hierarchical name ownership and resolution.</p>
@@ -2471,7 +3003,7 @@ For tokenised nodes, authorisation is based on ERC721 owner/approvals.</p>
 <p>Thrown when the supplied parent label does not match the parent node.</p>
 <pre><code class="language-solidity">error ParentLabelMismatch();
 </code></pre>
-<h2 id="structs-2"><a class="header" href="#structs-2">Structs</a></h2>
+<h2 id="structs-3"><a class="header" href="#structs-3">Structs</a></h2>
 <h3 id="subnoderecord"><a class="header" href="#subnoderecord">SubnodeRecord</a></h3>
 <p>Record describing a subnode creation request</p>
 <p>Label string is included for convenience, for the store</p>
@@ -2531,7 +3063,7 @@ For tokenised nodes, authorisation is based on ERC721 owner/approvals.</p>
 <li><a href="contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnscontentresolver-1"><a class="header" href="#dotnscontentresolver-1">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsContentResolver.sol//contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
@@ -2714,7 +3246,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsresolver-1"><a class="header" href="#dotnsresolver-1">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsResolver.sol//contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
@@ -2831,7 +3363,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsreverseresolver-1"><a class="header" href="#dotnsreverseresolver-1">DotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsReverseResolver.sol//contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></p>
 <p><strong>Title:</strong>
@@ -2943,7 +3475,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscontentresolver"><a class="header" href="#idotnscontentresolver">IDotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Content Resolver</p>
 <p>Defines storage and retrieval for content hash, text records, and operator approvals for DotNS nodes</p>
@@ -3093,7 +3625,7 @@ security-contact: admin@parity.io</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsresolver"><a class="header" href="#idotnsresolver">IDotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Resolver</p>
 <p>Defines forward-resolution address records for DotNS nodes</p>
@@ -3166,7 +3698,7 @@ security-contact: admin@parity.io</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsreverseresolver"><a class="header" href="#idotnsreverseresolver">IDotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Reverse Resolver</p>
 <p>Interface for writing and reading reverse name records for addresses.</p>
@@ -3250,7 +3782,7 @@ reverts: NotRegistrar if the caller is not authorised to write.</p>
 <li><a href="contracts/store/StoreFactory.sol/contract.StoreFactory.html">StoreFactory</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="istore"><a class="header" href="#istore">IStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/store/IStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/store/IStore.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStore</p>
 <p>Interface defining a key-value storage for IPFS URIs scoped by user address.</p>
@@ -3548,7 +4080,7 @@ reverts: NotAuthorised if caller is not the owner.</p>
 <tr><td><code>key</code></td><td><code>bytes32</code></td><td>The key that is locked.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="istorefactory"><a class="header" href="#istorefactory">IStoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/store/IStoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/store/IStoreFactory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStoreFactory</p>
 <p>Interface defining factory functions for deploying and managing user-specific stores.</p>
@@ -3648,7 +4180,7 @@ this call succeeds.</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting to make the transfer</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="store"><a class="header" href="#store">Store</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/store/Store.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/store/Store.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/Store.sol//contracts/store/IStore.sol/interface.IStore.html">IStore</a>, Ownable</p>
 <p><strong>Title:</strong>
@@ -3908,7 +4440,7 @@ reverts: NotAuthorised if caller is not the owner.</p>
 <tr><td><code>key</code></td><td><code>bytes32</code></td><td>Storage key</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="storefactory-2"><a class="header" href="#storefactory-2">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/StoreFactory.sol//contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
@@ -3978,7 +4510,7 @@ this call succeeds.</p>
 <li><a href="contracts/utils/StringUtils.sol/library.StringUtils.html">StringUtils</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Constants</p>
 <p>Protocol-level invariants shared across DotNS contracts.</p>
@@ -4015,7 +4547,7 @@ forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant DOTNS_LITE_LINK_KEY = bytes32("dotns.liteLink")
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="storeutils"><a class="header" href="#storeutils">StoreUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/utils/StoreUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/utils/StoreUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Store Utilities Library</p>
 <p>Provides Store acquisition and management utilities for any contract that requires a store.</p>
@@ -4184,7 +4716,7 @@ Skips the write if the key already has a value (prevents overwriting locked entr
 <tr><td><code>store</code></td><td><code>address</code></td><td>The Store address, or zero if none exists.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="stringutils"><a class="header" href="#stringutils">StringUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3feb92691023c8a372c5e6258c74e0cd634205f1/contracts/utils/StringUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b1012865a214e1ff6a8b5a6baeee43aa644728ab/contracts/utils/StringUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 String Utilities Library</p>
 <p>Provides string manipulation utilities for DotNS contracts.</p>
