@@ -49,6 +49,9 @@ abstract contract BaseDotns is Test {
     /// @notice Test user account: owner/admin used to deploy and configure contracts.
     address public owner;
 
+    /// @notice Test PoP gateway account wired into `DotnsProtocolRegistry.POP_GATEWAY` during setup.
+    address public popGateway;
+
     /// @notice Default native balance allocated to test users.
     uint256 public constant DEFAULT_BALANCE = 99_999_999_999_999 ether;
 
@@ -106,6 +109,7 @@ abstract contract BaseDotns is Test {
         leonardo = _createUser("leonardo");
         tiago = _createUser("tiago");
         owner = _createUser("owner");
+        popGateway = _createUser("popGateway");
 
         dotLabel = keccak256(bytes("dot"));
         dotNode = _namehash(ZERO_HASH, dotLabel);
@@ -181,6 +185,9 @@ abstract contract BaseDotns is Test {
         dotnsRegistrarController = DotnsRegistrarController(dotnsRegistrarControllerAddress);
         vm.label(dotnsRegistrarControllerAddress, "DotnsRegistrarController");
 
+        // Install PoP reservation duration via the 1.5.0 reinitializer.
+        dotnsRegistrarController.initializeV2(30 days);
+
         dotnsRegistrar.addController(IDotnsRegistrarController(dotnsRegistrarControllerAddress));
 
         address protocolRegistryAddress = Upgrades.deployUUPSProxy(
@@ -198,6 +205,7 @@ abstract contract BaseDotns is Test {
         protocolRegistry.set(protocolRegistry.STORE_FACTORY(), address(storeFactory));
         protocolRegistry.set(protocolRegistry.RESOLVER(), dotnsResolverAddress);
         protocolRegistry.set(protocolRegistry.CONTENT_RESOLVER(), dotnsContentResolverAddress);
+        protocolRegistry.set(protocolRegistry.POP_GATEWAY(), popGateway);
 
         dotnsRegistrar.updateProtocolRegistry(IDotnsProtocolRegistry(address(protocolRegistry)));
         dotnsRegistrarController.updateProtocolRegistry(

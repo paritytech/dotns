@@ -27,8 +27,8 @@ contract DotnsProtocolRegistryTests is BaseDotns {
         assertEq(popGatewayKey, bytes32("popGateway"));
     }
 
-    function test_popGateway_is_unset_by_default() public view {
-        assertEq(protocolRegistry.get(popGatewayKey), address(0));
+    function test_popGateway_is_set_by_base_setup() public view {
+        assertEq(protocolRegistry.get(popGatewayKey), popGateway);
     }
 
     function test_owner_can_set_popGateway_address_and_emits_event() public {

@@ -18,6 +18,7 @@ import {StringUtils} from "../utils/StringUtils.sol";
 import {IDotnsRegistrarController} from "./IDotnsRegistrarController.sol";
 import {Store} from "../store/Store.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
+import {IStore} from "../store/IStore.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsProtocolRegistry} from "../registry/DotnsProtocolRegistry.sol";
@@ -87,8 +88,50 @@ contract DotnsRegistrarController is
     /// @notice Protocol-level address registry for all DotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
+    /// @notice Upper bound for the number of simultaneously queued reservations per label.
+    /// @dev Keeps `expireReservation` gas bounded.
+    uint16 public constant MAX_RESERVATION_QUEUE = 64;
+
+    /// @notice Reservation queue entry: a user and the timestamp they joined the queue.
+    /// @dev Packs into a single storage slot (20 + 8 bytes).
+    struct ReservationEntry {
+        address owner;
+        uint64 joinedAt;
+    }
+
+    /// @notice Metadata describing the occupied range of a reservation queue.
+    /// @dev Uses monotonically increasing indices. Active entries occupy
+    ///      `[head, tail)`; `length = tail - head`. Slots past `head` are deleted as the
+    ///      head advances so garbage never accumulates.
+    struct ReservationQueueMeta {
+        uint64 head;
+        uint64 tail;
+    }
+
+    /// @notice Per-label queue metadata (head/tail pointers).
+    mapping(bytes32 labelhash => ReservationQueueMeta meta) internal _reservationMeta;
+
+    /// @notice Per-label sparse entries keyed by monotonically-increasing index.
+    mapping(bytes32 labelhash => mapping(uint64 index => ReservationEntry entry)) internal
+        _reservationEntries;
+
+    /// @notice Tracks which label each user currently holds a reservation for.
+    /// @dev A non-zero labelhash means the user is somewhere in the queue for that label.
+    ///      Enforces "one active reservation per account".
+    mapping(address user => bytes32 labelhash) internal _userReservation;
+
+    /// @notice Records the monotonic index at which a user's reservation lives within the
+    ///         queue, so non-head relinquishment can find it in O(1).
+    mapping(address user => uint64 index) internal _userReservationIndex;
+
+    /// @notice Duration (in seconds) after which a reservation entry is considered expired.
+    /// @dev Mirrors `pallet_resources::UsernameReservationDuration`. Configurable by governance
+    ///      via `setReservationDuration`.
+    uint64 public reservationDuration;
+
     /// @dev Reserved storage space to allow for layout changes in the future.
-    uint256[48] private __gap;
+    ///      Shrunk from 48 by 5 slots added above (4 mappings + `reservationDuration`).
+    uint256[43] private __gap;
 
     /// @notice Restricts calls to the forward registry contract.
     modifier onlyRegistry() {
@@ -102,6 +145,13 @@ contract DotnsRegistrarController is
     ///      for users who are already known and verified and dont need Pop checks.
     modifier onlyWhiteListedOrOwner() {
         _onlyWhiteListedOrOwner();
+        _;
+    }
+
+    /// @notice Restricts calls to the privileged PoP gateway address stored in the protocol
+    ///         registry under `POP_GATEWAY`.
+    modifier onlyGateway() {
+        _onlyGateway();
         _;
     }
 
@@ -146,6 +196,17 @@ contract DotnsRegistrarController is
 
         minCommitmentAge = minAge;
         maxCommitmentAge = maxAge;
+    }
+
+    /// @notice Initializer for the 1.5.0 upgrade.
+    /// @dev Callable exactly once via `upgradeToAndCall` to atomically install the new
+    ///      implementation and set the PoP reservation duration. Using a reinitializer avoids
+    ///      a race window where reservations would instantly appear expired between the
+    ///      upgrade and a follow-up `setReservationDuration` call.
+    /// @param _reservationDuration Initial reservation duration in seconds.
+    function initializeV2(uint64 _reservationDuration) external reinitializer(2) {
+        reservationDuration = _reservationDuration;
+        emit ReservationDurationSet(_reservationDuration);
     }
 
     /// @inheritdoc IDotnsRegistrarController
@@ -205,6 +266,9 @@ contract DotnsRegistrarController is
     function register(Registration calldata registration) external payable override {
         (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
             _requireAvailableLabel(registration.label);
+
+        _requireNotReservedByOther(registration.label, labelhash, registration.owner);
+
         _consumeCommitment(registration);
 
         IPopRules rules = IPopRules(
@@ -219,13 +283,6 @@ contract DotnsRegistrarController is
         _completeRegistration(
             registration, registrar, labelhash, node, priced.price, setReverseRecord
         );
-
-        if (
-            priced.status == IPopRules.PopStatus.PopLite
-                && priced.userStatus == IPopRules.PopStatus.PopLite
-        ) {
-            rules.reserveBaseName(registration.label, registration.owner);
-        }
 
         if (msg.value > priced.price) {
             (bool ok,) = payable(msg.sender).call{value: msg.value - priced.price}("");
@@ -255,6 +312,131 @@ contract DotnsRegistrarController is
         _consumeCommitment(registration);
 
         _completeRegistration(registration, registrar, labelhash, node, 0, true);
+    }
+
+    /// @inheritdoc IDotnsRegistrarController
+    function reserveBaseName(
+        string calldata label,
+        address user,
+        bytes calldata chatKey,
+        string calldata reservedLabel
+    )
+        external
+        override
+        onlyGateway
+    {
+        (, bytes32 labelhash, bytes32 node) = _requireAvailableLabel(label);
+
+        _advanceExpiredHead(labelhash);
+        _requireNotReservedByOther(label, labelhash, user);
+
+        _completeGatewayRegistration(user, label, labelhash, node, chatKey, bytes32(0));
+
+        emit LiteNameReserved(labelhash, user, label);
+
+        if (bytes(reservedLabel).length != 0) {
+            bytes32 reservedHash = keccak256(bytes(reservedLabel));
+            _advanceExpiredHead(reservedHash);
+
+            if (_userReservation[user] != bytes32(0)) {
+                _removeUserFromQueue(user);
+            }
+            _enqueueReservation(reservedHash, user);
+        }
+    }
+
+    /// @inheritdoc IDotnsRegistrarController
+    function registerBaseName(
+        string calldata label,
+        address user,
+        Link calldata link
+    )
+        external
+        override
+        onlyGateway
+    {
+        (, bytes32 labelhash, bytes32 node) = _requireAvailableLabel(label);
+
+        _advanceExpiredHead(labelhash);
+
+        // Reservation axis: `user` is claiming iff they hold the live head-of-queue
+        // reservation on `label`. Orthogonal to `link.kind`.
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        bool isClaim = _userReservation[user] == labelhash && meta.head < meta.tail
+            && _reservationEntries[labelhash][meta.head].owner == user;
+
+        if (isClaim) {
+            _clearQueue(labelhash);
+        } else {
+            _requireNotReservedByOther(label, labelhash, user);
+            // Silent relinquish: any pending queue entry the user holds is removed.
+            if (_userReservation[user] != bytes32(0)) {
+                _removeUserFromQueue(user);
+            }
+        }
+
+        // Chat-key axis: `link.kind` selects whether a fresh key is persisted or the
+        // entry is linked back to a prior lite-person username.
+        bytes memory chatKey;
+        bytes32 liteLabelhash;
+        if (link.kind == LinkKind.LiteUsername) {
+            liteLabelhash = keccak256(bytes(link.liteLabel));
+        } else {
+            chatKey = link.chatKey;
+        }
+
+        _completeGatewayRegistration(user, label, labelhash, node, chatKey, liteLabelhash);
+
+        if (isClaim) {
+            emit BaseNameClaimed(labelhash, user, label);
+        } else {
+            emit StandaloneNameRegistered(labelhash, user, label);
+        }
+        if (link.kind == LinkKind.LiteUsername) {
+            emit LiteToFullLinked(labelhash, liteLabelhash);
+        }
+    }
+
+    /// @inheritdoc IDotnsRegistrarController
+    function expireReservation(string calldata label) external override {
+        bytes32 labelhash = keccak256(bytes(label));
+        _advanceExpiredHead(labelhash);
+    }
+
+    /// @inheritdoc IDotnsRegistrarController
+    function relinquishReservation() external override {
+        bytes32 labelhash = _userReservation[msg.sender];
+        require(labelhash != bytes32(0), NoActiveReservation(msg.sender));
+        _removeUserFromQueue(msg.sender);
+        emit ReservationRelinquished(labelhash, msg.sender);
+    }
+
+    /// @inheritdoc IDotnsRegistrarController
+    function isReservedForClaim(string calldata label)
+        external
+        view
+        override
+        returns (bool reserved, address holder)
+    {
+        bytes32 labelhash = keccak256(bytes(label));
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        if (meta.head >= meta.tail) {
+            return (false, address(0));
+        }
+        ReservationEntry memory head = _reservationEntries[labelhash][meta.head];
+        if (head.owner == address(0)) {
+            return (false, address(0));
+        }
+        if (_isExpired(head.joinedAt)) {
+            return (false, address(0));
+        }
+        return (true, head.owner);
+    }
+
+    /// @inheritdoc IDotnsRegistrarController
+    function setReservationDuration(uint64 duration) external override onlyOwner {
+        reservationDuration = duration;
+        emit ReservationDurationSet(duration);
     }
 
     /// @inheritdoc ERC165Upgradeable
@@ -372,15 +554,214 @@ contract DotnsRegistrarController is
         );
     }
 
+    /// @notice Mints a label, wires forward registry, persists store entries, and writes
+    ///         PoP-flow chat-key and (optional) lite-link entries.
+    /// @dev Shared implementation for gateway-driven registration flows. Skips pricing,
+    ///      commit-reveal, and reverse-record setting entirely. The caller must have already
+    ///      validated the label via `_requireAvailableLabel` and checked reservation state.
+    function _completeGatewayRegistration(
+        address user,
+        string calldata label,
+        bytes32 labelhash,
+        bytes32 node,
+        bytes memory chatKey,
+        bytes32 liteLabelhash
+    )
+        internal
+    {
+        IDotnsRegistrar registrar = IDotnsRegistrar(
+            protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).REGISTRAR())
+        );
+        IDotnsRegistry registry = IDotnsRegistry(
+            protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).REGISTRY())
+        );
+        IDotnsReverseResolver reverse = IDotnsReverseResolver(
+            protocolRegistry.get(
+                DotnsProtocolRegistry(address(protocolRegistry)).REVERSE_RESOLVER()
+            )
+        );
+
+        registrar.register(uint256(node), user, label);
+        registry.setOwner(node, user, address(reverse));
+
+        IStoreFactory factory = IStoreFactory(
+            protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).STORE_FACTORY())
+        );
+        address[] memory controllers = new address[](3);
+        controllers[0] = address(this);
+        controllers[1] = address(registry);
+        controllers[2] = address(registrar);
+
+        string memory fullName = string.concat(label, DotnsConstants.TLD);
+        Store store = factory.writeToStore(controllers, user, labelhash, fullName);
+
+        if (chatKey.length != 0) {
+            store.setValueFor(user, StoreUtils.chatKeyStoreKey(labelhash), string(chatKey));
+        }
+        if (liteLabelhash != bytes32(0)) {
+            store.setValueFor(
+                user,
+                StoreUtils.liteLinkStoreKey(labelhash),
+                string(abi.encodePacked(liteLabelhash))
+            );
+        }
+
+        emit NameRegistered(label, labelhash, user, 0, address(store));
+    }
+
+    /// @notice Reverts when a label has a live (non-expired) reservation at the head of its
+    ///         queue held by an address other than `user`.
+    /// @dev Relinquished mid-queue slots (`owner == address(0)`) and expired heads are
+    ///      treated as absent. Intended to be called AFTER `_advanceExpiredHead` so that
+    ///      stale entries don't trigger false rejections.
+    function _requireNotReservedByOther(
+        string calldata label,
+        bytes32 labelhash,
+        address user
+    )
+        internal
+        view
+    {
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        if (meta.head >= meta.tail) {
+            return;
+        }
+        ReservationEntry memory head = _reservationEntries[labelhash][meta.head];
+        if (head.owner == address(0)) {
+            return;
+        }
+        if (_isExpired(head.joinedAt)) {
+            return;
+        }
+        if (head.owner != user) {
+            revert LabelReservedForPop(label);
+        }
+    }
+
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.4.0";
+        versionString = "1.5.0";
     }
 
     /// @notice Internal check enforcing whitelist-or-owner access.
     function _onlyWhiteListedOrOwner() internal view {
         require(whiteList[msg.sender] || msg.sender == owner(), NotWhiteListedOrOwner(msg.sender));
+    }
+
+    /// @notice Internal check enforcing PoP-gateway-only access.
+    function _onlyGateway() internal view {
+        address gateway =
+            protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).POP_GATEWAY());
+        require(msg.sender == gateway, NotGateway(msg.sender));
+    }
+
+    /// @notice Returns the reservation entry at the head of the queue for `labelhash`.
+    /// @return entry Head entry. `entry.owner == address(0)` when the queue is empty.
+    function _queueHead(bytes32 labelhash) internal view returns (ReservationEntry memory entry) {
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        if (meta.head >= meta.tail) {
+            return entry;
+        }
+        entry = _reservationEntries[labelhash][meta.head];
+    }
+
+    /// @notice Returns whether a queue entry is expired relative to `block.timestamp`.
+    function _isExpired(uint64 joinedAt) internal view returns (bool) {
+        return joinedAt + reservationDuration <= block.timestamp;
+    }
+
+    /// @notice Appends a new reservation entry to the tail of the queue for `labelhash`.
+    /// @dev Reverts if the queue is full or the user already holds a reservation.
+    function _enqueueReservation(bytes32 labelhash, address user) internal {
+        require(_userReservation[user] == bytes32(0), AlreadyReserved(user, labelhash));
+
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        require(meta.tail - meta.head < MAX_RESERVATION_QUEUE, QueueFull(labelhash));
+
+        uint64 index = meta.tail;
+        _reservationEntries[labelhash][index] =
+            ReservationEntry({owner: user, joinedAt: uint64(block.timestamp)});
+        _reservationMeta[labelhash] = ReservationQueueMeta({head: meta.head, tail: index + 1});
+
+        _userReservation[user] = labelhash;
+        _userReservationIndex[user] = index;
+
+        emit ReservationQueued(labelhash, user, index - meta.head);
+    }
+
+    /// @notice Wipes the entire reservation queue for `labelhash`.
+    /// @dev Used when a holder claims their reservation: every waiter is evicted and their
+    ///      per-user tracking state is cleared. Deletes entries as it walks so storage is
+    ///      released.
+    function _clearQueue(bytes32 labelhash) internal {
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        for (uint64 i = meta.head; i < meta.tail; i++) {
+            ReservationEntry memory entry = _reservationEntries[labelhash][i];
+            if (entry.owner != address(0)) {
+                delete _userReservation[entry.owner];
+                delete _userReservationIndex[entry.owner];
+            }
+            delete _reservationEntries[labelhash][i];
+        }
+        delete _reservationMeta[labelhash];
+    }
+
+    /// @notice Advances the queue head past every expired entry at the head of the queue.
+    /// @dev Bounded by queue length. Emits `ReservationExpired` per removed entry.
+    function _advanceExpiredHead(bytes32 labelhash) internal {
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        uint64 head = meta.head;
+        uint64 tail = meta.tail;
+
+        while (head < tail) {
+            ReservationEntry memory entry = _reservationEntries[labelhash][head];
+            // Skip already-relinquished slots.
+            if (entry.owner == address(0)) {
+                delete _reservationEntries[labelhash][head];
+                head++;
+                continue;
+            }
+            if (!_isExpired(entry.joinedAt)) {
+                break;
+            }
+
+            delete _userReservation[entry.owner];
+            delete _userReservationIndex[entry.owner];
+            delete _reservationEntries[labelhash][head];
+            emit ReservationExpired(labelhash, entry.owner);
+            head++;
+        }
+
+        if (head == tail) {
+            delete _reservationMeta[labelhash];
+        } else if (head != meta.head) {
+            _reservationMeta[labelhash] = ReservationQueueMeta({head: head, tail: tail});
+        }
+    }
+
+    /// @notice Removes `user` from whichever reservation queue they currently occupy.
+    /// @dev If the user is at the head the head is advanced and further expired entries are
+    ///      compacted. Otherwise the entry is zeroed in place and the slot is left for the
+    ///      next head advance to clean up.
+    function _removeUserFromQueue(address user) internal {
+        bytes32 labelhash = _userReservation[user];
+        if (labelhash == bytes32(0)) {
+            return;
+        }
+        uint64 index = _userReservationIndex[user];
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+
+        delete _userReservation[user];
+        delete _userReservationIndex[user];
+
+        if (index == meta.head) {
+            delete _reservationEntries[labelhash][index];
+            _reservationMeta[labelhash] = ReservationQueueMeta({head: index + 1, tail: meta.tail});
+            _advanceExpiredHead(labelhash);
+        } else {
+            delete _reservationEntries[labelhash][index];
+        }
     }
 
     /// @inheritdoc IDotnsRegistrarController
