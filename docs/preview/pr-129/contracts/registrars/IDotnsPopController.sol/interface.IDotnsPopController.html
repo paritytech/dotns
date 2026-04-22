@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/9dd8839ab0a60a9fdda04147ddac11604c9f641f/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/40b94cd3e0e34188c11eaa3898b87f804e930a4a/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -198,11 +198,11 @@ not block public registrations.</p>
 <li>Lite-person usernames (first argument to <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#reservebasename">reserveBaseName</a> and the
 <code>liteLabel</code> of a <code>LinkKind.LiteUsername</code> link) are DNS labels with at
 least two trailing digits (e.g. <code>alice42</code>) per
-{StringUtils-isLitePersonLabel}. The gateway strips any separator
+<a href="/contracts/utils/StringUtils.sol/library.StringUtils.html#islitepersonlabel">StringUtils-isLitePersonLabel</a>. The gateway strips any separator
 before calling so the on-chain label is flat.</li>
 <li>Full-person usernames (the <code>label</code> of <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#registerbasename">registerBaseName</a> and the optional
 <code>reservedBaseLabel</code> of <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#reservebasename">reserveBaseName</a>) follow the DNS-label rules
-enforced by {StringUtils-isSingleLabel} (e.g. <code>alice</code>).
+enforced by <a href="/contracts/utils/StringUtils.sol/library.StringUtils.html#issinglelabel">StringUtils-isSingleLabel</a> (e.g. <code>alice</code>).
 Lite and public registrations share one namespace; first-to-mint wins at
 the ERC721 layer. Cross-flow priority on the stripped base stem is
 arbitrated by {IPopRules.reserveBaseNameForPop}.</li>
@@ -491,7 +491,7 @@ reservation for the label.</p>
 <h3 id="linkkind"><a class="header" href="#linkkind">LinkKind</a></h3>
 <p>Discriminant for the <code>Link</code> union supplied to <code>registerBaseName</code>.</p>
 <p>Selects the chat-key source for the full-person username. Orthogonal to
-whether the registration is a claim or standalone — that is derived
+whether the registration is a claim or standalone; that is derived
 from on-chain reservation state. <code>None</code> means the caller supplies a
 fresh chat key in <code>link.chatKey</code>. <code>LiteUsername</code> means the
 full-person username is linked to a prior lite-person username

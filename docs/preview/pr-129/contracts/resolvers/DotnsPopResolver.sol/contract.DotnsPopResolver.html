@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopresolver"><a class="header" href="#dotnspopresolver">DotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/9dd8839ab0a60a9fdda04147ddac11604c9f641f/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/40b94cd3e0e34188c11eaa3898b87f804e930a4a/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html">IDotnsPopResolver</a></p>
 <p><strong>Title:</strong>
@@ -201,11 +201,21 @@ security-contact: admin@parity.io</p>
 </code></pre>
 <h3 id="_litelinks"><a class="header" href="#_litelinks">_liteLinks</a></h3>
 <p>Stored lite-person labelhash keyed by full-person node.</p>
+<p>Answers "which lite label does this full name link to?" (full =&gt; lite).</p>
 <pre><code class="language-solidity">mapping(bytes32 fullNode =&gt; bytes32 liteLabelhash) private _liteLinks
+</code></pre>
+<h3 id="_fullclaims"><a class="header" href="#_fullclaims">_fullClaims</a></h3>
+<p>Reverse index: the full node claimed by a given lite label.</p>
+<p>Answers "which full name did this lite user claim?" (lite =&gt; full).
+Written alongside <code>_liteLinks</code> on every claim so consumers that look
+up by lite username (Nova's pallet does) can resolve the full name
+without scanning events. Zero when the lite label has never been
+linked to a full claim.</p>
+<pre><code class="language-solidity">mapping(bytes32 liteLabelhash =&gt; bytes32 fullNode) private _fullClaims
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in the future.</p>
-<pre><code class="language-solidity">uint256[50] private __gap
+<pre><code class="language-solidity">uint256[49] private __gap
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlypopcontroller"><a class="header" href="#onlypopcontroller">onlyPopController</a></h3>
@@ -218,7 +228,11 @@ oz-upgrades-unsafe-allow: constructor</p>
 <pre><code class="language-solidity">constructor() ;
 </code></pre>
 <h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
-<p>Initializes the PoP resolver.</p>
+<p>Initialises the PoP resolver.</p>
+<p>Called once through the UUPS proxy; <code>_disableInitializers</code> on the
+implementation makes direct calls revert. The registry pointer is
+the only storage this setup needs because the authorised writer
+is resolved dynamically through <code>POP_CONTROLLER</code>.</p>
 <pre><code class="language-solidity">function initialize(IDotnsProtocolRegistry registry) external initializer;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -289,8 +303,27 @@ oz-upgrades-unsafe-allow: constructor</p>
 <tr><td><code>&lt;none&gt;</code></td><td><code>bytes32</code></td><td>liteLabelhash The linked lite-person labelhash, or zero if unset.</td></tr>
 </tbody></table>
 </div>
+<h3 id="fullclaim"><a class="header" href="#fullclaim">fullClaim</a></h3>
+<p>Returns the full-person node a given lite label has claimed.</p>
+<p>Reverse of {liteLink}. Written by the same <code>setLiteLink</code> call so the
+two directions stay in lockstep. Returns zero when the lite label
+has never been linked to a full claim.</p>
+<pre><code class="language-solidity">function fullClaim(bytes32 liteLabelhash) external view override returns (bytes32);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>liteLabelhash</code></td><td><code>bytes32</code></td><td>The labelhash of the lite-person username to query.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>&lt;none&gt;</code></td><td><code>bytes32</code></td><td>fullNode The full-person node claimed from this lite label, or zero if unset.</td></tr>
+</tbody></table>
+</div>
 <h3 id="version"><a class="header" href="#version">version</a></h3>
 <p>Returns implementation version.</p>
+<p>Bumped on every upgrade. Used by deployment scripts as a
+post-upgrade assertion target.</p>
 <pre><code class="language-solidity">function version() external pure virtual returns (string memory versionString);
 </code></pre>
 <p><strong>Returns</strong></p>

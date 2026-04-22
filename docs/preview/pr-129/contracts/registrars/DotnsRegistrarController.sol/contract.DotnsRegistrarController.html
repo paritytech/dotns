@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/9dd8839ab0a60a9fdda04147ddac11604c9f641f/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/40b94cd3e0e34188c11eaa3898b87f804e930a4a/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -420,7 +420,7 @@ shape violations revert with <code>InvalidLabel()</code>.</p>
 <p>Completes a commit-reveal registration: mints, wires forward registry,
 optionally sets the reverse record, and writes the owner's Store.</p>
 <p>The mint + forward-registry + store-write triad is delegated to
-{RegistrationUtils-registerAndStore}, which is the single canonical
+<a href="/contracts/utils/RegistrationUtils.sol/library.RegistrationUtils.html#registerandstore">RegistrationUtils-registerAndStore</a>, which is the single canonical
 implementation shared across every DotNS registration flow. Reverse-record
 setting and the priced-registration event stay here because they are
 commit-reveal-specific policy.</p>
