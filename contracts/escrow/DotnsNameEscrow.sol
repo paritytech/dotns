@@ -232,7 +232,7 @@ contract DotnsNameEscrow is
         position.claimed = true;
         position.amount = 0;
         // We not going to check for asset
-        // as the current implmenetation only supports native
+        // as the current implementation only supports native
         // payments later on we can add logic for assets e.g. PUSD and and
         tokenReserved[asset] -= amount;
         (bool ok,) = payable(recipient).call{value: amount}("");
