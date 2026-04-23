@@ -187,6 +187,7 @@ interface IDotnsNameEscrow {
 
     /// @notice Records an asset deposit position for a token.
     /// @dev Callable only by the registrar controller. The call value must equal `amount`.
+    /// @dev We trust that the controller passed amount since it handles refunds
     /// @param params see @custom: DepositParams struct definition.
     function deposit(DepositParams calldata params) external payable;
 
