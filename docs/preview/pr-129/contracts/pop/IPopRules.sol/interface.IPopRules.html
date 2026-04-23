@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/f3322c853534b68bbbb6f2c01f73aa48d1a8a847/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/376bd47f11cbb75e85214d505024e92255a8f70a/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
 <p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements, and base-name reservation rules</p>
@@ -487,12 +487,14 @@ precompile exposes PoP status directly from the pallet.</p>
 <pre><code class="language-solidity">struct Reservation {
     address owner;
     uint64 expires;
+    address controller;
 }
 </code></pre>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>owner</code></td><td><code>address</code></td><td>Address holding exclusive claim rights during the reservation window.</td></tr>
 <tr><td><code>expires</code></td><td><code>uint64</code></td><td>UNIX timestamp when the reservation expires.</td></tr>
+<tr><td><code>controller</code></td><td><code>address</code></td><td>Address that wrote the reservation; the only address permitted to release it before expiry.</td></tr>
 </tbody></table>
 </div>
 <h2 id="enums"><a class="header" href="#enums">Enums</a></h2>
