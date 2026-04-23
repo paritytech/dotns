@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrarold"><a class="header" href="#dotnsregistrarold">DotnsRegistrarOld</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/f0d43b13eafdac9d12e2ed2905e809a88eac62e7/contracts/registrars/DotnsRegistrarOld.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/fdfbe4a5c989555d862960e17d68bd22fd592fe3/contracts/registrars/DotnsRegistrarOld.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="/contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -396,6 +396,12 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address) internal onlyOwner {}
 </code></pre>
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
+</code></pre>
+<h3 id="labelof"><a class="header" href="#labelof">labelOf</a></h3>
+<p>Stub for the post-upgrade surface. This reference snapshot captures
+the pre-upgrade bytecode and storage layout only; the public label
+getter ships on <code>DotnsRegistrar</code>.</p>
+<pre><code class="language-solidity">function labelOf(uint256) external pure override returns (string memory);
 </code></pre>
 
                     </main>

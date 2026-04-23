@@ -291,17 +291,18 @@ bun run deploy:testnet
 <p>Every resolver must spell out its writer policy on its interface and its read surface. Writes are gated; reads are always open. Two gate patterns exist in the system today and picking the right one matters. When the record is owned by the end user (forward address records, content hashes, text records), gate on node ownership: the resolver calls back into <code>DotnsRegistry.owner(node)</code> on every write, so transferring the name transfers write permission automatically with no resolver upgrade. When the record is owned by a protocol-level writer (reverse records, PoP-flow records), gate on the writer address fetched from the protocol registry on every call: the resolver reads something like <code>POP_CONTROLLER</code> or <code>CONTROLLER</code> off the registry per write, so rotating the writer is a single <code>protocolRegistry.set</code> call with no resolver upgrade. Do not store the writer address on the resolver itself.</p>
 <h4 id="when-to-extend-something-existing-instead"><a class="header" href="#when-to-extend-something-existing-instead">When to extend something existing instead</a></h4>
 <p>Most features fit an existing contract and extending it is the right move. A new text record goes on the content resolver. A new view function on an existing registry adds to that registry. A new validation rule on registration modifies the commit-reveal controller. Adding a new controller or resolver solves a different problem: a responsibility that does not yet have a home. If you cannot cite the new responsibility in a sentence, you are extending, not adding.</p>
-<p>Example questions and the paths that answer them. Each row starts from a small set of known contracts; every hop is a public view call, so anyone with a node can resolve the answer without special access.</p>
-<div class="table-wrapper"><table><thead><tr><th>Question</th><th>Path</th></tr></thead><tbody>
-<tr><td>Which full name did this lite user claim?</td><td>Protocol registry =&gt; PoP resolver =&gt; <code>fullClaim(liteLabelhash)</code></td></tr>
-<tr><td>Which lite username backs this full name?</td><td>Protocol registry =&gt; PoP resolver =&gt; <code>liteLink(fullNode)</code></td></tr>
-<tr><td>What chat key is published for this name?</td><td>Protocol registry =&gt; PoP resolver =&gt; <code>chatKey(node)</code></td></tr>
-<tr><td>Is this base stem reserved via the gateway?</td><td>Protocol registry =&gt; PoP controller =&gt; <code>isReservedForClaim(baseLabel)</code></td></tr>
-<tr><td>Is this base stem reserved cross-flow?</td><td>Protocol registry =&gt; PopRules =&gt; <code>isBaseNameReserved(baseLabel)</code></td></tr>
-<tr><td>Who owns this <code>.dot</code> name?</td><td>Protocol registry =&gt; registrar =&gt; <code>ownerOf(tokenId)</code></td></tr>
-<tr><td>Who owns this subname?</td><td>Protocol registry =&gt; registry =&gt; <code>owner(subnode)</code></td></tr>
-<tr><td>What address does this name resolve to?</td><td>Protocol registry =&gt; forward resolver =&gt; address record</td></tr>
-<tr><td>What is the primary name for this address?</td><td>Protocol registry =&gt; reverse resolver =&gt; primary name</td></tr>
+<p>Example query paths. Each row starts from a small set of known contracts; every hop is a public view call, so any node can resolve the path without special access.</p>
+<div class="table-wrapper"><table><thead><tr><th>Lookup</th><th>Path</th></tr></thead><tbody>
+<tr><td>Lite labelhash =&gt; full-person node</td><td>Protocol registry =&gt; PoP resolver =&gt; <code>fullClaim(liteLabelhash)</code></td></tr>
+<tr><td>Full-person node =&gt; lite labelhash</td><td>Protocol registry =&gt; PoP resolver =&gt; <code>liteLink(fullNode)</code></td></tr>
+<tr><td>Node =&gt; chat key</td><td>Protocol registry =&gt; PoP resolver =&gt; <code>chatKey(node)</code></td></tr>
+<tr><td>Node or tokenId =&gt; registered label</td><td>Protocol registry =&gt; registrar =&gt; <code>labelOf(uint256(node))</code></td></tr>
+<tr><td>Base stem =&gt; gateway-reservation state</td><td>Protocol registry =&gt; PoP controller =&gt; <code>isReservedForClaim(baseLabel)</code></td></tr>
+<tr><td>Base stem =&gt; cross-flow reservation state</td><td>Protocol registry =&gt; PopRules =&gt; <code>isBaseNameReserved(baseLabel)</code></td></tr>
+<tr><td>Node =&gt; ERC721 owner</td><td>Protocol registry =&gt; registrar =&gt; <code>ownerOf(uint256(node))</code></td></tr>
+<tr><td>Subnode =&gt; forward-registry owner</td><td>Protocol registry =&gt; registry =&gt; <code>owner(subnode)</code></td></tr>
+<tr><td>Node =&gt; forward address record</td><td>Protocol registry =&gt; forward resolver =&gt; address record</td></tr>
+<tr><td>Address =&gt; primary name</td><td>Protocol registry =&gt; reverse resolver =&gt; primary name</td></tr>
 </tbody></table>
 </div>
 <h3 id="build"><a class="header" href="#build">Build</a></h3>

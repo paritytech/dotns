@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/f0d43b13eafdac9d12e2ed2905e809a88eac62e7/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/fdfbe4a5c989555d862960e17d68bd22fd592fe3/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -444,17 +444,6 @@ persisted in the full-person's Store.</li>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>user</code></td><td><code>address</code></td><td>The address that attempted to reserve.</td></tr>
-<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the reserved name.</td></tr>
-</tbody></table>
-</div>
-<h3 id="notholder"><a class="header" href="#notholder">NotHolder</a></h3>
-<p>Thrown when the user attempting a claim does not hold the head-of-queue
-reservation for the label.</p>
-<pre><code class="language-solidity">error NotHolder(address user, bytes32 labelhash);
-</code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>user</code></td><td><code>address</code></td><td>The address that attempted the claim.</td></tr>
 <tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the reserved name.</td></tr>
 </tbody></table>
 </div>
