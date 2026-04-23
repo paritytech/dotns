@@ -31,17 +31,22 @@ contract UpgradePopRules is BaseDeployer {
         console.log("=== PopRules Upgrade ===");
         console.log("Chain ID:", block.chainid);
 
+        Options memory opts;
+        opts.referenceContract = _POP_RULES_OLD;
+
         vm.startBroadcast(msg.sender);
-        upgrade(msg.sender);
+        Upgrades.upgradeProxy(POP_RULES_PROXY, _POP_RULES_NEW, "", opts, msg.sender);
+        PopRules(POP_RULES_PROXY)
+            .updateProtocolRegistry(IDotnsProtocolRegistry(PROTOCOL_REGISTRY_PROXY));
         vm.stopBroadcast();
 
         verifyUpgrade();
     }
 
-    /// @notice Applies the PopRules upgrade and wires the protocol registry pointer.
-    /// @dev Exposed so fork tests can invoke the exact production code path without
-    ///      going through `vm.startBroadcast`. The setter is idempotent when the
-    ///      current value already matches.
+    /// @notice Fork-test entry point that mirrors `run()` without an active
+    ///         broadcast. `vm.prank` authorizes the owner-only wiring call;
+    ///         `vm.prank` is forbidden under `vm.startBroadcast`, which is why
+    ///         `run()` inlines these steps rather than delegating here.
     /// @param caller Owner of the PopRules proxy.
     function upgrade(address caller) public {
         Options memory opts;
