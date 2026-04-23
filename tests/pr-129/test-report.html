@@ -8,12 +8,12 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">DotNS Test Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-04-19 01:53 UTC | 21 suites</p>
+<p class="text-sm text-gray-500">Generated 2026-04-23 02:27 UTC | 26 suites</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">Status</p><p class="text-xl font-bold text-green-400">All Passed</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">173</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">173</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">211</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">211</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-gray-500">0</p></div>
 </div></div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
@@ -49,6 +49,34 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_revert_unapproved_cannot_set_contenthash</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistryFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/registry/DotnsRegistryFuzz.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">3/3</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_non_parent_non_owner_cannot_reassign</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_parent_can_reassign_subnode_to_any_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reassignment_preserves_resolver</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -118,7 +146,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsPopControllerTests</span><span class="ml-2 text-xs text-gray-500">test/unit/registrar/DotnsPopController.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">26/26</span>
+<span class="text-sm font-mono text-green-400">42/42</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -127,12 +155,77 @@
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
 </tr></thead><tbody>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_advanceExpiredHead_last_expire_releases_popRules_slot</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_both_controllers_can_mint_on_shared_registrar</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_lite_and_base_label_formats_are_disjoint</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_claim_releases_popRules_slot</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_claim_then_reEnqueue_on_same_stem_resets_cleanly</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_controller_authorised_but_not_gateway_cannot_enter_pop_flow</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_controller_does_not_mutate_reservedBaseLabel_string</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_enqueueReservation_reverts_when_queue_full</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_enqueue_becomesHead_writes_popRules_reservation</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_enqueue_not_head_does_not_touch_popRules</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_entry_point_format_rejections</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_expireReservation_is_permissionless</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_expireReservation_on_empty_queue_is_noop</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_gateway_reserved_name_allows_holder_to_register_via_public</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_gateway_reserved_name_rejects_public_register_by_other_user</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_head_expires_with_tombstone_in_middle_advances_to_next_live</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -152,12 +245,22 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_public_controller_ignores_pop_reservation_queue</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_public_register_after_pop_full_mint_reverts_at_registrar</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_public_register_after_pop_full_mint_reverts_at_registrar</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_public_stranger_can_mint_after_claim_clears_reservation</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_public_stranger_can_mint_after_reservation_expires</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_reEnqueue_after_own_expiry_promotes_same_user_to_head</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -178,11 +281,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_registerBaseName_reverts_for_non_gateway_caller</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_registerBaseName_reverts_on_base_label_containing_dot</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -213,6 +311,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_relinquishReservation_reverts_when_caller_has_no_reservation</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_relinquish_last_releases_popRules_slot</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -252,7 +355,63 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_setReservationDuration_updates_value_and_emits</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_setReservationDuration_shortening_retroactively_expires_live_entries</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setReservationDuration_zero_makes_new_reservations_immediately_expired</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsPopControllerDecouplingTest</span><span class="ml-2 text-xs text-gray-500">test/unit/registrar/DotnsPopControllerDecoupling.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">2/2</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_commitReveal_controller_does_not_import_pop_controller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_popController_does_not_import_commit_reveal_controller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistryInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registry/DotnsRegistryInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">3/3</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_parent_can_always_reassign_subnodes</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_subnode_owner_authorized</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_subnodes_always_exist</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -261,7 +420,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsPopControllerFuzz</span><span class="ml-2 text-xs text-gray-500">test/fuzz/registrar/DotnsPopControllerFuzz.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">4/4</span>
+<span class="text-sm font-mono text-green-400">5/5</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -271,6 +430,11 @@
 </tr></thead><tbody>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">testFuzz_isReservedForClaim_tracks_duration_boundary</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_public_register_respects_popRules_reservation</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -285,7 +449,646 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reserveBaseName_rejects_lite_label_without_separator</td>
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reserveBaseName_rejects_lite_label_without_trailing_digits</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsResolverTests</span><span class="ml-2 text-xs text-gray-500">test/unit/resolver/DotnsResolver.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">2/2</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setaddress_emits_event_and_persists</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setaddress_overwrites_previous_value</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsReverseResolverTests</span><span class="ml-2 text-xs text-gray-500">test/unit/resolver/DotnsReverseResolver.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">4/4</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_nameof_returns_empty_when_unset</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_register_overwrites_existing_reverse_record</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_register_sets_reverse_record_for_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_updateprotocolregistry_emits_event_and_persists</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">PopRulesFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/pop/PopFuzz.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">8/8</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_expired_reservation_rolls_forward_to_next_lite_registrant</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_governance_names_always_revert</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_mixed_case_names_are_rejected</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_nostatus_user_cannot_access_popfull</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_popfull_user_can_access_nostatus</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_popfull_user_can_access_poplite</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_price_without_check_returns_price</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reservation_blocks_other_users</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">PopLifecycleFlow</span><span class="ml-2 text-xs text-gray-500">test/intergration/PopLifecycleFlow.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">2/2</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_pop_full_name_is_first_class_erc721_name</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_recover_full_username_from_lite_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">PopRulesTests</span><span class="ml-2 text-xs text-gray-500">test/unit/pop/PopRules.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">13/13</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_base_reservation_blocks_others</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_classify_governance</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_classify_nostatus</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_classify_popfull</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_classify_poplite</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_popfull_user_can_access_poplite_name</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_price_with_check_revert_full_needed</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_price_with_check_revert_governance</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_price_without_check_returns_price_for_reserved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_releaseBaseName_reverts_for_non_controller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_reserveBaseNameForPop_refreshes_expiry_for_same_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_reserveBaseNameForPop_reverts_for_non_controller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_reserveBaseNameForPop_reverts_when_slot_held_by_other_user</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">PopRulesUpgradeForkTest</span><span class="ml-2 text-xs text-gray-500">test/fork/PopRulesUpgradeFork.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">4/4</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_constants_survive_upgrade</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_protocol_registry_wired</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_registrar_reachable_via_protocol_registry</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_version_bumped</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">PopSystemUpgradeForkTest</span><span class="ml-2 text-xs text-gray-500">test/fork/PopSystemUpgradeFork.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">9/9</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_commit_reveal_controller_still_authorised_on_registrar</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_commit_reveal_controller_still_functions_after_upgrade</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_existing_registry_keys_preserved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_popRules_protocol_registry_wired</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_pop_controller_authorised_on_registrar</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_pop_keys_wired</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_registrar_erc721_metadata_preserved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_rotating_pop_controller_locks_out_old_controller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_versions_bumped</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">ProtocolKeysForkBatch1Test</span><span class="ml-2 text-xs text-gray-500">test/fork/ProtocolKeysFork.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">4/4</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_batch1_versions_bumped</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_register_after_batch1_upgrade</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_registrar_erc721_metadata_preserved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_registry_keys_preserved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">ProtocolKeysForkBatch2Test</span><span class="ml-2 text-xs text-gray-500">test/fork/ProtocolKeysFork.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">1/1</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_batch2_versions_bumped</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">StoreTests</span><span class="ml-2 text-xs text-gray-500">test/unit/store/Store.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">7/7</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_deletevalue_clears_and_emits</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setvalue_stores_and_emits</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setvaluefor_authorized_store_writes_for_user</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setvaluefor_by_dotnscontroller_locks_key</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setvaluefor_reverts_when_not_authorized</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_unauthorize_store_blocks_setvaluefor</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_values_appends_on_overwrite_and_survives_delete</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">StoreFactoryTests</span><span class="ml-2 text-xs text-gray-500">test/unit/store/StoreFactory.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">4/4</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_deploy_reverts_when_already_deployed</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transferownership_moves_mapping_and_emits</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transferownership_reverts_when_caller_has_no_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transferownership_reverts_when_new_owner_already_has_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistrarControllerTest</span><span class="ml-2 text-xs text-gray-500">test/unit/registrar/DotnsRegistrarController.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">30/30</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_available_reverts_for_dotted_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_available_reverts_for_empty_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_available_state_transitions</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_commit_allows_recommit_after_expiry</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_commit_sets_timestamp</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_mint_does_not_trigger_store_write</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_register_does_not_overwrite_third_party_reverse_record</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_register_popfull_wires_all_records</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_register_poplite_reserves_base_name</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_register_reverts_for_dotted_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_registerreserved_revertnon_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_registerreserved_writes_to_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_registration_reverts_unauthorized_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_removed_from_whitelist_cannot_register_reserved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_safe_transfer_writes_to_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_already_set</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_for_dotted_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_for_non_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_for_uppercase_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_wrong_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_sets_label_for_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_back_skips_locked_entry</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_clears_primary_reverse_name_when_current_name_is_moved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_deploys_store_without_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_succeeds_when_sender_has_no_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_succeeds_without_protocol_registry</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_via_approved_operator_writes_to_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_writes_label_and_creates_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_whitelistaddress_reverts_non_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_whitelisted_can_register_reserved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistrarControllerFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/registrar/DotnsRegistrarControllerFuzz.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">6/6</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_register_accepts_overpayment_when_price_is_zero</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_register_refunds_overpayment</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_register_refunds_to_payer_not_owner_when_registering_for_other</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_third_party_registration_does_not_overwrite_owner_reverse</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_transfer_clears_sender_primary_reverse</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_transfer_writes_label_to_recipient_store</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -484,59 +1287,8 @@
 </div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsRegistryFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/registry/DotnsRegistryFuzz.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">3/3</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_non_parent_non_owner_cannot_reassign</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_parent_can_reassign_subnode_to_any_owner</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reassignment_preserves_resolver</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsPopControllerInvariant</span><span class="ml-2 text-xs text-gray-500">test/invariant/registrar/DotnsPopControllerInvariant.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">2/2</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_one_reservation_per_account_consistent</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_queue_length_bounded</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsPopResolverTests</span><span class="ml-2 text-xs text-gray-500">test/unit/resolver/DotnsPopResolver.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">5/5</span>
+<span class="text-sm font-mono text-green-400">7/7</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -550,12 +1302,22 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setChatKey_accepts_zero_node_as_passthrough</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_setChatKey_reverts_for_unauthorised_caller</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_setChatKey_writes_and_emits</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setLiteLink_accepts_zero_inputs_as_passthrough</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -611,8 +1373,8 @@
 </div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsRegistrarControllerTest</span><span class="ml-2 text-xs text-gray-500">test/unit/registrar/DotnsRegistrarController.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">30/30</span>
+<div><span class="font-semibold text-white">DotnsPopControllerInvariant</span><span class="ml-2 text-xs text-gray-500">test/invariant/registrar/DotnsPopControllerInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">5/5</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -621,534 +1383,27 @@
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
 </tr></thead><tbody>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_available_reverts_for_dotted_label</td>
+<td class="py-2 px-3 font-mono text-gray-200">invariant_every_minted_tokenId_has_nonempty_label</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_available_reverts_for_empty_label</td>
+<td class="py-2 px-3 font-mono text-gray-200">invariant_fullClaim_liteLink_are_inverse</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_available_state_transitions</td>
+<td class="py-2 px-3 font-mono text-gray-200">invariant_one_reservation_per_account_consistent</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_commit_allows_recommit_after_expiry</td>
+<td class="py-2 px-3 font-mono text-gray-200">invariant_popRules_head_matches_queue_head_or_zero</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_commit_sets_timestamp</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_mint_does_not_trigger_store_write</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_register_does_not_overwrite_third_party_reverse_record</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_register_popfull_wires_all_records</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_register_poplite_reserves_base_name</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_register_reverts_for_dotted_label</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_registerreserved_revertnon_owner</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_registerreserved_writes_to_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_registration_reverts_unauthorized_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_removed_from_whitelist_cannot_register_reserved</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_safe_transfer_writes_to_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_already_set</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_for_dotted_label</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_for_non_owner</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_for_uppercase_label</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_reverts_wrong_label</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_syncLabel_sets_label_for_owner</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_back_skips_locked_entry</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_clears_primary_reverse_name_when_current_name_is_moved</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_deploys_store_without_label</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_succeeds_when_sender_has_no_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_succeeds_without_protocol_registry</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_via_approved_operator_writes_to_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_writes_label_and_creates_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_whitelistaddress_reverts_non_owner</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_whitelisted_can_register_reserved</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsRegistryInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registry/DotnsRegistryInvariant.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">3/3</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_parent_can_always_reassign_subnodes</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_subnode_owner_authorized</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_subnodes_always_exist</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsRegistrarControllerFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/registrar/DotnsRegistrarControllerFuzz.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">6/6</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_register_accepts_overpayment_when_price_is_zero</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_register_refunds_overpayment</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_register_refunds_to_payer_not_owner_when_registering_for_other</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_third_party_registration_does_not_overwrite_owner_reverse</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_transfer_clears_sender_primary_reverse</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_transfer_writes_label_to_recipient_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsResolverTests</span><span class="ml-2 text-xs text-gray-500">test/unit/resolver/DotnsResolver.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">2/2</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_setaddress_emits_event_and_persists</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_setaddress_overwrites_previous_value</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">DotnsReverseResolverTests</span><span class="ml-2 text-xs text-gray-500">test/unit/resolver/DotnsReverseResolver.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">4/4</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_nameof_returns_empty_when_unset</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_register_overwrites_existing_reverse_record</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_register_sets_reverse_record_for_owner</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_updateprotocolregistry_emits_event_and_persists</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">PopRulesFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/pop/PopFuzz.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">8/8</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_expired_reservation_rolls_forward_to_next_lite_registrant</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_governance_names_always_revert</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_mixed_case_names_are_rejected</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_nostatus_user_cannot_access_popfull</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_popfull_user_can_access_nostatus</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_popfull_user_can_access_poplite</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_price_without_check_returns_price</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reservation_blocks_other_users</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">PopSystemUpgradeForkTest</span><span class="ml-2 text-xs text-gray-500">test/fork/PopSystemUpgradeFork.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">9/9</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_commit_reveal_controller_still_authorised_on_registrar</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_commit_reveal_controller_still_functions_after_upgrade</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_existing_registry_keys_preserved</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_full_pop_user_flow_after_upgrade</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_pop_controller_authorised_on_registrar</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_pop_keys_wired</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_pop_minted_name_supports_subname_creation</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_registrar_erc721_metadata_preserved</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_versions_bumped</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">PopRulesTests</span><span class="ml-2 text-xs text-gray-500">test/unit/pop/PopRules.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">10/10</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_base_reservation_blocks_others</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_base_reservation_rolls_forward_after_expiry</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_classify_governance</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_classify_nostatus</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_classify_popfull</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_classify_poplite</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_popfull_user_can_access_poplite_name</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_price_with_check_revert_full_needed</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_price_with_check_revert_governance</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_price_without_check_returns_price_for_reserved</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">StoreTests</span><span class="ml-2 text-xs text-gray-500">test/unit/store/Store.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">7/7</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_deletevalue_clears_and_emits</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_setvalue_stores_and_emits</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_setvaluefor_authorized_store_writes_for_user</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_setvaluefor_by_dotnscontroller_locks_key</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_setvaluefor_reverts_when_not_authorized</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_unauthorize_store_blocks_setvaluefor</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_values_appends_on_overwrite_and_survives_delete</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-</tbody></table></div>
-</div>
-<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
-<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-<div><span class="font-semibold text-white">StoreFactoryTests</span><span class="ml-2 text-xs text-gray-500">test/unit/store/StoreFactory.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">4/4</span>
-</div>
-<div class="overflow-x-auto"><table class="w-full text-sm">
-<thead><tr class="border-b border-gray-800">
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
-<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
-</tr></thead><tbody>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_deploy_reverts_when_already_deployed</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transferownership_moves_mapping_and_emits</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transferownership_reverts_when_caller_has_no_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transferownership_reverts_when_new_owner_already_has_store</td>
+<td class="py-2 px-3 font-mono text-gray-200">invariant_queue_length_bounded</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
