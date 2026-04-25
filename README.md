@@ -139,6 +139,8 @@ Paseo Asset Hub (chainId `420420417`):
 | DotnsResolver            | 0x95645C7fD0fF38790647FE13F87Eb11c1DCc8514 |
 | PopRules                 | 0x4e8920B1E69d0cEA9b23CBFC87A17Ee6fE02d2d3 |
 | DotnsRegistrarController | 0xd09e0F1c1E6CE8Cf40df929ef4FC778629573651 |
+| DotnsPopController       | 0x33575240105e9E5fD623516A1a6bA8A8Ba6937BB |
+| DotnsPopResolver         | 0x86B83CA91f8BC2293E304EA7e026C0914c68C793 |
 
 ### Mental model for new features
 
@@ -210,7 +212,7 @@ forge clean
 forge test
 ```
 
-Fork tests run against a local Paseo Asset Hub fork and require the ETH-RPC adapter described in the deployment note. To skip them:
+Fork tests are upgrade-PR scoped: they live in `test/fork/` for the duration of an upgrade PR (paired 1:1 with the upgrade script under `scripts/deploy/`), run against a local Paseo Asset Hub fork via the ETH-RPC adapter described in the deployment note, and are deleted alongside the upgrade script and the matching `Old.sol` snapshots before merge. Between upgrade PRs the directory is empty and there is nothing to skip; while a fork test is in flight, skip it with:
 
 ```bash
 forge test --no-match-path 'test/fork/**'
