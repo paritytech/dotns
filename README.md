@@ -141,6 +141,9 @@ Paseo Asset Hub (chainId `420420417`):
 | DotnsRegistrarController | 0xd09e0F1c1E6CE8Cf40df929ef4FC778629573651 |
 | DotnsPopController       | 0x33575240105e9E5fD623516A1a6bA8A8Ba6937BB |
 | DotnsPopResolver         | 0x86B83CA91f8BC2293E304EA7e026C0914c68C793 |
+| POP_GATEWAY (EOA)        | 0x4A519C30DA0EC16AA9a73c26EA6CA6F701CcE099 |
+
+`POP_GATEWAY` is the privileged origin/proxy allowed to drive the PoP controller's lite/full-person flows. It is an EOA registered under the `POP_GATEWAY` key on the protocol registry, not a deployed contract. Currently set to the deployer as a placeholder; rotate to the production gateway with a single `protocolRegistry.set(DotnsConstants.POP_GATEWAY, newAddr)` call from the registry owner.
 
 ### Mental model for new features
 
