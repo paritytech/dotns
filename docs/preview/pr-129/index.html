@@ -261,8 +261,10 @@ bun run deploy:testnet
 <tr><td>DotnsRegistrarController</td><td>0xd09e0F1c1E6CE8Cf40df929ef4FC778629573651</td></tr>
 <tr><td>DotnsPopController</td><td>0x33575240105e9E5fD623516A1a6bA8A8Ba6937BB</td></tr>
 <tr><td>DotnsPopResolver</td><td>0x86B83CA91f8BC2293E304EA7e026C0914c68C793</td></tr>
+<tr><td>POP_GATEWAY (EOA)</td><td>0x4A519C30DA0EC16AA9a73c26EA6CA6F701CcE099</td></tr>
 </tbody></table>
 </div>
+<p><code>POP_GATEWAY</code> is the privileged origin/proxy allowed to drive the PoP controller's lite/full-person flows. It is an EOA registered under the <code>POP_GATEWAY</code> key on the protocol registry, not a deployed contract. Currently set to the deployer as a placeholder; rotate to the production gateway with a single <code>protocolRegistry.set(DotnsConstants.POP_GATEWAY, newAddr)</code> call from the registry owner.</p>
 <h3 id="mental-model-for-new-features"><a class="header" href="#mental-model-for-new-features">Mental model for new features</a></h3>
 <p>Treat the chain as the database. Assume no servers and no indexers. If a feature needs an offchain service to be usable, it is not a DotNS feature.</p>
 <p>This has a practical implication: every feature must come with an explicit query path. A client should be able to start from a small set of known contracts and find everything it needs with a bounded number of calls. Every getter is <code>external view</code>; controllers and resolvers check authorisation on writes, never on reads; governance key rotation does not break existing read paths because consumers re-resolve their siblings through the protocol registry on every call.</p>
