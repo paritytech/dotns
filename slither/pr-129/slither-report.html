@@ -8,14 +8,14 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">DotNS Slither Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-04-23 21:19 UTC | 141 findings</p>
+<p class="text-sm text-gray-500">Generated 2026-04-25 00:41 UTC | 86 findings</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-3 gap-6 text-center">
-<div><p class="text-sm text-gray-500 mb-1">Medium</p><p class="text-xl font-mono font-bold text-yellow-400">23</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">37</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Informational</p><p class="text-xl font-mono font-bold text-gray-400">75</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Medium</p><p class="text-xl font-mono font-bold text-yellow-400">19</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">25</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Informational</p><p class="text-xl font-mono font-bold text-gray-400">39</p></div>
 </div></div>
-<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Medium (23)</h2>
+<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Medium (19)</h2>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Check</th>
@@ -26,11 +26,6 @@
 <td class="py-2 px-3 font-mono text-yellow-400">incorrect-equality</td>
 <td class="py-2 px-3 text-gray-200">DotnsRegistrarController.commit(bytes32) (contracts/registrars/DotnsRegistrarController.sol#191-200) uses a dangerous st</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarController.sol:191</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">incorrect-equality</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarControllerOld.commit(bytes32) (contracts/registrars/DotnsRegistrarControllerOld.sol#194-203) uses a danger</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:194</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
@@ -89,11 +84,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarOld._syncRecipientStore(address,uint256) (contracts/registrars/DotnsRegistrarOld.sol#224-253) ignores retu</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarOld.sol:224</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
 <td class="py-2 px-3 text-gray-200">DotnsRegistrar._syncRecipientStore(address,uint256) (contracts/registrars/DotnsRegistrar.sol#220-235) ignores return val</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrar.sol:220</td>
 </tr>
@@ -101,16 +91,6 @@
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
 <td class="py-2 px-3 text-gray-200">DotnsRegistrar._syncRecipientStore(address,uint256) (contracts/registrars/DotnsRegistrar.sol#220-235) ignores return val</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrar.sol:220</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistryOld._writeSubnodeToStore(address,bytes32,string) (contracts/registry/DotnsRegistryOld.sol#221-240) ignores </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:221</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarOld._syncRecipientStore(address,uint256) (contracts/registrars/DotnsRegistrarOld.sol#224-253) ignores retu</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarOld.sol:224</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
@@ -138,7 +118,7 @@
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:212</td>
 </tr>
 </tbody></table></div>
-<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Low (37)</h2>
+<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Low (25)</h2>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Check</th>
@@ -161,29 +141,14 @@
 <td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/IDotnsPopResolver.sol:68</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">shadowing-local</td>
-<td class="py-2 px-3 text-gray-200">IDotnsRegistrarControllerOld.isWhiteListed(address).isWhiteListed (contracts/registrars/IDotnsRegistrarControllerOld.sol</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/IDotnsRegistrarControllerOld.sol:135</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">events-maths</td>
 <td class="py-2 px-3 text-gray-200">DotnsRegistrarController.initialize(IDotnsRegistrar,IDotnsRegistry,IDotnsReverseResolver,IPopRules,IStoreFactory,uint256</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarController.sol:123</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">events-maths</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarControllerOld.initialize(IDotnsRegistrar,IDotnsRegistry,IDotnsReverseResolver,IPopRules,IStoreFactory,uint</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:124</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in StoreFactory.deploy() (contracts/store/StoreFactory.sol#21-31): 	External calls: 	- newStore.transferOwner</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:21</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.registerBaseName(string,address,IDotnsPopController.Link) (contracts/registrars/DotnsPo</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:233</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -197,23 +162,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsRegistrarOld.register(uint256,address,string) (contracts/registrars/DotnsRegistrarOld.sol#117-130): 	</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarOld.sol:117</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(string,address,bytes,string) (contracts/registrars/DotnsPopController.s</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:179</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._reserveLite(string,address,bytes) (contracts/registrars/DotnsPopController.sol#212-230</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:212</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.registerBaseName(string,address,IDotnsPopController.Link) (contracts/registrars/DotnsPo</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:233</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -232,6 +182,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.registerBaseName(string,address,IDotnsPopController.Link) (contracts/registrars/DotnsPo</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:233</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(string,address,bytes,string) (contracts/registrars/DotnsPopController.s</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:179</td>
 </tr>
@@ -242,18 +197,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsRegistryOld.setSubnodeOwner(IDotnsRegistry.SubnodeRecord) (contracts/registry/DotnsRegistryOld.sol#10</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:106</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsRegistrar.register(uint256,address,string) (contracts/registrars/DotnsRegistrar.sol#122-135): 	Extern</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrar.sol:122</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsRegistrarControllerOld._completeRegistration(IDotnsRegistrarController.Registration,IDotnsRegistrar,b</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:337</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -262,23 +207,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._reserveLite(string,address,bytes) (contracts/registrars/DotnsPopController.sol#212-230</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:212</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._completeGatewayRegistration(address,string,bytes32,bytes32,bytes,bytes32) (contracts/r</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:409</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">PopRulesOld.reserveBaseName(string,address) (contracts/pop/PopRulesOld.sol#97-127) uses timestamp for comparisons 	Dange</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/pop/PopRulesOld.sol:97</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">PopRulesOld.priceWithoutCheck(string,address) (contracts/pop/PopRulesOld.sol#208-240) uses timestamp for comparisons 	Da</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/pop/PopRulesOld.sol:208</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">PopRulesOld._enforceReservationRules(string,address) (contracts/pop/PopRulesOld.sol#263-273) uses timestamp for comparis</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/pop/PopRulesOld.sol:263</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -287,18 +222,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarControllerOld._consumeCommitment(IDotnsRegistrarController.Registration) (contracts/registrars/DotnsRegist</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:320</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">PopRules.priceWithoutCheck(string,address) (contracts/pop/PopRules.sol#227-256) uses timestamp for comparisons 	Dangerou</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/pop/PopRules.sol:227</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">PopRulesOld.isBaseNameReserved(string) (contracts/pop/PopRulesOld.sol#149-161) uses timestamp for comparisons 	Dangerous</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/pop/PopRulesOld.sol:149</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -317,11 +242,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarControllerOld.commit(bytes32) (contracts/registrars/DotnsRegistrarControllerOld.sol#194-203) uses timestam</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:194</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">DotnsRegistrarController._consumeCommitment(IDotnsRegistrarController.Registration) (contracts/registrars/DotnsRegistrar</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarController.sol:288</td>
 </tr>
@@ -331,7 +251,7 @@
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:233</td>
 </tr>
 </tbody></table></div>
-<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Informational (75)</h2>
+<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Informational (39)</h2>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Check</th>
@@ -350,48 +270,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">assembly</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistryOld._namehash(bytes32,bytes32) (contracts/registry/DotnsRegistryOld.sol#251-258) uses assembly 	- INLINE AS</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:251</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">assembly</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarControllerOld._namehash(bytes32) (contracts/registrars/DotnsRegistrarControllerOld.sol#287-295) uses assem</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:287</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">assembly</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarOld._syncRecipientStore(address,uint256) (contracts/registrars/DotnsRegistrarOld.sol#224-253) uses assembl</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarOld.sol:224</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">assembly</td>
 <td class="py-2 px-3 text-gray-200">StoreUtils.storeKey(bytes32) (contracts/utils/StoreUtils.sol#30-38) uses assembly 	- INLINE ASM (contracts/utils/StoreUt</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/utils/StoreUtils.sol:30</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">assembly</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarOld._stringHash(string) (contracts/registrars/DotnsRegistrarOld.sol#255-259) uses assembly 	- INLINE ASM (</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarOld.sol:255</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">assembly</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistryOld._parentNamehash(string) (contracts/registry/DotnsRegistryOld.sol#260-291) uses assembly 	- INLINE ASM (</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:260</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">assembly</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarControllerOld._labelhash(string) (contracts/registrars/DotnsRegistrarControllerOld.sol#275-282) uses assem</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:275</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">assembly</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarControllerOld.makeCommitment(IDotnsRegistrarController.Registration) (contracts/registrars/DotnsRegistrarC</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:163</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">assembly</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarOld.syncLabel(uint256,string) (contracts/registrars/DotnsRegistrarOld.sol#133-155) uses assembly 	- INLINE</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarOld.sol:133</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">assembly</td>
@@ -410,18 +290,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">assembly</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistryOld._labelhash(string) (contracts/registry/DotnsRegistryOld.sol#242-249) uses assembly 	- INLINE ASM (contr</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:242</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">assembly</td>
 <td class="py-2 px-3 text-gray-200">LabelUtils.namehash(bytes32) (contracts/utils/LabelUtils.sol#67-75) uses assembly 	- INLINE ASM (contracts/utils/LabelUt</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/utils/LabelUtils.sol:67</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">dead-code</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarControllerOld._onlyRegistry() (contracts/registrars/DotnsRegistrarControllerOld.sol#402-406) is never used</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:402</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">dead-code</td>
@@ -432,16 +302,6 @@
 <td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
 <td class="py-2 px-3 text-gray-200">Low level call in DotnsRegistrarController.register(IDotnsRegistrarController.Registration) (contracts/registrars/DotnsR</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarController.sol:203</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
-<td class="py-2 px-3 text-gray-200">Low level call in DotnsRegistrarControllerOld.register(IDotnsRegistrarController.Registration) (contracts/registrars/Dot</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:206</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Variable DotnsResolverOld.__gap (contracts/resolvers/DotnsResolverOld.sol#40) is not in mixedCase </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsResolverOld.sol:40</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
@@ -455,11 +315,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Parameter DotnsResolverOld.initialize(IDotnsRegistry)._registry (contracts/resolvers/DotnsResolverOld.sol#60) is not in </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsResolverOld.sol:60</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
 <td class="py-2 px-3 text-gray-200">Parameter DotnsRegistry.initialize(IDotnsRegistrar,IDotnsReverseResolver,IStoreFactory)._registrar (contracts/registry/D</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistry.sol:88</td>
 </tr>
@@ -467,11 +322,6 @@
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
 <td class="py-2 px-3 text-gray-200">Parameter DotnsRegistry.initialize(IDotnsRegistrar,IDotnsReverseResolver,IStoreFactory)._factory (contracts/registry/Dot</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistry.sol:90</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Variable DotnsRegistryOld.__gap (contracts/registry/DotnsRegistryOld.sol#59) is not in mixedCase </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:59</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
@@ -487,26 +337,6 @@
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
 <td class="py-2 px-3 text-gray-200">Variable DotnsProtocolRegistry.__gap (contracts/registry/DotnsProtocolRegistry.sol#28) is not in mixedCase </td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistry.sol:28</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Variable DotnsContentResolverOld.__gap (contracts/resolvers/DotnsContentResolverOld.sol#49) is not in mixedCase </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsContentResolverOld.sol:49</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Variable DotnsRegistrarControllerOld.__gap (contracts/registrars/DotnsRegistrarControllerOld.sol#92) is not in mixedCase</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:92</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Variable DotnsProtocolRegistryOld.__gap (contracts/registry/DotnsProtocolRegistryOld.sol#68) is not in mixedCase </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistryOld.sol:68</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Parameter DotnsContentResolverOld.initialize(IDotnsRegistry)._registry (contracts/resolvers/DotnsContentResolverOld.sol#</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsContentResolverOld.sol:59</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
@@ -530,38 +360,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Parameter DotnsRegistryOld.initialize(IDotnsRegistrar,IDotnsReverseResolver,IStoreFactory)._reverseResolver (contracts/r</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:86</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Parameter DotnsRegistryOld.initialize(IDotnsRegistrar,IDotnsReverseResolver,IStoreFactory)._registrar (contracts/registr</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:85</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Parameter DotnsContentResolverOld.updateProtocolRegistry(IDotnsProtocolRegistry)._registry (contracts/resolvers/DotnsCon</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsContentResolverOld.sol:118</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Variable PopRulesOld.__gap (contracts/pop/PopRulesOld.sol#51) is not in mixedCase </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/pop/PopRulesOld.sol:51</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
 <td class="py-2 px-3 text-gray-200">Parameter StringUtils.bytes32ToString(bytes32)._bytes32 (contracts/utils/StringUtils.sol#153) is not in mixedCase </td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/utils/StringUtils.sol:153</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Variable DotnsRegistrarOld.__gap (contracts/registrars/DotnsRegistrarOld.sol#69) is not in mixedCase </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarOld.sol:69</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Parameter DotnsResolverOld.updateProtocolRegistry(IDotnsProtocolRegistry)._registry (contracts/resolvers/DotnsResolverOl</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsResolverOld.sol:85</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
@@ -575,18 +375,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Parameter DotnsRegistryOld.initialize(IDotnsRegistrar,IDotnsReverseResolver,IStoreFactory)._factory (contracts/registry/</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:87</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
 <td class="py-2 px-3 text-gray-200">Variable DotnsPopResolver.__gap (contracts/resolvers/DotnsPopResolver.sol#49) is not in mixedCase </td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsPopResolver.sol:49</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Variable DotnsReverseResolverOld.__gap (contracts/resolvers/DotnsReverseResolverOld.sol#43) is not in mixedCase </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsReverseResolverOld.sol:43</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
@@ -609,19 +399,9 @@
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistry.sol:89</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Parameter PopRulesOld.initialize(uint256)._startingPrice (contracts/pop/PopRulesOld.sol#75) is not in mixedCase </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/pop/PopRulesOld.sol:75</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
 <td class="py-2 px-3 text-gray-200">DotnsRegistry.__gap (contracts/registry/DotnsRegistry.sol#62) is never used in DotnsRegistry (contracts/registry/DotnsRe</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistry.sol:62</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarControllerOld.__gap (contracts/registrars/DotnsRegistrarControllerOld.sol#92) is never used in DotnsRegist</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarControllerOld.sol:92</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
@@ -630,23 +410,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsProtocolRegistryOld.__gap (contracts/registry/DotnsProtocolRegistryOld.sol#68) is never used in DotnsProtocolRegist</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistryOld.sol:68</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
 <td class="py-2 px-3 text-gray-200">DotnsProtocolRegistry.__gap (contracts/registry/DotnsProtocolRegistry.sol#28) is never used in DotnsProtocolRegistry (co</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistry.sol:28</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarOld.__gap (contracts/registrars/DotnsRegistrarOld.sol#69) is never used in DotnsRegistrarOld (contracts/re</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarOld.sol:69</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistryOld.__gap (contracts/registry/DotnsRegistryOld.sol#59) is never used in DotnsRegistryOld (contracts/registr</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistryOld.sol:59</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
@@ -655,18 +420,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsReverseResolverOld.__gap (contracts/resolvers/DotnsReverseResolverOld.sol#43) is never used in DotnsReverseResolver</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsReverseResolverOld.sol:43</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopResolver.__gap (contracts/resolvers/DotnsPopResolver.sol#49) is never used in DotnsPopResolver (contracts/resolv</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsPopResolver.sol:49</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsContentResolverOld.__gap (contracts/resolvers/DotnsContentResolverOld.sol#49) is never used in DotnsContentResolver</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsContentResolverOld.sol:49</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
@@ -685,18 +440,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistrarOld._labelhashes (contracts/registrars/DotnsRegistrarOld.sol#60) is never used in DotnsRegistrarOld (contr</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarOld.sol:60</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
 <td class="py-2 px-3 text-gray-200">DotnsRegistrar.__gap (contracts/registrars/DotnsRegistrar.sol#74) is never used in DotnsRegistrar (contracts/registrars/</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrar.sol:74</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsResolverOld.__gap (contracts/resolvers/DotnsResolverOld.sol#40) is never used in DotnsResolverOld (contracts/resolv</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/resolvers/DotnsResolverOld.sol:40</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
@@ -707,11 +452,6 @@
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopController.__gap (contracts/registrars/DotnsPopController.sol#130) is never used in DotnsPopController (contract</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:130</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">PopRulesOld.__gap (contracts/pop/PopRulesOld.sol#51) is never used in PopRulesOld (contracts/pop/PopRulesOld.sol#20-396)</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/pop/PopRulesOld.sol:51</td>
 </tr>
 </tbody></table></div>
 </div></body></html>
