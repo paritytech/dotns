@@ -10,6 +10,7 @@ import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
@@ -42,6 +43,7 @@ contract DotnsRegistrarController is
     UUPSUpgradeable,
     OwnableUpgradeable,
     ERC165Upgradeable,
+    ReentrancyGuardTransient,
     IDotnsRegistrarController
 {
     using StringUtils for *;
@@ -206,7 +208,7 @@ contract DotnsRegistrarController is
     }
 
     /// @inheritdoc IDotnsRegistrarController
-    function register(Registration calldata registration) external payable override {
+    function register(Registration calldata registration) external payable override nonReentrant {
         address escrow = _escrow();
 
         (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
@@ -214,12 +216,32 @@ contract DotnsRegistrarController is
         _consumeCommitment(registration);
 
         IPopRules rules = IPopRules(protocolRegistry.get(DotnsConstants.POP_RULES));
-        IPopRules.PriceWithMeta memory priced =
-            rules.priceWithCheck(registration.label, registration.owner);
 
-        require(msg.value >= priced.price, InsufficientValue());
+        bool isDirect = msg.sender == registration.owner;
+        IPopRules.PriceWithMeta memory priced;
+        if (isDirect) {
+            // Direct path: enforce personhood + reservation gate.
+            priced = rules.priceWithCheck(registration.label, registration.owner);
+        } else {
+            // Cross-payer path: the personhood gate is skipped here, but base-name
+            // reservations are still enforced so a third party cannot pay around a
+            // reservation held by another user.
+            priced = rules.priceWithoutCheck(registration.label, registration.owner);
+            require(priced.status != IPopRules.PopStatus.Reserved, NameReserved(registration.label));
+        }
 
-        bool setReverseRecord = registration.reserved && msg.sender == registration.owner;
+        // Cross-payer friction: when the sender is registering on behalf of a verified
+        // owner (priced.price == 0) but the sender's own reach is below the label's
+        // required tier, the personhood gate has been skipped and PopRules.reachFee
+        // re-applies it as a length-scaled charge that credits the insurance fund.
+        uint256 friction = 0;
+        if (!isDirect && priced.price == 0) {
+            friction = rules.reachFee(registration.label, msg.sender);
+        }
+        uint256 totalCharged = priced.price + friction;
+        require(msg.value >= totalCharged, InsufficientValue());
+
+        bool setReverseRecord = registration.reserved && isDirect;
 
         uint256 tokenId = uint256(node);
         // Custody handoff: if the token already exists, escrow is holding it from a prior
@@ -235,9 +257,44 @@ contract DotnsRegistrarController is
         );
 
         if (priced.price != 0) {
-            IDotnsNameEscrow(payable(escrow)).deposit{value: priced.price}(
-                IDotnsNameEscrow.DepositParams({
-                    tokenId: tokenId, asset: address(0), amount: priced.price
+            if (isDirect) {
+                // Direct path: refundable deposit with owner as refund recipient.
+                IDotnsNameEscrow(payable(escrow)).deposit{value: priced.price}(
+                    IDotnsNameEscrow.DepositParams({
+                        tokenId: tokenId,
+                        asset: address(0),
+                        amount: priced.price,
+                        recipient: registration.owner
+                    })
+                );
+            } else {
+                // Cross-payer path: compare payer's tier price for the same label to
+                // distinguish "same-tier-different-address" (refundable to owner)
+                // from a genuine cross-tier payment (insurance fund).
+                uint256 senderPrice = rules.priceWithoutCheck(registration.label, msg.sender).price;
+                if (senderPrice == priced.price) {
+                    IDotnsNameEscrow(payable(escrow)).deposit{value: priced.price}(
+                        IDotnsNameEscrow.DepositParams({
+                            tokenId: tokenId,
+                            asset: address(0),
+                            amount: priced.price,
+                            recipient: registration.owner
+                        })
+                    );
+                } else {
+                    IDotnsNameEscrow(payable(escrow)).depositInsurance{value: priced.price}(
+                        IDotnsNameEscrow.InsuranceDepositParams({
+                            tokenId: tokenId, payer: msg.sender, recipient: registration.owner
+                        })
+                    );
+                }
+            }
+        }
+
+        if (friction != 0) {
+            IDotnsNameEscrow(payable(escrow)).depositInsurance{value: friction}(
+                IDotnsNameEscrow.InsuranceDepositParams({
+                    tokenId: tokenId, payer: msg.sender, recipient: registration.owner
                 })
             );
         }
@@ -249,9 +306,11 @@ contract DotnsRegistrarController is
             rules.reserveBaseName(registration.label, registration.owner);
         }
 
-        if (msg.value > priced.price) {
-            (bool ok,) = payable(msg.sender).call{value: msg.value - priced.price}("");
+        if (msg.value > totalCharged) {
+            uint256 refund = msg.value - totalCharged;
+            (bool ok,) = payable(msg.sender).call{value: refund}("");
             require(ok, RefundFailed());
+            emit OverpaymentRefunded(msg.sender, refund);
         }
     }
 
@@ -271,6 +330,7 @@ contract DotnsRegistrarController is
         external
         override
         onlyWhiteListedOrOwner
+        nonReentrant
     {
         (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
             _requireAvailableLabel(registration.label);
@@ -398,7 +458,7 @@ contract DotnsRegistrarController is
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.6.0";
+        versionString = "1.7.0";
     }
 
     /// @inheritdoc IDotnsRegistrarController

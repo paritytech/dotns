@@ -37,6 +37,10 @@ contract BasicDotnsIntegration is BaseDotns {
         popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
         vm.stopPrank();
 
+        // The transfer recipient must be PopFull so the reach fee on this PopFull-tier
+        // base name is zero; this end-to-end exercises the lifecycle, not the fee path.
+        _grantPopFull(tiago);
+
         _flowEndToEnd(
             FlowParams({
                 nameOwner: ed,
@@ -56,6 +60,12 @@ contract BasicDotnsIntegration is BaseDotns {
         vm.startPrank(leonardo);
         popRules.setUserPopStatus(IPopRules.PopStatus.PopLite);
         vm.stopPrank();
+
+        // The cross-tier fee gate now requires the recipient to be on a tier
+        // that prices the post-transfer name at zero. PopFull is the smallest
+        // such tier that also satisfies the recipient's later NoStatus-classified
+        // registration in `_flowEndToEnd`.
+        _grantPopFull(tiago);
 
         _flowEndToEnd(
             FlowParams({
@@ -308,5 +318,106 @@ contract BasicDotnsIntegration is BaseDotns {
         returns (string memory)
     {
         return string.concat(string.concat(subLabel, string.concat(".", parentLabel)), ".dot");
+    }
+
+    function test_upgrade_ladder_friction_credits_insurance_through_lifecycle() public {
+        // End-to-end flow that exercises both new pricing branches:
+        //   1) NoStatus sender sponsors a base-name registration for a PopFull owner.
+        //      Owner price is zero (verified), but the sender's reach is below PopFull,
+        //      so the controller's friction branch fires and credits the NoStatus rate
+        //      to the insurance fund. No refundable position is created.
+        //   2) The PopFull owner transfers the name to a PopLite recipient. The recipient
+        //      is "covered" in price terms (priceForTo is zero) but reaches above their
+        //      tier (label is PopFull), so the registrar's reach fee charges the same
+        //      length-scaled rate, again to insurance.
+        //   3) The PopLite owner transfers the name to a PopFull recipient. PopFull
+        //      meets reach for every label tier, so the move is free.
+        //
+        // The single-tier-price ladder is the design's core pressure: the only
+        // friction-free position is PopFull, in every direction.
+        // PopFull-tier label, length 13.
+        string memory label = "alicelongname";
+        bytes32 labelHash = keccak256(bytes(label));
+        bytes32 node = _namehash(dotNode, labelHash);
+        uint256 tokenId = uint256(node);
+
+        // Sponsor defaults to NoStatus; owner is granted PopFull below.
+        address nostatusSponsor = ed;
+        address fullOwner = leonardo;
+        address liteRecipient = tiago;
+
+        _grantPopFull(fullOwner);
+
+        // Step 1: NoStatus sponsor registers the base name for the PopFull owner.
+        bytes32 secret =
+            keccak256(abi.encodePacked(label, fullOwner, nostatusSponsor, block.timestamp));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: fullOwner, secret: secret, reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        vm.prank(fullOwner);
+        dotnsRegistrarController.commit(commitment);
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        uint256 friction = popRules.reachFee(label, nostatusSponsor);
+        assertGt(friction, 0, "sponsor reaches above tier; friction must be non-zero");
+        uint256 insuranceAfterRegistration;
+        {
+            uint256 insuranceBefore = dotnsNameEscrow.insuranceFund();
+            vm.prank(nostatusSponsor);
+            dotnsRegistrarController.register{value: friction}(registration);
+            insuranceAfterRegistration = dotnsNameEscrow.insuranceFund();
+            assertEq(
+                insuranceAfterRegistration - insuranceBefore, friction, "friction credits insurance"
+            );
+        }
+        assertEq(dotnsRegistrar.ownerOf(tokenId), fullOwner, "name minted to verified owner");
+
+        // Step 2: Transfer to a PopLite recipient. Reach fee charges, runningMax stays
+        // unchanged because no tier delta was actually paid.
+        _grantPopLite(liteRecipient);
+
+        uint256 reachFee = dotnsRegistrar.quoteTransferFee(tokenId, liteRecipient);
+        assertGt(reachFee, 0, "lite recipient owes the reach fee on a base name");
+
+        uint256 runningMaxBeforeTransfer = dotnsNameEscrow.runningMax(tokenId);
+        vm.prank(fullOwner);
+        dotnsRegistrar.transferFrom{value: reachFee}(fullOwner, liteRecipient, tokenId);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), liteRecipient);
+        assertEq(
+            dotnsNameEscrow.insuranceFund() - insuranceAfterRegistration,
+            reachFee,
+            "reach fee credits insurance"
+        );
+        assertEq(
+            dotnsNameEscrow.runningMax(tokenId),
+            reachFee,
+            "runningMax tracks the highest payment through escrow"
+        );
+
+        // Step 3: Transfer to a PopFull recipient. PopFull meets reach for every label
+        // tier, so the move is free.
+        address fullRecipient = makeAddr("fullRecipient");
+        _grantPopFull(fullRecipient);
+
+        assertEq(
+            dotnsRegistrar.quoteTransferFee(tokenId, fullRecipient),
+            0,
+            "popfull recipient pays no friction"
+        );
+        uint256 insuranceBeforeFinalMove = dotnsNameEscrow.insuranceFund();
+
+        vm.prank(liteRecipient);
+        dotnsRegistrar.transferFrom(liteRecipient, fullRecipient, tokenId);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), fullRecipient);
+        assertEq(
+            dotnsNameEscrow.insuranceFund(),
+            insuranceBeforeFinalMove,
+            "free transfer must not credit insurance"
+        );
     }
 }

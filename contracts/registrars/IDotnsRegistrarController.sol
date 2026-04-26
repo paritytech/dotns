@@ -60,6 +60,14 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @param amount Native amount migrated.
     event NativeFundsMigrated(address indexed escrow, uint256 amount);
 
+    /// @notice Emitted when overpayment is refunded to the payer at registration entry.
+    /// @dev Mirrors the {IDotnsNameEscrow-OverpaymentRefunded} event signature so indexers
+    ///      can consume both entry points uniformly. Emitted from `register()` after the
+    ///      refund call succeeds.
+    /// @param payer The address receiving the refund.
+    /// @param amount The refunded amount in wei.
+    event OverpaymentRefunded(address indexed payer, uint256 amount);
+
     /// @notice Thrown when the caller is not whitelisted or the owner.
     /// @param caller The address that attempted the call.
     error NotWhiteListedOrOwner(address caller);
@@ -86,6 +94,14 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @notice Thrown when attempting to register an unavailable name.
     /// @param label Label supplied by the caller.
     error NameNotAvailable(string label);
+
+    /// @notice Thrown when attempting to register a name whose base stem is reserved
+    ///         by another user.
+    /// @dev Surfaced on the cross-tier register path (`msg.sender != registration.owner`)
+    ///      where reservation gating is applied explicitly via
+    ///      {IPopRules-priceWithoutCheck} rather than {IPopRules-priceWithCheck}.
+    /// @param label Label supplied by the caller.
+    error NameReserved(string label);
 
     /// @notice Thrown when a label is not a canonical lowercase ASCII DNS label.
     error InvalidLabel();

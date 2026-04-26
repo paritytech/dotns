@@ -45,6 +45,14 @@ interface IPopRules {
     /// @param status New PoP tier assigned.
     event UserPopStatusSet(address indexed user, PopStatus status);
 
+    /// @notice Emitted when the spam-deterrent starting price is changed by the owner.
+    /// @dev `startingPrice` is the wei-denominated base used by `_priceValidatedName`
+    ///      to compute the NoStatus length curve. A change takes effect on the next
+    ///      `priceWithCheck` / `priceWithoutCheck` call — no redeploy.
+    /// @param oldPrice Previous wei value.
+    /// @param newPrice New wei value.
+    event StartingPriceUpdated(uint256 oldPrice, uint256 newPrice);
+
     /// @notice Thrown when a name violates PoP-tier or reservation requirements.
     /// @param reason Human-readable explanation of the failure condition.
     error PopError(string reason);
@@ -175,6 +183,16 @@ interface IPopRules {
         view
         returns (PriceWithMeta memory metadata);
 
+    /// @notice Friction fee owed when `account` reaches into a label tier above its verification level.
+    /// @dev Returns a length-scaled reach price when the account does not satisfy the label's
+    ///      required verification tier; zero otherwise. The personhood gate on direct registration
+    ///      enforces this same comparison as a revert; this view exposes it as a charge for paths
+    ///      that bypass the gate (cross-payer registration, transfer to an under-qualified recipient).
+    /// @param name Domain label being acted on.
+    /// @param account Account whose verification reach is being measured.
+    /// @return fee Length-scaled reach price when `account` is below the label's required tier; zero otherwise.
+    function reachFee(string calldata name, address account) external view returns (uint256 fee);
+
     /// @notice Returns whether `name` is a base name under PoP rules.
     /// @dev A base name has no trailing digits; lite-person labels always
     ///      have at least two trailing digits, so the two spaces are disjoint.
@@ -188,6 +206,12 @@ interface IPopRules {
     ///      precompile exposes PoP status directly from the pallet.
     /// @param status The PoP tier to assign to the user (NoStatus, PopLite, or PopFull).
     function setUserPopStatus(PopStatus status) external;
+
+    /// @notice Updates the spam-deterrent starting price for NoStatus pricing.
+    /// @dev Owner-only. The new value flows into `_priceValidatedName` on the next
+    ///      pricing read; no redeploy. Emits {StartingPriceUpdated}.
+    /// @param newStartingPrice New base price in wei.
+    function updateStartingPrice(uint256 newStartingPrice) external;
 
     /// @notice Calculates registration cost for a label.
     /// @dev Pure length-based pricing; ignores PoP status and reservation state.

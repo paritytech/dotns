@@ -2,8 +2,8 @@
 pragma solidity ^0.8.30;
 
 import {BaseDotns, IDotnsRegistrarController} from "../../base/BaseDotns.t.sol";
+import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {IDotnsRegistrar} from "../../../contracts/registrars/IDotnsRegistrar.sol";
-import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocolRegistry.sol";
 
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IStore, Store} from "../../../contracts/store/Store.sol";
@@ -159,6 +159,89 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(giftedLabel)), tiago);
         assertEq(dotnsReverseResolver.nameOf(tiago), "victimname01.dot");
+    }
+
+    function test_third_party_reveal_mints_to_owner_and_locks_owner_refund() public {
+        string memory victimLabel = "victimside01";
+        string memory giftedLabel = "senderlock01";
+        address committedOwner = tiago;
+        address revealer = ed;
+
+        _commitAndRegister(victimLabel, committedOwner, true);
+        assertEq(dotnsReverseResolver.nameOf(committedOwner), "victimside01.dot");
+
+        bytes32 secret = keccak256(abi.encodePacked(giftedLabel, committedOwner, revealer));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: giftedLabel, owner: committedOwner, secret: secret, reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+
+        vm.prank(committedOwner);
+        dotnsRegistrarController.commit(commitment);
+
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        uint256 quotedOwnerPrice = popRules.priceWithoutCheck(giftedLabel, committedOwner).price;
+        uint256 tokenId = _tokenIdForLabel(giftedLabel);
+
+        vm.prank(revealer);
+        dotnsRegistrarController.register{value: quotedOwnerPrice}(registration);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), committedOwner);
+        assertEq(dotnsReverseResolver.nameOf(committedOwner), "victimside01.dot");
+
+        IDotnsNameEscrow.ReleasePosition memory position =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(position.amount, quotedOwnerPrice);
+        assertEq(position.recipient, committedOwner);
+    }
+
+    function test_cross_payer_refund_recipient_survives_secondary_transfer() public {
+        string memory nameLabel = "payerlock02";
+        address payer = ed;
+        address nameOwner = tiago;
+        address currentHolder = leonardo;
+
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, payer));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+
+        vm.prank(nameOwner);
+        dotnsRegistrarController.commit(commitment);
+
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        uint256 price = popRules.priceWithoutCheck(nameLabel, nameOwner).price;
+        uint256 tokenId = _tokenIdForLabel(nameLabel);
+
+        vm.prank(payer);
+        dotnsRegistrarController.register{value: price}(registration);
+
+        vm.prank(nameOwner);
+        dotnsRegistrar.transferFrom(nameOwner, currentHolder, tokenId);
+
+        vm.startPrank(currentHolder);
+        dotnsRegistrar.approve(address(dotnsNameEscrow), tokenId);
+        dotnsRegistrar.setApprovalForAll(nameOwner, true);
+        vm.stopPrank();
+
+        vm.prank(nameOwner);
+        dotnsNameEscrow.release(tokenId);
+
+        vm.warp(block.timestamp + dotnsNameEscrow.cooldown() + 1);
+
+        vm.prank(nameOwner);
+        dotnsNameEscrow.withdraw(tokenId);
+
+        assertEq(dotnsNameEscrow.pendingWithdrawal(nameOwner), price);
+        assertEq(dotnsNameEscrow.pendingWithdrawal(payer), 0);
+        assertEq(dotnsNameEscrow.pendingWithdrawal(currentHolder), 0);
     }
 
     function test_registerreserved_writes_to_store() public {
@@ -341,6 +424,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
 
+        // Same-tier transfer: recipient must also be PopFull so the cross-tier
+        // fee gate sees priceForTo == 0 and waives the delta.
+        _grantPopFull(leonardo);
+
         assertEq(address(storeFactory.getDeployedStore(leonardo)), address(0));
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
@@ -368,6 +455,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
 
+        // Same-tier round-trip: both parties PopFull so neither leg owes a fee.
+        _grantPopFull(leonardo);
+
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
         vm.prank(ed);
@@ -389,6 +479,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         string memory nameLabel = "primarymove01";
 
         _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
+
+        // Same-tier transfer: keep recipient on the PopFull tier so the cross-tier
+        // fee gate is a no-op for this test's reverse-name semantics.
+        _grantPopFull(leonardo);
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
         assertEq(dotnsReverseResolver.nameOf(ed), "primarymove01.dot");
@@ -415,51 +509,38 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         assertEq(address(storeFactory.getDeployedStore(address(0))), address(0));
     }
 
-    function test_transfer_succeeds_without_protocol_registry() public {
-        string memory nameLabel = "noregistry01";
+    function test_transfer_keeps_sender_store_and_writes_recipient_store() public {
+        string memory nameLabel = "storexfer01";
+        bytes32 labelhash = keccak256(bytes(nameLabel));
+        uint256 tokenId = _tokenIdForLabel(nameLabel);
 
         _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
 
-        uint256 tokenId = _tokenIdForLabel(nameLabel);
+        _grantPopFull(leonardo);
 
-        vm.prank(owner);
-        dotnsRegistrar.updateProtocolRegistry(IDotnsProtocolRegistry(address(0)));
-
-        vm.prank(ed);
-        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
-
-        assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
-        assertEq(address(storeFactory.getDeployedStore(leonardo)), address(0));
-    }
-
-    function test_transfer_succeeds_when_sender_has_no_store() public {
-        string memory nameLabel = "nostore01";
-        bytes32 labelhash = keccak256(bytes(nameLabel));
-        bytes32 node = _namehash(dotNode, labelhash);
-        uint256 tokenId = uint256(node);
-
-        vm.prank(address(dotnsRegistrarController));
-        dotnsRegistrar.register(tokenId, ed, nameLabel);
-
-        // Sender has no Store — transfer should still succeed
-        assertEq(address(storeFactory.getDeployedStore(ed)), address(0));
+        address edStoreAddr = address(storeFactory.getDeployedStore(ed));
+        assertTrue(edStoreAddr != address(0));
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
+        assertEq(address(storeFactory.getDeployedStore(ed)), edStoreAddr);
 
-        // Recipient gets a Store with the label written (label comes from _labels, not sender Store)
         assertTrue(address(storeFactory.getDeployedStore(leonardo)) != address(0));
         bytes32 storeKey = _storeKey(labelhash);
         Store leonardoStore = Store(address(storeFactory.getDeployedStore(leonardo)));
-        assertEq(leonardoStore.getValueFor(leonardo, storeKey), "nostore01.dot");
+        assertEq(leonardoStore.getValueFor(leonardo, storeKey), string.concat(nameLabel, ".dot"));
     }
 
     function test_safe_transfer_writes_to_store() public {
         string memory nameLabel = "safexfer01";
 
         _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
+
+        // Same-tier safe transfer: recipient also PopFull so the fee gate waives
+        // the delta and the test exercises the store-write path only.
+        _grantPopFull(leonardo);
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
@@ -483,6 +564,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
+
+        // Grant the recipient PopFull so the reach fee on this PopLite-tier label is zero;
+        // this test exercises operator-initiated store writes, not the fee path.
+        _grantPopFull(leonardo);
 
         vm.prank(ed);
         dotnsRegistrar.setApprovalForAll(tiago, true);
@@ -512,6 +597,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.prank(ed);
         dotnsRegistrar.syncLabel(tokenId, nameLabel);
+
+        // Recipient is on a verified tier so the cross-tier fee gate sees
+        // priceForTo == 0; this test only cares about label propagation.
+        _grantPopFull(leonardo);
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
@@ -591,25 +680,154 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         dotnsRegistrar.syncLabel(tokenId, nameLabel);
     }
 
-    function test_transfer_deploys_store_without_label() public {
-        string memory nameLabel = "nolabel01";
-        bytes32 labelhash = keccak256(bytes(nameLabel));
-        bytes32 node = _namehash(dotNode, labelhash);
-        uint256 tokenId = uint256(node);
+    function test_register_cross_payer_friction_credits_insurance() public {
+        // A NoStatus sender funding a base-name registration for a PopFull owner pays
+        // the length-scaled friction. The value credits insurance, no refundable position
+        // is created, and runningMax stays unset because the delta path was not taken.
+        // Sender is default NoStatus; owner is granted PopFull below.
+        address sender = ed;
+        address nameOwner = leonardo;
 
-        vm.prank(address(dotnsRegistrarController));
-        dotnsRegistrar.register(tokenId, ed, "");
+        vm.prank(nameOwner);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
 
-        assertEq(address(storeFactory.getDeployedStore(leonardo)), address(0));
+        // PopFull-tier label, length 13 produces a non-zero rate.
+        string memory label = "alicelongname";
+        bytes32 secret = keccak256(abi.encodePacked(label, nameOwner, sender));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: nameOwner, secret: secret, reserved: true
+            });
 
-        vm.prank(ed);
-        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        vm.prank(nameOwner);
+        dotnsRegistrarController.commit(commitment);
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
-        assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
-        assertTrue(address(storeFactory.getDeployedStore(leonardo)) != address(0));
+        // Owner price is zero (verified). Sender's reach is below the label tier.
+        uint256 ownerPrice = popRules.priceWithoutCheck(label, nameOwner).price;
+        assertEq(ownerPrice, 0, "owner is verified; price should be zero");
+        uint256 friction = popRules.reachFee(label, sender);
+        assertGt(friction, 0, "sender reaches above tier; friction must be non-zero");
 
-        bytes32 storeKey = _storeKey(labelhash);
-        Store leonardoStore = Store(address(storeFactory.getDeployedStore(leonardo)));
-        assertEq(leonardoStore.getValueFor(leonardo, storeKey), "");
+        uint256 insuranceBefore = dotnsNameEscrow.insuranceFund();
+        uint256 tokenId = _tokenIdForLabel(label);
+
+        vm.prank(sender);
+        dotnsRegistrarController.register{value: friction}(registration);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), nameOwner, "token minted to owner");
+        assertEq(
+            dotnsNameEscrow.insuranceFund() - insuranceBefore,
+            friction,
+            "friction credits insurance fund"
+        );
+        IDotnsNameEscrow.ReleasePosition memory position =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(position.amount, 0, "no refundable position created on friction path");
+        // depositInsurance updates runningMax to msg.value, recording the highest
+        // payment ever made for this name. Future delta-path comparisons read against it.
+        assertEq(
+            dotnsNameEscrow.runningMax(tokenId), friction, "runningMax tracks friction payment"
+        );
+    }
+
+    function test_register_cross_payer_no_friction_for_full_sender() public {
+        // A PopFull sender registering for a PopFull owner pays nothing. Both prices are
+        // zero and the friction branch never fires because the sender meets reach.
+        address sender = ed;
+        address nameOwner = leonardo;
+
+        vm.prank(sender);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+        vm.prank(nameOwner);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+
+        string memory label = "alicelongname";
+        bytes32 secret = keccak256(abi.encodePacked(label, nameOwner, sender));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: nameOwner, secret: secret, reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        vm.prank(nameOwner);
+        dotnsRegistrarController.commit(commitment);
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        assertEq(popRules.reachFee(label, sender), 0, "PopFull sender meets reach");
+
+        uint256 insuranceBefore = dotnsNameEscrow.insuranceFund();
+        uint256 tokenId = _tokenIdForLabel(label);
+
+        vm.prank(sender);
+        dotnsRegistrarController.register(registration);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), nameOwner);
+        assertEq(dotnsNameEscrow.insuranceFund(), insuranceBefore, "no insurance credit");
+    }
+
+    function test_register_cross_payer_friction_reverts_on_insufficient_value() public {
+        // Friction is required when the sender reaches above tier; sending less than the
+        // computed friction must revert with InsufficientValue.
+        address sender = ed;
+        address nameOwner = leonardo;
+
+        vm.prank(nameOwner);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+
+        string memory label = "alicelongname";
+        bytes32 secret = keccak256(abi.encodePacked(label, nameOwner, sender));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: nameOwner, secret: secret, reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        vm.prank(nameOwner);
+        dotnsRegistrarController.commit(commitment);
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        uint256 friction = popRules.reachFee(label, sender);
+        assertGt(friction, 0);
+
+        vm.prank(sender);
+        vm.expectRevert(IDotnsRegistrarController.InsufficientValue.selector);
+        dotnsRegistrarController.register{value: friction - 1}(registration);
+    }
+
+    function test_register_cross_payer_friction_refunds_overpayment() public {
+        // Overpayment on the friction path: the sender keeps every wei above the
+        // friction amount via the synchronous OverpaymentRefunded path.
+        address sender = ed;
+        address nameOwner = leonardo;
+
+        vm.prank(nameOwner);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+
+        string memory label = "alicelongname";
+        bytes32 secret = keccak256(abi.encodePacked(label, nameOwner, sender));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: nameOwner, secret: secret, reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        vm.prank(nameOwner);
+        dotnsRegistrarController.commit(commitment);
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        uint256 friction = popRules.reachFee(label, sender);
+        uint256 overpay = 1 ether;
+        uint256 senderBalanceBefore = sender.balance;
+
+        vm.prank(sender);
+        dotnsRegistrarController.register{value: friction + overpay}(registration);
+
+        assertEq(
+            sender.balance,
+            senderBalanceBefore - friction,
+            "sender keeps the overpayment after refund"
+        );
     }
 }

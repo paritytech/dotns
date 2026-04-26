@@ -293,7 +293,7 @@ def run_local_mode():
     run_shell("forge clean && forge build --force")
 
     current_stdout, current_stderr, _ = run_shell(
-        "forge test --gas-report --no-match-path 'test/fork/*'"
+        "forge test --gas-report"
     )
     current_raw_output = current_stdout + current_stderr
     current_contracts = parse_gas_report(current_raw_output)
@@ -310,7 +310,7 @@ def run_local_mode():
     run_shell("forge clean && forge build --force")
 
     main_stdout, main_stderr, _ = run_shell(
-        "forge test --gas-report --no-match-path 'test/fork/*'"
+        "forge test --gas-report"
     )
     main_raw_output = main_stdout + main_stderr
     main_contracts = parse_gas_report(main_raw_output)

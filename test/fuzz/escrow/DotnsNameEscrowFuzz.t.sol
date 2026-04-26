@@ -3,7 +3,6 @@ pragma solidity ^0.8.30;
 
 import {BaseDotns, IDotnsRegistrarController} from "../../base/BaseDotns.t.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
-import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 
 contract DotnsNameEscrowFuzzTest is BaseDotns {
     /// @notice Fuzz deposit tracking across multiple registrations with varying label lengths.
@@ -18,7 +17,8 @@ contract DotnsNameEscrowFuzzTest is BaseDotns {
         string[5] memory prefixes =
             ["escrowfza", "escrowfzab", "escrowfzabc", "escrowfzabcd", "escrowfzabcde"];
         string memory prefix = prefixes[seed % prefixes.length];
-        string memory suffix = vm.toString(10 + (seed % 90)); // 10..99 — exactly 2 digits
+        // 10..99, exactly 2 digits.
+        string memory suffix = vm.toString(10 + (seed % 90));
         string memory nameLabel = string(abi.encodePacked(prefix, suffix));
 
         IDotnsRegistrarController.Registration memory registration =
@@ -113,6 +113,10 @@ contract DotnsNameEscrowFuzzTest is BaseDotns {
 
             vm.prank(registrant);
             dotnsNameEscrow.withdraw(tokenId);
+
+            // Pull-payment: balance only changes once claimWithdrawal is called.
+            vm.prank(registrant);
+            dotnsNameEscrow.claimWithdrawal();
 
             uint256 balanceAfter = registrant.balance;
             assertEq(

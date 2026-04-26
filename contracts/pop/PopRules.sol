@@ -28,9 +28,10 @@ contract PopRules is
 {
     using StringUtils for *;
 
-    /// @notice Wei price for names with 9 characters and up.
+    /// @notice Base unit for the length-scaled name price.
     /// @dev Scales down inside `_priceValidatedName` according to label length;
-    ///      only charged to NoStatus users as a spam deterrent.
+    ///      charged to NoStatus users as a spam deterrent and to below-tier reach
+    ///      paths as protocol friction.
     uint256 public startingPrice;
 
     /// @notice Tracks PoP status per user profile.
@@ -105,6 +106,13 @@ contract PopRules is
     function setUserPopStatus(PopStatus status) external override {
         userPopStatus[msg.sender] = status;
         emit UserPopStatusSet(msg.sender, status);
+    }
+
+    /// @inheritdoc IPopRules
+    function updateStartingPrice(uint256 newStartingPrice) external override onlyOwner {
+        require(newStartingPrice > 0, PopError("Price must be greater than 0"));
+        emit StartingPriceUpdated(startingPrice, newStartingPrice);
+        startingPrice = newStartingPrice;
     }
 
     /// @inheritdoc IPopRules
@@ -261,11 +269,39 @@ contract PopRules is
         return _priceValidatedName(bytes(name).length);
     }
 
-    function _priceValidatedName(uint256 namelength) internal view returns (uint256 priceValue) {
-        if (namelength < 9) {
+    /// @inheritdoc IPopRules
+    function reachFee(
+        string calldata name,
+        address account
+    )
+        external
+        view
+        override
+        returns (uint256 fee)
+    {
+        _requireCanonicalLabel(name);
+        (PopStatus required,) = _classifyValidatedName(name);
+        if (_meetsReach(required, userPopStatus[account])) {
             return 0;
         }
+        return _priceValidatedName(bytes(name).length);
+    }
 
+    /// @notice Single canonical "is `userStatus` at reach for `required`?" predicate.
+    /// @dev Mirrors the personhood gate enforced in `priceWithCheck` so the cross-payer
+    ///      and transfer paths that bypass that gate compute the same answer when
+    ///      pricing the bypass.
+    function _meetsReach(PopStatus required, PopStatus userStatus) internal pure returns (bool) {
+        if (required == PopStatus.PopFull) {
+            return userStatus == PopStatus.PopFull;
+        }
+        if (required == PopStatus.PopLite) {
+            return userStatus == PopStatus.PopLite || userStatus == PopStatus.PopFull;
+        }
+        return true;
+    }
+
+    function _priceValidatedName(uint256 namelength) internal view returns (uint256 priceValue) {
         if (namelength >= 15) {
             return startingPrice / 2;
         }
@@ -407,7 +443,7 @@ contract PopRules is
     ///      post-upgrade assertion target.
     /// @return versionString Current version string.
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.2.0";
+        versionString = "1.5.0";
     }
 
     /// @notice Ensures the caller is any controller authorised on the registrar.

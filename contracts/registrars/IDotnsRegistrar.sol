@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {IERC721} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IDotnsController} from "./IDotnsController.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 
@@ -37,6 +37,28 @@ interface IDotnsRegistrar is IERC721 {
     /// @notice Thrown when a label is not a canonical lowercase ASCII DNS label.
     error InvalidLabel();
 
+    /// @notice Thrown when a transfer is attempted for a token whose label has not been
+    ///         synced into the registrar's `_labels` mapping.
+    /// @dev Closes the legacy backdoor where labelless tokens could move without paying
+    ///      the cross-tier fee. Owners must call `syncLabel` to populate the mapping
+    ///      before transfers can proceed for tokens that pre-date label storage.
+    /// @param tokenId The token identifier.
+    error LabelNotSynced(uint256 tokenId);
+
+    /// @notice Thrown when the protocol registry has no escrow address configured.
+    /// @dev Defensive: prevents `_update` from forwarding `msg.value` to `address(0)`
+    ///      on a fee-bearing transfer when the registry is unconfigured.
+    error EscrowNotConfigured();
+
+    /// @notice Thrown when a standard ERC721 transfer is attempted but the recipient tier
+    ///         requires a non-zero fee delta.
+    /// @dev Callers should preflight via {quoteTransferFee} and attach the required
+    ///      value to the payable ERC721 transfer entrypoint they intend to use.
+    /// @param tokenId The token being transferred.
+    /// @param to The intended recipient.
+    /// @param requiredFee The exact native amount that must accompany the payable path.
+    error TransferFeeRequired(uint256 tokenId, address to, uint256 requiredFee);
+
     /// @notice Emitted when a name is registered.
     /// @param id Token identifier.
     /// @param owner Owner of the name.
@@ -64,7 +86,8 @@ interface IDotnsRegistrar is IERC721 {
     event LabelSynced(uint256 indexed tokenId, string label);
 
     /// @notice Returns whether a name is available for registration.
-    /// @dev A name is available if and only if it has not been registered yet.
+    /// @dev A name is available when it has not been registered yet, or when escrow owns
+    ///      the token and the release lifecycle has reached the reclaimable state.
     /// @param id Token identifier.
     /// @return isAvailable True if the name can be registered.
     function available(uint256 id) external view returns (bool isAvailable);
@@ -113,6 +136,22 @@ interface IDotnsRegistrar is IERC721 {
     /// @return tokenExists True if the token has an owner, false otherwise.
     function exists(uint256 tokenId) external view returns (bool tokenExists);
 
+    /// @notice Quotes the additional native fee required to transfer a token to `to`.
+    /// @dev Returns the delta between the recipient-tier price and the token's current
+    ///      covered running max. Returns zero for same-tier, upward, escrow-custody, or
+    ///      already-covered moves. Reverts for nonexistent tokens and unsynced legacy labels.
+    /// @param tokenId Token identifier.
+    /// @param to Recipient address.
+    /// @return requiredFee Native amount the caller must attach to the payable ERC721
+    ///         transfer entrypoint; zero means the transfer is already fully covered.
+    function quoteTransferFee(
+        uint256 tokenId,
+        address to
+    )
+        external
+        view
+        returns (uint256 requiredFee);
+
     /// @notice Updates the protocol registry address.
     /// @dev Callable only by the contract owner.
     /// @dev  TODO: This is temporary as we need to upgrade the contract we need to remember to remove this function
@@ -120,4 +159,19 @@ interface IDotnsRegistrar is IERC721 {
     /// @param registry The address of the new protocol registry.
     // TODO: On fresh deploy (not upgrade), remove this function. Set protocolRegistry in initialize instead.
     function updateProtocolRegistry(IDotnsProtocolRegistry registry) external;
+
+    /// @inheritdoc IERC721
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes calldata data
+    )
+        external
+        payable
+        override;
+    /// @inheritdoc IERC721
+    function safeTransferFrom(address from, address to, uint256 tokenId) external payable override;
+    /// @inheritdoc IERC721
+    function transferFrom(address from, address to, uint256 tokenId) external payable override;
 }

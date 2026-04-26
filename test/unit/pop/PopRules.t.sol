@@ -193,4 +193,73 @@ contract PopRulesTests is BaseDotns {
         (address holder,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, address(0));
     }
+
+    function test_reachFee_NoStatus_label_returns_zero_for_any_status() public {
+        // The open tier has no verification gate to bypass, so reachFee returns zero
+        // regardless of the account's status.
+        assertEq(popRules.reachFee("longnamehere01", ed), 0);
+
+        vm.prank(ed);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopLite);
+        assertEq(popRules.reachFee("longnamehere01", ed), 0);
+
+        vm.prank(ed);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+        assertEq(popRules.reachFee("longnamehere01", ed), 0);
+    }
+
+    function test_reachFee_PopLite_label_charges_NoStatus_user() public {
+        // "alicebo42" is a 7-char base + 2 trailing digits, classifying as PopLite at
+        // total length 9 so the reach-fee curve matches the NoStatus price curve.
+        uint256 expected = popRules.price("alicebo42");
+        assertGt(expected, 0);
+        assertEq(popRules.reachFee("alicebo42", ed), expected);
+    }
+
+    function test_reachFee_PopLite_label_zero_for_verified() public {
+        // A PopLite or PopFull account meets the reach for a PopLite-tier label, so
+        // the friction is zero in both cases.
+        vm.prank(ed);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopLite);
+        assertEq(popRules.reachFee("alicebo42", ed), 0);
+
+        vm.prank(leonardo);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+        assertEq(popRules.reachFee("alicebo42", leonardo), 0);
+    }
+
+    function test_reachFee_PopFull_label_charges_below_full() public {
+        // Both unverified and lite-verified accounts owe friction on a PopFull-tier
+        // (base name) label. Only PopFull reaches it for free.
+        // 13-char base-name label classifies as PopFull and has a non-zero NoStatus rate.
+        uint256 expected = popRules.price("alicelongname");
+        assertGt(expected, 0);
+        assertEq(popRules.reachFee("alicelongname", ed), expected);
+
+        vm.prank(ed);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopLite);
+        assertEq(popRules.reachFee("alicelongname", ed), expected);
+
+        vm.prank(leonardo);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+        assertEq(popRules.reachFee("alicelongname", leonardo), 0);
+    }
+
+    function test_reachFee_short_PopFull_label_extends_length_curve() public view {
+        // "alicebob" is an 8-char base name, so the shared length curve charges
+        // one extra startingPrice step above a 9-char label.
+        uint256 expected = RENT_PRICE * (15 - bytes("alicebob").length);
+
+        assertEq(popRules.price("alicebob"), expected);
+        assertEq(popRules.reachFee("alicebob", ed), expected);
+    }
+
+    function test_reachFee_short_PopLite_label_extends_length_curve() public view {
+        // "lights01" is PopLite-tier and 8 chars total, so it follows the same
+        // length-based price as any other 8-char label.
+        uint256 expected = RENT_PRICE * (15 - bytes("lights01").length);
+
+        assertEq(popRules.price("lights01"), expected);
+        assertEq(popRules.reachFee("lights01", ed), expected);
+    }
 }

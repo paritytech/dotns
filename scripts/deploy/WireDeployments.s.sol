@@ -8,6 +8,7 @@ import {DeploymentNetwork} from "./DeploymentNetwork.sol";
 import {DotnsRegistrar} from "../../contracts/registrars/DotnsRegistrar.sol";
 import {DotnsRegistrarController} from "../../contracts/registrars/DotnsRegistrarController.sol";
 import {DotnsPopController} from "../../contracts/registrars/DotnsPopController.sol";
+import {DotnsNameEscrow} from "../../contracts/escrow/DotnsNameEscrow.sol";
 import {IDotnsController} from "../../contracts/registrars/IDotnsController.sol";
 import {DotnsRegistry} from "../../contracts/registry/DotnsRegistry.sol";
 import {DotnsProtocolRegistry} from "../../contracts/registry/DotnsProtocolRegistry.sol";
@@ -30,6 +31,10 @@ import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 ///      registry key, and controller authorisation for each proxy.
 /// @custom:security-contact admin@parity.io
 contract WireDeployments is BaseDeployer {
+    error NameEscrowWrongOwner();
+    error NameEscrowKeyMismatch();
+    error NameEscrowProtocolRegistryMismatch();
+
     struct Addresses {
         address storeFactory;
         address registrar;
@@ -40,6 +45,7 @@ contract WireDeployments is BaseDeployer {
         address popRules;
         address registrarController;
         address protocolRegistry;
+        address nameEscrow;
         address popResolver;
         address popController;
     }
@@ -72,6 +78,7 @@ contract WireDeployments is BaseDeployer {
         addr.popRules = _readAddress("PopRules");
         addr.registrarController = _readAddress("DotnsRegistrarController");
         addr.protocolRegistry = _readAddress("DotnsProtocolRegistry");
+        addr.nameEscrow = _readAddress("DotnsNameEscrow");
         addr.popResolver = _readAddress("DotnsPopResolver");
         addr.popController = _readAddress("DotnsPopController");
     }
@@ -111,6 +118,7 @@ contract WireDeployments is BaseDeployer {
         registry.set(DotnsConstants.CONTENT_RESOLVER, addr.contentResolver);
         registry.set(DotnsConstants.POP_RULES, addr.popRules);
         registry.set(DotnsConstants.STORE_FACTORY, addr.storeFactory);
+        registry.set(DotnsConstants.NAME_ESCROW, addr.nameEscrow);
         registry.set(DotnsConstants.POP_CONTROLLER, addr.popController);
         registry.set(DotnsConstants.POP_RESOLVER, addr.popResolver);
         registry.set(DotnsConstants.POP_GATEWAY, popGateway);
@@ -151,8 +159,10 @@ contract WireDeployments is BaseDeployer {
         // chain, and anything that falls through the folder mapping resolves
         // to the `localhost` folder. Only the two known production-ish chains
         // are treated as non-dev here.
-        if (chainId == 420420422) return false; // passethub-testnet
-        if (chainId == 420420417) return false; // paseo-assethub
+        // passethub-testnet
+        if (chainId == 420420422) return false;
+        // paseo-assethub
+        if (chainId == 420420417) return false;
         return true;
     }
 
@@ -188,6 +198,10 @@ contract WireDeployments is BaseDeployer {
         );
         require(PopRules(addr.popRules).owner() == expectedOwner, "PopRules: wrong owner");
         require(
+            DotnsNameEscrow(payable(addr.nameEscrow)).owner() == expectedOwner,
+            NameEscrowWrongOwner()
+        );
+        require(
             DotnsPopController(addr.popController).owner() == expectedOwner,
             "PopController: wrong owner"
         );
@@ -219,7 +233,15 @@ contract WireDeployments is BaseDeployer {
             registry.get(DotnsConstants.STORE_FACTORY) == addr.storeFactory, "Key: storeFactory"
         );
         require(
+            registry.get(DotnsConstants.NAME_ESCROW) == addr.nameEscrow, NameEscrowKeyMismatch()
+        );
+        require(
             registry.get(DotnsConstants.POP_CONTROLLER) == addr.popController, "Key: popController"
+        );
+        require(
+            address(DotnsNameEscrow(payable(addr.nameEscrow)).protocolRegistry())
+                == addr.protocolRegistry,
+            NameEscrowProtocolRegistryMismatch()
         );
         require(registry.get(DotnsConstants.POP_RESOLVER) == addr.popResolver, "Key: popResolver");
 

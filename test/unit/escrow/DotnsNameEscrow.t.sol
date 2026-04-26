@@ -95,6 +95,17 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(ed);
         dotnsNameEscrow.withdraw(tokenId);
 
+        // Pull-payment: withdraw credits the pending balance; the recipient must
+        // call claimWithdrawal to actually receive the funds.
+        assertEq(
+            dotnsNameEscrow.pendingWithdrawal(ed),
+            RENT_PRICE,
+            "pending withdrawal should be credited"
+        );
+
+        vm.prank(ed);
+        dotnsNameEscrow.claimWithdrawal();
+
         assertEq(ed.balance, balanceBefore + RENT_PRICE, "ed should receive RENT_PRICE refund");
 
         IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
@@ -124,16 +135,26 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertFalse(pos.released, "released flag cleared after reclaim");
     }
 
-    function test_release_after_transfer_refunds_current_holder() public {
+    function test_release_after_transfer_still_refunds_locked_recipient() public {
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
-        _approveAndRelease(tokenId, leonardo);
+        // Two-party cooperation: the current holder approves the escrow for the
+        // safeTransferFrom inside release() and authorises the locked recipient
+        // (ed) to call it. position.recipient is locked at deposit time and is
+        // not mutated by NFT transfers.
+        vm.startPrank(leonardo);
+        dotnsRegistrar.approve(address(dotnsNameEscrow), tokenId);
+        dotnsRegistrar.setApprovalForAll(ed, true);
+        vm.stopPrank();
+
+        vm.prank(ed);
+        dotnsNameEscrow.release(tokenId);
 
         IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
-        assertEq(pos.recipient, leonardo, "recipient should be leonardo (current holder)");
+        assertEq(pos.recipient, ed, "recipient should remain locked to ed");
     }
 
     function test_revert_deposit_not_controller() public {
@@ -142,7 +163,9 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(ed);
         vm.expectRevert(abi.encodeWithSelector(IDotnsNameEscrow.NotController.selector, ed));
         dotnsNameEscrow.deposit(
-            IDotnsNameEscrow.DepositParams({tokenId: tokenId, asset: address(0), amount: 1 ether})
+            IDotnsNameEscrow.DepositParams({
+                tokenId: tokenId, asset: address(0), amount: 1 ether, recipient: ed
+            })
         );
     }
 
@@ -260,7 +283,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         );
         dotnsNameEscrow.deposit{value: RENT_PRICE}(
             IDotnsNameEscrow.DepositParams({
-                tokenId: tokenId, asset: address(0), amount: RENT_PRICE
+                tokenId: tokenId, asset: address(0), amount: RENT_PRICE, recipient: ed
             })
         );
     }
@@ -342,6 +365,11 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         vm.prank(ed);
         dotnsNameEscrow.withdraw(tokenId);
+
+        // Pull-payment: settle the pending balance via claimWithdrawal before
+        // asserting that the correct amount has reached the recipient.
+        vm.prank(ed);
+        dotnsNameEscrow.claimWithdrawal();
 
         assertEq(
             ed.balance, balanceBefore + RENT_PRICE, "withdraw should still transfer correct amount"

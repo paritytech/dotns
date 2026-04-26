@@ -3,7 +3,6 @@ pragma solidity ^0.8.30;
 
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
-import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {EscrowHandler} from "./EscrowHandler.t.sol";
 
 contract DotnsNameEscrowInvariantTest is BaseDotns {
@@ -23,6 +22,19 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         handler.addActor(tiago);
 
         targetContract(address(handler));
+
+        bytes4[] memory selectors = new bytes4[](10);
+        selectors[0] = handler.commitRegisterAndDeposit.selector;
+        selectors[1] = handler.registerCrossTier.selector;
+        selectors[2] = handler.releaseToken.selector;
+        selectors[3] = handler.withdrawRefund.selector;
+        selectors[4] = handler.claim.selector;
+        selectors[5] = handler.setRandomPopStatus.selector;
+        selectors[6] = handler.reRegisterReclaimed.selector;
+        selectors[7] = handler.transferDeposited.selector;
+        selectors[8] = handler.transferPayable.selector;
+        selectors[9] = handler.advanceTime.selector;
+        targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
 
         excludeContract(address(dotnsRegistrarController));
         excludeContract(address(dotnsRegistry));
@@ -71,16 +83,44 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         }
     }
 
-    /// @notice On-chain releasedTokenCount must match the count of released-but-not-withdrawn tokens.
+    /// @notice On-chain releasedTokenCount must match released tokens still held by escrow.
     function invariant_released_count_consistent() public view {
         uint256[] memory released = handler.getReleasedTokenIds();
+        uint256[] memory withdrawn = handler.getWithdrawnTokenIds();
         uint256 onChainCount = dotnsNameEscrow.releasedTokenCount();
 
         assertEq(
             onChainCount,
-            released.length,
-            "On-chain released count must match ghost state released count"
+            released.length + withdrawn.length,
+            "On-chain released count must match released and withdrawn ghost state"
         );
+    }
+
+    /// @notice Refund recipients remain fixed from deposit through release.
+    function invariant_refund_recipient_locked_until_withdraw() public view {
+        uint256[] memory deposited = handler.getDepositedTokenIds();
+        for (uint256 i; i < deposited.length; ++i) {
+            uint256 tokenId = deposited[i];
+            if (handler.depositAmounts(tokenId) == 0) continue;
+
+            address expectedRecipient = handler.lockedRecipient(tokenId);
+            if (expectedRecipient == address(0)) continue;
+
+            IDotnsNameEscrow.ReleasePosition memory position =
+                dotnsNameEscrow.getReleasePosition(tokenId);
+            assertEq(position.recipient, expectedRecipient, "deposit recipient must stay locked");
+        }
+
+        uint256[] memory released = handler.getReleasedTokenIds();
+        for (uint256 i; i < released.length; ++i) {
+            uint256 tokenId = released[i];
+            address expectedRecipient = handler.lockedRecipient(tokenId);
+            if (expectedRecipient == address(0)) continue;
+
+            IDotnsNameEscrow.ReleasePosition memory position =
+                dotnsNameEscrow.getReleasePosition(tokenId);
+            assertEq(position.recipient, expectedRecipient, "release recipient must stay locked");
+        }
     }
 
     /// @notice The controller must never hold native funds (all deposits flow to escrow).

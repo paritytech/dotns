@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 /// @title IStore
 /// @notice Interface defining a key-value storage for IPFS URIs scoped by user address.

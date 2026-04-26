@@ -135,4 +135,60 @@ contract PopRulesFuzzTest is BaseDotns {
         }
         return string(buffer);
     }
+
+    function testFuzz_reachFee_NoStatus_label_returns_zero_for_any_status(
+        uint256 seed,
+        uint256 length,
+        uint8 statusSeed
+    )
+        public
+    {
+        // NoStatus-tier labels: long alpha + 2 trailing digits, length 9..14.
+        // The open tier has no verification gate, so reachFee returns zero for any caller status.
+        length = bound(length, 9, 14);
+        string memory nameLabel = string(abi.encodePacked(_makeAlpha(seed, length), "01"));
+
+        IPopRules.PopStatus userStatus = IPopRules.PopStatus(bound(statusSeed, 0, 2));
+        vm.prank(ed);
+        popRules.setUserPopStatus(userStatus);
+
+        assertEq(popRules.reachFee(nameLabel, ed), 0);
+    }
+
+    function testFuzz_reachFee_PopFull_label_charges_below_full(
+        uint256 seed,
+        uint256 length,
+        uint8 statusSeed
+    )
+        public
+    {
+        // PopFull-tier base names: alpha only, length 9..14 so _priceValidatedName is non-zero.
+        // Any caller below PopFull (NoStatus or PopLite) owes the same length-scaled rate.
+        length = bound(length, 9, 14);
+        string memory nameLabel = _makeAlpha(seed, length);
+
+        IPopRules.PopStatus userStatus = IPopRules.PopStatus(bound(statusSeed, 0, 1));
+        vm.prank(ed);
+        popRules.setUserPopStatus(userStatus);
+
+        uint256 expected = popRules.price(nameLabel);
+        assertEq(popRules.reachFee(nameLabel, ed), expected);
+    }
+
+    function testFuzz_reachFee_PopFull_user_pays_zero_anywhere(
+        uint256 seed,
+        uint256 length
+    )
+        public
+    {
+        // A PopFull-verified caller meets reach for every label tier the public path can
+        // produce, so reachFee is uniformly zero across the random length range.
+        length = bound(length, 6, 14);
+        string memory nameLabel = _makeAlpha(seed, length);
+
+        vm.prank(ed);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+
+        assertEq(popRules.reachFee(nameLabel, ed), 0);
+    }
 }

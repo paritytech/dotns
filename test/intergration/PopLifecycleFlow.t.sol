@@ -72,8 +72,12 @@ contract PopLifecycleFlow is BaseDotns {
         bytes32 subnode = _setSubnode(ed, fullNode, SUB_LABEL, FULL_LABEL, leonardo);
         assertEq(dotnsRegistry.owner(subnode), leonardo);
 
+        // Cross-tier transfer: ed is PopFull, tiago has no status set, so the
+        // recipient owes the cross-tier delta. Route through the payable ERC721
+        // transfer entrypoint with the priced delta attached.
+        uint256 priceForTiago = popRules.priceWithoutCheck(FULL_LABEL, tiago).price;
         vm.prank(ed);
-        IERC721(address(dotnsRegistrar)).transferFrom(ed, tiago, fullTokenId);
+        dotnsRegistrar.transferFrom{value: priceForTiago}(ed, tiago, fullTokenId);
 
         // Post-transfer invariants. Only ownership fields change; PoP-layer
         // records are keyed by node and survive intact.
