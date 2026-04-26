@@ -3,14 +3,12 @@ pragma solidity ^0.8.30;
 
 import {console} from "forge-std/Script.sol";
 import {BaseDeployer} from "./BaseDeployer.s.sol";
-import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 import {PopRules, IPopRules} from "../../contracts/pop/PopRules.sol";
 import {DotnsRegistrar, IDotnsRegistrar} from "../../contracts/registrars/DotnsRegistrar.sol";
-import {
-    DotnsRegistrarController,
-    IDotnsRegistrarController
-} from "../../contracts/registrars/DotnsRegistrarController.sol";
+import {DotnsRegistrarController} from "../../contracts/registrars/DotnsRegistrarController.sol";
+import {DotnsPopController} from "../../contracts/registrars/DotnsPopController.sol";
+import {IDotnsController} from "../../contracts/registrars/IDotnsController.sol";
 import {DotnsRegistry, IDotnsRegistry} from "../../contracts/registry/DotnsRegistry.sol";
 import {
     DotnsReverseResolver,
@@ -18,15 +16,29 @@ import {
 } from "../../contracts/resolvers/DotnsReverseResolver.sol";
 import {DotnsContentResolver} from "../../contracts/resolvers/DotnsContentResolver.sol";
 import {DotnsResolver} from "../../contracts/resolvers/DotnsResolver.sol";
+import {DotnsPopResolver} from "../../contracts/resolvers/DotnsPopResolver.sol";
 import {StoreFactory, IStoreFactory} from "../../contracts/store/StoreFactory.sol";
 import {
     DotnsProtocolRegistry,
     IDotnsProtocolRegistry
 } from "../../contracts/registry/DotnsProtocolRegistry.sol";
+import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 
 /// @title DotnsDeployer
+/// @notice Fresh-deploy script for the full DotNS contract set behind UUPS proxies.
+/// @dev Deploys every proxy in its own broadcast scope to cap forge's per-tx
+///      memory accounting; every proxy still runs OZ upgrade-safety validation.
+///      Wires the protocol-registry keys and pointer references after the last
+///      deploy, and authorises both controllers on the registrar.
+/// TODO: Before mainnet we need to modify this
+/// @custom:security-contact admin@parity.io
 contract DotnsDeployer is BaseDeployer {
     uint256 public constant RENT_PRICE = 2e15 wei;
+
+    /// @notice Default reservation duration for the freshly-deployed PoP controller.
+    /// @dev Mirrors `pallet_resources::UsernameReservationDuration`; the protocol owner
+    ///      rotates this post-deploy via `DotnsPopController.setReservationDuration`.
+    uint64 public constant DEFAULT_RESERVATION_DURATION = 7 days;
 
     StoreFactory public storeFactory;
 
@@ -36,9 +48,33 @@ contract DotnsDeployer is BaseDeployer {
     DotnsReverseResolver public dotnsReverseResolver;
     DotnsContentResolver public dotnsContentResolver;
     DotnsResolver public dotnsResolver;
+    DotnsPopResolver public dotnsPopResolver;
     DotnsRegistrarController public dotnsRegistrarController;
+    DotnsPopController public dotnsPopController;
     DotnsProtocolRegistry public protocolRegistry;
 
+    /// @notice Per-proxy handle returned from the deploy pipeline, kept as a
+    ///         struct so the ten downstream addresses can be passed around as
+    ///         one named value rather than ten positional parameters.
+    struct Deployment {
+        address storeFactory;
+        address registrar;
+        address reverseResolver;
+        address registry;
+        address contentResolver;
+        address resolver;
+        address popRules;
+        address registrarController;
+        address protocolRegistry;
+        address popResolver;
+        address popController;
+    }
+
+    /// @notice Deploys the full DotNS contract set, wires the protocol registry,
+    ///         and writes the resulting manifest under `deployments/`.
+    /// @dev Network-specific output folder is chosen from `block.chainid`; see
+    ///      {_getDeploymentFolder}. The broadcasting account becomes the owner
+    ///      of every proxy and the default `POP_GATEWAY` until governance rotates it.
     function run() external {
         uint256 chainId = block.chainid;
 
@@ -46,159 +82,255 @@ contract DotnsDeployer is BaseDeployer {
 
         console.log("Current blocktime", block.timestamp);
 
-        initDeployment();
+        initDeployment(_getDeploymentFolder(), vm.toString(chainId));
 
         address OWNER = msg.sender;
-        vm.startBroadcast(OWNER);
         vm.label(OWNER, "OWNER");
 
-        // StoreFactory
+        // Each `_deploy*` step wraps its own `Upgrades.deployUUPSProxy` call in
+        // a dedicated `vm.startBroadcast / vm.stopBroadcast` pair. Running each
+        // proxy deployment in its own broadcast scope caps forge's per-tx
+        // memory accounting; otherwise the OZ upgrade-safety validator's
+        // cumulative FFI output (multi-MB build-info JSON per call) drives the
+        // whole `run()` into `MemoryOOG` around the 8th proxy. Full OZ
+        // validation still runs on every proxy; no checks are skipped.
+        Deployment memory deployment;
+        deployment.storeFactory = _deployStoreFactory(OWNER);
+        deployment.registrar = _deployRegistrar(OWNER);
+        deployment.reverseResolver = _deployReverseResolver(OWNER);
+        deployment.registry = _deployRegistry(
+            OWNER, deployment.registrar, deployment.reverseResolver, deployment.storeFactory
+        );
+        deployment.contentResolver = _deployContentResolver(OWNER, deployment.registry);
+        deployment.resolver = _deployResolver(OWNER, deployment.registry);
+        deployment.popRules = _deployPopRules(OWNER);
+        deployment.registrarController = _deployRegistrarController(OWNER, deployment);
+        deployment.protocolRegistry = _deployProtocolRegistry(OWNER);
+        deployment.popResolver = _deployPopResolver(OWNER, deployment.protocolRegistry);
+        deployment.popController = _deployPopController(OWNER, deployment.protocolRegistry);
+
+        _authoriseControllers(OWNER, deployment);
+        _wireProtocolRegistryKeys(OWNER, deployment);
+        _wireProtocolRegistryPointers(OWNER);
+
+        _verifyDeployment(
+            deployment.registrar,
+            deployment.registrarController,
+            deployment.registry,
+            deployment.reverseResolver,
+            deployment.resolver,
+            deployment.contentResolver,
+            deployment.popRules,
+            deployment.popController,
+            deployment.popResolver,
+            OWNER
+        );
+
+        saveDeployments();
+    }
+
+    function _deployStoreFactory(address owner) internal returns (address proxy) {
+        vm.startBroadcast(owner);
         storeFactory = new StoreFactory();
-        vm.label(address(storeFactory), "StoreFactory");
-        logDeployment("StoreFactory", address(storeFactory));
+        vm.stopBroadcast();
+        proxy = address(storeFactory);
+        vm.label(proxy, "StoreFactory");
+        logDeployment("StoreFactory", proxy);
+    }
 
-        // DotnsRegistrar
-        address dotnsRegistrarProxy = Upgrades.deployUUPSProxy(
+    function _deployRegistrar(address owner) internal returns (address proxy) {
+        proxy = _broadcastDeployUups(
+            owner,
             "DotnsRegistrar.sol:DotnsRegistrar",
-            abi.encodeCall(DotnsRegistrar.initialize, ("Dotns", "Dotns"))
+            abi.encodeCall(DotnsRegistrar.initialize, ("Dotns", "Dotns")),
+            "DotnsRegistrar"
         );
-        dotnsRegistrar = DotnsRegistrar(dotnsRegistrarProxy);
-        vm.label(dotnsRegistrarProxy, "DotnsRegistrar");
-        logDeployment("DotnsRegistrar", dotnsRegistrarProxy);
+        dotnsRegistrar = DotnsRegistrar(proxy);
+    }
 
-        // DotnsReverseResolver
-        address dotnsReverseResolverProxy = Upgrades.deployUUPSProxy(
+    function _deployReverseResolver(address owner) internal returns (address proxy) {
+        proxy = _broadcastDeployUups(
+            owner,
             "DotnsReverseResolver.sol:DotnsReverseResolver",
-            abi.encodeCall(DotnsReverseResolver.initialize, ())
+            abi.encodeCall(DotnsReverseResolver.initialize, ()),
+            "DotnsReverseResolver"
         );
-        dotnsReverseResolver = DotnsReverseResolver(dotnsReverseResolverProxy);
-        vm.label(dotnsReverseResolverProxy, "DotnsReverseResolver");
-        logDeployment("DotnsReverseResolver", dotnsReverseResolverProxy);
+        dotnsReverseResolver = DotnsReverseResolver(proxy);
+    }
 
-        // DotnsRegistry
-        address dotnsRegistryProxy = Upgrades.deployUUPSProxy(
+    function _deployRegistry(
+        address owner,
+        address registrar,
+        address reverseResolver,
+        address factory
+    )
+        internal
+        returns (address proxy)
+    {
+        proxy = _broadcastDeployUups(
+            owner,
             "DotnsRegistry.sol:DotnsRegistry",
             abi.encodeCall(
                 DotnsRegistry.initialize,
                 (
-                    IDotnsRegistrar(dotnsRegistrarProxy),
-                    IDotnsReverseResolver(dotnsReverseResolverProxy),
-                    storeFactory
+                    IDotnsRegistrar(registrar),
+                    IDotnsReverseResolver(reverseResolver),
+                    IStoreFactory(factory)
                 )
-            )
+            ),
+            "DotnsRegistry"
         );
-        dotnsRegistry = DotnsRegistry(dotnsRegistryProxy);
-        vm.label(dotnsRegistryProxy, "DotnsRegistry");
-        logDeployment("DotnsRegistry", dotnsRegistryProxy);
+        dotnsRegistry = DotnsRegistry(proxy);
+    }
 
-        // DotnsContentResolver
-        address dotnsContentResolverProxy = Upgrades.deployUUPSProxy(
+    function _deployContentResolver(
+        address owner,
+        address registry
+    )
+        internal
+        returns (address proxy)
+    {
+        proxy = _broadcastDeployUups(
+            owner,
             "DotnsContentResolver.sol:DotnsContentResolver",
-            abi.encodeCall(DotnsContentResolver.initialize, (IDotnsRegistry(dotnsRegistryProxy)))
+            abi.encodeCall(DotnsContentResolver.initialize, (IDotnsRegistry(registry))),
+            "DotnsContentResolver"
         );
-        dotnsContentResolver = DotnsContentResolver(dotnsContentResolverProxy);
-        vm.label(dotnsContentResolverProxy, "DotnsContentResolver");
-        logDeployment("DotnsContentResolver", dotnsContentResolverProxy);
+        dotnsContentResolver = DotnsContentResolver(proxy);
+    }
 
-        // DotnsResolver
-        address dotnsResolverProxy = Upgrades.deployUUPSProxy(
+    function _deployResolver(address owner, address registry) internal returns (address proxy) {
+        proxy = _broadcastDeployUups(
+            owner,
             "DotnsResolver.sol:DotnsResolver",
-            abi.encodeCall(DotnsResolver.initialize, (IDotnsRegistry(dotnsRegistryProxy)))
+            abi.encodeCall(DotnsResolver.initialize, (IDotnsRegistry(registry))),
+            "DotnsResolver"
         );
-        dotnsResolver = DotnsResolver(dotnsResolverProxy);
-        vm.label(dotnsResolverProxy, "DotnsResolver");
-        logDeployment("DotnsResolver", dotnsResolverProxy);
+        dotnsResolver = DotnsResolver(proxy);
+    }
 
-        // PopRules
-        address popRulesProxy = Upgrades.deployUUPSProxy(
-            "PopRules.sol:PopRules", abi.encodeCall(PopRules.initialize, (RENT_PRICE))
+    function _deployPopRules(address owner) internal returns (address proxy) {
+        proxy = _broadcastDeployUups(
+            owner,
+            "PopRules.sol:PopRules",
+            abi.encodeCall(PopRules.initialize, (RENT_PRICE)),
+            "PopRules"
         );
-        popRules = PopRules(popRulesProxy);
-        vm.label(popRulesProxy, "PopRules");
-        logDeployment("PopRules", popRulesProxy);
+        popRules = PopRules(proxy);
+    }
 
-        // DotnsRegistrarController
-        address dotnsRegistrarControllerProxy = Upgrades.deployUUPSProxy(
+    function _deployRegistrarController(
+        address owner,
+        Deployment memory deployment
+    )
+        internal
+        returns (address proxy)
+    {
+        proxy = _broadcastDeployUups(
+            owner,
             "DotnsRegistrarController.sol:DotnsRegistrarController",
             abi.encodeCall(
                 DotnsRegistrarController.initialize,
                 (
-                    IDotnsRegistrar(dotnsRegistrarProxy),
-                    IDotnsRegistry(dotnsRegistryProxy),
-                    IDotnsReverseResolver(dotnsReverseResolverProxy),
-                    IPopRules(popRulesProxy),
-                    IStoreFactory(address(storeFactory)),
+                    IDotnsRegistrar(deployment.registrar),
+                    IDotnsRegistry(deployment.registry),
+                    IDotnsReverseResolver(deployment.reverseResolver),
+                    IPopRules(deployment.popRules),
+                    IStoreFactory(deployment.storeFactory),
                     6 seconds,
                     1 days
                 )
-            )
+            ),
+            "DotnsRegistrarController"
         );
-        dotnsRegistrarController = DotnsRegistrarController(dotnsRegistrarControllerProxy);
-        vm.label(dotnsRegistrarControllerProxy, "DotnsRegistrarController");
-        logDeployment("DotnsRegistrarController", dotnsRegistrarControllerProxy);
+        dotnsRegistrarController = DotnsRegistrarController(proxy);
+    }
 
-        // DotnsProtocolRegistry
-        address protocolRegistryProxy = Upgrades.deployUUPSProxy(
+    function _deployProtocolRegistry(address owner) internal returns (address proxy) {
+        proxy = _broadcastDeployUups(
+            owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ())
+            abi.encodeCall(DotnsProtocolRegistry.initialize, ()),
+            "DotnsProtocolRegistry"
         );
-        protocolRegistry = DotnsProtocolRegistry(protocolRegistryProxy);
-        vm.label(protocolRegistryProxy, "DotnsProtocolRegistry");
-        logDeployment("DotnsProtocolRegistry", protocolRegistryProxy);
+        protocolRegistry = DotnsProtocolRegistry(proxy);
+    }
 
-        // Registrar needs controller in its own mapping (not resolved via protocol registry)
-        dotnsRegistrar.addController(IDotnsRegistrarController(dotnsRegistrarControllerProxy));
-
-        // Wire protocol registry keys (single source of truth for all contract resolution)
-        // forge-lint: disable-next-line(unsafe-typecast)
-        protocolRegistry.set(bytes32("registrar"), dotnsRegistrarProxy);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        protocolRegistry.set(bytes32("controller"), dotnsRegistrarControllerProxy);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        protocolRegistry.set(bytes32("registry"), dotnsRegistryProxy);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        protocolRegistry.set(bytes32("reverseResolver"), dotnsReverseResolverProxy);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        protocolRegistry.set(bytes32("resolver"), dotnsResolverProxy);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        protocolRegistry.set(bytes32("contentResolver"), dotnsContentResolverProxy);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        protocolRegistry.set(bytes32("popRules"), popRulesProxy);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        protocolRegistry.set(bytes32("storeFactory"), address(storeFactory));
-        console.log("Protocol registry keys set");
-
-        // Wire protocol registry to all contracts
-        dotnsRegistrar.updateProtocolRegistry(IDotnsProtocolRegistry(address(protocolRegistry)));
-        dotnsRegistrarController.updateProtocolRegistry(
-            IDotnsProtocolRegistry(address(protocolRegistry))
+    function _deployPopResolver(
+        address owner,
+        address protocolRegistryProxy
+    )
+        internal
+        returns (address proxy)
+    {
+        proxy = _broadcastDeployUups(
+            owner,
+            "DotnsPopResolver.sol:DotnsPopResolver",
+            abi.encodeCall(
+                DotnsPopResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
+            ),
+            "DotnsPopResolver"
         );
-        dotnsRegistry.updateProtocolRegistry(IDotnsProtocolRegistry(address(protocolRegistry)));
-        dotnsReverseResolver.updateProtocolRegistry(
-            IDotnsProtocolRegistry(address(protocolRegistry))
-        );
-        dotnsResolver.updateProtocolRegistry(IDotnsProtocolRegistry(address(protocolRegistry)));
-        dotnsContentResolver.updateProtocolRegistry(
-            IDotnsProtocolRegistry(address(protocolRegistry))
-        );
-        popRules.updateProtocolRegistry(IDotnsProtocolRegistry(address(protocolRegistry)));
-        console.log("Protocol registry wired to all contracts");
+        dotnsPopResolver = DotnsPopResolver(proxy);
+    }
 
+    function _deployPopController(
+        address owner,
+        address protocolRegistryProxy
+    )
+        internal
+        returns (address proxy)
+    {
+        proxy = _broadcastDeployUups(
+            owner,
+            "DotnsPopController.sol:DotnsPopController",
+            abi.encodeCall(
+                DotnsPopController.initialize,
+                (IDotnsProtocolRegistry(protocolRegistryProxy), DEFAULT_RESERVATION_DURATION)
+            ),
+            "DotnsPopController"
+        );
+        dotnsPopController = DotnsPopController(proxy);
+    }
+
+    function _authoriseControllers(address owner, Deployment memory deployment) internal {
+        vm.startBroadcast(owner);
+        dotnsRegistrar.addController(IDotnsController(deployment.registrarController));
+        dotnsRegistrar.addController(IDotnsController(deployment.popController));
         vm.stopBroadcast();
+    }
 
-        // Post-deploy verification
-        _verifyDeployment(
-            dotnsRegistrarProxy,
-            dotnsRegistrarControllerProxy,
-            dotnsRegistryProxy,
-            dotnsReverseResolverProxy,
-            dotnsResolverProxy,
-            dotnsContentResolverProxy,
-            popRulesProxy,
-            OWNER
-        );
+    function _wireProtocolRegistryKeys(address owner, Deployment memory deployment) internal {
+        vm.startBroadcast(owner);
+        protocolRegistry.set(DotnsConstants.REGISTRAR, deployment.registrar);
+        protocolRegistry.set(DotnsConstants.CONTROLLER, deployment.registrarController);
+        protocolRegistry.set(DotnsConstants.REGISTRY, deployment.registry);
+        protocolRegistry.set(DotnsConstants.REVERSE_RESOLVER, deployment.reverseResolver);
+        protocolRegistry.set(DotnsConstants.RESOLVER, deployment.resolver);
+        protocolRegistry.set(DotnsConstants.CONTENT_RESOLVER, deployment.contentResolver);
+        protocolRegistry.set(DotnsConstants.POP_RULES, deployment.popRules);
+        protocolRegistry.set(DotnsConstants.STORE_FACTORY, deployment.storeFactory);
+        protocolRegistry.set(DotnsConstants.POP_CONTROLLER, deployment.popController);
+        protocolRegistry.set(DotnsConstants.POP_RESOLVER, deployment.popResolver);
+        // `popGateway` defaults to the deploying owner for local deploys. Governance
+        // rotates it post-deploy via `protocolRegistry.set(DotnsConstants.POP_GATEWAY, ...)`.
+        protocolRegistry.set(DotnsConstants.POP_GATEWAY, owner);
+        vm.stopBroadcast();
+        console.log("Protocol registry keys set");
+    }
 
-        saveDeployments(_getDeploymentFolder(), vm.toString(chainId));
+    function _wireProtocolRegistryPointers(address owner) internal {
+        IDotnsProtocolRegistry registry = IDotnsProtocolRegistry(address(protocolRegistry));
+        vm.startBroadcast(owner);
+        dotnsRegistrar.updateProtocolRegistry(registry);
+        dotnsRegistrarController.updateProtocolRegistry(registry);
+        dotnsRegistry.updateProtocolRegistry(registry);
+        dotnsReverseResolver.updateProtocolRegistry(registry);
+        dotnsResolver.updateProtocolRegistry(registry);
+        dotnsContentResolver.updateProtocolRegistry(registry);
+        popRules.updateProtocolRegistry(registry);
+        vm.stopBroadcast();
+        console.log("Protocol registry wired to all contracts");
     }
 
     function _verifyDeployment(
@@ -209,6 +341,8 @@ contract DotnsDeployer is BaseDeployer {
         address resolverProxy,
         address contentResolverProxy,
         address popRulesProxy,
+        address popControllerProxy,
+        address popResolverProxy,
         address expectedOwner
     )
         internal
@@ -231,29 +365,47 @@ contract DotnsDeployer is BaseDeployer {
             "ContentResolver: wrong owner"
         );
         require(PopRules(popRulesProxy).owner() == expectedOwner, "PopRules: wrong owner");
+        require(
+            DotnsPopController(popControllerProxy).owner() == expectedOwner,
+            "PopController: wrong owner"
+        );
+        require(
+            DotnsPopResolver(popResolverProxy).owner() == expectedOwner, "PopResolver: wrong owner"
+        );
         require(protocolRegistry.owner() == expectedOwner, "ProtocolRegistry: wrong owner");
         console.log("Ownership verified for all contracts");
 
         // Verify protocol registry wiring
-        // forge-lint: disable-start(unsafe-typecast)
-        require(protocolRegistry.get(bytes32("registrar")) == registrarProxy, "Key: registrar");
-        require(protocolRegistry.get(bytes32("controller")) == controllerProxy, "Key: controller");
-        require(protocolRegistry.get(bytes32("registry")) == registryProxy, "Key: registry");
+        require(protocolRegistry.get(DotnsConstants.REGISTRAR) == registrarProxy, "Key: registrar");
         require(
-            protocolRegistry.get(bytes32("reverseResolver")) == reverseResolverProxy,
+            protocolRegistry.get(DotnsConstants.CONTROLLER) == controllerProxy, "Key: controller"
+        );
+        require(protocolRegistry.get(DotnsConstants.REGISTRY) == registryProxy, "Key: registry");
+        require(
+            protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER) == reverseResolverProxy,
             "Key: reverseResolver"
         );
-        require(protocolRegistry.get(bytes32("resolver")) == resolverProxy, "Key: resolver");
+        require(protocolRegistry.get(DotnsConstants.RESOLVER) == resolverProxy, "Key: resolver");
         require(
-            protocolRegistry.get(bytes32("contentResolver")) == contentResolverProxy,
+            protocolRegistry.get(DotnsConstants.CONTENT_RESOLVER) == contentResolverProxy,
             "Key: contentResolver"
         );
-        require(protocolRegistry.get(bytes32("popRules")) == popRulesProxy, "Key: popRules");
+        require(protocolRegistry.get(DotnsConstants.POP_RULES) == popRulesProxy, "Key: popRules");
         require(
-            protocolRegistry.get(bytes32("storeFactory")) == address(storeFactory),
+            protocolRegistry.get(DotnsConstants.STORE_FACTORY) == address(storeFactory),
             "Key: storeFactory"
         );
-        // forge-lint: disable-end(unsafe-typecast)
+        require(
+            protocolRegistry.get(DotnsConstants.POP_CONTROLLER) == popControllerProxy,
+            "Key: popController"
+        );
+        require(
+            protocolRegistry.get(DotnsConstants.POP_RESOLVER) == popResolverProxy,
+            "Key: popResolver"
+        );
+        require(
+            protocolRegistry.get(DotnsConstants.POP_GATEWAY) == expectedOwner, "Key: popGateway"
+        );
         console.log("Protocol registry keys verified");
 
         // Verify protocol registry is wired to all contracts
@@ -290,10 +442,26 @@ contract DotnsDeployer is BaseDeployer {
         );
         console.log("Protocol registry wiring verified");
 
-        // Verify controller is authorized
+        // Verify both controllers are authorised on the registrar's multi-controller mapping.
         require(
-            DotnsRegistrar(registrarProxy).controllers(IDotnsRegistrarController(controllerProxy)),
+            DotnsRegistrar(registrarProxy).controllers(IDotnsController(controllerProxy)),
             "Controller not added to registrar"
+        );
+        require(
+            DotnsRegistrar(registrarProxy).controllers(IDotnsController(popControllerProxy)),
+            "PopController not added to registrar"
+        );
+
+        // Verify PoP contracts are wired to the protocol registry.
+        require(
+            address(DotnsPopController(popControllerProxy).protocolRegistry())
+                == address(protocolRegistry),
+            "PopController: not wired"
+        );
+        require(
+            address(DotnsPopResolver(popResolverProxy).protocolRegistry())
+                == address(protocolRegistry),
+            "PopResolver: not wired"
         );
 
         // Verify root record exists

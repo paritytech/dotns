@@ -101,7 +101,14 @@ jobs:
               table += `| ${key} | ${rows[key]} |\n`;
             }
 
-            const body = `${marker}\n## CI Summary\n\n${table}${detailsSection}`;
+            let body = `${marker}\n## CI Summary\n\n${table}${detailsSection}`;
+
+            // GitHub issue/PR comments are capped at 65536 characters. Fall back
+            // to the summary table only when the cumulative body would overflow.
+            const MAX_BODY = 65000;
+            if (body.length > MAX_BODY) {
+              body = `${marker}\n## CI Summary\n\n${table}\n\n_Per-section details omitted: combined body exceeded the ${MAX_BODY}-char comment limit. Follow the **View Report** links above for each section's full output._`;
+            }
 
             if (existing) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
@@ -239,6 +246,13 @@ jobs:
 
             if (sortedDetails.length > 0) {
               body += `\n${detailsMarker}\n\n---\n\n${sortedDetails.map(k => existingDetails[k]).join("\n\n")}`;
+            }
+
+            // GitHub issue/PR comments are capped at 65536 characters. Fall back
+            // to the summary table only when the cumulative body would overflow.
+            const MAX_BODY = 65000;
+            if (body.length > MAX_BODY) {
+              body = `${marker}\n## CI Summary\n\n${table}\n\n_Per-section details omitted: combined body exceeded the ${MAX_BODY}-char comment limit. Follow the **View Report** links above for each section's full output._`;
             }
 
             if (existing) {

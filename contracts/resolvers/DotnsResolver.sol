@@ -13,7 +13,7 @@ import {
 import {IDotnsResolver} from "./IDotnsResolver.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
-import {DotnsProtocolRegistry} from "../registry/DotnsProtocolRegistry.sol";
+import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title Dotns Resolver
 /// @notice Stores forward-resolution address records for DotNS nodes
@@ -90,16 +90,14 @@ contract DotnsResolver is
     /// @notice Internal ownership check for a registry node
     /// @param node Node identifier
     function _onlyNodeOwner(bytes32 node) internal view {
-        IDotnsRegistry _registry = IDotnsRegistry(
-            protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).REGISTRY())
-        );
+        IDotnsRegistry _registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
         require(_registry.owner(node) == msg.sender, NotAuthorised(node, msg.sender));
     }
 
     /// @notice Returns implementation version
     /// @return versionString Current version string
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.1.0";
+        versionString = "1.2.0";
     }
 
     /// @inheritdoc UUPSUpgradeable

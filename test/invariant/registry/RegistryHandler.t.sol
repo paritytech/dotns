@@ -4,19 +4,20 @@ pragma solidity ^0.8.30;
 import {Test} from "forge-std/Test.sol";
 import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {DotnsRegistry} from "../../../contracts/registry/DotnsRegistry.sol";
+import {LabelUtils} from "../../../contracts/utils/LabelUtils.sol";
 import {DotnsRegistrar} from "../../../contracts/registrars/DotnsRegistrar.sol";
 import {
     IDotnsRegistrarController,
     DotnsRegistrarController
 } from "../../../contracts/registrars/DotnsRegistrarController.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
+import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 
 /// @title Registry Handler for Invariant Testing
 /// @notice Executes bounded random actions on the registry: register base domains,
 ///         create subnodes, reassign subnodes, set resolvers, and transfer base domains.
 contract RegistryHandler is Test {
-    bytes32 private constant DOT_NODE =
-        0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
+    bytes32 private constant DOT_NODE = DotnsConstants.DOT_NODE;
 
     DotnsRegistrarController public controller;
     DotnsRegistry public registry;
@@ -202,7 +203,7 @@ contract RegistryHandler is Test {
     }
 
     function _computeNode(string memory label) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(DOT_NODE, keccak256(bytes(label))));
+        return LabelUtils.namehashUnder(DOT_NODE, LabelUtils.labelhashMemory(label));
     }
 
     function _generateUniqueLabel() internal returns (string memory) {

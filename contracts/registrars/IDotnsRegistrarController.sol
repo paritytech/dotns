@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
+import {IDotnsController} from "./IDotnsController.sol";
 
 /// @title Dotns Registrar Controller
 /// @notice Interface for registering .dot labels using a commit–reveal scheme.
@@ -17,7 +18,7 @@ import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 ///        to create an immutable onchain record of the name registration.
 ///      - This store serves as a quick lookup for all names registered.
 /// @custom:security-contact admin@parity.io
-interface IDotnsRegistrarController {
+interface IDotnsRegistrarController is IDotnsController {
     /// @notice Parameters used to generate and reveal a commitment.
     /// @dev All fields must match exactly between commitment and reveal.
     /// @param label Label being registered (e.g. "alice").
@@ -54,6 +55,19 @@ interface IDotnsRegistrarController {
     /// @param whiteListStatus Whether the address was added or removed from the whitelist.
     event WhiteListed(address indexed who, bool indexed whiteListStatus);
 
+    /// @notice Emitted when controller-held native funds are migrated to escrow.
+    /// @param escrow Escrow address that received the funds.
+    /// @param amount Native amount migrated.
+    event NativeFundsMigrated(address indexed escrow, uint256 amount);
+
+    /// @notice Emitted when overpayment is refunded to the payer at registration entry.
+    /// @dev Mirrors the {IDotnsNameEscrow-OverpaymentRefunded} event signature so indexers
+    ///      can consume both entry points uniformly. Emitted from `register()` after the
+    ///      refund call succeeds.
+    /// @param payer The address receiving the refund.
+    /// @param amount The refunded amount in wei.
+    event OverpaymentRefunded(address indexed payer, uint256 amount);
+
     /// @notice Thrown when the caller is not whitelisted or the owner.
     /// @param caller The address that attempted the call.
     error NotWhiteListedOrOwner(address caller);
@@ -81,6 +95,14 @@ interface IDotnsRegistrarController {
     /// @param label Label supplied by the caller.
     error NameNotAvailable(string label);
 
+    /// @notice Thrown when attempting to register a name whose base stem is reserved
+    ///         by another user.
+    /// @dev Surfaced on the cross-tier register path (`msg.sender != registration.owner`)
+    ///      where reservation gating is applied explicitly via
+    ///      {IPopRules-priceWithoutCheck} rather than {IPopRules-priceWithCheck}.
+    /// @param label Label supplied by the caller.
+    error NameReserved(string label);
+
     /// @notice Thrown when a label is not a canonical lowercase ASCII DNS label.
     error InvalidLabel();
 
@@ -101,6 +123,12 @@ interface IDotnsRegistrarController {
 
     /// @notice Thrown when the caller is not the registry.
     error NotRegistry();
+
+    /// @notice Thrown when escrow is not configured in the protocol registry.
+    error EscrowNotConfigured();
+
+    /// @notice Thrown when native-fund migration to escrow fails.
+    error NativeFundsMigrationFailed();
 
     /// @notice Returns whether a label is available for registration.
     /// @param label Label to check.
@@ -149,4 +177,10 @@ interface IDotnsRegistrarController {
     /// @param registry The address of the new protocol registry.
     // TODO: On fresh deploy (not upgrade), remove this function. Set protocolRegistry in initialize instead.
     function updateProtocolRegistry(IDotnsProtocolRegistry registry) external;
+
+    /// @notice Migrates controller-held native funds into escrow.
+    /// @dev Callable only by the contract owner. Temporary upgrade-compatibility path for
+    ///      moving any pre-escrow controller balance into the new custody contract.
+    /// @param amount Native amount to migrate.
+    function migrateNativeFundsToEscrow(uint256 amount) external;
 }

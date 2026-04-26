@@ -10,7 +10,9 @@ import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {IDotnsReverseResolver} from "../../../contracts/resolvers/IDotnsReverseResolver.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IStoreFactory} from "../../../contracts/store/IStoreFactory.sol";
+import {LabelUtils} from "../../../contracts/utils/LabelUtils.sol";
 import {DotnsRegistrar} from "../../../contracts/registrars/DotnsRegistrar.sol";
+import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 
 /// @title Registrar Controller Handler
 /// @notice Handler contract that executes bounded random actions against the controller.
@@ -18,8 +20,7 @@ import {DotnsRegistrar} from "../../../contracts/registrars/DotnsRegistrar.sol";
 ///      for invariant checks.
 contract RegistrarControllerHandler is Test {
     /// @notice Namehash of the .dot TLD.
-    bytes32 private constant DOT_NODE =
-        0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
+    bytes32 private constant DOT_NODE = DotnsConstants.DOT_NODE;
     /// @notice The registrar controller under test.
     IDotnsRegistrarController public controller;
 
@@ -317,7 +318,7 @@ contract RegistrarControllerHandler is Test {
         if (recipient == address(0)) return;
 
         bytes32 labelhash = keccak256(bytes(label));
-        bytes32 node = keccak256(abi.encodePacked(DOT_NODE, labelhash));
+        bytes32 node = LabelUtils.namehashUnder(DOT_NODE, labelhash);
         uint256 tokenId = uint256(node);
 
         vm.prank(currentOwner);
@@ -342,7 +343,7 @@ contract RegistrarControllerHandler is Test {
         address currentOwner = _registeredOwners[index];
 
         bytes32 labelhash = keccak256(bytes(label));
-        bytes32 node = keccak256(abi.encodePacked(DOT_NODE, labelhash));
+        bytes32 node = LabelUtils.namehashUnder(DOT_NODE, labelhash);
         uint256 tokenId = uint256(node);
 
         // Transfer through 2–4 hops

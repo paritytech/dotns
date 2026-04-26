@@ -128,6 +128,10 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
         vm.stopPrank();
 
+        // Same-tier transfer: recipient also PopFull so the cross-tier fee gate
+        // sees priceForTo == 0 and waives the delta.
+        _grantPopFull(recipient);
+
         IDotnsRegistrarController.Registration memory registration =
             _commitFor(nameLabel, sender, true);
 
@@ -192,6 +196,10 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
 
         vm.prank(sender);
         popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+
+        // Same-tier transfer so the cross-tier fee gate is a no-op for this
+        // reverse-name clearing test.
+        _grantPopFull(recipient);
 
         IDotnsRegistrarController.Registration memory registration =
             _commitFor(nameLabel, sender, true);

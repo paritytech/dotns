@@ -12,7 +12,7 @@ import {
 import {IDotnsReverseResolver} from "./IDotnsReverseResolver.sol";
 import {IDotnsRegistrarController} from "../registrars/IDotnsRegistrarController.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
-import {DotnsProtocolRegistry} from "../registry/DotnsProtocolRegistry.sol";
+import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title Dotns Reverse Resolver
 /// @notice Resolves an address to its associated .dot name.
@@ -92,10 +92,8 @@ contract DotnsReverseResolver is
 
     /// @notice Internal check enforcing registrar-only access.
     function _onlyRegistrar() internal view {
-        address controller =
-            protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).CONTROLLER());
-        address registrar =
-            protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).REGISTRAR());
+        address controller = protocolRegistry.get(DotnsConstants.CONTROLLER);
+        address registrar = protocolRegistry.get(DotnsConstants.REGISTRAR);
         require(
             msg.sender == controller || msg.sender == registrar, NotRegistrarController(msg.sender)
         );
@@ -104,7 +102,7 @@ contract DotnsReverseResolver is
     /// @notice Returns implementation version
     /// @return versionString Current version string
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.1.0";
+        versionString = "1.2.0";
     }
 
     /// @inheritdoc UUPSUpgradeable

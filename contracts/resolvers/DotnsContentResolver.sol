@@ -13,7 +13,7 @@ import {
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IDotnsContentResolver} from "./IDotnsContentResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
-import {DotnsProtocolRegistry} from "../registry/DotnsProtocolRegistry.sol";
+import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title Dotns Content Resolver
 /// @notice Implements `IDotnsContentResolver` interface with content hash, text records, and operator approvals
@@ -123,9 +123,7 @@ contract DotnsContentResolver is
     /// @notice Ensures caller is either the node owner or an approved operator
     /// @param node Node identifier
     function _requireNodeOwnerOrOperator(bytes32 node) internal view {
-        IDotnsRegistry _registry = IDotnsRegistry(
-            protocolRegistry.get(DotnsProtocolRegistry(address(protocolRegistry)).REGISTRY())
-        );
+        IDotnsRegistry _registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
         address nodeOwner = _registry.owner(node);
         require(
             msg.sender == nodeOwner || operators[nodeOwner][msg.sender],
@@ -136,7 +134,7 @@ contract DotnsContentResolver is
     /// @notice Returns implementation version
     /// @return versionString Current version string
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.1.0";
+        versionString = "1.2.0";
     }
 
     /// @inheritdoc ERC165Upgradeable

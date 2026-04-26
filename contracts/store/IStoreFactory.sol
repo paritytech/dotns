@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import {IStore} from "./IStore.sol";
 
@@ -8,7 +8,7 @@ import {IStore} from "./IStore.sol";
 /// @dev Each address can deploy a single store instance. Subsequent deployment attempts revert.
 // TODO: On fresh deploy, adopt OZ Ownable2Step on Store and use the factory as escrow:
 //       1. Alice calls store.transferOwnership(factory) -- pending via Ownable2Step.
-//       2. Factory accepts ownership and records the offer (Alice -> Bob).
+//       2. Factory accepts ownership and records the offer (Alice => Bob).
 //       3. Bob calls factory.acceptTransfer() -- factory transfers store to Bob and updates mapping.
 //       4. If Bob never accepts, Alice calls factory.cancelTransfer() -- factory returns store to Alice.
 /// @custom:security-contact admin@parity.io

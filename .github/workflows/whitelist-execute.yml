@@ -116,7 +116,7 @@ jobs:
               "",
               "Once your account is mapped, comment `/retry` on this issue to try again.",
               "",
-              "cc @filvecchiato @waytwotall @andrew-ifrita @corey-hathaway @sphamjoli",
+              "cc @waytwotall @andrew-ifrita @sphamjoli",
             ].join("\n");
 
             const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
@@ -179,7 +179,7 @@ jobs:
             lines.push("");
             lines.push(`[View on Blockscout](${explorerUrl}/address/${address})`);
             lines.push("");
-            lines.push("cc @filvecchiato @waytwotall @andrew-ifrita @corey-hathaway @sphamjoli");
+            lines.push("cc @waytwotall @andrew-ifrita @sphamjoli");
 
             const section = lines.join("\n");
 
@@ -253,7 +253,7 @@ jobs:
             lines.push("");
             lines.push(`@${author} Your address has been whitelisted. This means your address can now bypass Proof of Personhood (POP) rules when registering .dot names. Note that whitelisting does not register a name for you -- it only allows your address to skip POP verification during the registration process.`);
             lines.push("");
-            lines.push("cc @filvecchiato @waytwotall @andrew-ifrita @corey-hathaway @sphamjoli");
+            lines.push("cc @waytwotall @andrew-ifrita @sphamjoli");
 
             const section = lines.join("\n");
 
@@ -288,7 +288,7 @@ jobs:
               "",
               "Comment `/retry` on this issue to try again.",
               "",
-              "cc @filvecchiato @waytwotall @andrew-ifrita @corey-hathaway @sphamjoli",
+              "cc @waytwotall @andrew-ifrita @sphamjoli",
             ].join("\n");
 
             const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });

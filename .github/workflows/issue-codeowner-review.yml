@@ -23,7 +23,7 @@ jobs:
             const body = [
               "### Code Owner Review Required",
               "",
-              `@filvecchiato @waytwotall @andrew-ifrita @corey-hathaway @sphamjoli`,
+              `@waytwotall @andrew-ifrita @sphamjoli`,
               "",
               `New whitelist request from @${opener}. Review the address and apply \`whitelist-approved\` to proceed.`,
             ].join("\n");

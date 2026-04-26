@@ -17,10 +17,8 @@ jobs:
         with:
           script: |
             const codeOwners = [
-              "filvecchiato",
               "waytwotall",
               "andrew-ifrita",
-              "corey-hathaway",
               "sphamjoli",
             ];
 
@@ -51,6 +49,6 @@ jobs:
                 "",
                 "If you need approval permissions, request to be added as a [code owner](https://github.com/paritytech/dotns/blob/main/.github/CODEOWNERS).",
                 "",
-                "cc @filvecchiato @waytwotall @andrew-ifrita @corey-hathaway @sphamjoli",
+                "cc @waytwotall @andrew-ifrita @sphamjoli",
               ].join("\n"),
             });

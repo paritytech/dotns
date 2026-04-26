@@ -9,6 +9,11 @@ import {
     DotnsRegistrarController,
     IDotnsRegistrarController
 } from "../../contracts/registrars/DotnsRegistrarController.sol";
+import {
+    DotnsPopController,
+    IDotnsPopController
+} from "../../contracts/registrars/DotnsPopController.sol";
+import {IDotnsController} from "../../contracts/registrars/IDotnsController.sol";
 import {DotnsRegistry, IDotnsRegistry} from "../../contracts/registry/DotnsRegistry.sol";
 import {DotnsResolver} from "../../contracts/resolvers/DotnsResolver.sol";
 import {DotnsContentResolver} from "../../contracts/resolvers/DotnsContentResolver.sol";
@@ -16,14 +21,17 @@ import {
     DotnsReverseResolver,
     IDotnsReverseResolver
 } from "../../contracts/resolvers/DotnsReverseResolver.sol";
+import {DotnsPopResolver} from "../../contracts/resolvers/DotnsPopResolver.sol";
 import {Store} from "../../contracts/store/Store.sol";
 import {StoreFactory, IStoreFactory} from "../../contracts/store/StoreFactory.sol";
 import {
     DotnsProtocolRegistry,
     IDotnsProtocolRegistry
 } from "../../contracts/registry/DotnsProtocolRegistry.sol";
+import {DotnsNameEscrow} from "../../contracts/escrow/DotnsNameEscrow.sol";
 import {StoreUtils} from "../../contracts/utils/StoreUtils.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
+import {LabelUtils} from "../../contracts/utils/LabelUtils.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 /// @title BaseDotns
@@ -36,6 +44,7 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 ///      - DotnsContentResolver: resolver used for content records
 ///      - PopRules: PoP rules and spam-pricing oracle
 ///      - DotnsRegistrarController: commit–reveal controller orchestrating registration flow
+///      - DotnsNameEscrow: escrow for refundable deposits and name release lifecycle
 abstract contract BaseDotns is Test {
     /// @notice Test user account: ed.
     address public ed;
@@ -73,18 +82,50 @@ abstract contract BaseDotns is Test {
     /// @notice Deployed reverse resolver instance.
     DotnsReverseResolver public dotnsReverseResolver;
 
+    /// @notice Deployed PoP resolver instance (chat keys + lite links).
+    DotnsPopResolver public dotnsPopResolver;
+
+    /// @notice Deployed PoP controller instance (gateway-driven lite/full issuance).
+    DotnsPopController public dotnsPopController;
+
+    /// @notice Test account representing the privileged PoP gateway origin.
+    address public popGateway;
+
+    /// @notice Default reservation duration used by the PoP controller.
+    uint64 public constant DEFAULT_RESERVATION_DURATION = 7 days;
+
     /// @notice Deployed Store factory instance.
     StoreFactory public storeFactory;
 
     /// @notice Deployed protocol registry instance.
     DotnsProtocolRegistry public protocolRegistry;
 
+    /// @notice Deployed name escrow instance.
+    DotnsNameEscrow public dotnsNameEscrow;
+
     /// @notice Rent price applied to PoP NoStatus users for spam resistance.
     /// @dev This value is passed into PopRules initialization in this base test.
     uint256 public constant RENT_PRICE = 2e15 wei;
 
+    /// @notice Default escrow cooldown used in tests.
+    uint256 public constant ESCROW_COOLDOWN = 7 days;
+
     /// @notice Zero hash constant
     bytes32 public constant ZERO_HASH = bytes32(0);
+
+    // Classification-valid labels for the PoP path (post PopRules enforcement).
+    // baselength 7 with 2 trailing digits classifies as PopLite.
+    string internal constant LITE_LABEL_A = "aliceli01";
+    string internal constant LITE_LABEL_B = "alicoli02";
+    string internal constant LITE_LABEL_C = "boblilu03";
+    string internal constant LITE_LABEL_D = "carolli04";
+    // baselength 8 with no trailing digits classifies as PopFull.
+    string internal constant BASE_LABEL_A = "alicebob";
+    string internal constant BASE_LABEL_B = "wonderla";
+    string internal constant BASE_LABEL_C = "carolboy";
+    // baselength >= 9 with 2 trailing digits classifies as NoStatus.
+    string internal constant NOSTATUS_LABEL_A = "nostatususer01";
+    string internal constant NOSTATUS_LABEL_B = "anothernostatus02";
 
     /// @notice Label hash for "dot".
     /// @dev Computed during setup as `keccak256(bytes("dot"))`.
@@ -96,8 +137,7 @@ abstract contract BaseDotns is Test {
 
     /// @notice Default node hash for the ".dot" TLD.
     /// @dev Included to cross-check against computed `dotNode` where relevant.
-    bytes32 private constant DOT_NODE =
-        0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
+    bytes32 private constant DOT_NODE = DotnsConstants.DOT_NODE;
 
     function setUp() public virtual noGasMetering {
         vm.warp(365 days);
@@ -106,6 +146,7 @@ abstract contract BaseDotns is Test {
         leonardo = _createUser("leonardo");
         tiago = _createUser("tiago");
         owner = _createUser("owner");
+        popGateway = _createUser("popGateway");
 
         dotLabel = keccak256(bytes("dot"));
         dotNode = _namehash(ZERO_HASH, dotLabel);
@@ -181,7 +222,7 @@ abstract contract BaseDotns is Test {
         dotnsRegistrarController = DotnsRegistrarController(dotnsRegistrarControllerAddress);
         vm.label(dotnsRegistrarControllerAddress, "DotnsRegistrarController");
 
-        dotnsRegistrar.addController(IDotnsRegistrarController(dotnsRegistrarControllerAddress));
+        dotnsRegistrar.addController(IDotnsController(dotnsRegistrarControllerAddress));
 
         address protocolRegistryAddress = Upgrades.deployUUPSProxy(
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
@@ -190,14 +231,49 @@ abstract contract BaseDotns is Test {
         protocolRegistry = DotnsProtocolRegistry(protocolRegistryAddress);
         vm.label(protocolRegistryAddress, "DotnsProtocolRegistry");
 
-        protocolRegistry.set(protocolRegistry.REGISTRAR(), dotnsRegistrarAddress);
-        protocolRegistry.set(protocolRegistry.CONTROLLER(), dotnsRegistrarControllerAddress);
-        protocolRegistry.set(protocolRegistry.REGISTRY(), dotnsRegistryAddress);
-        protocolRegistry.set(protocolRegistry.REVERSE_RESOLVER(), dotnsReverseResolverAddress);
-        protocolRegistry.set(protocolRegistry.POP_RULES(), popRulesAddress);
-        protocolRegistry.set(protocolRegistry.STORE_FACTORY(), address(storeFactory));
-        protocolRegistry.set(protocolRegistry.RESOLVER(), dotnsResolverAddress);
-        protocolRegistry.set(protocolRegistry.CONTENT_RESOLVER(), dotnsContentResolverAddress);
+        address dotnsPopResolverAddress = Upgrades.deployUUPSProxy(
+            "DotnsPopResolver.sol:DotnsPopResolver",
+            abi.encodeCall(
+                DotnsPopResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryAddress))
+            )
+        );
+        dotnsPopResolver = DotnsPopResolver(dotnsPopResolverAddress);
+        vm.label(dotnsPopResolverAddress, "DotnsPopResolver");
+
+        address dotnsPopControllerAddress = Upgrades.deployUUPSProxy(
+            "DotnsPopController.sol:DotnsPopController",
+            abi.encodeCall(
+                DotnsPopController.initialize,
+                (IDotnsProtocolRegistry(protocolRegistryAddress), DEFAULT_RESERVATION_DURATION)
+            )
+        );
+        dotnsPopController = DotnsPopController(dotnsPopControllerAddress);
+        vm.label(dotnsPopControllerAddress, "DotnsPopController");
+
+        dotnsRegistrar.addController(IDotnsController(dotnsPopControllerAddress));
+
+        address dotnsNameEscrowAddress = Upgrades.deployUUPSProxy(
+            "DotnsNameEscrow.sol:DotnsNameEscrow",
+            abi.encodeCall(
+                DotnsNameEscrow.initialize,
+                (IDotnsProtocolRegistry(protocolRegistryAddress), ESCROW_COOLDOWN)
+            )
+        );
+        dotnsNameEscrow = DotnsNameEscrow(payable(dotnsNameEscrowAddress));
+        vm.label(dotnsNameEscrowAddress, "DotnsNameEscrow");
+
+        protocolRegistry.set(DotnsConstants.REGISTRAR, dotnsRegistrarAddress);
+        protocolRegistry.set(DotnsConstants.CONTROLLER, dotnsRegistrarControllerAddress);
+        protocolRegistry.set(DotnsConstants.REGISTRY, dotnsRegistryAddress);
+        protocolRegistry.set(DotnsConstants.REVERSE_RESOLVER, dotnsReverseResolverAddress);
+        protocolRegistry.set(DotnsConstants.POP_RULES, popRulesAddress);
+        protocolRegistry.set(DotnsConstants.STORE_FACTORY, address(storeFactory));
+        protocolRegistry.set(DotnsConstants.RESOLVER, dotnsResolverAddress);
+        protocolRegistry.set(DotnsConstants.CONTENT_RESOLVER, dotnsContentResolverAddress);
+        protocolRegistry.set(DotnsConstants.POP_RESOLVER, dotnsPopResolverAddress);
+        protocolRegistry.set(DotnsConstants.POP_CONTROLLER, dotnsPopControllerAddress);
+        protocolRegistry.set(DotnsConstants.POP_GATEWAY, popGateway);
+        protocolRegistry.set(DotnsConstants.NAME_ESCROW, dotnsNameEscrowAddress);
 
         dotnsRegistrar.updateProtocolRegistry(IDotnsProtocolRegistry(address(protocolRegistry)));
         dotnsRegistrarController.updateProtocolRegistry(
@@ -217,13 +293,14 @@ abstract contract BaseDotns is Test {
         vm.warp(block.timestamp + 365 days);
     }
 
-    /// @notice Computes an namehash for `parent` and `label`.
-    /// @dev Equivalent to `keccak256(abi.encodePacked(parent, label))`.
+    /// @notice Computes the namehash of `parent` and `labelhash`.
+    /// @dev Thin wrapper around {LabelUtils-namehashUnder} so tests do not
+    ///      reimplement the assembly composition.
     /// @param parent The parent node hash.
-    /// @param label The label hash.
+    /// @param labelhash The labelhash.
     /// @return node The resulting node hash.
-    function _namehash(bytes32 parent, bytes32 label) internal pure returns (bytes32 node) {
-        node = keccak256(abi.encodePacked(parent, label));
+    function _namehash(bytes32 parent, bytes32 labelhash) internal pure returns (bytes32 node) {
+        node = LabelUtils.namehashUnder(parent, labelhash);
     }
 
     /// @notice Computes the ERC721 tokenId used by DotnsRegistrar for a given label.
@@ -232,9 +309,91 @@ abstract contract BaseDotns is Test {
     /// @param label The label to compute for (without the `.dot` suffix).
     /// @return tokenId The ERC721 tokenId (uint256(node)).
     function _tokenIdForLabel(string memory label) internal pure returns (uint256 tokenId) {
-        bytes32 labelhash = keccak256(bytes(label));
-        bytes32 node = keccak256(abi.encodePacked(DOT_NODE, labelhash));
-        tokenId = uint256(node);
+        tokenId = uint256(_nodeOf(label));
+    }
+
+    /// @notice Computes `namehash(DOT_NODE, keccak256(label))` for a flat label.
+    /// @dev Shared across test suites that need the node identifier for a .dot label.
+    /// @param label Label (without the `.dot` suffix).
+    /// @return node The node identifier under the `.dot` TLD.
+    function _nodeOf(string memory label) internal pure returns (bytes32 node) {
+        node = LabelUtils.namehashUnder(DOT_NODE, LabelUtils.labelhashMemory(label));
+    }
+
+    /// @dev Returns a valid 65-byte chat key seeded with `seed`. Format mimics the
+    ///      uncompressed secp256k1 encoding (1 prefix byte + 32 X + 32 Y) so the
+    ///      resolver's length guard is satisfied.
+    function _validChatKey(bytes1 seed) internal pure returns (bytes memory key) {
+        key = new bytes(65);
+        key[0] = 0x04;
+        for (uint256 i = 1; i < 65; i++) {
+            key[i] = seed;
+        }
+    }
+
+    /// @notice Grants PopFull status to `who` on the PoP rules oracle.
+    function _grantPopFull(address who) internal {
+        vm.prank(who);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopFull);
+    }
+
+    /// @notice Grants PopLite status to `who` on the PoP rules oracle.
+    function _grantPopLite(address who) internal {
+        vm.prank(who);
+        popRules.setUserPopStatus(IPopRules.PopStatus.PopLite);
+    }
+
+    /// @notice Grants NoStatus (default) to `who` on the PoP rules oracle.
+    function _grantNoStatus(address who) internal {
+        vm.prank(who);
+        popRules.setUserPopStatus(IPopRules.PopStatus.NoStatus);
+    }
+
+    /// @notice Drives `DotnsPopController.reserveBaseName` through the configured gateway.
+    /// @dev Single canonical helper for PoP-gateway reservations across unit and fuzz
+    ///      test suites. Keeps the `vm.prank(popGateway)` boilerplate in one place.
+    function _reservePop(
+        address user,
+        string memory liteLabel,
+        bytes memory chatKey,
+        string memory reservedBaseLabel
+    )
+        internal
+    {
+        vm.prank(popGateway);
+        dotnsPopController.reserveBaseName(liteLabel, user, chatKey, reservedBaseLabel);
+    }
+
+    /// @notice Constructs a `Link` that inherits the chat key from a prior lite label.
+    function _linkWithLite(string memory liteLabel)
+        internal
+        pure
+        returns (IDotnsPopController.Link memory)
+    {
+        return IDotnsPopController.Link({
+            kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
+        });
+    }
+
+    /// @notice Constructs a `Link` carrying a fresh chat key (no lite inheritance).
+    function _linkFresh(bytes memory chatKey)
+        internal
+        pure
+        returns (IDotnsPopController.Link memory)
+    {
+        return IDotnsPopController.Link({
+            kind: IDotnsPopController.LinkKind.None, liteLabel: "", chatKey: chatKey
+        });
+    }
+
+    /// @notice Authorises the calling test contract on the registrar's controller set.
+    /// @dev PopRules' `_onlyRegistry` trusts `DotnsRegistrar.controllers`, so unit
+    ///      tests that exercise `reserveBaseName` / `reserveBaseNameForPop` /
+    ///      `releaseBaseName` directly have to be registered. Single helper keeps
+    ///      the `vm.prank(owner)` + `addController` boilerplate in one place.
+    function _authoriseTestAsController() internal {
+        vm.prank(owner);
+        dotnsRegistrar.addController(IDotnsController(address(this)));
     }
 
     /// @notice Creates a new test user and funds it with DEFAULT_BALANCE.
@@ -345,9 +504,7 @@ abstract contract BaseDotns is Test {
 
         _commitAndRegister(label, labelOwner, true);
 
-        // IMPORTANT: tokenId is uint256(node) where node = namehash(DOT_NODE, labelhash)
-        // Do not use uint256(node) as the tokenId in tests.
-        node = keccak256(abi.encodePacked(DOT_NODE, keccak256(bytes(label))));
+        node = _nodeOf(label);
     }
 
     /// @notice Ensures a Store exists for `storeOwner`, deploying one if necessary.
@@ -369,7 +526,7 @@ abstract contract BaseDotns is Test {
     }
 
     /// @notice Computes the Store key for a registered label.
-    /// @dev Delegates to `StoreUtils.storeKey` — single source of truth for the key derivation.
+    /// @dev Delegates to `StoreUtils.storeKey`; single source of truth for the key derivation.
     /// @param labelhash keccak256(label).
     /// @return key Store key used for DotNS-written registration entry.
     function _storeKey(bytes32 labelhash) internal pure returns (bytes32 key) {

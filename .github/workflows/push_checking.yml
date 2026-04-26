@@ -42,10 +42,18 @@ jobs:
 
       - run: bun install
 
+      - name: Start revive-eth-rpc (paseo_local fork target)
+        run: |
+          docker compose up -d --build
+          bash scripts/shell/wait-for-eth-rpc.sh
+
       - name: Run tests
         id: run
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+          FOUNDRY_PROFILE: "ci"
+          FOUNDRY_FUZZ_GAS_REPORT_SAMPLES: "1000"
+          FOUNDRY_INVARIANT_GAS_REPORT_SAMPLES: "1000"
         run: |
           set +e
           forge build --sizes > build.log 2>&1
@@ -65,6 +73,10 @@ jobs:
           if [ $TEST -ne 0 ]; then
             exit 1
           fi
+
+      - name: Tear down revive-eth-rpc
+        if: always()
+        run: docker compose down --volumes --remove-orphans
 
       - name: Set deploy path
         id: path
@@ -153,6 +165,14 @@ jobs:
             const sortedDetails = Object.keys(existingDetails).sort((a, b) => (detailsOrder.indexOf(a) === -1 ? 999 : detailsOrder.indexOf(a)) - (detailsOrder.indexOf(b) === -1 ? 999 : detailsOrder.indexOf(b)));
             let body = `${marker}\n## CI Summary\n\n${table}`;
             if (sortedDetails.length > 0) body += `\n${detailsMarker}\n\n---\n\n${sortedDetails.map(k => existingDetails[k]).join('\n\n')}`;
+
+            // GitHub issue/PR comments are capped at 65536 characters. Fall back to
+            // the summary table only when the cumulative body would overflow; per-
+            // section reports remain reachable via the `[View Report]` row links.
+            const MAX_BODY = 65000;
+            if (body.length > MAX_BODY) {
+              body = `${marker}\n## CI Summary\n\n${table}\n\n_Per-section details omitted: combined body exceeded the ${MAX_BODY}-char comment limit. Follow the **View Report** links above for each section's full output._`;
+            }
 
             if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
             else await github.rest.issues.createComment({ owner, repo, issue_number, body });
