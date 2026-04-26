@@ -52,7 +52,7 @@ contract DotnsRegistryTests is BaseDotns {
 
         string memory subLabel = "alice";
         bytes32 subLabelHash = keccak256(bytes(subLabel));
-        bytes32 expectedSubnode = keccak256(abi.encodePacked(parentNode, subLabelHash));
+        bytes32 expectedSubnode = _namehash(parentNode, subLabelHash);
 
         _ensureStoreFor(ed);
 
@@ -79,7 +79,7 @@ contract DotnsRegistryTests is BaseDotns {
 
         string memory subLabel = "carol";
         bytes32 subLabelHash = keccak256(bytes(subLabel));
-        bytes32 node = keccak256(abi.encodePacked(parentNode, subLabelHash));
+        bytes32 node = _namehash(parentNode, subLabelHash);
         address newResolver = makeAddr("resolver");
 
         _ensureStoreFor(ed);
@@ -108,7 +108,7 @@ contract DotnsRegistryTests is BaseDotns {
 
         string memory subLabel = "dave";
         bytes32 subLabelHash = keccak256(bytes(subLabel));
-        bytes32 node = keccak256(abi.encodePacked(parentNode, subLabelHash));
+        bytes32 node = _namehash(parentNode, subLabelHash);
         address newResolver = makeAddr("resolver");
 
         _ensureStoreFor(ed);
@@ -164,7 +164,7 @@ contract DotnsRegistryTests is BaseDotns {
 
         string memory childLabel = "child";
         bytes32 childLabelHash = keccak256(bytes(childLabel));
-        bytes32 expectedChildNode = keccak256(abi.encodePacked(parentNode, childLabelHash));
+        bytes32 expectedChildNode = _namehash(parentNode, childLabelHash);
 
         _ensureStoreFor(tiago);
 

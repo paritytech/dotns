@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "forge test -vvvvv",
-    "deploy:anvil": "forge clean && forge script scripts/deploy/DotnsDeployer.s.sol:DotnsDeployer --rpc-url paseo_local --account anvil-polkadot --password 123456 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --broadcast -vvvvv --slow",
-    "deploy:testnet": "forge script scripts/deploy/DotnsDeployer.s.sol:DotnsDeployer --rpc-url paseo_local --account revive --password 123456 --sender 0xf24FF3a9CF04c71Dbc94D0b566f7A27B94566cac --broadcast --timeout 1000 --gas-estimate-multiplier 300 -vvvvv",
+    "deploy:anvil": "forge clean && forge build && ./scripts/deploy/run.sh anvil-polkadot 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 '--slow'",
+    "deploy:testnet": "./scripts/deploy/run.sh revive 0xf24FF3a9CF04c71Dbc94D0b566f7A27B94566cac '--timeout 1000 --gas-estimate-multiplier 300'",
     "postinstall": "./setup.bash",
     "reset": "forge clean"
   },

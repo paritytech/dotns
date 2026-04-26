@@ -39,12 +39,18 @@ jobs:
 
       - run: bun install
 
+      - name: Start revive-eth-rpc (paseo_local fork target)
+        run: |
+          docker compose up -d --build
+          bash scripts/shell/wait-for-eth-rpc.sh
+
       - name: Generate gas report (PR branch)
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+          FOUNDRY_PROFILE: "gas"
         run: |
           forge build
-          forge test --gas-report --no-match-path "test/fork/*" 2>&1 | tee pr-gas-report.txt
+          forge test --gas-report 2>&1 | tee pr-gas-report.txt
 
       - name: Checkout main branch
         uses: actions/checkout@v4
@@ -56,11 +62,17 @@ jobs:
       - name: Generate gas report (main branch)
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+          FOUNDRY_FUZZ_GAS_REPORT_SAMPLES: "1000"
+          FOUNDRY_INVARIANT_GAS_REPORT_SAMPLES: "1000"
         working-directory: main-branch
         run: |
           bun install
           forge build
-          forge test --gas-report --no-match-path "test/fork/*" 2>&1 | tee ../main-gas-report.txt
+          forge test --gas-report 2>&1 | tee ../main-gas-report.txt
+
+      - name: Tear down revive-eth-rpc
+        if: always()
+        run: docker compose down --volumes --remove-orphans
 
       - name: Generate HTML and markdown reports
         id: diff

@@ -54,7 +54,7 @@ contract DotnsRegistryInvariantTest is BaseDotns {
             string[] memory labels = handler.getRegisteredLabels();
             string memory parentLabel;
             for (uint256 j; j < labels.length; ++j) {
-                bytes32 node = keccak256(abi.encodePacked(dotNode, keccak256(bytes(labels[j]))));
+                bytes32 node = _namehash(dotNode, keccak256(bytes(labels[j])));
                 if (node == parentNode) {
                     parentLabel = labels[j];
                     break;

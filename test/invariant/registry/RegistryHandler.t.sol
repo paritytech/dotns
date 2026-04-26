@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import {Test} from "forge-std/Test.sol";
 import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {DotnsRegistry} from "../../../contracts/registry/DotnsRegistry.sol";
+import {LabelUtils} from "../../../contracts/utils/LabelUtils.sol";
 import {DotnsRegistrar} from "../../../contracts/registrars/DotnsRegistrar.sol";
 import {
     IDotnsRegistrarController,
@@ -202,7 +203,7 @@ contract RegistryHandler is Test {
     }
 
     function _computeNode(string memory label) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(DOT_NODE, keccak256(bytes(label))));
+        return LabelUtils.namehashUnder(DOT_NODE, LabelUtils.labelhashMemory(label));
     }
 
     function _generateUniqueLabel() internal returns (string memory) {

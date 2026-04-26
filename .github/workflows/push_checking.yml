@@ -45,24 +45,15 @@ jobs:
       - name: Start revive-eth-rpc (paseo_local fork target)
         run: |
           docker compose up -d --build
-          for i in $(seq 1 60); do
-            if curl -sf -X POST -H "Content-Type: application/json" \
-                 --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
-                 http://127.0.0.1:8545 >/dev/null; then
-              echo "eth-rpc ready after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-          curl -sf -X POST -H "Content-Type: application/json" \
-            --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
-            http://127.0.0.1:8545 \
-            || { echo "eth-rpc failed to come up"; docker compose logs; exit 1; }
+          bash scripts/shell/wait-for-eth-rpc.sh
 
       - name: Run tests
         id: run
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+          FOUNDRY_PROFILE: "ci"
+          FOUNDRY_FUZZ_GAS_REPORT_SAMPLES: "1000"
+          FOUNDRY_INVARIANT_GAS_REPORT_SAMPLES: "1000"
         run: |
           set +e
           forge build --sizes > build.log 2>&1

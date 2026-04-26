@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import {IStore} from "./IStore.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";

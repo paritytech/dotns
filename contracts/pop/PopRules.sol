@@ -12,6 +12,8 @@ import {
 import {StringUtils} from "../utils/StringUtils.sol";
 import {IPopRules} from "./IPopRules.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
+import {IDotnsController} from "../registrars/IDotnsController.sol";
+import {DotnsRegistrar} from "../registrars/DotnsRegistrar.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title PopRules
@@ -26,19 +28,32 @@ contract PopRules is
 {
     using StringUtils for *;
 
-    /// @notice Wei price for names with 9 characters and up
+    /// @notice Base unit for the length-scaled name price.
+    /// @dev Scales down inside `_priceValidatedName` according to label length;
+    ///      charged to NoStatus users as a spam deterrent and to below-tier reach
+    ///      paths as protocol friction.
     uint256 public startingPrice;
 
-    /// @notice Tracks PoP status per user/profile
+    /// @notice Tracks PoP status per user profile.
+    /// @dev Temporary until a precompile exposes PoP status directly from the
+    ///      pallet; every registration read goes through this map.
     mapping(address => PopStatus) public userPopStatus;
 
-    /// @notice Active reservations for base names
+    /// @notice Active reservations keyed by digit-stripped base name.
+    /// @dev Single cross-flow reservation table. Both the commit-reveal
+    ///      controller (via `priceWithCheck`) and the PoP controller (via
+    ///      `reserveBaseNameForPop` / `releaseBaseName`) read and write this
+    ///      map, so the live-window predicate `_isLive` stays the one place
+    ///      freshness is computed.
     mapping(string baseName => Reservation reservation) public reservations;
 
-    /// @notice Maximum time a base name can be reserved
+    /// @notice Maximum time a base name can be reserved.
+    /// @dev Every reservation write (`reserveBaseName`, `reserveBaseNameForPop`)
+    ///      stamps `block.timestamp + MAX_RESERVATION_TIME` as the expiry; the
+    ///      reservation predicate `_isLive` tests this bound.
     uint256 public constant MAX_RESERVATION_TIME = 12 weeks;
 
-    /// @notice DEPRECATED: Authorized registry controller address.
+    /// @notice DEPRECATED: Authorised registry controller address.
     /// @dev Retained for UUPS storage layout compatibility. Use protocolRegistry instead.
     /// TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.
     address public dotRegistryController;
@@ -50,7 +65,12 @@ contract PopRules is
     // forge-lint: disable-next-line(mixed-case-variable)
     uint256[49] private __gap;
 
-    /// @notice Restricts function to registry controller
+    /// @notice Restricts function to any registry-authorised controller
+    /// @dev The registrar's `controllers` mapping is the canonical ACL for "who may
+    ///      drive DotNS name state". Every controller lives behind owner-gated
+    ///      `addController` / `removeController`, so trusting that set directly
+    ///      keeps PopRules open to current and future controllers without
+    ///      requiring a new modifier per controller type.
     modifier onlyRegistry() {
         _onlyRegistry();
         _;
@@ -61,16 +81,22 @@ contract PopRules is
         _disableInitializers();
     }
 
-    /// @notice Initializes the oracle with pricing parameters
-    /// @param _startingPrice Base price in wei for No pop status users
+    /// @notice Initialises the oracle with pricing parameters.
+    /// @dev Shared initialiser body; called from `initialize` so future upgrade
+    ///      variants can reuse the same setup without duplicating the Ownable
+    ///      and ERC165 wiring.
+    /// @param _startingPrice Base price in wei for NoStatus users.
     function _popRulesInit(uint256 _startingPrice) internal onlyInitializing {
         __Ownable_init(msg.sender);
         __ERC165_init();
         startingPrice = _startingPrice;
     }
 
-    /// @notice Initializes the oracle (public entry point)
-    /// @param _startingPrice Base price in wei for No pop status users
+    /// @notice Initialises the oracle (public entry point).
+    /// @dev One-shot initialiser invoked through the UUPS proxy. Delegates to
+    ///      `_popRulesInit` so an upgraded initialiser can add new wiring
+    ///      without rewriting the base setup.
+    /// @param _startingPrice Base price in wei for NoStatus users.
     // TODO: On fresh deploy (not upgrade), accept IDotnsProtocolRegistry and set protocolRegistry here.
     function initialize(uint256 _startingPrice) public initializer {
         _popRulesInit(_startingPrice);
@@ -80,6 +106,13 @@ contract PopRules is
     function setUserPopStatus(PopStatus status) external override {
         userPopStatus[msg.sender] = status;
         emit UserPopStatusSet(msg.sender, status);
+    }
+
+    /// @inheritdoc IPopRules
+    function updateStartingPrice(uint256 newStartingPrice) external override onlyOwner {
+        require(newStartingPrice > 0, PopError("Price must be greater than 0"));
+        emit StartingPriceUpdated(startingPrice, newStartingPrice);
+        startingPrice = newStartingPrice;
     }
 
     /// @inheritdoc IPopRules
@@ -113,14 +146,12 @@ contract PopRules is
         string memory strippedBase = _stripDigits(name);
 
         Reservation memory existingReservation = reservations[strippedBase];
-        if (
-            existingReservation.owner == address(0)
-                || existingReservation.expires <= block.timestamp
-        ) {
+        if (!_isLive(existingReservation)) {
             // casting to 'uint64' is safe because MAX_RESERVATION_TIME will never be large enough to cause a revert
             // forge-lint: disable-next-line(unsafe-typecast)
             uint64 expiryTime = uint64(block.timestamp + MAX_RESERVATION_TIME);
-            reservations[strippedBase] = Reservation({owner: userAddress, expires: expiryTime});
+            reservations[strippedBase] =
+                Reservation({owner: userAddress, expires: expiryTime, controller: msg.sender});
             emit BaseNameReserved(strippedBase, userAddress, expiryTime);
         }
     }
@@ -153,10 +184,7 @@ contract PopRules is
     {
         _requireCanonicalLabel(baseName);
         Reservation memory reservation = reservations[baseName];
-        if (reservation.owner != address(0) && reservation.expires > block.timestamp) {
-            return (true, reservation.owner, reservation.expires);
-        }
-        return (false, reservation.owner, reservation.expires);
+        return (_isLive(reservation), reservation.owner, reservation.expires);
     }
 
     /// @inheritdoc IPopRules
@@ -227,10 +255,7 @@ contract PopRules is
         string memory baseName = _stripDigits(name);
         Reservation memory reservation = reservations[baseName];
 
-        if (
-            reservation.owner != address(0) && reservation.expires > block.timestamp
-                && reservation.owner != userAddress
-        ) {
+        if (_isLive(reservation) && reservation.owner != userAddress) {
             metadata.message = "Base name reserved for original Lite registrant";
             metadata.status = IPopRules.PopStatus.Reserved;
         }
@@ -244,11 +269,39 @@ contract PopRules is
         return _priceValidatedName(bytes(name).length);
     }
 
-    function _priceValidatedName(uint256 namelength) internal view returns (uint256 priceValue) {
-        if (namelength < 9) {
+    /// @inheritdoc IPopRules
+    function reachFee(
+        string calldata name,
+        address account
+    )
+        external
+        view
+        override
+        returns (uint256 fee)
+    {
+        _requireCanonicalLabel(name);
+        (PopStatus required,) = _classifyValidatedName(name);
+        if (_meetsReach(required, userPopStatus[account])) {
             return 0;
         }
+        return _priceValidatedName(bytes(name).length);
+    }
 
+    /// @notice Single canonical "is `userStatus` at reach for `required`?" predicate.
+    /// @dev Mirrors the personhood gate enforced in `priceWithCheck` so the cross-payer
+    ///      and transfer paths that bypass that gate compute the same answer when
+    ///      pricing the bypass.
+    function _meetsReach(PopStatus required, PopStatus userStatus) internal pure returns (bool) {
+        if (required == PopStatus.PopFull) {
+            return userStatus == PopStatus.PopFull;
+        }
+        if (required == PopStatus.PopLite) {
+            return userStatus == PopStatus.PopLite || userStatus == PopStatus.PopFull;
+        }
+        return true;
+    }
+
+    function _priceValidatedName(uint256 namelength) internal view returns (uint256 priceValue) {
         if (namelength >= 15) {
             return startingPrice / 2;
         }
@@ -256,14 +309,17 @@ contract PopRules is
         return startingPrice * (15 - namelength);
     }
 
-    /// @notice Enforces base name reservation rules
-    /// @param name Domain label
-    /// @param userAddress Registering user
+    /// @notice Enforces base-name reservation rules.
+    /// @dev Invoked from `priceWithCheck`. A live reservation owned by a
+    ///      different user blocks the registration; a matching owner passes
+    ///      through; an expired or empty slot is a no-op.
+    /// @param name Domain label.
+    /// @param userAddress Registering user.
     function _enforceReservationRules(string calldata name, address userAddress) internal view {
         string memory baseName = _stripDigits(name);
         Reservation memory reservation = reservations[baseName];
 
-        if (reservation.owner != address(0) && reservation.expires > block.timestamp) {
+        if (_isLive(reservation)) {
             require(
                 reservation.owner == userAddress,
                 PopError("Base name reserved for original Lite registrant")
@@ -271,9 +327,21 @@ contract PopRules is
         }
     }
 
-    /// @notice Counts trailing digits in a string
-    /// @param label String to analyze
-    /// @return digitCount Number of trailing digits
+    /// @notice Returns whether `reservation` is live at `block.timestamp`.
+    /// @dev Single canonical live-reservation predicate so every reservation
+    ///      read path (`priceWithCheck`, `priceWithoutCheck`, `isBaseNameReserved`,
+    ///      `reserveBaseName`, `reserveBaseNameForPop`) agrees on the edge
+    ///      condition and cannot drift.
+    function _isLive(Reservation memory reservation) internal view returns (bool) {
+        return reservation.owner != address(0) && reservation.expires > block.timestamp;
+    }
+
+    /// @notice Counts trailing digits in a string.
+    /// @dev Walks the label right-to-left until a non-digit byte; used by
+    ///      classification and `_stripDigits` to separate the base stem from
+    ///      the lite-suffix.
+    /// @param label String to analyse.
+    /// @return digitCount Number of trailing digits.
     function _countTrailingDigits(string calldata label)
         internal
         pure
@@ -291,9 +359,11 @@ contract PopRules is
         }
     }
 
-    /// @notice Strips trailing digits from a name
-    /// @param name Domain label
-    /// @return baseName Name without trailing digits
+    /// @notice Strips trailing digits from a name.
+    /// @dev Returns the stem used as the reservation-table key so `alice42`
+    ///      and `alice` share one reservation slot.
+    /// @param name Domain label.
+    /// @return baseName Name without trailing digits.
     function _stripDigits(string calldata name) internal pure returns (string memory baseName) {
         bytes calldata bytesName = bytes(name);
         uint256 endPosition = bytesName.length;
@@ -368,15 +438,71 @@ contract PopRules is
         emit ProtocolRegistryUpdated(registry);
     }
 
-    /// @notice Returns implementation version
-    /// @return versionString Current version string
+    /// @notice Returns implementation version.
+    /// @dev Bumped on every upgrade. Used by deployment scripts as a
+    ///      post-upgrade assertion target.
+    /// @return versionString Current version string.
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.2.0";
+        versionString = "1.5.0";
     }
 
-    /// @notice Ensures the caller is the authorized registry controller
+    /// @notice Ensures the caller is any controller authorised on the registrar.
+    /// @dev Trusts `DotnsRegistrar.controllers[msg.sender]` as the single source of
+    ///      truth for "is this address an authorised DotNS controller". Lets the
+    ///      commit-reveal controller and the PoP controller both write reservations
+    ///      without PopRules knowing their specific interfaces.
     function _onlyRegistry() internal view {
-        address controller = protocolRegistry.get(DotnsConstants.CONTROLLER);
-        require(msg.sender == controller, NotRegistry());
+        DotnsRegistrar registrar = DotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        require(registrar.controllers(IDotnsController(msg.sender)), NotRegistry());
+    }
+
+    /// @inheritdoc IPopRules
+    function reserveBaseNameForPop(
+        string calldata baseName,
+        address userAddress
+    )
+        external
+        override
+        onlyRegistry
+    {
+        _requireCanonicalLabel(baseName);
+
+        Reservation memory existing = reservations[baseName];
+        if (_isLive(existing)) {
+            // An earlier reserver still holds the live slot. A silent no-op here
+            // would let the PoP controller's local queue state diverge from
+            // PopRules (controller writes head-bookkeeping assuming the write
+            // landed). Reverting propagates the collision back to the caller so
+            // both sides stay consistent. Refresh-own-expiry still goes through.
+            require(existing.owner == userAddress, PopError("Base name held by another user"));
+        }
+
+        // casting to 'uint64' is safe because MAX_RESERVATION_TIME will never be
+        // large enough to cause a revert.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint64 expiryTime = uint64(block.timestamp + MAX_RESERVATION_TIME);
+        reservations[baseName] =
+            Reservation({owner: userAddress, expires: expiryTime, controller: msg.sender});
+        emit BaseNameReserved(baseName, userAddress, expiryTime);
+    }
+
+    /// @inheritdoc IPopRules
+    function releaseBaseName(string calldata baseName) external override onlyRegistry {
+        _requireCanonicalLabel(baseName);
+        Reservation memory reservation = reservations[baseName];
+        // Live reservations can only be cleared by the controller that wrote
+        // them, so one registrar-authorised controller cannot wipe another's
+        // active slot. Expired reservations are dead weight and may be cleared
+        // by any authorised controller as garbage collection. Reservations
+        // with a zero controller predate this field and also fall through to
+        // the GC path for backwards compatibility.
+        if (_isLive(reservation) && reservation.controller != address(0)) {
+            require(
+                msg.sender == reservation.controller,
+                PopError("Only reserving controller can release")
+            );
+        }
+        delete reservations[baseName];
+        emit BaseNameReleased(baseName);
     }
 }

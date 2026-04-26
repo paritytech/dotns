@@ -14,6 +14,10 @@ library DotnsConstants {
     string internal constant TLD = ".dot";
 
     /// @notice Store key prefix for DotNS registration entries.
+    /// @dev The Store is intentionally restricted to label-registration records only
+    ///      (user-read, protocol-write). Other per-name data (chat keys, lite links,
+    ///      content hashes, text records, reverse names) lives in dedicated resolver
+    ///      contracts rather than on the Store.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered");
 
@@ -50,4 +54,29 @@ library DotnsConstants {
     /// @notice Well-known key for the content resolver storing content hashes and text records.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant CONTENT_RESOLVER = bytes32("contentResolver");
+
+    /// @notice Well-known key for the privileged PoP gateway address allowed to drive
+    ///         lite/full-person username flows via `DotnsPopController`.
+    /// @dev External account or pallet adapter configured by governance; the
+    ///      `DotnsPopController` reads it to gate its privileged entry points, so
+    ///      rotating the gateway is a single `set` call with no upgrade needed.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant POP_GATEWAY = bytes32("popGateway");
+
+    /// @notice Well-known key for the dedicated PoP controller orchestrating lite/full-person
+    ///         username issuance on behalf of the PoP gateway.
+    /// @dev Kept distinct from `CONTROLLER` (commit-reveal public controller) so the
+    ///      two can coexist per `DotnsRegistrar`'s multi-controller affordance.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant POP_CONTROLLER = bytes32("popController");
+
+    /// @notice Well-known key for the PoP resolver holding per-name records produced
+    ///         by the PoP username flow (chat keys, lite => full links).
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant POP_RESOLVER = bytes32("popResolver");
+
+    /// @notice Well-known key for the name escrow holding refundable deposits and
+    ///         driving the release lifecycle for registered names.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant NAME_ESCROW = bytes32("nameEscrow");
 }
