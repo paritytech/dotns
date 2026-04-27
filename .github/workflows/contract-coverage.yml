@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     if: github.event.action != 'closed'
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +42,14 @@ jobs:
       - name: Build contracts
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-        run: forge build
+        # Remove any prior build-info so this `forge build` writes the only
+        # JSON in `out/build-info/`; the OZ validator (vm.ffi inside upgrade
+        # tests) requires a complete-compilation artefact. Note: `forge
+        # coverage --ir-minimum` in the next step recompiles via the IR
+        # pipeline and may emit its own build-info mid-run; if the validator
+        # ever fires inside coverage runs we'll need a tighter mitigation
+        # (e.g. excluding upgrade tests from coverage).
+        run: rm -rf out/build-info && forge build
 
       - name: Run coverage
         id: run

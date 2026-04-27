@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,7 +29,10 @@ jobs:
       - name: Build contracts
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-        run: forge build --sizes
+        # Remove any prior build-info so the OZ validator (vm.ffi inside
+        # upgrade tests in the next step) reads the complete artefact this
+        # build emits. Preserving `cache/` keeps incremental compile fast.
+        run: rm -rf out/build-info && forge build --sizes
 
       - name: Run tests
         env:

@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   gas-report:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     if: github.event.action != 'closed'
     steps:
       - uses: actions/checkout@v4
@@ -49,8 +49,15 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
           FOUNDRY_PROFILE: "gas"
         run: |
+          # `rm -rf out/build-info` is load-bearing: forge test re-invokes solc
+          # with a narrower outputSelection than forge build, can overwrite the
+          # full build-info with a partial one, and the OZ validator (which runs
+          # at test execution time via vm.ffi) then rejects it. Removing only
+          # the build-info dir forces forge build to write a fresh complete one
+          # while preserving the solc compilation cache under `cache/`.
+          rm -rf out/build-info
           forge build
-          forge test --gas-report 2>&1 | tee pr-gas-report.txt
+          forge test --gas-report --no-match-path 'test/fork/**' 2>&1 | tee pr-gas-report.txt
 
       - name: Checkout main branch
         uses: actions/checkout@v4
@@ -62,13 +69,13 @@ jobs:
       - name: Generate gas report (main branch)
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-          FOUNDRY_FUZZ_GAS_REPORT_SAMPLES: "1000"
-          FOUNDRY_INVARIANT_GAS_REPORT_SAMPLES: "1000"
+          FOUNDRY_PROFILE: "gas"
         working-directory: main-branch
         run: |
           bun install
+          rm -rf out/build-info
           forge build
-          forge test --gas-report 2>&1 | tee ../main-gas-report.txt
+          forge test --gas-report --no-match-path 'test/fork/**' 2>&1 | tee ../main-gas-report.txt
 
       - name: Tear down revive-eth-rpc
         if: always()

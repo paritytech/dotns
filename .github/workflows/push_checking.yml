@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     if: github.event.action != 'closed'
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +56,14 @@ jobs:
           FOUNDRY_INVARIANT_GAS_REPORT_SAMPLES: "1000"
         run: |
           set +e
+          # Remove any prior build-info before `forge build` so the JSON the OZ
+          # validator (vm.ffi inside upgrade tests) reads is the complete one
+          # this build emits. Defence-in-depth: on a fresh `ubuntu-latest`
+          # runner there is no prior `out/`, but if a future change reuses a
+          # warm cache (self-hosted runner, docker layer, etc.) a partial
+          # build-info from another solc invocation would otherwise survive.
+          # Preserving `cache/` keeps incremental compile fast.
+          rm -rf out/build-info
           forge build --sizes > build.log 2>&1
           BUILD=$?
 

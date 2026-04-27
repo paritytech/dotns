@@ -79,10 +79,10 @@ show_solidity = true
 check_interval = 1
 
 [profile.gas.fuzz]
-gas_report_samples = 1000
+gas_report_samples = 512
 
 [profile.gas.invariant]
-gas_report_samples = 1000
+gas_report_samples = 512
 
 [fmt]
 line_length = 100
