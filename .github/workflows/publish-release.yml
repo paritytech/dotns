@@ -29,6 +29,12 @@ jobs:
         with:
           bun-version: "1.2.6"
 
+      # `openzeppelin-foundry-upgrades` shells out to `npx @openzeppelin/upgrades-core`
+      # via `vm.ffi` during tests; bun does not provide `npx`, so install Node here.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - run: bun install
 
       - name: Build contracts

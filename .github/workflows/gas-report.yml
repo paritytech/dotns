@@ -38,6 +38,12 @@ jobs:
         with:
           bun-version: "1.2.6"
 
+      # `openzeppelin-foundry-upgrades` shells out to `npx @openzeppelin/upgrades-core`
+      # via `vm.ffi` during tests; bun does not provide `npx`, so install Node here.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -78,6 +84,18 @@ jobs:
         working-directory: main-branch
         run: |
           bun install
+          # Until the OZ payable patches land on main, the main checkout
+          # produces vanilla OZ via setup.bash and the payable transferFrom
+          # overrides on `DotnsRegistrar`/`IDotnsRegistrar` fail to compile.
+          # Copy the patches and the apply script from the PR-branch checkout
+          # and re-apply against main's freshly cloned `lib/`. Once main merges
+          # the patches this becomes an idempotent overwrite.
+          rm -rf patches
+          cp -R ../patches ./patches
+          mkdir -p scripts/shell
+          cp ../scripts/shell/apply-oz-patches.sh scripts/shell/apply-oz-patches.sh
+          chmod +x scripts/shell/apply-oz-patches.sh
+          bash scripts/shell/apply-oz-patches.sh
           rm -rf out/build-info
           forge build
           forge test --gas-report --no-match-path 'test/fork/**' 2>&1 | tee ../main-gas-report.txt
