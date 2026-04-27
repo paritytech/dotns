@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/9055c917a8cefee4d1f34093265d2a663576d920/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/e8d18258a0bc9320e2fc12460cbddb4651f19492/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -198,11 +198,11 @@ not block public registrations.</p>
 <li>Lite-person usernames (first argument to <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#reservebasename">reserveBaseName</a> and the
 <code>liteLabel</code> of a <code>LinkKind.LiteUsername</code> link) are DNS labels with at
 least two trailing digits (e.g. <code>alice42</code>) per
-<a href="/contracts/utils/StringUtils.sol/library.StringUtils.html#islitepersonlabel">StringUtils-isLitePersonLabel</a>. The gateway strips any separator
+{StringUtils-isLitePersonLabel}. The gateway strips any separator
 before calling so the on-chain label is flat.</li>
 <li>Full-person usernames (the <code>label</code> of <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#registerbasename">registerBaseName</a> and the optional
 <code>reservedBaseLabel</code> of <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#reservebasename">reserveBaseName</a>) follow the DNS-label rules
-enforced by <a href="/contracts/utils/StringUtils.sol/library.StringUtils.html#issinglelabel">StringUtils-isSingleLabel</a> (e.g. <code>alice</code>).
+enforced by {StringUtils-isSingleLabel} (e.g. <code>alice</code>).
 Lite and public registrations share one namespace; first-to-mint wins at
 the ERC721 layer. Cross-flow priority on the stripped base stem is
 arbitrated by {IPopRules.reserveBaseNameForPop}.</li>
