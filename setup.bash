@@ -98,6 +98,11 @@ init_submodules(){
   done
 }
 
+apply_dependency_patches(){
+  echo "Applying dependency patches..."
+  bash scripts/shell/apply-oz-patches.sh
+}
+
 setup_wallet() {
   local wallet_name="$1"
   local private_key="$2"
@@ -136,6 +141,7 @@ check_missing_files(){
 }
 
 init_submodules
+apply_dependency_patches
 setup_foundry_wallet
 check_missing_files
 echo "Setup complete!"

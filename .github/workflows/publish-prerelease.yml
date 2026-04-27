@@ -51,6 +51,9 @@ jobs:
             "PopRules"
             "DotnsRegistrarController"
             "DotnsProtocolRegistry"
+            "DotnsNameEscrow"
+            "DotnsPopController"
+            "DotnsPopResolver"
             "IStore"
             "IStoreFactory"
             "IDotnsRegistrar"
@@ -61,6 +64,9 @@ jobs:
             "IDotnsResolver"
             "IPopRules"
             "IDotnsProtocolRegistry"
+            "IDotnsNameEscrow"
+            "IDotnsPopController"
+            "IDotnsPopResolver"
           )
 
           for name in "${contracts[@]}"; do
