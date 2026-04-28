@@ -167,7 +167,8 @@ contract RegistrarControllerHandler is Test {
         uint256 price = popRules.priceWithCheck(label, actor).price;
 
         vm.prank(actor);
-        try controller.register{value: price}(registration) {} catch {
+        try controller.register{value: price}(registration) {}
+        catch {
             _removeActiveCommitment(commitment);
             return;
         }
@@ -241,7 +242,8 @@ contract RegistrarControllerHandler is Test {
         bytes32 commitment = controller.makeCommitment(registration);
 
         vm.prank(actor);
-        try controller.commit(commitment) {} catch {
+        try controller.commit(commitment) {}
+        catch {
             return;
         }
 
@@ -251,7 +253,8 @@ contract RegistrarControllerHandler is Test {
         uint256 balanceBefore = actor.balance;
 
         vm.prank(actor);
-        try controller.register{value: price + overpayment}(registration) {} catch {
+        try controller.register{value: price + overpayment}(registration) {}
+        catch {
             return;
         }
 
@@ -441,9 +444,8 @@ contract RegistrarControllerHandler is Test {
             encoded /= 26;
         }
 
-        string memory padded = suffix < 10
-            ? string(abi.encodePacked("0", vm.toString(suffix)))
-            : vm.toString(suffix);
+        string memory padded =
+            suffix < 10 ? string(abi.encodePacked("0", vm.toString(suffix))) : vm.toString(suffix);
         label = string(abi.encodePacked("controller", letters, padded));
         ++labelNonce;
     }

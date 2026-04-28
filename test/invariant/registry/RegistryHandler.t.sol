@@ -177,7 +177,8 @@ contract RegistryHandler is Test {
 
         bytes32 commitment = controller.makeCommitment(registration);
         vm.prank(domainOwner);
-        try controller.commit(commitment) {} catch {
+        try controller.commit(commitment) {}
+        catch {
             return false;
         }
         vm.warp(block.timestamp + minCommitmentAge + 1);
@@ -238,9 +239,8 @@ contract RegistryHandler is Test {
             encoded /= 26;
         }
 
-        string memory padded = suffix < 10
-            ? string(abi.encodePacked("0", vm.toString(suffix)))
-            : vm.toString(suffix);
+        string memory padded =
+            suffix < 10 ? string(abi.encodePacked("0", vm.toString(suffix))) : vm.toString(suffix);
         string memory label = string(abi.encodePacked("invariant", letters, padded));
         ++labelNonce;
         return label;
