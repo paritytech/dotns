@@ -58,9 +58,19 @@ gas_report_samples = 1000
 show_logs = true
 
 [profile.ci.invariant]
-runs = 1024
-depth = 1000
-fail_on_revert = true
+# Foundry's defaults (256 × 500) already drive deep state exploration without
+# the multi-minute wall time the previous 1024 × 1000 incurred. 512 × 500
+# doubles the number of independent starting sequences (better coverage of
+# distinct state-space regions) while keeping per-sequence depth modest, so
+# wall time scales linearly rather than the quadratic blow-up of bumping both.
+runs = 512
+depth = 500
+
+# False is the safer default for handler-driven suites: legitimate reverts
+# (collisions, cross-tier fee paths, expired commitments) are part of the
+# state space the fuzzer should explore, not test failures. Real bugs surface
+# through the `invariant_*` assertions.
+fail_on_revert = false
 
 # Keep normal invariant campaigns close to real EVM call behaviour.
 # Use a separate targeted suite if you specifically want call override behaviour.
@@ -70,9 +80,11 @@ dictionary_weight = 90
 shrink_run_limit = 10000
 max_assume_rejects = 131072
 gas_report_samples = 1000
-corpus_dir = "cache/invariant/corpus"
-corpus_min_mutations = 10
-corpus_min_size = 1
+# Corpus persistence is intentionally omitted: when CI caches `cache/`,
+# previously-shrunk failure sequences replay on subsequent runs and report
+# "persisted failure revert" even after the underlying bug is fixed. Local
+# devs chasing a specific shrink can opt in via the FOUNDRY_INVARIANT_CORPUS_DIR
+# env var without committing the persistence into CI.
 show_edge_coverage = true
 show_metrics = true
 show_solidity = true

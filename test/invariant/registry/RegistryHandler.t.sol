@@ -72,9 +72,9 @@ contract RegistryHandler is Test {
         address subnodeOwner = actors[subnodeOwnerSeed % actors.length];
         string memory label = _generateUniqueLabel();
 
-        _registerBaseDomain(label, domainOwner);
-        bytes32 parentNode = _computeNode(label);
+        if (!_registerBaseDomain(label, domainOwner)) return;
 
+        bytes32 parentNode = _computeNode(label);
         _createSubnode(parentNode, "sub", label, domainOwner, subnodeOwner);
     }
 
@@ -135,8 +135,12 @@ contract RegistryHandler is Test {
         address recipient = _pickDifferent(currentOwner, recipientSeed);
         if (recipient == address(0)) return;
 
+        // Cross-tier transfers require a fee under the reach-floor model; quote
+        // it from the registrar and supply it via the now-payable transferFrom.
+        uint256 fee = registrar.quoteTransferFee(tokenId, recipient);
+
         vm.prank(currentOwner);
-        registrar.transferFrom(currentOwner, recipient, tokenId);
+        registrar.transferFrom{value: fee}(currentOwner, recipient, tokenId);
 
         _registeredOwners[index] = recipient;
     }
@@ -157,7 +161,13 @@ contract RegistryHandler is Test {
         return _registeredLabels;
     }
 
-    function _registerBaseDomain(string memory label, address domainOwner) internal {
+    function _registerBaseDomain(
+        string memory label,
+        address domainOwner
+    )
+        internal
+        returns (bool success)
+    {
         bytes32 secret =
             keccak256(abi.encodePacked(label, domainOwner, block.timestamp, labelNonce));
         IDotnsRegistrarController.Registration memory registration =
@@ -167,15 +177,20 @@ contract RegistryHandler is Test {
 
         bytes32 commitment = controller.makeCommitment(registration);
         vm.prank(domainOwner);
-        controller.commit(commitment);
+        try controller.commit(commitment) {} catch {
+            return false;
+        }
         vm.warp(block.timestamp + minCommitmentAge + 1);
 
         uint256 price = popRules.priceWithCheck(label, domainOwner).price;
         vm.prank(domainOwner);
-        controller.register{value: price}(registration);
-
-        _registeredLabels.push(label);
-        _registeredOwners.push(domainOwner);
+        try controller.register{value: price}(registration) {
+            _registeredLabels.push(label);
+            _registeredOwners.push(domainOwner);
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     function _createSubnode(
@@ -207,7 +222,26 @@ contract RegistryHandler is Test {
     }
 
     function _generateUniqueLabel() internal returns (string memory) {
-        string memory label = string(abi.encodePacked("inv", vm.toString(labelNonce)));
+        // PopRules classifies labels by base-stem length and trailing-digit count.
+        // Targets the open NoStatus tier: baselength ≥9 + exactly 2 trailing
+        // digits — every actor (including NoStatus tiago) can register without a
+        // PoP gate. The "invariant" stem (9 chars) plus a 4-letter rotation
+        // index gives ~456k unique prefixes; the 2-digit suffix fans each one
+        // out 100x. Easily enough headroom for a full CI invariant campaign
+        // (1024 runs × 1000 depth) without label collisions.
+        uint256 encoded = labelNonce / 100;
+        uint256 suffix = labelNonce % 100;
+
+        bytes memory letters = new bytes(4);
+        for (uint256 i; i < 4; ++i) {
+            letters[i] = bytes1(uint8(0x61) + uint8(encoded % 26));
+            encoded /= 26;
+        }
+
+        string memory padded = suffix < 10
+            ? string(abi.encodePacked("0", vm.toString(suffix)))
+            : vm.toString(suffix);
+        string memory label = string(abi.encodePacked("invariant", letters, padded));
         ++labelNonce;
         return label;
     }

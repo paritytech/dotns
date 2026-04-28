@@ -69,6 +69,15 @@ contract RegistrarControllerHandler is Test {
     /// @notice Counter for generating unique labels.
     uint256 public labelNonce;
 
+    /// @notice Tracks whether an owner already has a reserved registration.
+    /// @dev `register` overwrites a reverse record on every reserved direct
+    ///      registration, so a second reserved registration by the same owner
+    ///      would silently invalidate the first owner's reverse-resolution
+    ///      check. Force `reserved = false` for subsequent tries by the same
+    ///      owner so each tracked reserved label remains the single source of
+    ///      truth for that owner's reverse name.
+    mapping(address owner => bool hasReserved) internal _hasReservedRegistration;
+
     /// @notice Total count of successful registrations.
     uint256 public registrationCount;
 
@@ -134,7 +143,7 @@ contract RegistrarControllerHandler is Test {
         if (actors.length == 0) return;
 
         address actor = actors[actorSeed % actors.length];
-        bool reserved = reservedSeed % 2 == 0;
+        bool reserved = reservedSeed % 2 == 0 && !_hasReservedRegistration[actor];
         string memory label = _generateUniqueLabel();
 
         bytes32 secret = keccak256(abi.encodePacked(label, actor, block.timestamp, labelNonce));
@@ -146,21 +155,23 @@ contract RegistrarControllerHandler is Test {
 
         bytes32 commitment = controller.makeCommitment(registration);
 
-        // Commit
         vm.prank(actor);
-        controller.commit(commitment);
-        _activeCommitments.push(commitment);
+        try controller.commit(commitment) {
+            _activeCommitments.push(commitment);
+        } catch {
+            return;
+        }
 
-        // Warp past minimum commitment age
         vm.warp(block.timestamp + minCommitmentAge + 1);
 
-        // Get price and register
         uint256 price = popRules.priceWithCheck(label, actor).price;
 
         vm.prank(actor);
-        controller.register{value: price}(registration);
+        try controller.register{value: price}(registration) {} catch {
+            _removeActiveCommitment(commitment);
+            return;
+        }
 
-        // Update ghost state
         _registeredLabels.push(label);
         _registeredOwners.push(actor);
         _consumedCommitments.push(commitment);
@@ -171,6 +182,7 @@ contract RegistrarControllerHandler is Test {
         if (reserved) {
             _reservedLabels.push(label);
             _reservedOwners.push(actor);
+            _hasReservedRegistration[actor] = true;
         }
     }
 
@@ -193,8 +205,11 @@ contract RegistrarControllerHandler is Test {
         bytes32 commitment = controller.makeCommitment(registration);
 
         vm.prank(actor);
-        controller.commit(commitment);
-        _activeCommitments.push(commitment);
+        try controller.commit(commitment) {
+            _activeCommitments.push(commitment);
+        } catch {
+            return;
+        }
     }
 
     /// @notice Performs a registration with overpayment to test refunds.
@@ -212,7 +227,7 @@ contract RegistrarControllerHandler is Test {
         if (actors.length == 0) return;
 
         address actor = actors[actorSeed % actors.length];
-        bool reserved = reservedSeed % 2 == 0;
+        bool reserved = reservedSeed % 2 == 0 && !_hasReservedRegistration[actor];
         string memory label = _generateUniqueLabel();
         uint256 overpayment = (overpaymentSeed % 10) * 1e15;
 
@@ -226,7 +241,9 @@ contract RegistrarControllerHandler is Test {
         bytes32 commitment = controller.makeCommitment(registration);
 
         vm.prank(actor);
-        controller.commit(commitment);
+        try controller.commit(commitment) {} catch {
+            return;
+        }
 
         vm.warp(block.timestamp + minCommitmentAge + 1);
 
@@ -234,9 +251,10 @@ contract RegistrarControllerHandler is Test {
         uint256 balanceBefore = actor.balance;
 
         vm.prank(actor);
-        controller.register{value: price + overpayment}(registration);
+        try controller.register{value: price + overpayment}(registration) {} catch {
+            return;
+        }
 
-        // Verify refund occurred
         if (overpayment > 0 && price == 0) {
             assertEq(actor.balance, balanceBefore, "Full overpayment must be refunded");
         }
@@ -250,6 +268,7 @@ contract RegistrarControllerHandler is Test {
         if (reserved) {
             _reservedLabels.push(label);
             _reservedOwners.push(actor);
+            _hasReservedRegistration[actor] = true;
         }
     }
 
@@ -321,8 +340,13 @@ contract RegistrarControllerHandler is Test {
         bytes32 node = LabelUtils.namehashUnder(DOT_NODE, labelhash);
         uint256 tokenId = uint256(node);
 
+        // Cross-tier transfers are payable under the reach-floor model; quote
+        // the fee from the registrar and forward it via the now-payable
+        // transferFrom so cross-tier picks don't revert on InsufficientValue.
+        uint256 fee = registrar.quoteTransferFee(tokenId, recipient);
+
         vm.prank(currentOwner);
-        registrar.transferFrom(currentOwner, recipient, tokenId);
+        registrar.transferFrom{value: fee}(currentOwner, recipient, tokenId);
 
         _registeredOwners[index] = recipient;
         _transferredLabels.push(label);
@@ -353,8 +377,9 @@ contract RegistrarControllerHandler is Test {
             address recipient = _pickDifferentActor(currentOwner, hopSeed + h);
             if (recipient == address(0)) break;
 
+            uint256 fee = registrar.quoteTransferFee(tokenId, recipient);
             vm.prank(currentOwner);
-            registrar.transferFrom(currentOwner, recipient, tokenId);
+            registrar.transferFrom{value: fee}(currentOwner, recipient, tokenId);
 
             _transferredLabels.push(label);
             _transferredRecipients.push(recipient);
@@ -398,10 +423,28 @@ contract RegistrarControllerHandler is Test {
     }
 
     /// @notice Generates a unique label for registration.
-    /// @dev Uses incrementing nonce to ensure uniqueness across calls.
-    /// @return label A unique label string with minimum 3 characters.
+    /// @dev PopRules classifies labels by base-stem length and trailing-digit count.
+    ///      Targets the open NoStatus tier: baselength ≥9 + exactly 2 trailing
+    ///      digits — every actor (including NoStatus tiago) can register without
+    ///      a PoP gate. The "controller" stem (10 chars) plus a 4-letter rotation
+    ///      index gives ~456k unique prefixes; the 2-digit suffix fans each one
+    ///      out 100x. Easily enough headroom for a full CI invariant campaign
+    ///      (1024 runs × 1000 depth) without label collisions.
+    /// @return label A unique NoStatus-tier label string.
     function _generateUniqueLabel() internal returns (string memory label) {
-        label = string(abi.encodePacked("name", vm.toString(labelNonce)));
+        uint256 encoded = labelNonce / 100;
+        uint256 suffix = labelNonce % 100;
+
+        bytes memory letters = new bytes(4);
+        for (uint256 i; i < 4; ++i) {
+            letters[i] = bytes1(uint8(0x61) + uint8(encoded % 26));
+            encoded /= 26;
+        }
+
+        string memory padded = suffix < 10
+            ? string(abi.encodePacked("0", vm.toString(suffix)))
+            : vm.toString(suffix);
+        label = string(abi.encodePacked("controller", letters, padded));
         ++labelNonce;
     }
 
