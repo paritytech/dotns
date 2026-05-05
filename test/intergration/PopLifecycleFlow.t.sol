@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import {BaseDotns} from "../base/BaseDotns.t.sol";
 
+import {IDotnsPopController} from "../../contracts/registrars/IDotnsPopController.sol";
 import {IDotnsRegistry} from "../../contracts/registry/IDotnsRegistry.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IStore} from "../../contracts/store/IStore.sol";
@@ -120,7 +121,11 @@ contract PopLifecycleFlow is BaseDotns {
         _grantPopFull(user);
         _reservePop(user, LITE_LABEL, CHAT_KEY, FULL_LABEL);
         vm.prank(popGateway);
-        dotnsPopController.registerBaseName(FULL_LABEL, user, _linkWithLite(LITE_LABEL));
+        dotnsPopController.registerBaseName(
+            IDotnsPopController.FullRegistration({
+                label: FULL_LABEL, user: user, link: _linkWithLite(LITE_LABEL)
+            })
+        );
     }
 
     function _setSubnode(

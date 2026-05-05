@@ -361,7 +361,14 @@ abstract contract BaseDotns is Test {
         internal
     {
         vm.prank(popGateway);
-        dotnsPopController.reserveBaseName(liteLabel, user, chatKey, reservedBaseLabel);
+        dotnsPopController.reserveBaseName(
+            IDotnsPopController.BaseReservation({
+                lite: IDotnsPopController.LiteRegistration({
+                    liteLabel: liteLabel, user: user, chatKey: chatKey
+                }),
+                reservedBaseLabel: reservedBaseLabel
+            })
+        );
     }
 
     /// @notice Constructs a `Link` that inherits the chat key from a prior lite label.
