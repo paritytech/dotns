@@ -35,16 +35,22 @@ yul = true
 ffi = true
 show_progress = true
 
+# CI fuzz/invariant settings track the foundry defaults (fuzz runs = 256,
+# invariant runs = 256 x depth 500). The full DotNS test suite + invariants
+# OOMs the GitHub-hosted `ubuntu-latest` runner (16 GB) above these baselines,
+# and the gas-report job runs the suite twice (PR branch and main branch),
+# doubling the pressure. Raise these values only when the workflow runs on a
+# provisioned machine with more headroom; bump `runs` first since `depth`
+# lengthens each sequence and amplifies handler-state drift.
 [profile.ci.fuzz]
-
-runs = 2560
+runs = 256
 max_test_rejects = 131072
 dictionary_weight = 85
 gas_report_samples = 1000
 show_logs = true
 
 [profile.ci.invariant]
-runs = 265
+runs = 256
 depth = 500
 
 fail_on_revert = false
