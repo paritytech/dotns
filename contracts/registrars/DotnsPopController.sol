@@ -626,7 +626,7 @@ contract DotnsPopController is
     /// @dev Prepends `selector` to `payload` and `delegatecall`s `address(this)` so the typed
     /// overload runs with the original `msg.sender` (the gateway), making the typed path the
     /// single source of truth. The `bytes` payload from the cross-chain caller is already
-    /// `abi.encode(StructTuple)`, so concatenating `selector ‖ payload` is exactly the
+    /// `abi.encode(StructTuple)`, so concatenating `selector with payload` is exactly the
     /// calldata the typed overload expects. Reverts bubble up byte-for-byte so the caller sees
     /// the same error it would have seen on a direct typed call.
     ///
@@ -639,7 +639,7 @@ contract DotnsPopController is
     ///   contract ever runs in our storage context.
     /// - `selector` is one of three module-private constants pointing at our own typed
     ///   entrypoints. The caller cannot redirect the dispatch elsewhere.
-    /// - The proxy round-trip (proxy → impl → impl.delegatecall(this) → proxy → impl)
+    /// - The proxy round-trip (proxy => impl => impl.delegatecall(this) => proxy => impl)
     ///   ends in the same implementation, in the same storage context, that a direct
     ///   typed call would land in.
     /// @custom:oz-upgrades-unsafe-allow delegatecall
