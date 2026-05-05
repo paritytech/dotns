@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsresolver"><a class="header" href="#dotnsresolver">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/27c3bccc24dbd8b6cc4fca8285319c58adbab362/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/23c9b30e1b61b37e1fc3081133c2bf3da6489f0b/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
@@ -195,24 +195,24 @@ security-contact: admin@parity.io</p>
 <p>DEPRECATED: Registry used to resolve node ownership.</p>
 <p>Retained for UUPS storage layout compatibility. Use protocolRegistry instead.
 TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.</p>
-<pre><code class="language-solidity">IDotnsRegistry public registry;
+<pre><code class="language-solidity">IDotnsRegistry public registry
 </code></pre>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
 <p>Protocol-level address registry for all DotNS contracts.</p>
-<pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry;
+<pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in the future.</p>
-<pre><code class="language-solidity">uint256[49] private __gap;
+<pre><code class="language-solidity">uint256[49] private __gap
 </code></pre>
 <h3 id="addresses"><a class="header" href="#addresses">addresses</a></h3>
 <p>Node → resolved address</p>
-<pre><code class="language-solidity">mapping(bytes32 node =&gt; address owner) private addresses;
+<pre><code class="language-solidity">mapping(bytes32 node =&gt; address owner) private addresses
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlynodeowner"><a class="header" href="#onlynodeowner">onlyNodeOwner</a></h3>
 <p>Restricts access to the owner of <code>node</code> as recorded in the registry</p>
-<pre><code class="language-solidity">modifier onlyNodeOwner(bytes32 node);
+<pre><code class="language-solidity">modifier onlyNodeOwner(bytes32 node) ;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -222,7 +222,7 @@ TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.</p>
 <h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
 <p><strong>Note:</strong>
 oz-upgrades-unsafe-allow: constructor</p>
-<pre><code class="language-solidity">constructor();
+<pre><code class="language-solidity">constructor() ;
 </code></pre>
 <h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
 <p>Initializes the resolver</p>

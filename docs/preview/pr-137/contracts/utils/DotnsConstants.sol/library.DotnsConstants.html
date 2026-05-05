@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/27c3bccc24dbd8b6cc4fca8285319c58adbab362/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/23c9b30e1b61b37e1fc3081133c2bf3da6489f0b/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Constants</p>
 <p>Protocol-level invariants shared across DotNS contracts.</p>
@@ -191,11 +191,11 @@ security-contact: admin@parity.io</p>
 <p>Namehash of the .dot TLD node.</p>
 <p>keccak256(abi.encodePacked(bytes32(0), keccak256("dot")))</p>
 <pre><code class="language-solidity">bytes32 internal constant DOT_NODE =
-    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
+    0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce
 </code></pre>
 <h3 id="tld"><a class="header" href="#tld">TLD</a></h3>
 <p>TLD suffix appended to labels when building full domain names.</p>
-<pre><code class="language-solidity">string internal constant TLD = ".dot";
+<pre><code class="language-solidity">string internal constant TLD = ".dot"
 </code></pre>
 <h3 id="dotns_registered_key"><a class="header" href="#dotns_registered_key">DOTNS_REGISTERED_KEY</a></h3>
 <p>Store key prefix for DotNS registration entries.</p>
@@ -204,47 +204,47 @@ security-contact: admin@parity.io</p>
 content hashes, text records, reverse names) lives in dedicated resolver
 contracts rather than on the Store.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered");
+<pre><code class="language-solidity">bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered")
 </code></pre>
 <h3 id="registrar"><a class="header" href="#registrar">REGISTRAR</a></h3>
 <p>Well-known key for the ERC721 registrar backing name ownership.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant REGISTRAR = bytes32("registrar");
+<pre><code class="language-solidity">bytes32 internal constant REGISTRAR = bytes32("registrar")
 </code></pre>
 <h3 id="controller"><a class="header" href="#controller">CONTROLLER</a></h3>
 <p>Well-known key for the registrar controller orchestrating commit-reveal registration.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant CONTROLLER = bytes32("controller");
+<pre><code class="language-solidity">bytes32 internal constant CONTROLLER = bytes32("controller")
 </code></pre>
 <h3 id="registry"><a class="header" href="#registry">REGISTRY</a></h3>
 <p>Well-known key for the forward registry storing node ownership and resolver.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant REGISTRY = bytes32("registry");
+<pre><code class="language-solidity">bytes32 internal constant REGISTRY = bytes32("registry")
 </code></pre>
 <h3 id="reverse_resolver"><a class="header" href="#reverse_resolver">REVERSE_RESOLVER</a></h3>
 <p>Well-known key for the reverse resolver for address-to-name mapping.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant REVERSE_RESOLVER = bytes32("reverseResolver");
+<pre><code class="language-solidity">bytes32 internal constant REVERSE_RESOLVER = bytes32("reverseResolver")
 </code></pre>
 <h3 id="pop_rules"><a class="header" href="#pop_rules">POP_RULES</a></h3>
 <p>Well-known key for the PoP oracle enforcing eligibility and pricing.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant POP_RULES = bytes32("popRules");
+<pre><code class="language-solidity">bytes32 internal constant POP_RULES = bytes32("popRules")
 </code></pre>
 <h3 id="store_factory"><a class="header" href="#store_factory">STORE_FACTORY</a></h3>
 <p>Well-known key for the factory deploying per-user Store instances.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant STORE_FACTORY = bytes32("storeFactory");
+<pre><code class="language-solidity">bytes32 internal constant STORE_FACTORY = bytes32("storeFactory")
 </code></pre>
 <h3 id="resolver"><a class="header" href="#resolver">RESOLVER</a></h3>
 <p>Well-known key for the forward resolver storing address records.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant RESOLVER = bytes32("resolver");
+<pre><code class="language-solidity">bytes32 internal constant RESOLVER = bytes32("resolver")
 </code></pre>
 <h3 id="content_resolver"><a class="header" href="#content_resolver">CONTENT_RESOLVER</a></h3>
 <p>Well-known key for the content resolver storing content hashes and text records.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant CONTENT_RESOLVER = bytes32("contentResolver");
+<pre><code class="language-solidity">bytes32 internal constant CONTENT_RESOLVER = bytes32("contentResolver")
 </code></pre>
 <h3 id="pop_gateway"><a class="header" href="#pop_gateway">POP_GATEWAY</a></h3>
 <p>Well-known key for the privileged PoP gateway address allowed to drive
@@ -253,7 +253,7 @@ lite/full-person username flows via <code>DotnsPopController</code>.</p>
 <code>DotnsPopController</code> reads it to gate its privileged entry points, so
 rotating the gateway is a single <code>set</code> call with no upgrade needed.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant POP_GATEWAY = bytes32("popGateway");
+<pre><code class="language-solidity">bytes32 internal constant POP_GATEWAY = bytes32("popGateway")
 </code></pre>
 <h3 id="pop_controller"><a class="header" href="#pop_controller">POP_CONTROLLER</a></h3>
 <p>Well-known key for the dedicated PoP controller orchestrating lite/full-person
@@ -261,19 +261,19 @@ username issuance on behalf of the PoP gateway.</p>
 <p>Kept distinct from <code>CONTROLLER</code> (commit-reveal public controller) so the
 two can coexist per <code>DotnsRegistrar</code>'s multi-controller affordance.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant POP_CONTROLLER = bytes32("popController");
+<pre><code class="language-solidity">bytes32 internal constant POP_CONTROLLER = bytes32("popController")
 </code></pre>
 <h3 id="pop_resolver"><a class="header" href="#pop_resolver">POP_RESOLVER</a></h3>
 <p>Well-known key for the PoP resolver holding per-name records produced
 by the PoP username flow (chat keys, lite =&gt; full links).
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant POP_RESOLVER = bytes32("popResolver");
+<pre><code class="language-solidity">bytes32 internal constant POP_RESOLVER = bytes32("popResolver")
 </code></pre>
 <h3 id="name_escrow"><a class="header" href="#name_escrow">NAME_ESCROW</a></h3>
 <p>Well-known key for the name escrow holding refundable deposits and
 driving the release lifecycle for registered names.
 forge-lint: disable-next-line(unsafe-typecast)</p>
-<pre><code class="language-solidity">bytes32 internal constant NAME_ESCROW = bytes32("nameEscrow");
+<pre><code class="language-solidity">bytes32 internal constant NAME_ESCROW = bytes32("nameEscrow")
 </code></pre>
 
                     </main>
