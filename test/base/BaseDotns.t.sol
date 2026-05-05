@@ -88,8 +88,16 @@ abstract contract BaseDotns is Test {
     /// @notice Deployed PoP controller instance (gateway-driven lite/full issuance).
     DotnsPopController public dotnsPopController;
 
-    /// @notice Test account representing the privileged PoP gateway origin.
+    /// @notice Test account representing the configured PoP gateway signer.
+    /// @dev Auth is now signature-based: the controller recovers an EIP-712
+    ///      signature and compares the signer against
+    ///      `DotnsProtocolRegistry.POP_GATEWAY`. Tests therefore need the
+    ///      private key, not just the address.
     address public popGateway;
+
+    /// @notice Private key matching `popGateway`, used by tests to sign
+    ///         EIP-712 gateway authorizations.
+    uint256 public popGatewayPk;
 
     /// @notice Default reservation duration used by the PoP controller.
     uint64 public constant DEFAULT_RESERVATION_DURATION = 7 days;
@@ -146,7 +154,9 @@ abstract contract BaseDotns is Test {
         leonardo = _createUser("leonardo");
         tiago = _createUser("tiago");
         owner = _createUser("owner");
-        popGateway = _createUser("popGateway");
+        (popGateway, popGatewayPk) = makeAddrAndKey("popGateway");
+        vm.deal(popGateway, DEFAULT_BALANCE);
+        vm.label(popGateway, "popGateway");
 
         dotLabel = keccak256(bytes("dot"));
         dotNode = _namehash(ZERO_HASH, dotLabel);
@@ -349,9 +359,166 @@ abstract contract BaseDotns is Test {
         popRules.setUserPopStatus(IPopRules.PopStatus.NoStatus);
     }
 
-    /// @notice Drives `DotnsPopController.reserveBaseName` through the configured gateway.
-    /// @dev Single canonical helper for PoP-gateway reservations across unit and fuzz
-    ///      test suites. Keeps the `vm.prank(popGateway)` boilerplate in one place.
+    /// @dev EIP-712 type hash for `ReserveLiteName`. Mirrors the value declared
+    ///      in `DotnsPopController.sol`; kept literal so the test catches any
+    ///      drift between the contract and the harness.
+    bytes32 internal constant RESERVE_LITE_TYPEHASH = keccak256(
+        "ReserveLiteName(string liteLabel,address user,bytes chatKey,uint256 deadline,uint256 nonce)"
+    );
+
+    /// @dev EIP-712 type hash for `ReserveBaseName`.
+    bytes32 internal constant RESERVE_BASE_TYPEHASH = keccak256(
+        "ReserveBaseName(string liteLabel,address user,bytes chatKey,string reservedBaseLabel,uint256 deadline,uint256 nonce)"
+    );
+
+    /// @dev EIP-712 type hash for `RegisterBaseName`. The `Link` struct is
+    ///      flattened into the typehash to match the contract.
+    bytes32 internal constant REGISTER_BASE_TYPEHASH = keccak256(
+        "RegisterBaseName(string label,address user,uint8 linkKind,string linkLiteLabel,bytes linkChatKey,uint256 deadline,uint256 nonce)"
+    );
+
+    /// @dev Default validity window applied by gateway-signing helpers.
+    uint256 internal constant DEFAULT_AUTH_VALIDITY = 1 hours;
+
+    /// @notice Signs a struct hash as the configured gateway signer.
+    /// @dev Reads the controller's EIP-712 domain via `eip712Domain()` so the
+    ///      digest matches whatever name/version/chainId/verifyingContract the
+    ///      contract is actually using.
+    /// @param structHash EIP-712 struct hash of the typed payload.
+    /// @return deadline The deadline embedded in the payload (now + 1h).
+    /// @return nonce The signer's current nonce read from the controller.
+    /// @return sig The 65-byte signature.
+    function _signGatewayCall(bytes32 structHash)
+        internal
+        view
+        returns (uint256 deadline, uint256 nonce, bytes memory sig)
+    {
+        deadline = block.timestamp + DEFAULT_AUTH_VALIDITY;
+        nonce = dotnsPopController.gatewayNonces(popGateway);
+        bytes32 digest = _eip712Digest(structHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(popGatewayPk, digest);
+        sig = abi.encodePacked(r, s, v);
+    }
+
+    /// @notice Builds an EIP-712 digest under the controller's domain.
+    function _eip712Digest(bytes32 structHash) internal view returns (bytes32) {
+        (
+            ,
+            string memory name,
+            string memory version,
+            uint256 chainId,
+            address verifyingContract,
+            ,
+        ) = dotnsPopController.eip712Domain();
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256(bytes(name)),
+                keccak256(bytes(version)),
+                chainId,
+                verifyingContract
+            )
+        );
+        return keccak256(abi.encodePacked(hex"1901", domainSeparator, structHash));
+    }
+
+    /// @notice Builds the struct hash for `reserveLiteName`.
+    function _reserveLiteStructHash(
+        string memory liteLabel,
+        address user,
+        bytes memory chatKey,
+        uint256 deadline,
+        uint256 nonce
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encode(
+                RESERVE_LITE_TYPEHASH,
+                keccak256(bytes(liteLabel)),
+                user,
+                keccak256(chatKey),
+                deadline,
+                nonce
+            )
+        );
+    }
+
+    /// @notice Builds the struct hash for `reserveBaseName`.
+    function _reserveBaseStructHash(
+        string memory liteLabel,
+        address user,
+        bytes memory chatKey,
+        string memory reservedBaseLabel,
+        uint256 deadline,
+        uint256 nonce
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encode(
+                RESERVE_BASE_TYPEHASH,
+                keccak256(bytes(liteLabel)),
+                user,
+                keccak256(chatKey),
+                keccak256(bytes(reservedBaseLabel)),
+                deadline,
+                nonce
+            )
+        );
+    }
+
+    /// @notice Builds the struct hash for `registerBaseName`.
+    function _registerBaseStructHash(
+        string memory label,
+        address user,
+        IDotnsPopController.Link memory link,
+        uint256 deadline,
+        uint256 nonce
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encode(
+                REGISTER_BASE_TYPEHASH,
+                keccak256(bytes(label)),
+                user,
+                uint8(link.kind),
+                keccak256(bytes(link.liteLabel)),
+                keccak256(link.chatKey),
+                deadline,
+                nonce
+            )
+        );
+    }
+
+    /// @notice Drives `DotnsPopController.reserveLiteName` with a valid gateway
+    ///         signature.
+    function _reserveLiteAsGateway(
+        string memory liteLabel,
+        address user,
+        bytes memory chatKey
+    )
+        internal
+    {
+        uint256 deadline = block.timestamp + DEFAULT_AUTH_VALIDITY;
+        uint256 nonce = dotnsPopController.gatewayNonces(popGateway);
+        bytes32 structHash = _reserveLiteStructHash(liteLabel, user, chatKey, deadline, nonce);
+        bytes memory sig = _sign(structHash);
+        dotnsPopController.reserveLiteName(liteLabel, user, chatKey, deadline, nonce, sig);
+    }
+
+    /// @notice Drives `DotnsPopController.reserveBaseName` with a valid gateway
+    ///         signature.
+    /// @dev Replaces the previous `_reservePop` helper.
     function _reservePop(
         address user,
         string memory liteLabel,
@@ -360,8 +527,95 @@ abstract contract BaseDotns is Test {
     )
         internal
     {
-        vm.prank(popGateway);
-        dotnsPopController.reserveBaseName(liteLabel, user, chatKey, reservedBaseLabel);
+        uint256 deadline = block.timestamp + DEFAULT_AUTH_VALIDITY;
+        uint256 nonce = dotnsPopController.gatewayNonces(popGateway);
+        bytes32 structHash = _reserveBaseStructHash(
+            liteLabel, user, chatKey, reservedBaseLabel, deadline, nonce
+        );
+        bytes memory sig = _sign(structHash);
+        dotnsPopController.reserveBaseName(
+            liteLabel, user, chatKey, reservedBaseLabel, deadline, nonce, sig
+        );
+    }
+
+    /// @notice Drives `DotnsPopController.registerBaseName` with a valid gateway
+    ///         signature.
+    function _registerBaseAsGateway(
+        string memory label,
+        address user,
+        IDotnsPopController.Link memory link
+    )
+        internal
+    {
+        uint256 deadline = block.timestamp + DEFAULT_AUTH_VALIDITY;
+        uint256 nonce = dotnsPopController.gatewayNonces(popGateway);
+        bytes32 structHash = _registerBaseStructHash(label, user, link, deadline, nonce);
+        bytes memory sig = _sign(structHash);
+        dotnsPopController.registerBaseName(label, user, link, deadline, nonce, sig);
+    }
+
+    /// @dev Signs a struct hash under the controller's EIP-712 domain with the
+    ///      gateway private key and returns the 65-byte signature.
+    function _sign(bytes32 structHash) internal view returns (bytes memory) {
+        return _signWith(popGatewayPk, structHash);
+    }
+
+    /// @dev Signs a struct hash with an arbitrary private key. Useful for
+    ///      negative tests that need a signature from a non-gateway signer.
+    function _signWith(uint256 pk, bytes32 structHash) internal view returns (bytes memory) {
+        bytes32 digest = _eip712Digest(structHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    /// @notice Builds a valid auth tail for `reserveLiteName` without making
+    ///         the controller call. Used by revert tests that need
+    ///         `vm.expectRevert` to land on the controller call itself.
+    function _authReserveLite(
+        string memory liteLabel,
+        address user,
+        bytes memory chatKey
+    )
+        internal
+        view
+        returns (uint256 deadline, uint256 nonce, bytes memory sig)
+    {
+        deadline = block.timestamp + DEFAULT_AUTH_VALIDITY;
+        nonce = dotnsPopController.gatewayNonces(popGateway);
+        sig = _sign(_reserveLiteStructHash(liteLabel, user, chatKey, deadline, nonce));
+    }
+
+    /// @notice Builds a valid auth tail for `reserveBaseName`.
+    function _authReserveBase(
+        string memory liteLabel,
+        address user,
+        bytes memory chatKey,
+        string memory reservedBaseLabel
+    )
+        internal
+        view
+        returns (uint256 deadline, uint256 nonce, bytes memory sig)
+    {
+        deadline = block.timestamp + DEFAULT_AUTH_VALIDITY;
+        nonce = dotnsPopController.gatewayNonces(popGateway);
+        sig = _sign(
+            _reserveBaseStructHash(liteLabel, user, chatKey, reservedBaseLabel, deadline, nonce)
+        );
+    }
+
+    /// @notice Builds a valid auth tail for `registerBaseName`.
+    function _authRegisterBase(
+        string memory label,
+        address user,
+        IDotnsPopController.Link memory link
+    )
+        internal
+        view
+        returns (uint256 deadline, uint256 nonce, bytes memory sig)
+    {
+        deadline = block.timestamp + DEFAULT_AUTH_VALIDITY;
+        nonce = dotnsPopController.gatewayNonces(popGateway);
+        sig = _sign(_registerBaseStructHash(label, user, link, deadline, nonce));
     }
 
     /// @notice Constructs a `Link` that inherits the chat key from a prior lite label.

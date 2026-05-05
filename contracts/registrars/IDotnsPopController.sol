@@ -111,9 +111,25 @@ interface IDotnsPopController is IDotnsController {
         string indexed label, bytes32 indexed labelhash, address indexed owner, address store
     );
 
-    /// @notice Thrown when the caller is not the PoP gateway.
-    /// @param caller The address that attempted the call.
+    /// @notice Thrown when the recovered EIP-712 signer does not match the
+    ///         address registered at `DotnsProtocolRegistry.POP_GATEWAY`.
+    /// @param caller The address recovered from the supplied signature.
     error NotGateway(address caller);
+
+    /// @notice Thrown when the authorization deadline has elapsed.
+    /// @param deadline The deadline carried in the signed payload.
+    /// @param nowTs The block timestamp observed at verification time.
+    error AuthExpired(uint256 deadline, uint256 nowTs);
+
+    /// @notice Thrown when no gateway signer is configured at
+    ///         `DotnsProtocolRegistry.POP_GATEWAY`.
+    error GatewayNotConfigured();
+
+    /// @notice Thrown when the supplied nonce does not match the next expected
+    ///         nonce for the configured gateway signer.
+    /// @param supplied The nonce carried in the signed payload.
+    /// @param expected The next expected nonce for the configured signer.
+    error BadNonce(uint256 supplied, uint256 expected);
 
     /// @notice Thrown when a supplied lite-person label does not match `NAMEXX`.
     error InvalidLiteLabel();
@@ -143,7 +159,7 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Registers a lite-person username on behalf of `user` and optionally
     ///         enqueues a reservation for a base name the user intends to claim as a
     ///         full person later.
-    /// @dev Callable only by the PoP gateway registered in
+    /// @dev Authorized by an EIP-712 signature from the address registered at
     ///      `DotnsProtocolRegistry.POP_GATEWAY`. Bypasses pricing (PoP tiers pay
     ///      zero) and commit-reveal, but still honours classification and tier
     ///      enforcement via `IPopRules.priceWithCheck`, so the gateway cannot mint
@@ -160,33 +176,51 @@ interface IDotnsPopController is IDotnsController {
     /// @param user The lite-person account receiving the username.
     /// @param chatKey ECDH chat-key bytes to persist on {IDotnsChatKeyResolver}.
     /// @param reservedBaseLabel Optional base name to reserve. Empty string skips.
+    /// @param deadline Unix timestamp after which the authorization is rejected.
+    /// @param nonce Per-signer nonce; must equal the current
+    ///        `gatewayNonces[signer]` and is incremented on success.
+    /// @param signature EIP-712 ECDSA signature produced by the configured signer
+    ///        over the `ReserveBaseName` typed payload.
     function reserveBaseName(
         string calldata liteLabel,
         address user,
         bytes calldata chatKey,
-        string calldata reservedBaseLabel
+        string calldata reservedBaseLabel,
+        uint256 deadline,
+        uint256 nonce,
+        bytes calldata signature
     )
         external;
 
     /// @notice Registers a lite-person username on behalf of `user` without
     ///         touching the base-name reservation queue.
-    /// @dev Callable only by the PoP gateway. Bypasses pricing and commit-reveal
-    ///      but honours classification and tier enforcement via
+    /// @dev Authorized by an EIP-712 signature from the address registered at
+    ///      `DotnsProtocolRegistry.POP_GATEWAY`. Bypasses pricing and
+    ///      commit-reveal but honours classification and tier enforcement via
     ///      `IPopRules.priceWithCheck`. Compositional counterpart to
     ///      {reserveBaseName}: for flows that only need to mint the lite name,
     ///      this entrypoint has no failure modes tied to base queue capacity.
     /// @param liteLabel The lite-person `NAMEXX` label to register.
     /// @param user The lite-person account receiving the username.
     /// @param chatKey ECDH chat-key bytes to persist on {IDotnsChatKeyResolver}.
+    /// @param deadline Unix timestamp after which the authorization is rejected.
+    /// @param nonce Per-signer nonce; must equal the current
+    ///        `gatewayNonces[signer]` and is incremented on success.
+    /// @param signature EIP-712 ECDSA signature produced by the configured signer
+    ///        over the `ReserveLiteName` typed payload.
     function reserveLiteName(
         string calldata liteLabel,
         address user,
-        bytes calldata chatKey
+        bytes calldata chatKey,
+        uint256 deadline,
+        uint256 nonce,
+        bytes calldata signature
     )
         external;
 
     /// @notice Registers a full-person username on behalf of `user`.
-    /// @dev Callable only by the PoP gateway. Bypasses pricing (PoP tiers pay
+    /// @dev Authorized by an EIP-712 signature from the address registered at
+    ///      `DotnsProtocolRegistry.POP_GATEWAY`. Bypasses pricing (PoP tiers pay
     ///      zero) and commit-reveal, but still honours classification and tier
     ///      enforcement via `IPopRules.priceWithCheck`.
     ///
@@ -203,7 +237,20 @@ interface IDotnsPopController is IDotnsController {
     /// @param label The full-person label to register.
     /// @param user The full-person account receiving the username.
     /// @param link Tagged union selecting the chat-key source.
-    function registerBaseName(string calldata label, address user, Link calldata link) external;
+    /// @param deadline Unix timestamp after which the authorization is rejected.
+    /// @param nonce Per-signer nonce; must equal the current
+    ///        `gatewayNonces[signer]` and is incremented on success.
+    /// @param signature EIP-712 ECDSA signature produced by the configured signer
+    ///        over the `RegisterBaseName` typed payload.
+    function registerBaseName(
+        string calldata label,
+        address user,
+        Link calldata link,
+        uint256 deadline,
+        uint256 nonce,
+        bytes calldata signature
+    )
+        external;
 
     /// @notice Permissionlessly removes expired entries from the head of a reservation queue.
     /// @param reservedBaseLabel The reserved label whose queue should be compacted.

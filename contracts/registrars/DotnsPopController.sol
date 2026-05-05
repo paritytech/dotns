@@ -9,6 +9,10 @@ import {
 import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {
+    EIP712Upgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {IDotnsPopController} from "./IDotnsPopController.sol";
@@ -74,6 +78,7 @@ contract DotnsPopController is
     UUPSUpgradeable,
     OwnableUpgradeable,
     ERC165Upgradeable,
+    EIP712Upgradeable,
     IDotnsPopController
 {
     using StringUtils for *;
@@ -126,15 +131,35 @@ contract DotnsPopController is
     ///      governance via `setReservationDuration`.
     uint64 public reservationDuration;
 
-    /// @dev Reserved storage space to allow for layout changes in the future.
-    uint256[50] private __gap;
+    /// @notice Per-signer monotonic nonce for EIP-712 gateway authorizations.
+    /// @dev Mirrors the pallet's view of the same value; the next valid nonce
+    ///      for `signer` is `gatewayNonces[signer]`. Keyed by signer (not user)
+    ///      so a key rotation at `DotnsProtocolRegistry.POP_GATEWAY` resets the
+    ///      sequence for the new signer to zero.
+    mapping(address signer => uint256 nonce) public gatewayNonces;
 
-    /// @notice Restricts calls to the privileged PoP gateway address stored in the
-    ///         protocol registry under `POP_GATEWAY`.
-    modifier onlyGateway() {
-        _onlyGateway();
-        _;
-    }
+    /// @dev EIP-712 type hash for {reserveLiteName}. Field order mirrors the
+    ///      function signature followed by the auth tail.
+    bytes32 private constant RESERVE_LITE_TYPEHASH = keccak256(
+        "ReserveLiteName(string liteLabel,address user,bytes chatKey,uint256 deadline,uint256 nonce)"
+    );
+
+    /// @dev EIP-712 type hash for {reserveBaseName}.
+    bytes32 private constant RESERVE_BASE_TYPEHASH = keccak256(
+        "ReserveBaseName(string liteLabel,address user,bytes chatKey,string reservedBaseLabel,uint256 deadline,uint256 nonce)"
+    );
+
+    /// @dev EIP-712 type hash for {registerBaseName}. The `Link` struct is
+    ///      flattened into the typehash (`linkKind`, `linkLiteLabel`,
+    ///      `linkChatKey`) to keep one struct hash per call and simplify the
+    ///      pallet-side encoding.
+    bytes32 private constant REGISTER_BASE_TYPEHASH = keccak256(
+        "RegisterBaseName(string label,address user,uint8 linkKind,string linkLiteLabel,bytes linkChatKey,uint256 deadline,uint256 nonce)"
+    );
+
+    /// @dev Reserved storage space to allow for layout changes in the future.
+    ///      Shrunk from 50 to 49 to accommodate `gatewayNonces`.
+    uint256[49] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -153,10 +178,11 @@ contract DotnsPopController is
         uint64 reservationDuration_
     )
         external
-        initializer
+        reinitializer(2)
     {
         __Ownable_init(msg.sender);
         __ERC165_init();
+        __EIP712_init("DotnsPopController", "1");
         protocolRegistry = registry;
         reservationDuration = reservationDuration_;
         emit ReservationDurationSet(reservationDuration_);
@@ -166,12 +192,25 @@ contract DotnsPopController is
     function reserveLiteName(
         string calldata liteLabel,
         address user,
-        bytes calldata chatKey
+        bytes calldata chatKey,
+        uint256 deadline,
+        uint256 nonce,
+        bytes calldata signature
     )
         external
         override
-        onlyGateway
     {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                RESERVE_LITE_TYPEHASH,
+                keccak256(bytes(liteLabel)),
+                user,
+                keccak256(chatKey),
+                deadline,
+                nonce
+            )
+        );
+        _verifyGateway(structHash, deadline, nonce, signature);
         _reserveLite(liteLabel, user, chatKey);
     }
 
@@ -180,12 +219,27 @@ contract DotnsPopController is
         string calldata liteLabel,
         address user,
         bytes calldata chatKey,
-        string calldata reservedBaseLabel
+        string calldata reservedBaseLabel,
+        uint256 deadline,
+        uint256 nonce,
+        bytes calldata signature
     )
         external
         override
-        onlyGateway
     {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                RESERVE_BASE_TYPEHASH,
+                keccak256(bytes(liteLabel)),
+                user,
+                keccak256(chatKey),
+                keccak256(bytes(reservedBaseLabel)),
+                deadline,
+                nonce
+            )
+        );
+        _verifyGateway(structHash, deadline, nonce, signature);
+
         _reserveLite(liteLabel, user, chatKey);
 
         if (bytes(reservedBaseLabel).length != 0) {
@@ -207,8 +261,8 @@ contract DotnsPopController is
     /// @notice Lite-only mint shared by {reserveLiteName} and the lite leg of
     ///         {reserveBaseName}.
     /// @dev Gated by `priceWithCheck` so the lite label's classification and
-    ///      the user's tier are honoured here too. The gateway-only modifier is
-    ///      enforced at the entrypoints that call this internal.
+    ///      the user's tier are honoured here too. EIP-712 gateway
+    ///      verification runs at the entrypoints that call this internal.
     function _reserveLite(
         string calldata liteLabel,
         address user,
@@ -233,12 +287,21 @@ contract DotnsPopController is
     function registerBaseName(
         string calldata label,
         address user,
-        Link calldata link
+        Link calldata link,
+        uint256 deadline,
+        uint256 nonce,
+        bytes calldata signature
     )
         external
         override
-        onlyGateway
     {
+        _verifyGateway(
+            _registerBaseStructHash(label, user, link, deadline, nonce),
+            deadline,
+            nonce,
+            signature
+        );
+
         // Classification and tier enforcement for the full-person label. Runs
         // ahead of the reservation-axis detection so a mis-tiered request never
         // even touches the queue.
@@ -628,10 +691,61 @@ contract DotnsPopController is
         delete _reservedBaseLabel[labelhash];
     }
 
-    /// @notice Internal check enforcing PoP-gateway-only access.
-    function _onlyGateway() internal view {
-        address gateway = protocolRegistry.get(DotnsConstants.POP_GATEWAY);
-        require(msg.sender == gateway, NotGateway(msg.sender));
+    /// @notice Verifies an EIP-712 gateway authorization and consumes the nonce.
+    /// @dev Recovers the signer from the supplied signature and requires it to
+    ///      equal the address registered at `DotnsProtocolRegistry.POP_GATEWAY`.
+    ///      Reverts on expired deadline, missing registry entry, or nonce
+    ///      mismatch. On success, advances `gatewayNonces[signer]` by one.
+    /// @param structHash EIP-712 struct hash of the typed payload.
+    /// @param deadline Unix timestamp after which the authorization is rejected.
+    /// @param nonce Per-signer nonce supplied by the caller.
+    /// @param sig EIP-712 ECDSA signature over the typed payload.
+    function _verifyGateway(
+        bytes32 structHash,
+        uint256 deadline,
+        uint256 nonce,
+        bytes calldata sig
+    )
+        internal
+    {
+        require(block.timestamp <= deadline, AuthExpired(deadline, block.timestamp));
+        address signer = protocolRegistry.get(DotnsConstants.POP_GATEWAY);
+        require(signer != address(0), GatewayNotConfigured());
+        uint256 expected = gatewayNonces[signer];
+        require(nonce == expected, BadNonce(nonce, expected));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        address recovered = ECDSA.recover(digest, sig);
+        require(recovered == signer, NotGateway(recovered));
+        gatewayNonces[signer] = expected + 1;
+    }
+
+    /// @notice Builds the EIP-712 struct hash for {registerBaseName}.
+    /// @dev Hoisted to an internal helper to keep the entrypoint's stack frame
+    ///      under the EVM's local-variable limit. The `Link` struct is
+    ///      flattened into the hashed payload to match the typehash.
+    function _registerBaseStructHash(
+        string calldata label,
+        address user,
+        Link calldata link,
+        uint256 deadline,
+        uint256 nonce
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encode(
+                REGISTER_BASE_TYPEHASH,
+                keccak256(bytes(label)),
+                user,
+                uint8(link.kind),
+                keccak256(bytes(link.liteLabel)),
+                keccak256(link.chatKey),
+                deadline,
+                nonce
+            )
+        );
     }
 
     /// @inheritdoc UUPSUpgradeable

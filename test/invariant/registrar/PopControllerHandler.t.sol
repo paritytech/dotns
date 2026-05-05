@@ -19,7 +19,15 @@ import {LabelUtils} from "../../../contracts/utils/LabelUtils.sol";
 contract PopControllerHandler is Test {
     DotnsPopController public immutable CONTROLLER;
     address public immutable GATEWAY;
+    uint256 internal immutable GATEWAY_PK;
     uint16 public constant MAX_QUEUE = 64;
+
+    bytes32 private constant RESERVE_BASE_TYPEHASH = keccak256(
+        "ReserveBaseName(string liteLabel,address user,bytes chatKey,string reservedBaseLabel,uint256 deadline,uint256 nonce)"
+    );
+    bytes32 private constant REGISTER_BASE_TYPEHASH = keccak256(
+        "RegisterBaseName(string label,address user,uint8 linkKind,string linkLiteLabel,bytes linkChatKey,uint256 deadline,uint256 nonce)"
+    );
 
     address[] public actors;
     string[] public baseLabels;
@@ -47,11 +55,13 @@ contract PopControllerHandler is Test {
     constructor(
         DotnsPopController controller_,
         address gateway_,
+        uint256 gatewayPk_,
         address[] memory actors_,
         PopRules popRules_
     ) {
         CONTROLLER = controller_;
         GATEWAY = gateway_;
+        GATEWAY_PK = gatewayPk_;
         actors = actors_;
         // baselength 8, no trailing digits: PopFull classification.
         baseLabels.push("alicebob");
@@ -109,8 +119,9 @@ contract PopControllerHandler is Test {
         string memory liteLabel = _buildLiteLabel("rsv", actor, _liteSuffix[actor]);
         string memory reservedBase = attachReservation ? _baseLabel(baseIndex) : "";
 
-        vm.prank(GATEWAY);
-        try CONTROLLER.reserveBaseName(liteLabel, actor, "", reservedBase) {
+        (uint256 d, uint256 n, bytes memory s) =
+            _authReserveBase(liteLabel, actor, "", reservedBase);
+        try CONTROLLER.reserveBaseName(liteLabel, actor, "", reservedBase, d, n, s) {
             if (attachReservation) _track(keccak256(bytes(reservedBase)));
             bytes32 node = LabelUtils.namehashUnder(
                 DotnsConstants.DOT_NODE, LabelUtils.labelhashMemory(liteLabel)
@@ -137,14 +148,14 @@ contract PopControllerHandler is Test {
         _liteSuffix[actor]++;
         string memory liteLabel = _buildLiteLabel("clm", actor, _liteSuffix[actor]);
 
-        vm.prank(GATEWAY);
-        try CONTROLLER.reserveBaseName(liteLabel, actor, "", "") {
+        (uint256 rd, uint256 rn, bytes memory rs) = _authReserveBase(liteLabel, actor, "", "");
+        try CONTROLLER.reserveBaseName(liteLabel, actor, "", "", rd, rn, rs) {
             IDotnsPopController.Link memory link = IDotnsPopController.Link({
                 kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
             });
 
-            vm.prank(GATEWAY);
-            try CONTROLLER.registerBaseName(baseLabel, actor, link) {
+            (uint256 cd, uint256 cn, bytes memory cs) = _authRegisterBase(baseLabel, actor, link);
+            try CONTROLLER.registerBaseName(baseLabel, actor, link, cd, cn, cs) {
                 bytes32 liteLabelhash = LabelUtils.labelhashMemory(liteLabel);
                 bytes32 fullNode = LabelUtils.namehashUnder(
                     DotnsConstants.DOT_NODE, LabelUtils.labelhashMemory(baseLabel)
@@ -184,8 +195,8 @@ contract PopControllerHandler is Test {
             kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
         });
 
-        vm.prank(GATEWAY);
-        try CONTROLLER.registerBaseName(baseLabel, actor, link) {
+        (uint256 d, uint256 n, bytes memory s) = _authRegisterBase(baseLabel, actor, link);
+        try CONTROLLER.registerBaseName(baseLabel, actor, link, d, n, s) {
             bytes32 liteLabelhash = LabelUtils.labelhashMemory(liteLabel);
             bytes32 fullNode = LabelUtils.namehashUnder(
                 DotnsConstants.DOT_NODE, LabelUtils.labelhashMemory(baseLabel)
@@ -255,5 +266,85 @@ contract PopControllerHandler is Test {
             _tracked[labelhash] = true;
             reservedLabelsSeen.push(labelhash);
         }
+    }
+
+    /// @dev Builds a valid EIP-712 auth tail for `reserveBaseName`.
+    function _authReserveBase(
+        string memory liteLabel,
+        address user,
+        bytes memory chatKey,
+        string memory reservedBaseLabel
+    )
+        internal
+        view
+        returns (uint256 deadline, uint256 nonce, bytes memory sig)
+    {
+        deadline = block.timestamp + 1 hours;
+        nonce = CONTROLLER.gatewayNonces(GATEWAY);
+        bytes32 structHash = keccak256(
+            abi.encode(
+                RESERVE_BASE_TYPEHASH,
+                keccak256(bytes(liteLabel)),
+                user,
+                keccak256(chatKey),
+                keccak256(bytes(reservedBaseLabel)),
+                deadline,
+                nonce
+            )
+        );
+        sig = _sign(structHash);
+    }
+
+    /// @dev Builds a valid EIP-712 auth tail for `registerBaseName`.
+    function _authRegisterBase(
+        string memory label,
+        address user,
+        IDotnsPopController.Link memory link
+    )
+        internal
+        view
+        returns (uint256 deadline, uint256 nonce, bytes memory sig)
+    {
+        deadline = block.timestamp + 1 hours;
+        nonce = CONTROLLER.gatewayNonces(GATEWAY);
+        bytes32 structHash = keccak256(
+            abi.encode(
+                REGISTER_BASE_TYPEHASH,
+                keccak256(bytes(label)),
+                user,
+                uint8(link.kind),
+                keccak256(bytes(link.liteLabel)),
+                keccak256(link.chatKey),
+                deadline,
+                nonce
+            )
+        );
+        sig = _sign(structHash);
+    }
+
+    /// @dev Signs the controller's EIP-712 digest under `GATEWAY_PK`.
+    function _sign(bytes32 structHash) internal view returns (bytes memory) {
+        (
+            ,
+            string memory name,
+            string memory version,
+            uint256 chainId,
+            address verifyingContract,
+            ,
+        ) = CONTROLLER.eip712Domain();
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256(bytes(name)),
+                keccak256(bytes(version)),
+                chainId,
+                verifyingContract
+            )
+        );
+        bytes32 digest = keccak256(abi.encodePacked(hex"1901", domainSeparator, structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(GATEWAY_PK, digest);
+        return abi.encodePacked(r, s, v);
     }
 }

@@ -23,7 +23,9 @@ contract DotnsPopControllerInvariant is BaseDotns {
             handlerActors[i] = makeAddr(string.concat("popActor", vm.toString(i)));
         }
 
-        handler = new PopControllerHandler(dotnsPopController, popGateway, handlerActors, popRules);
+        handler = new PopControllerHandler(
+            dotnsPopController, popGateway, popGatewayPk, handlerActors, popRules
+        );
         targetContract(address(handler));
 
         bytes4[] memory selectors = new bytes4[](6);
