@@ -1,0 +1,59 @@
+diff --git a/contracts/token/ERC721/ERC721.sol b/contracts/token/ERC721/ERC721.sol
+index f4783f1e..628bde1e 100644
+--- a/contracts/token/ERC721/ERC721.sol
++++ b/contracts/token/ERC721/ERC721.sol
+@@ -112,7 +112,7 @@ abstract contract ERC721 is Context, ERC165, IERC721, IERC721Metadata, IERC721Er
+     }
+ 
+     /// @inheritdoc IERC721
+-    function transferFrom(address from, address to, uint256 tokenId) public virtual {
++    function transferFrom(address from, address to, uint256 tokenId) public virtual payable {
+         if (to == address(0)) {
+             revert ERC721InvalidReceiver(address(0));
+         }
+@@ -125,12 +125,12 @@ abstract contract ERC721 is Context, ERC165, IERC721, IERC721Metadata, IERC721Er
+     }
+ 
+     /// @inheritdoc IERC721
+-    function safeTransferFrom(address from, address to, uint256 tokenId) public {
++    function safeTransferFrom(address from, address to, uint256 tokenId) public virtual payable {
+         safeTransferFrom(from, to, tokenId, "");
+     }
+ 
+     /// @inheritdoc IERC721
+-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) public virtual {
++    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) public virtual payable {
+         transferFrom(from, to, tokenId);
+         ERC721Utils.checkOnERC721Received(_msgSender(), from, to, tokenId, data);
+     }
+diff --git a/contracts/token/ERC721/IERC721.sol b/contracts/token/ERC721/IERC721.sol
+index 74982034..1cdfaad9 100644
+--- a/contracts/token/ERC721/IERC721.sol
++++ b/contracts/token/ERC721/IERC721.sol
+@@ -52,7 +52,7 @@ interface IERC721 is IERC165 {
+      *
+      * Emits a {Transfer} event.
+      */
+-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) external;
++    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) external payable;
+ 
+     /**
+      * @dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients
+@@ -70,7 +70,7 @@ interface IERC721 is IERC165 {
+      *
+      * Emits a {Transfer} event.
+      */
+-    function safeTransferFrom(address from, address to, uint256 tokenId) external;
++    function safeTransferFrom(address from, address to, uint256 tokenId) external payable;
+ 
+     /**
+      * @dev Transfers `tokenId` token from `from` to `to`.
+@@ -88,7 +88,7 @@ interface IERC721 is IERC165 {
+      *
+      * Emits a {Transfer} event.
+      */
+-    function transferFrom(address from, address to, uint256 tokenId) external;
++    function transferFrom(address from, address to, uint256 tokenId) external payable;
+ 
+     /**
+      * @dev Gives permission to `to` to transfer `tokenId` token to another account.

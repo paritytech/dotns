@@ -34,6 +34,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Apply OZ payable patches
+        run: bash scripts/shell/apply-oz-patches.sh
+
       - env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
         run: forge install && forge build --build-info

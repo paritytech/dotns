@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   gas-report:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     if: github.event.action != 'closed'
     steps:
       - uses: actions/checkout@v4
@@ -29,9 +29,20 @@ jobs:
         with:
           version: nightly
 
+      # Parity internal runners ship a minimal image; `oven-sh/setup-bun@v2`
+      # extracts a zip archive at install time and needs `unzip` on PATH.
+      - name: Install unzip (required by oven-sh/setup-bun on parity-int-* images)
+        run: sudo apt-get update && sudo apt-get install -y unzip
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.2.6"
+
+      # `openzeppelin-foundry-upgrades` shells out to `npx @openzeppelin/upgrades-core`
+      # via `vm.ffi` during tests; bun does not provide `npx`, so install Node here.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - uses: actions/setup-python@v5
         with:
@@ -49,8 +60,15 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
           FOUNDRY_PROFILE: "gas"
         run: |
+          # `rm -rf out/build-info` is load-bearing: forge test re-invokes solc
+          # with a narrower outputSelection than forge build, can overwrite the
+          # full build-info with a partial one, and the OZ validator (which runs
+          # at test execution time via vm.ffi) then rejects it. Removing only
+          # the build-info dir forces forge build to write a fresh complete one
+          # while preserving the solc compilation cache under `cache/`.
+          rm -rf out/build-info
           forge build
-          forge test --gas-report 2>&1 | tee pr-gas-report.txt
+          forge test --gas-report --no-match-path 'test/fork/**' 2>&1 | tee pr-gas-report.txt
 
       - name: Checkout main branch
         uses: actions/checkout@v4
@@ -62,13 +80,25 @@ jobs:
       - name: Generate gas report (main branch)
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-          FOUNDRY_FUZZ_GAS_REPORT_SAMPLES: "1000"
-          FOUNDRY_INVARIANT_GAS_REPORT_SAMPLES: "1000"
+          FOUNDRY_PROFILE: "gas"
         working-directory: main-branch
         run: |
           bun install
+          # Until the OZ payable patches land on main, the main checkout
+          # produces vanilla OZ via setup.bash and the payable transferFrom
+          # overrides on `DotnsRegistrar`/`IDotnsRegistrar` fail to compile.
+          # Copy the patches and the apply script from the PR-branch checkout
+          # and re-apply against main's freshly cloned `lib/`. Once main merges
+          # the patches this becomes an idempotent overwrite.
+          rm -rf patches
+          cp -R ../patches ./patches
+          mkdir -p scripts/shell
+          cp ../scripts/shell/apply-oz-patches.sh scripts/shell/apply-oz-patches.sh
+          chmod +x scripts/shell/apply-oz-patches.sh
+          bash scripts/shell/apply-oz-patches.sh
+          rm -rf out/build-info
           forge build
-          forge test --gas-report 2>&1 | tee ../main-gas-report.txt
+          forge test --gas-report --no-match-path 'test/fork/**' 2>&1 | tee ../main-gas-report.txt
 
       - name: Tear down revive-eth-rpc
         if: always()

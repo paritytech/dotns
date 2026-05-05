@@ -220,13 +220,8 @@ contract PopRules is
                 userStatus == PopStatus.PopLite || userStatus == PopStatus.PopFull,
                 PopError("Requires Personhood Lite verification")
             );
-        } else {
-            uint256 trailingDigits = _countTrailingDigits(name);
-            require(
-                trailingDigits != 0 && userStatus != PopStatus.PopLite,
-                PopError("Personhood Lite cannot register base names")
-            );
         }
+        // requiredStatus == PopStatus.NoStatus falls through: any user tier may register.
 
         return metadata;
     }

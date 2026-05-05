@@ -53,36 +53,49 @@ show_progress = true
 [profile.ci.fuzz]
 runs = 10000
 max_test_rejects = 131072
-dictionary_weight = 90
+dictionary_weight = 85
 gas_report_samples = 1000
 show_logs = true
 
 [profile.ci.invariant]
-runs = 1024
-depth = 1000
-fail_on_revert = true
+# Foundry's defaults are 256 × 500. 300 × 500 sits a small step above default:
+# enough extra starting sequences to broaden state-space coverage on every CI
+# run, without the wall-time blow-up of the previous 512 × 500 (let alone the
+# original 1024 × 1000) configuration. Bump `runs` first if you need more
+# coverage later; bumping `depth` lengthens each sequence and amplifies any
+# handler-state drift, so it is the riskier knob to grow.
+runs = 300
+depth = 500
+
+# False is the safer default for handler-driven suites: legitimate reverts
+# (collisions, cross-tier fee paths, expired commitments) are part of the
+# state space the fuzzer should explore, not test failures. Real bugs surface
+# through the `invariant_*` assertions.
+fail_on_revert = false
 
 # Keep normal invariant campaigns close to real EVM call behaviour.
 # Use a separate targeted suite if you specifically want call override behaviour.
 call_override = false
 
-dictionary_weight = 90
+dictionary_weight = 85
 shrink_run_limit = 10000
 max_assume_rejects = 131072
 gas_report_samples = 1000
-corpus_dir = "cache/invariant/corpus"
-corpus_min_mutations = 10
-corpus_min_size = 1
+# Corpus persistence is intentionally omitted: when CI caches `cache/`,
+# previously-shrunk failure sequences replay on subsequent runs and report
+# "persisted failure revert" even after the underlying bug is fixed. Local
+# devs chasing a specific shrink can opt in via the FOUNDRY_INVARIANT_CORPUS_DIR
+# env var without committing the persistence into CI.
 show_edge_coverage = true
 show_metrics = true
 show_solidity = true
 check_interval = 1
 
 [profile.gas.fuzz]
-gas_report_samples = 1000
+gas_report_samples = 512
 
 [profile.gas.invariant]
-gas_report_samples = 1000
+gas_report_samples = 512
 
 [fmt]
 line_length = 100

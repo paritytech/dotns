@@ -35,6 +35,18 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
 
         targetContract(address(handler));
 
+        // Restrict the fuzzer to handler actions; `addActor` is a setUp helper
+        // whose `PopStatus` parameter would revert under random uint8 values
+        // outside the enum range.
+        bytes4[] memory selectors = new bytes4[](6);
+        selectors[0] = handler.commitAndRegister.selector;
+        selectors[1] = handler.commitOnly.selector;
+        selectors[2] = handler.registerWithOverpayment.selector;
+        selectors[3] = handler.advanceTime.selector;
+        selectors[4] = handler.transferName.selector;
+        selectors[5] = handler.chainTransfer.selector;
+        targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
+
         excludeContract(address(dotnsRegistrarController));
         excludeContract(address(dotnsRegistry));
         excludeContract(address(dotnsRegistrar));

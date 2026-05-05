@@ -452,16 +452,18 @@ contract EscrowHandler is Test {
         uint256 index = tokenSeed % _depositedTokenIds.length;
         uint256 tokenId = _depositedTokenIds[index];
 
-        // Zero-value transfer path is only safe when the recipient's tier price is
-        // already covered by runningMax. Skip the call otherwise so the registrar's
-        // _update branch does not revert with TransferFeeRequired.
+        // Zero-value transfer path: skip whenever the registrar's quote returns a
+        // non-zero fee. The quote folds in both the price-delta path and the
+        // reach-floor path, so the handler stays in sync with whatever fee
+        // branches the contract grows over time.
         string memory label = labelByTokenId[tokenId];
+        // Read once for documentation continuity; the actual gating check uses the quote.
+        label;
         address currentOwner = registrar.ownerOf(tokenId);
         address recipient = _pickDifferentActor(currentOwner, actorSeed);
         if (recipient == address(0)) return;
 
-        uint256 priceForTo = popRules.priceWithoutCheck(label, recipient).price;
-        if (priceForTo > escrow.runningMax(tokenId)) return;
+        if (registrar.quoteTransferFee(tokenId, recipient) != 0) return;
 
         vm.prank(currentOwner);
         try registrar.transferFrom(currentOwner, recipient, tokenId) {}
@@ -498,16 +500,29 @@ contract EscrowHandler is Test {
         uint256 priceForTo = popRules.priceWithoutCheck(label, to).price;
         if (priceForTo == 0) return;
 
-        uint256 prior = escrow.runningMax(tokenId);
-        uint256 delta = priceForTo > prior ? priceForTo - prior : 0;
+        // Use the registrar's own quote so the value attached matches whatever the
+        // contract actually requires. This includes the reach-floor branch: when
+        // the recipient's verification level is below the label's required tier,
+        // the registrar charges the length-scaled NoStatus rate even though the
+        // price-delta path returns zero. Using `quoteTransferFee` makes the handler
+        // drift-resistant against future fee additions.
+        uint256 requiredFee = registrar.quoteTransferFee(tokenId, to);
+        if (requiredFee == 0) return;
+
+        uint256 priorInsurance = escrow.insuranceFund();
 
         vm.recordLogs();
         vm.prank(currentOwner);
-        try registrar.transferFrom{value: delta}(currentOwner, to, tokenId) {
+        try registrar.transferFrom{value: requiredFee}(currentOwner, to, tokenId) {
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
-            if (delta > 0) {
-                ghost_insurancePaidIn += delta;
+            // Read the on-chain insurance delta rather than predicting it. The contract
+            // credits `max(priceForTo - prior, reachFloor)` to insurance; mirroring that
+            // formula in the handler would re-create the very drift this guard is meant
+            // to prevent.
+            uint256 newInsurance = escrow.insuranceFund();
+            if (newInsurance > priorInsurance) {
+                ghost_insurancePaidIn += (newInsurance - priorInsurance);
             }
             uint256 newMax = escrow.runningMax(tokenId);
             if (newMax > lastObservedRunningMax[tokenId]) {

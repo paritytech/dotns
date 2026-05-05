@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,16 +20,30 @@ jobs:
         with:
           version: nightly
 
+      # Parity internal runners ship a minimal image; `oven-sh/setup-bun@v2`
+      # extracts a zip archive at install time and needs `unzip` on PATH.
+      - name: Install unzip (required by oven-sh/setup-bun on parity-int-* images)
+        run: sudo apt-get update && sudo apt-get install -y unzip
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.2.6"
+
+      # `openzeppelin-foundry-upgrades` shells out to `npx @openzeppelin/upgrades-core`
+      # via `vm.ffi` during tests; bun does not provide `npx`, so install Node here.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - run: bun install
 
       - name: Build contracts
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-        run: forge build --sizes
+        # Remove any prior build-info so the OZ validator (vm.ffi inside
+        # upgrade tests in the next step) reads the complete artefact this
+        # build emits. Preserving `cache/` keeps incremental compile fast.
+        run: rm -rf out/build-info && forge build --sizes
 
       - name: Run tests
         env:
@@ -51,6 +65,9 @@ jobs:
             "PopRules"
             "DotnsRegistrarController"
             "DotnsProtocolRegistry"
+            "DotnsNameEscrow"
+            "DotnsPopController"
+            "DotnsPopResolver"
             "IStore"
             "IStoreFactory"
             "IDotnsRegistrar"
@@ -61,6 +78,9 @@ jobs:
             "IDotnsResolver"
             "IPopRules"
             "IDotnsProtocolRegistry"
+            "IDotnsNameEscrow"
+            "IDotnsPopController"
+            "IDotnsPopResolver"
           )
 
           for name in "${contracts[@]}"; do

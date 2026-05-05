@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     if: github.event.action != 'closed'
     steps:
       - uses: actions/checkout@v4
@@ -29,9 +29,20 @@ jobs:
         with:
           version: nightly
 
+      # Parity internal runners ship a minimal image; `oven-sh/setup-bun@v2`
+      # extracts a zip archive at install time and needs `unzip` on PATH.
+      - name: Install unzip (required by oven-sh/setup-bun on parity-int-* images)
+        run: sudo apt-get update && sudo apt-get install -y unzip
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.2.6"
+
+      # `openzeppelin-foundry-upgrades` shells out to `npx @openzeppelin/upgrades-core`
+      # via `vm.ffi` during tests; bun does not provide `npx`, so install Node here.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - uses: actions/setup-python@v5
         with:
@@ -42,7 +53,14 @@ jobs:
       - name: Build contracts
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-        run: forge build
+        # Remove any prior build-info so this `forge build` writes the only
+        # JSON in `out/build-info/`; the OZ validator (vm.ffi inside upgrade
+        # tests) requires a complete-compilation artefact. Note: `forge
+        # coverage --ir-minimum` in the next step recompiles via the IR
+        # pipeline and may emit its own build-info mid-run; if the validator
+        # ever fires inside coverage runs we'll need a tighter mitigation
+        # (e.g. excluding upgrade tests from coverage).
+        run: rm -rf out/build-info && forge build
 
       - name: Run coverage
         id: run
