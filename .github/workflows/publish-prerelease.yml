@@ -18,7 +18,7 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
       # Parity internal runners ship a minimal image; `oven-sh/setup-bun@v2`
       # extracts a zip archive at install time and needs `unzip` on PATH.
