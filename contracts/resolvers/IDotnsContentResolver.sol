@@ -4,9 +4,8 @@ pragma solidity ^0.8.30;
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 
 /// @title Dotns Content Resolver
-/// @notice Defines storage and retrieval for content hash, text records, and operator approvals for
-/// DotNS nodes @dev Content hash and text records point to off-chain content such as IPFS CIDs or
-/// future schemes.
+/// @notice Defines storage and retrieval for content hash, text records, and operator approvals for DotNS nodes
+/// @dev Content hash and text records point to off-chain content such as IPFS CIDs or future schemes.
 ///      Operator approvals allow third parties to manage records on behalf of the owner.
 ///      Interpretation is handled off-chain.
 /// @custom:security-contact admin@parity.io
@@ -57,8 +56,8 @@ interface IDotnsContentResolver {
     /// @return value Stored text value, or empty string if unset
     function text(bytes32 node, string calldata key) external view returns (string memory value);
 
-    /// @notice Enable or disable approval for a third party ("operator") to manage all of
-    /// `msg.sender`'s nodes @param operator Address to authorize or revoke
+    /// @notice Enable or disable approval for a third party ("operator") to manage all of `msg.sender`'s nodes
+    /// @param operator Address to authorize or revoke
     /// @param approved True to approve, false to revoke
     function setApprovalForAll(address operator, bool approved) external;
 

@@ -34,8 +34,8 @@ import {StoreUtils} from "../utils/StoreUtils.sol";
 ///
 /// @dev Tokenisation:
 ///      - The minted ERC721 tokenId is uint256(node), where node = namehash(DOT_NODE, labelhash).
-///      - The registry stores a sentinel owner (address(0)) for tokenised nodes and derives
-/// ownership from the ERC721 registrar for authorisation.
+///      - The registry stores a sentinel owner (address(0)) for tokenised nodes and derives ownership
+///        from the ERC721 registrar for authorisation.
 ///
 /// @custom:security-contact admin@parity.io
 contract DotnsRegistrarController is
@@ -102,9 +102,8 @@ contract DotnsRegistrarController is
     }
 
     /// @notice Restricts calls to whitelisted addresses or the owner.
-    /// @dev This is used to gate the `registerReserved` function, which allows registering reserved
-    /// names without PoP checks or payment. This is necessary to allow the owner to register
-    /// reserved names
+    /// @dev This is used to gate the `registerReserved` function, which allows registering reserved names
+    ///      without PoP checks or payment. This is necessary to allow the owner to register reserved names
     ///      for users who are already known and verified and dont need Pop checks.
     modifier onlyWhiteListedOrOwner() {
         _onlyWhiteListedOrOwner();

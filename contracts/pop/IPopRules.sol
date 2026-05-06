@@ -4,9 +4,8 @@ pragma solidity ^0.8.30;
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 
 /// @title Proof of Personhood Rules for Dotns
-/// @notice Proof of personhood interface defining Dotns price calculation, PoP-tier requirements,
-/// and base-name reservation rules @dev Provides the classification logic for Dotns labels,
-/// enforces suffix constraints, and exposes reservation metadata.
+/// @notice Proof of personhood interface defining Dotns price calculation, PoP-tier requirements, and base-name reservation rules
+/// @dev Provides the classification logic for Dotns labels, enforces suffix constraints, and exposes reservation metadata.
 ///      Names are evaluated according to the following rules:
 ///      • Length ≤ 5: Reserved
 ///      • Length 6–8 without trailing digits: PopFull required
@@ -15,9 +14,8 @@ import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 ///      • Length ≥ 9 with 2 trailing digits: NoStatus (open)
 ///      Trailing digits beyond 2 are invalid. Internal digits do not affect classification.
 ///      Reservation rules apply to a label stripped of trailing digits.
-///      Its also important to note that for Pop Full there are no restrictions to name
-/// registrations any Character combination is valid, the same is valid for Light and No status
-/// users with the exception of
+///      Its also important to note that for Pop Full there are no restrictions to name registrations any
+///      Character combination is valid, the same is valid for Light and No status users with the exception of
 ///      Requiring 2 suffix digits appended to the username being registered
 /// @dev The pricing applied is mainly for POP No status users as measure to prevent spam
 /// @custom:security-contact admin@parity.io
@@ -185,16 +183,14 @@ interface IPopRules {
         view
         returns (PriceWithMeta memory metadata);
 
-    /// @notice Friction fee owed when `account` reaches into a label tier above its verification
-    /// level. @dev Returns a length-scaled reach price when the account does not satisfy the
-    /// label's
+    /// @notice Friction fee owed when `account` reaches into a label tier above its verification level.
+    /// @dev Returns a length-scaled reach price when the account does not satisfy the label's
     ///      required verification tier; zero otherwise. The personhood gate on direct registration
     ///      enforces this same comparison as a revert; this view exposes it as a charge for paths
-    ///      that bypass the gate (cross-payer registration, transfer to an under-qualified
-    /// recipient). @param name Domain label being acted on.
+    ///      that bypass the gate (cross-payer registration, transfer to an under-qualified recipient).
+    /// @param name Domain label being acted on.
     /// @param account Account whose verification reach is being measured.
-    /// @return fee Length-scaled reach price when `account` is below the label's required tier;
-    /// zero otherwise.
+    /// @return fee Length-scaled reach price when `account` is below the label's required tier; zero otherwise.
     function reachFee(string calldata name, address account) external view returns (uint256 fee);
 
     /// @notice Returns whether `name` is a base name under PoP rules.

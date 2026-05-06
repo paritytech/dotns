@@ -7,14 +7,14 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 /// @title Store
 /// @notice Key-value storage for IPFS URIs, isolated per user address with authorization support.
 /// @dev Each address manages its own mapping of bytes32 keys to string values.
-///      Authorized contracts can write on behalf of users to enable atomic multi-contract
-/// operations. @dev This contract is not upgradeable.
+///      Authorized contracts can write on behalf of users to enable atomic multi-contract operations.
+/// @dev This contract is not upgradeable.
 ///
 /// @dev Permanent locking:
 ///      - A `(user, key)` can be locked permanently.
 ///      - Locked keys cannot be overwritten or deleted by any caller, including `owner`.
-///      - Keys are locked automatically when written via `setValueFor` by an address marked as a
-/// DotNS controller. @custom:security-contact admin@parity.io
+///      - Keys are locked automatically when written via `setValueFor` by an address marked as a DotNS controller.
+/// @custom:security-contact admin@parity.io
 contract Store is IStore, Ownable {
     /// @dev Primary data structure: user address => (key => value)
     mapping(address user => mapping(bytes32 key => string value)) private store;

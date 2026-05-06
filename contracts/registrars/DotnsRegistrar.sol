@@ -31,9 +31,8 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 ///      Transfers are supported to allow ownership changes without registry hooks.
 ///
 /// @dev Store writes on transfer:
-///      When an ERC721 name token is transferred between non-zero addresses (i.e. not mint or
-/// burn), the registrar writes the label to the recipient's Store using the label stored in
-/// `_labels`.
+///      When an ERC721 name token is transferred between non-zero addresses (i.e. not mint or burn),
+///      the registrar writes the label to the recipient's Store using the label stored in `_labels`.
 ///      This ensures the recipient's Store contains a record of every name they have received.
 ///      Stores are immutable (locked by DotNS controllers), so the sender's entry is not removed.
 ///
@@ -64,9 +63,8 @@ contract DotnsRegistrar is
 
     /// @notice DEPRECATED as of v1.2.0: Previously stored labelhashes per token ID.
     /// @dev Retained for UUPS storage layout compatibility. No longer written to.
-    ///      The labelhash is now derived on-the-fly from `_labels[tokenId]` via
-    /// `keccak256(bytes(label))`. REMOVE this mapping when deploying to a new environment (fresh
-    /// deploy, not upgrade).
+    ///      The labelhash is now derived on-the-fly from `_labels[tokenId]` via `keccak256(bytes(label))`.
+    ///      REMOVE this mapping when deploying to a new environment (fresh deploy, not upgrade).
     /// @custom:oz-retyped-from mapping(uint256 => bytes32)
     mapping(uint256 tokenId => bytes32 labelhash) private _labelhashes;
 
@@ -375,8 +373,7 @@ contract DotnsRegistrar is
     /// @return escrow The configured name escrow address.
     /// @return priceForTo Full recipient-tier price quoted by PopRules.
     /// @return reachFloor Friction floor when the recipient cannot meet the label's required tier.
-    /// @return requiredFee Final fee owed for the transfer: `max(priceForTo - runningMax,
-    /// reachFloor)`.
+    /// @return requiredFee Final fee owed for the transfer: `max(priceForTo - runningMax, reachFloor)`.
     function _quoteTransferFee(
         address from,
         address to,

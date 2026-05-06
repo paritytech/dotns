@@ -6,8 +6,8 @@ import {IDotnsController} from "./IDotnsController.sol";
 
 /// @title Dotns Registrar Controller
 /// @notice Interface for registering .dot labels using a commit–reveal scheme.
-/// @dev This interface defines allocation only. Forward resolution, reverse lookup, pricing
-/// mechanics, PoP validation, and store writing are handled by external contracts.
+/// @dev This interface defines allocation only. Forward resolution, reverse lookup, pricing mechanics,
+///      PoP validation, and store writing are handled by external contracts.
 ///
 /// @dev Commit–reveal:
 ///      - Users commit a hash of registration parameters.

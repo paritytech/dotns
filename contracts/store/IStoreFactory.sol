@@ -14,8 +14,8 @@ import {IStore} from "./IStore.sol";
 /// @custom:security-contact admin@parity.io
 interface IStoreFactory {
     /// @notice Deploys a new store contract for the caller
-    /// @dev Creates a store instance owned by msg.sender. Reverts if caller already has a deployed
-    /// store. @custom:reverts AlreadyDeployed if msg.sender has previously deployed a store
+    /// @dev Creates a store instance owned by msg.sender. Reverts if caller already has a deployed store.
+    /// @custom:reverts AlreadyDeployed if msg.sender has previously deployed a store
     function deploy() external returns (IStore);
 
     /// @notice Transfers the factory lookup mapping from msg.sender to newOwner.
@@ -29,8 +29,7 @@ interface IStoreFactory {
     /// @notice Retrieves the store contract address deployed by a specific user
     /// @dev Returns the zero address if no store has been deployed by the specified address
     /// @param who The address of the store owner to query
-    /// @return The IStore instance deployed by the specified address, or zero address if none
-    /// exists
+    /// @return The IStore instance deployed by the specified address, or zero address if none exists
     function getDeployedStore(address who) external view returns (IStore);
 
     /// @notice Retrieves all deployed stores

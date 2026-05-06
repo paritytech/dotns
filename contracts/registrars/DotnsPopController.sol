@@ -601,8 +601,7 @@ contract DotnsPopController is
         rules.reserveBaseNameForPop(baseLabel, newHead);
     }
 
-    /// @notice Clears the PopRules slot and the local label bookkeeping when the queue empties
-    /// (claim, last-relinquish, last-expire).
+    /// @notice Clears the PopRules slot and the local label bookkeeping when the queue empties (claim, last-relinquish, last-expire).
     function _releasePopRulesSlot(bytes32 labelhash) internal {
         string memory baseLabel = _reservedBaseLabel[labelhash];
         if (bytes(baseLabel).length == 0) return;

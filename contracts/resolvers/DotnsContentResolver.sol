@@ -16,8 +16,8 @@ import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title Dotns Content Resolver
-/// @notice Implements `IDotnsContentResolver` interface with content hash, text records, and
-/// operator approvals @dev Stores opaque content hash bytes and text key-value pairs per node
+/// @notice Implements `IDotnsContentResolver` interface with content hash, text records, and operator approvals
+/// @dev Stores opaque content hash bytes and text key-value pairs per node
 ///      Authorisation enforced via DotNS registry ownership or approved operators
 /// @custom:security-contact admin@parity.io
 contract DotnsContentResolver is

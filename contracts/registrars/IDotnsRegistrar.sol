@@ -154,8 +154,8 @@ interface IDotnsRegistrar is IERC721 {
 
     /// @notice Updates the protocol registry address.
     /// @dev Callable only by the contract owner.
-    /// @dev  TODO: This is temporary as we need to upgrade the contract we need to remember to
-    /// remove this function If we deploy to a new environment
+    /// @dev  TODO: This is temporary as we need to upgrade the contract we need to remember to remove this function
+    ///       If we deploy to a new environment
     /// @param registry The address of the new protocol registry.
     // TODO: On fresh deploy (not upgrade), remove this function. Set protocolRegistry in initialize instead.
     function updateProtocolRegistry(IDotnsProtocolRegistry registry) external;

@@ -317,8 +317,8 @@ abstract contract BaseDotns is Test {
     }
 
     /// @notice Computes the ERC721 tokenId used by DotnsRegistrar for a given label.
-    /// @dev DotnsRegistrar mints tokenId = uint256(node), where node = namehash(DOT_NODE,
-    /// labelhash). This helper prevents tests from accidentally using uint256(node) as the tokenId.
+    /// @dev DotnsRegistrar mints tokenId = uint256(node), where node = namehash(DOT_NODE, labelhash).
+    ///      This helper prevents tests from accidentally using uint256(node) as the tokenId.
     /// @param label The label to compute for (without the `.dot` suffix).
     /// @return tokenId The ERC721 tokenId (uint256(node)).
     function _tokenIdForLabel(string memory label) internal pure returns (uint256 tokenId) {
@@ -458,8 +458,8 @@ abstract contract BaseDotns is Test {
         vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
     }
 
-    /// @notice Submits a commitment, waits for the minimum age, then registers with the exact
-    /// oracle price. @dev Prices are obtained via `popRules.priceWithCheck(label, owner)`.
+    /// @notice Submits a commitment, waits for the minimum age, then registers with the exact oracle price.
+    /// @dev Prices are obtained via `popRules.priceWithCheck(label, owner)`.
     /// @param registration Registration parameters.
     function _commitRegistrationAndRegister(
         IDotnsRegistrarController.Registration memory registration
@@ -501,8 +501,8 @@ abstract contract BaseDotns is Test {
         dotnsRegistrarController.register{value: requiredPayment}(registration);
     }
 
-    /// @notice Registers `label` for `labelOwner` under the requested PoP status and returns its
-    /// node @dev For NoStatus, no status is set on the oracle.
+    /// @notice Registers `label` for `labelOwner` under the requested PoP status and returns its node
+    /// @dev For NoStatus, no status is set on the oracle.
     ///      For PopLite/PopFull, status is set for `(labelOwner, label)` before commit–reveal.
     /// @param label The label to register (without the `.dot` suffix)
     /// @param labelOwner The address that will own the registered label

@@ -26,15 +26,13 @@ library DotnsConstants {
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant DOTNS_REGISTERED_KEY = bytes32("dotns.registered");
 
-    // ── Protocol registry well-known keys
-    // ────────────────────────────
+    // ── Protocol registry well-known keys ────────────────────────────
 
     /// @notice Well-known key for the ERC721 registrar backing name ownership.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant REGISTRAR = bytes32("registrar");
 
-    /// @notice Well-known key for the registrar controller orchestrating commit-reveal
-    ///         registration.
+    /// @notice Well-known key for the registrar controller orchestrating commit-reveal registration.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant CONTROLLER = bytes32("controller");
 
