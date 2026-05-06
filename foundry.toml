@@ -33,7 +33,6 @@ quote_style = "double"
 number_underscore = "preserve"
 single_line_statement_blocks = "preserve"
 multiline_func_header = "all"
-wrap_comments = true
 
 [lint]
 exclude_lints = ["mixed-case-variable", "unsafe-cheatcode"]

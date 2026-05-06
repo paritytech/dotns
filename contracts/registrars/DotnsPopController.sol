@@ -589,8 +589,7 @@ contract DotnsPopController is
         return IPopRules(protocolRegistry.get(DotnsConstants.POP_RULES));
     }
 
-    /// @notice Writes the new head of the queue into PopRules so the public commit-reveal
-    /// flow rejects registrations of this base name for anyone other than `newHead`.
+    /// @notice Writes the new head of the queue into PopRules so the public commit-reveal flow rejects registrations of this base name for anyone other than `newHead`.
     function _syncPopRulesToHead(bytes32 labelhash, address newHead) internal {
         string memory baseLabel = _reservedBaseLabel[labelhash];
         if (bytes(baseLabel).length == 0 || newHead == address(0)) return;
