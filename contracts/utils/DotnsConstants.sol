@@ -34,7 +34,8 @@ library DotnsConstants {
     bytes32 internal constant REGISTRAR = bytes32("registrar");
 
     /// @notice Well-known key for the registrar controller orchestrating commit-reveal
-    /// registration. forge-lint: disable-next-line(unsafe-typecast)
+    ///         registration.
+    /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant CONTROLLER = bytes32("controller");
 
     /// @notice Well-known key for the forward registry storing node ownership and resolver.

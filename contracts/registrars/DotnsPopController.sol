@@ -653,36 +653,6 @@ contract DotnsPopController is
         }
     }
 
-    /// @notice Routes a raw cross-chain payload to the typed entrypoint identified by `selector`.
-    /// @dev Prepends `selector` to `payload` and `delegatecall`s `address(this)` so the typed
-    /// overload runs with the original `msg.sender` (the gateway), making the typed path the
-    /// single source of truth. The `bytes` payload from the cross-chain caller is already
-    /// `abi.encode(StructTuple)`, so concatenating `selector with payload` is exactly the
-    /// calldata the typed overload expects. Reverts bubble up byte-for-byte so the caller sees
-    /// the same error it would have seen on a direct typed call.
-    ///
-    /// Note: `onlyGateway` runs twice, once on the outer bytes overload and again on the
-    /// inner typed overload that the delegatecall lands on. The second check is a cheap,
-    /// intentional belt-and-braces; both checks read the same registry slot.
-    ///
-    /// Why the OZ unsafe-allow is acceptable here:
-    /// - The destination is hard-coded to `address(this)`, the proxy itself. No external
-    ///   contract ever runs in our storage context.
-    /// - `selector` is one of three module-private constants pointing at our own typed
-    ///   entrypoints. The caller cannot redirect the dispatch elsewhere.
-    /// - The proxy round-trip (proxy => impl => impl.delegatecall(this) => proxy => impl)
-    ///   ends in the same implementation, in the same storage context, that a direct
-    ///   typed call would land in.
-    /// @custom:oz-upgrades-unsafe-allow delegatecall
-    function _dispatchTyped(bytes4 selector, bytes calldata payload) private {
-        (bool ok, bytes memory ret) = address(this).delegatecall(bytes.concat(selector, payload));
-        if (!ok) {
-            assembly {
-                revert(add(ret, 32), mload(ret))
-            }
-        }
-    }
-
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

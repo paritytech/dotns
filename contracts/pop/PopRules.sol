@@ -147,8 +147,11 @@ contract PopRules is
 
         Reservation memory existingReservation = reservations[strippedBase];
         if (!_isLive(existingReservation)) {
-            // casting to 'uint64' is safe because MAX_RESERVATION_TIME will never be large enough
-            // to cause a revert forge-lint: disable-next-line(unsafe-typecast)
+            // `block.timestamp + MAX_RESERVATION_TIME` cannot overflow `uint64`:
+            // `MAX_RESERVATION_TIME` is bounded (1 year of seconds, ~3.15e7),
+            // and `uint64` saturates at ~5.84e11 — that horizon doesn't arrive
+            // until year 2554. Truncation under the cast is therefore unreachable.
+            // forge-lint: disable-next-line(unsafe-typecast)
             uint64 expiryTime = uint64(block.timestamp + MAX_RESERVATION_TIME);
             reservations[strippedBase] =
                 Reservation({owner: userAddress, expires: expiryTime, controller: msg.sender});
