@@ -21,53 +21,44 @@ import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title DotnsPopController
-/// @notice Dedicated PoP controller orchestrating lite-person and full-person
-///         username issuance on behalf of the PoP gateway pallet.
-/// @dev Lives behind its own UUPS proxy with its own storage. Registered on
-///      `DotnsRegistrar` via `addController`, which is how multiple controllers
-///      coexist on the same registrar without interfering with each other.
+/// @notice Dedicated PoP controller orchestrating lite-person and full-person username
+/// issuance on behalf of the PoP gateway pallet.
+/// @dev Lives behind its own UUPS proxy with its own storage. Registered on `DotnsRegistrar`
+/// via `addController`, which is how multiple controllers coexist on the same registrar
+/// without interfering with each other.
 ///
-/// @dev Enforcement:
-///      PoP entrypoints bypass native-token pricing (PoP tiers pay zero) and
-///      the commit-reveal window, but every mint path routes through
-///      `IPopRules.priceWithCheck` before any state mutation. This keeps
-///      classification (length-based "Reserved for Governance" guard) and tier
-///      policy (which PopStatus may register which labels) in lockstep with
-///      the public commit-reveal controller. The returned price is discarded
-///      because PoP tiers always resolve to zero; `priceWithCheck` reverts on
-///      classification or tier failure, which is the effect we are after.
+/// Enforcement:
+/// PoP entrypoints bypass native-token pricing (PoP tiers pay zero) and the commit-reveal
+/// window, but every mint path routes through `IPopRules.priceWithCheck` before any state
+/// mutation. This keeps classification (length-based "Reserved for Governance" guard) and
+/// tier policy (which PopStatus may register which labels) in lockstep with the public
+/// commit-reveal controller. The returned price is discarded because PoP tiers always
+/// resolve to zero; `priceWithCheck` reverts on classification or tier failure, which is the
+/// effect we are after.
 ///
-/// @dev Decoupling:
-///      This contract does not import or call `IDotnsRegistrarController`. The
-///      public commit-reveal controller is equally unaware of this one. Cross-
-///      flow collision handling relies on two distinct properties, neither of
-///      which requires the two controllers to know about each other:
+/// Decoupling:
+/// This contract does not import or call `IDotnsRegistrarController`. The public
+/// commit-reveal controller is equally unaware of this one. Cross-flow collision handling
+/// relies on two distinct properties, neither of which requires the two controllers to know
+/// about each other:
+/// (1) Lite-person labels (`NAMEXX`) share the public namespace: they are just DNS labels
+/// with at least two trailing digits. First-to-mint wins at the ERC721 layer, so a lite-user
+/// and a public registrant cannot hold the same flat label simultaneously. Keeping one
+/// namespace removes the ambiguity downstream tooling (dotli, dweb) would see with a
+/// separate separator form.
+/// (2) Base-name reservations are synchronised into `IPopRules`. The head of this
+/// controller's reservation queue is written through `IPopRules.reserveBaseNameForPop` on
+/// every head transition; the slot is cleared through `IPopRules.releaseBaseName` when the
+/// queue empties (claim, final relinquish, final expiry). Because the public commit-reveal
+/// controller already routes through `IPopRules.priceWithCheck`, which rejects any
+/// registration targeting a base-name stem reserved for another user, the public flow
+/// respects gateway reservations without ever importing this contract. PopRules is the
+/// single cross-flow authority; the queue here is the intra-PoP ordering layer on top of it.
 ///
-///      - Lite-person labels (`NAMEXX`) share the public namespace: they are
-///        just DNS labels with at least two trailing digits. First-to-mint wins
-///        at the ERC721 layer, so a lite-user and a public registrant cannot
-///        hold the same flat label simultaneously. Keeping one namespace
-///        removes the ambiguity downstream tooling (dotli, dweb) would see with
-///        a separate separator form.
-///      - Base-name reservations are synchronised into `IPopRules`. The head of
-///        this controller's reservation queue is written through
-///        `IPopRules.reserveBaseNameForPop` on every head transition; the
-///        slot is cleared through `IPopRules.releaseBaseName` when the queue
-///        empties (claim, final relinquish, final expiry). Because the public
-///        commit-reveal controller already routes through
-///        `IPopRules.priceWithCheck`, which rejects any registration targeting
-///        a base-name stem reserved for another user, the public flow respects
-///        gateway reservations without ever importing this contract. PopRules
-///        is the single cross-flow authority; the queue here is the intra-PoP
-///        ordering layer on top of it.
-///
-/// @dev Shared primitives:
-///      - Labelhash / namehash: {LabelUtils}.
-///      - Mint + forward-registry + store-write triad: {RegistrationUtils}.
-///      - Chat-key and lite => full link persistence: {IDotnsPopResolver}.
-///        Keeping these records on the resolver preserves the "Store = labels only"
-///        invariant (Store holds registration records, nothing else).
-///
+/// Shared primitives: labelhash / namehash via {LabelUtils}; the mint + forward-registry +
+/// store-write triad via {RegistrationUtils}; chat-key and lite-to-full link persistence via
+/// {IDotnsPopResolver}. Keeping per-name records on the resolver preserves the "Store =
+/// labels only" invariant.
 /// @custom:security-contact admin@parity.io
 contract DotnsPopController is
     Initializable,
@@ -82,6 +73,23 @@ contract DotnsPopController is
     /// @dev Keeps `expireReservation` gas bounded.
     uint16 public constant MAX_RESERVATION_QUEUE = 64;
 
+    /// @notice Selector for the typed {reserveLiteName} overload.
+    /// @dev Hard-coded to disambiguate from the `(bytes)` overload at compile time. Must stay
+    /// in sync with the {LiteRegistration} field layout.
+    bytes4 private constant SELECTOR_RESERVE_LITE =
+        bytes4(keccak256("reserveLiteName((string,address,bytes))"));
+
+    /// @notice Selector for the typed {reserveBaseName} overload.
+    /// @dev `BaseReservation` is `(LiteRegistration, string)` and `LiteRegistration` is
+    /// `(string,address,bytes)`, hence the nested tuple in the canonical signature.
+    bytes4 private constant SELECTOR_RESERVE_BASE =
+        bytes4(keccak256("reserveBaseName(((string,address,bytes),string))"));
+
+    /// @notice Selector for the typed {registerBaseName} overload.
+    /// @dev `Link` is `(uint8,string,bytes)` because `LinkKind` is an enum.
+    bytes4 private constant SELECTOR_REGISTER_BASE =
+        bytes4(keccak256("registerBaseName((string,address,(uint8,string,bytes)))"));
+
     /// @notice Reservation queue entry: a user and the timestamp they joined the queue.
     /// @dev Packs into a single storage slot (20 + 8 bytes).
     struct ReservationEntry {
@@ -90,9 +98,9 @@ contract DotnsPopController is
     }
 
     /// @notice Metadata describing the occupied range of a reservation queue.
-    /// @dev Uses monotonically increasing indices. Active entries occupy
-    ///      `[head, tail)`; `length = tail - head`. Slots past `head` are deleted
-    ///      as the head advances so garbage never accumulates.
+    /// @dev Uses monotonically increasing indices. Active entries occupy `[head, tail)`;
+    /// `length = tail - head`. Slots past `head` are deleted as the head advances so
+    /// garbage never accumulates.
     struct ReservationQueueMeta {
         uint64 head;
         uint64 tail;
@@ -109,28 +117,27 @@ contract DotnsPopController is
         _reservationEntries;
 
     /// @notice Single per-user pointer into the reservation queues.
-    /// @dev Keeps per-user reservation data behind one key and one struct value
-    ///      so callers read both fields in one call instead of two.
+    /// @dev Keeps per-user reservation data behind one key and one struct value so callers
+    /// read both fields in one call instead of two.
     mapping(address user => UserReservation reservation) internal _userReservations;
 
-    /// @notice Remembers the base-label string for each reserved labelhash so the
-    ///         PopRules sync path can address the reservation by its original
-    ///         string form (PopRules keys its `reservations` mapping by string).
-    /// @dev Populated on first enqueue for a label, cleared when the queue empties.
-    ///      Exists only to bridge the queue's `bytes32` key space to PopRules'
-    ///      `string` key space; nothing else reads it.
+    /// @notice Remembers the base-label string for each reserved labelhash so the PopRules
+    /// sync path can address the reservation by its original string form (PopRules keys its
+    /// `reservations` mapping by string).
+    /// @dev Populated on first enqueue for a label, cleared when the queue empties. Exists
+    /// only to bridge the queue's `bytes32` key space to PopRules' `string` key space;
+    /// nothing else reads it.
     mapping(bytes32 labelhash => string baseLabel) internal _reservedBaseLabel;
 
     /// @notice Duration (in seconds) after which a reservation entry is considered expired.
     /// @dev Mirrors `pallet_resources::UsernameReservationDuration`. Configurable by
-    ///      governance via `setReservationDuration`.
+    /// governance via `setReservationDuration`.
     uint64 public reservationDuration;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
 
-    /// @notice Restricts calls to the privileged PoP gateway address stored in the
-    ///         protocol registry under `POP_GATEWAY`.
+    /// @notice Restricts calls to the privileged PoP gateway address stored in the protocol registry under `POP_GATEWAY`.
     modifier onlyGateway() {
         _onlyGateway();
         _;
@@ -142,12 +149,12 @@ contract DotnsPopController is
     }
 
     /// @notice Initialises the PoP controller.
-    /// @dev Called once through the UUPS proxy; `_disableInitializers` on the
-    ///      implementation makes direct calls revert. Emits
-    ///      `ReservationDurationSet` so indexers observe the initial value
-    ///      through the same event the setter uses later.
-    /// @param registry Protocol-level address registry.
-    /// @param reservationDuration_ Initial reservation duration in seconds.
+    /// @dev Called once through the UUPS proxy; `_disableInitializers` on the implementation
+    /// makes direct calls revert. Emits `ReservationDurationSet` so indexers observe the
+    /// initial value through the same event the setter uses later.
+    /// @custom:emits ReservationDurationSet
+    /// @custom:reverts InvalidInitialization
+    /// @custom:reverts NotInitializing
     function initialize(
         IDotnsProtocolRegistry registry,
         uint64 reservationDuration_
@@ -163,82 +170,73 @@ contract DotnsPopController is
     }
 
     /// @inheritdoc IDotnsPopController
-    function reserveLiteName(
-        string calldata liteLabel,
-        address user,
-        bytes calldata chatKey
-    )
-        external
-        override
-        onlyGateway
-    {
-        _reserveLite(liteLabel, user, chatKey);
+    function reserveLiteName(LiteRegistration calldata params) external override onlyGateway {
+        _reserveLite(params);
     }
 
     /// @inheritdoc IDotnsPopController
-    function reserveBaseName(
-        string calldata liteLabel,
-        address user,
-        bytes calldata chatKey,
-        string calldata reservedBaseLabel
-    )
-        external
-        override
-        onlyGateway
-    {
-        _reserveLite(liteLabel, user, chatKey);
+    function reserveLiteName(bytes calldata payload) external override onlyGateway {
+        _dispatchTyped(SELECTOR_RESERVE_LITE, payload);
+    }
 
-        if (bytes(reservedBaseLabel).length != 0) {
+    /// @inheritdoc IDotnsPopController
+    function reserveBaseName(BaseReservation calldata params) external override onlyGateway {
+        _reserveLite(params.lite);
+
+        if (bytes(params.reservedBaseLabel).length != 0) {
             // Classification and tier enforcement for the base-name reservation.
             // Runs before any queue mutation so a mis-tiered reservation never
             // even touches the queue.
-            _popRules().priceWithCheck(reservedBaseLabel, user);
+            _popRules().priceWithCheck(params.reservedBaseLabel, params.lite.user);
 
-            bytes32 reservedHash = _validateBaseLabelHash(reservedBaseLabel);
+            bytes32 reservedHash = _validateBaseLabelHash(params.reservedBaseLabel);
             _advanceExpiredHead(reservedHash);
 
             // `_removeUserFromQueue` early-returns when the user has no active
             // reservation, so no outer guard is needed.
-            _removeUserFromQueue(user);
-            _enqueueReservation(reservedHash, reservedBaseLabel, user);
+            _removeUserFromQueue(params.lite.user);
+            _enqueueReservation(reservedHash, params.reservedBaseLabel, params.lite.user);
         }
     }
 
-    /// @notice Lite-only mint shared by {reserveLiteName} and the lite leg of
-    ///         {reserveBaseName}.
-    /// @dev Gated by `priceWithCheck` so the lite label's classification and
-    ///      the user's tier are honoured here too. The gateway-only modifier is
-    ///      enforced at the entrypoints that call this internal.
-    function _reserveLite(
-        string calldata liteLabel,
-        address user,
-        bytes calldata chatKey
-    )
-        internal
-    {
+    /// @inheritdoc IDotnsPopController
+    function reserveBaseName(bytes calldata payload) external override onlyGateway {
+        _dispatchTyped(SELECTOR_RESERVE_BASE, payload);
+    }
+
+    /// @notice Lite-only mint shared by {reserveLiteName} and the lite leg of {reserveBaseName}.
+    /// @dev Gated by `priceWithCheck` so the lite label's classification and the user's tier
+    /// are honoured here too. The gateway-only modifier is enforced at the entrypoints that
+    /// call this internal. Takes the {LiteRegistration} struct directly so both call sites
+    /// pass the same payload shape: the typed entrypoint forwards its own `params`, the
+    /// `reserveBaseName` entrypoint forwards `params.lite`.
+    function _reserveLite(LiteRegistration calldata params) internal {
         // Classification and tier enforcement for the lite label. Runs before
         // any state mutation so a mis-tiered request never touches the registry.
-        _popRules().priceWithCheck(liteLabel, user);
+        _popRules().priceWithCheck(params.liteLabel, params.user);
 
-        (bytes32 labelhash, bytes32 node) = _validateLiteLabel(liteLabel);
+        (bytes32 labelhash, bytes32 node) = _validateLiteLabel(params.liteLabel);
 
         _advanceExpiredHead(labelhash);
 
-        _completeGatewayRegistration(user, liteLabel, labelhash, node, chatKey, bytes32(0));
+        _completeGatewayRegistration(
+            params.user, params.liteLabel, labelhash, node, params.chatKey, bytes32(0)
+        );
 
-        emit LiteNameReserved(labelhash, user, liteLabel);
+        emit LiteNameReserved(labelhash, params.user, params.liteLabel);
     }
 
     /// @inheritdoc IDotnsPopController
-    function registerBaseName(
-        string calldata label,
-        address user,
-        Link calldata link
-    )
-        external
-        override
-        onlyGateway
-    {
+    function registerBaseName(bytes calldata payload) external override onlyGateway {
+        _dispatchTyped(SELECTOR_REGISTER_BASE, payload);
+    }
+
+    /// @inheritdoc IDotnsPopController
+    function registerBaseName(FullRegistration calldata params) external override onlyGateway {
+        Link calldata link = params.link;
+        address user = params.user;
+        string calldata label = params.label;
+
         // Classification and tier enforcement for the full-person label. Runs
         // ahead of the reservation-axis detection so a mis-tiered request never
         // even touches the queue.
@@ -339,44 +337,36 @@ contract DotnsPopController is
         emit ReservationDurationSet(duration);
     }
 
-    /// @notice Returns the queue metadata (`head`, `tail`) for `labelhash`.
-    /// @dev Read-only accessor used by invariant tests to probe queue bounds.
-    ///      Exposing the pair rather than the internal struct keeps the storage
-    ///      layout private whilst allowing property checks over live queues.
-    /// @param labelhash Keccak256 hash of the reserved base label.
-    /// @return head Index of the current queue head.
-    /// @return tail One past the last occupied index.
-    function reservationMeta(bytes32 labelhash) external view returns (uint64 head, uint64 tail) {
+    /// @inheritdoc IDotnsPopController
+    function reservationMeta(bytes32 labelhash)
+        external
+        view
+        override
+        returns (uint64 head, uint64 tail)
+    {
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         return (meta.head, meta.tail);
     }
 
-    /// @notice Returns the queue entry at `index` for `labelhash`.
-    /// @param labelhash Keccak256 hash of the reserved base label.
-    /// @param index Queue index (monotonically-increasing slot).
-    /// @return entryOwner Owner of the slot (zero if relinquished or empty).
-    /// @return joinedAt Unix timestamp when the entry was enqueued.
+    /// @inheritdoc IDotnsPopController
     function reservationEntry(
         bytes32 labelhash,
         uint64 index
     )
         external
         view
+        override
         returns (address entryOwner, uint64 joinedAt)
     {
         ReservationEntry memory entry = _reservationEntries[labelhash][index];
         return (entry.owner, entry.joinedAt);
     }
 
-    /// @notice Returns `user`'s current reservation pointer.
-    /// @dev A zero `labelhash` means the user holds no reservation; `index` is
-    ///      meaningful only when `labelhash` is non-zero. Returning the struct
-    ///      lets callers read both fields in one call instead of two.
-    /// @param user Account to query.
-    /// @return reservation The per-user pointer into the reservation queues.
+    /// @inheritdoc IDotnsPopController
     function userReservation(address user)
         external
         view
+        override
         returns (UserReservation memory reservation)
     {
         return _userReservations[user];
@@ -399,13 +389,12 @@ contract DotnsPopController is
         versionString = "1.0.0";
     }
 
-    /// @notice Mints a name, wires forward registry, writes the owner's Store, and
-    ///         persists PoP-flow records (chat key, lite link) on the PoP resolver.
+    /// @notice Mints a name, wires forward registry, writes the owner's Store, and persists
+    /// PoP-flow records (chat key, lite link) on the PoP resolver.
     /// @dev The mint + forward-registry + store-write triad is delegated to
-    ///      {RegistrationUtils-registerAndStore} so this flow and the public
-    ///      commit-reveal flow share exactly one implementation of that sequence.
-    ///      PoP-flow per-name records live on {IDotnsPopResolver} rather than on the
-    ///      Store so the Store stays labels-only.
+    /// {RegistrationUtils-registerAndStore} so this flow and the public commit-reveal flow
+    /// share exactly one implementation of that sequence. PoP-flow per-name records live on
+    /// {IDotnsPopResolver} rather than on the Store so the Store stays labels-only.
     function _completeGatewayRegistration(
         address user,
         string calldata label,
@@ -445,12 +434,11 @@ contract DotnsPopController is
     }
 
     /// @notice Appends a new reservation entry to the tail of the queue for `labelhash`.
-    /// @dev Reverts if the queue is full or the user already holds a reservation.
-    ///      When the enqueued entry is the new head of an empty queue, the
-    ///      controller also reserves the base name on PopRules so the public
-    ///      commit-reveal flow sees the reservation through its existing
-    ///      `priceWithCheck` guard. Subsequent waiters only live in the local
-    ///      queue until they are promoted.
+    /// @dev Reverts if the queue is full or the user already holds a reservation. When the
+    /// enqueued entry is the new head of an empty queue, the controller also reserves the
+    /// base name on PopRules so the public commit-reveal flow sees the reservation through
+    /// its existing `priceWithCheck` guard. Subsequent waiters only live in the local queue
+    /// until they are promoted.
     function _enqueueReservation(
         bytes32 labelhash,
         string memory baseLabel,
@@ -481,11 +469,11 @@ contract DotnsPopController is
     }
 
     /// @notice Wipes the entire reservation queue for `labelhash` and releases the
-    ///         corresponding PopRules reservation.
-    /// @dev Used when a holder claims their reservation: every waiter is evicted and
-    ///      their per-user tracking state is cleared, and PopRules is told the
-    ///      slot is free so future public registrations are unblocked (the claim
-    ///      itself just minted the name, so there is nothing left to reserve).
+    /// corresponding PopRules reservation.
+    /// @dev Used when a holder claims their reservation: every waiter is evicted and their
+    /// per-user tracking state is cleared, and PopRules is told the slot is free so future
+    /// public registrations are unblocked (the claim itself just minted the name, so there
+    /// is nothing left to reserve).
     function _clearQueue(bytes32 labelhash) internal {
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         for (uint64 i = meta.head; i < meta.tail; i++) {
@@ -500,7 +488,11 @@ contract DotnsPopController is
     }
 
     /// @notice Advances the queue head past every expired entry at the head of the queue.
-    /// @dev Bounded by queue length. Emits `ReservationExpired` per removed entry.
+    /// @dev Reset semantics matter: when the queue empties (head catches tail), the meta slot
+    /// is deleted AND the PopRules base-name slot is released, so the public commit-reveal flow
+    /// can register the label again. When a new live head emerges, PopRules is re-synced to that
+    /// head so reservations cannot be paid around by another address.
+    /// @custom:emits ReservationExpired
     function _advanceExpiredHead(bytes32 labelhash) internal {
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         uint64 head = meta.head;
@@ -532,12 +524,11 @@ contract DotnsPopController is
     }
 
     /// @notice Removes `user` from whichever reservation queue they currently occupy.
-    /// @dev For a head removal, we delete the entry without bumping `meta.head` and
-    ///      delegate the advance to `_advanceExpiredHead`. Its existing zero-owner
-    ///      skip walks past the freshly-deleted slot, and its `head != meta.head`
-    ///      branch fires the PopRules resync in the one place head promotion is
-    ///      actually handled. Non-head removals leave the queue shape intact, so
-    ///      no advance or resync is needed.
+    /// @dev For a head removal, we delete the entry without bumping `meta.head` and delegate
+    /// the advance to `_advanceExpiredHead`. Its existing zero-owner skip walks past the
+    /// freshly-deleted slot, and its `head != meta.head` branch fires the PopRules resync
+    /// in the one place head promotion is actually handled. Non-head removals leave the
+    /// queue shape intact, so no advance or resync is needed.
     function _removeUserFromQueue(address user) internal {
         bytes32 labelhash = _userReservations[user].labelhash;
         if (labelhash == bytes32(0)) return;
@@ -564,8 +555,8 @@ contract DotnsPopController is
     }
 
     /// @notice Validates a lite-person `NAMEXX` label and returns its labelhash.
-    /// @dev Node is not needed for every call site; this overload avoids the extra
-    ///      keccak when only the labelhash is used.
+    /// @dev Node is not needed for every call site; this overload avoids the extra keccak
+    /// when only the labelhash is used.
     function _validateLiteLabelHash(string calldata liteLabel)
         internal
         pure
@@ -605,9 +596,7 @@ contract DotnsPopController is
         return IPopRules(protocolRegistry.get(DotnsConstants.POP_RULES));
     }
 
-    /// @notice Writes the new head of the queue into PopRules so the public
-    ///         commit-reveal flow rejects registrations of this base name for
-    ///         anyone other than `newHead`.
+    /// @notice Writes the new head of the queue into PopRules so the public commit-reveal flow rejects registrations of this base name for anyone other than `newHead`.
     function _syncPopRulesToHead(bytes32 labelhash, address newHead) internal {
         string memory baseLabel = _reservedBaseLabel[labelhash];
         if (bytes(baseLabel).length == 0 || newHead == address(0)) return;
@@ -619,8 +608,7 @@ contract DotnsPopController is
         rules.reserveBaseNameForPop(baseLabel, newHead);
     }
 
-    /// @notice Clears the PopRules slot and the local label bookkeeping when the
-    ///         queue empties (claim, last-relinquish, last-expire).
+    /// @notice Clears the PopRules slot and the local label bookkeeping when the queue empties (claim, last-relinquish, last-expire).
     function _releasePopRulesSlot(bytes32 labelhash) internal {
         string memory baseLabel = _reservedBaseLabel[labelhash];
         if (bytes(baseLabel).length == 0) return;
@@ -632,6 +620,36 @@ contract DotnsPopController is
     function _onlyGateway() internal view {
         address gateway = protocolRegistry.get(DotnsConstants.POP_GATEWAY);
         require(msg.sender == gateway, NotGateway(msg.sender));
+    }
+
+    /// @notice Routes a raw cross-chain payload to the typed entrypoint identified by `selector`.
+    /// @dev Prepends `selector` to `payload` and `delegatecall`s `address(this)` so the typed
+    /// overload runs with the original `msg.sender` (the gateway), making the typed path the
+    /// single source of truth. The `bytes` payload from the cross-chain caller is already
+    /// `abi.encode(StructTuple)`, so concatenating `selector with payload` is exactly the
+    /// calldata the typed overload expects. Reverts bubble up byte-for-byte so the caller sees
+    /// the same error it would have seen on a direct typed call.
+    ///
+    /// Note: `onlyGateway` runs twice, once on the outer bytes overload and again on the
+    /// inner typed overload that the delegatecall lands on. The second check is a cheap,
+    /// intentional belt-and-braces; both checks read the same registry slot.
+    ///
+    /// Why the OZ unsafe-allow is acceptable here:
+    /// - The destination is hard-coded to `address(this)`, the proxy itself. No external
+    ///   contract ever runs in our storage context.
+    /// - `selector` is one of three module-private constants pointing at our own typed
+    ///   entrypoints. The caller cannot redirect the dispatch elsewhere.
+    /// - The proxy round-trip (proxy => impl => impl.delegatecall(this) => proxy => impl)
+    ///   ends in the same implementation, in the same storage context, that a direct
+    ///   typed call would land in.
+    /// @custom:oz-upgrades-unsafe-allow delegatecall
+    function _dispatchTyped(bytes4 selector, bytes calldata payload) private {
+        (bool ok, bytes memory ret) = address(this).delegatecall(bytes.concat(selector, payload));
+        if (!ok) {
+            assembly {
+                revert(add(ret, 32), mload(ret))
+            }
+        }
     }
 
     /// @inheritdoc UUPSUpgradeable

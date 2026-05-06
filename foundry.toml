@@ -5,29 +5,14 @@ test = "test"
 script = "scripts"
 libs = ["lib"]
 
-# OZ Foundry Upgrades and deploy simulations need file access to artifacts.
-# Keep broad access only if narrower permissions break upgrade validation or deployment scripts.
 fs_permissions = [{ access = "read-write", path = "./" }]
 
-# OZ Foundry Upgrades uses FFI for upgrade-safety validation.
 ffi = true
 
 ast = true
 build_info = true
 
-# Raised from Foundry's 32 MB default so the deploy script does not hit
-# MemoryOOG while provisioning the full stack. Each `Upgrades.deployUUPSProxy`
-# call loads the target contract's ABI JSON for OZ upgrade-safety validation;
-# with ten proxies in `DotnsDeployer.run` (StoreFactory + eight protocol
-# contracts + PoP controller + PoP resolver) the cumulative memory footprint
-# exceeds the default cap.
 memory_limit = 134217728
-
-# Raised from Foundry's 30M default so `forge script` (and simulations via
-# `forge script --rpc-url ...` without `--broadcast`) have enough gas to cover
-# memory expansion when OZ validation cheatcodes return multi-MB ABI JSON
-# blobs. Memory expansion gas is quadratic; 30M trips MemoryOOG long before
-# any real allocation fails. 1B gives comfortable headroom.
 block_gas_limit = 1000000000
 
 optimizer = true
@@ -50,42 +35,32 @@ yul = true
 ffi = true
 show_progress = true
 
+# CI fuzz/invariant settings track the foundry defaults (fuzz runs = 256,
+# invariant runs = 256 x depth 500). The full DotNS test suite + invariants
+# OOMs the GitHub-hosted `ubuntu-latest` runner (16 GB) above these baselines,
+# and the gas-report job runs the suite twice (PR branch and main branch),
+# doubling the pressure. Raise these values only when the workflow runs on a
+# provisioned machine with more headroom; bump `runs` first since `depth`
+# lengthens each sequence and amplifies handler-state drift.
 [profile.ci.fuzz]
-runs = 10000
+runs = 256
 max_test_rejects = 131072
 dictionary_weight = 85
 gas_report_samples = 1000
 show_logs = true
 
 [profile.ci.invariant]
-# Foundry's defaults are 256 × 500. 300 × 500 sits a small step above default:
-# enough extra starting sequences to broaden state-space coverage on every CI
-# run, without the wall-time blow-up of the previous 512 × 500 (let alone the
-# original 1024 × 1000) configuration. Bump `runs` first if you need more
-# coverage later; bumping `depth` lengthens each sequence and amplifies any
-# handler-state drift, so it is the riskier knob to grow.
-runs = 300
+runs = 256
 depth = 500
 
-# False is the safer default for handler-driven suites: legitimate reverts
-# (collisions, cross-tier fee paths, expired commitments) are part of the
-# state space the fuzzer should explore, not test failures. Real bugs surface
-# through the `invariant_*` assertions.
 fail_on_revert = false
 
-# Keep normal invariant campaigns close to real EVM call behaviour.
-# Use a separate targeted suite if you specifically want call override behaviour.
 call_override = false
 
 dictionary_weight = 85
 shrink_run_limit = 10000
 max_assume_rejects = 131072
 gas_report_samples = 1000
-# Corpus persistence is intentionally omitted: when CI caches `cache/`,
-# previously-shrunk failure sequences replay on subsequent runs and report
-# "persisted failure revert" even after the underlying bug is fixed. Local
-# devs chasing a specific shrink can opt in via the FOUNDRY_INVARIANT_CORPUS_DIR
-# env var without committing the persistence into CI.
 show_edge_coverage = true
 show_metrics = true
 show_solidity = true
