@@ -53,7 +53,8 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         assertGe(escrowBalance, reservedAmount, "Escrow balance must cover reserves");
     }
 
-    /// @notice Sum of all active (deposited but not withdrawn) position amounts must equal reserves.
+    /// @notice Sum of all active (deposited but not withdrawn) position amounts must equal
+    /// reserves.
     function invariant_reserves_match_positions() public view {
         uint256 expectedReserves;
 

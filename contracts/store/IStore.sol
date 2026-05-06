@@ -3,8 +3,8 @@ pragma solidity ^0.8.30;
 
 /// @title IStore
 /// @notice Interface defining a key-value storage for IPFS URIs scoped by user address.
-/// @dev Each user maintains an isolated namespace of key-value pairs. Authorized contracts can write on behalf of users.
-///
+/// @dev Each user maintains an isolated namespace of key-value pairs. Authorized contracts can
+/// write on behalf of users.
 /// @dev Permanent locking:
 ///      Some `(user, key)` entries can be locked permanently to make them immutable:
 ///      - Locked entries cannot be overwritten by any caller.
@@ -32,8 +32,8 @@ interface IStore {
     /// @param unauthorizedAddress The address that had authorization revoked.
     event StoreUnauthorized(address indexed unauthorizedAddress);
 
-    /// @notice Emitted when an authorized address is marked as a DotNS controller for locking semantics.
-    /// @param controllerAddress The address that was granted DotNS controller status.
+    /// @notice Emitted when an authorized address is marked as a DotNS controller for locking
+    /// semantics. @param controllerAddress The address that was granted DotNS controller status.
     event DotnsControllerAuthorized(address indexed controllerAddress);
 
     /// @notice Emitted when an address loses DotNS controller status.
@@ -63,8 +63,9 @@ interface IStore {
     function setValue(bytes32 key, string calldata value) external;
 
     /// @notice Store or update an IPFS URI under a given key for a specified user.
-    /// @dev Only authorized contracts can call this function. Keys are scoped to the specified user.
-    /// @dev If the caller is a DotNS controller, the key may be locked permanently as part of the write.
+    /// @dev Only authorized contracts can call this function. Keys are scoped to the specified
+    /// user. @dev If the caller is a DotNS controller, the key may be locked permanently as part of
+    /// the write.
     /// @param user The address whose storage will be modified.
     /// @param key The unique identifier for the stored value.
     /// @param value The IPFS URI to store.
@@ -95,8 +96,8 @@ interface IStore {
     function hasValue(bytes32 key) external view returns (bool exists);
 
     /// @notice Retrieve all stored values for the caller.
-    /// @dev Returns values in the order they were added. May include duplicates if setValue was called multiple times.
-    /// @return An array of all IPFS URIs stored by the caller.
+    /// @dev Returns values in the order they were added. May include duplicates if setValue was
+    /// called multiple times. @return An array of all IPFS URIs stored by the caller.
     function getValues() external view returns (string[] memory);
 
     /// @notice Check if an address is authorized to write on behalf of users.
@@ -105,8 +106,8 @@ interface IStore {
     function isAuthorized(address storeAddress) external view returns (bool authorized);
 
     /// @notice Check if an address is marked as a DotNS controller for locking semantics.
-    /// @dev DotNS controllers may cause `(user, key)` writes via `setValueFor` to become permanently locked.
-    /// @param controllerAddress The address to check.
+    /// @dev DotNS controllers may cause `(user, key)` writes via `setValueFor` to become
+    /// permanently locked. @param controllerAddress The address to check.
     /// @return isController True if the address is a DotNS controller.
     function isDotnsController(address controllerAddress) external view returns (bool isController);
 
@@ -130,8 +131,8 @@ interface IStore {
 
     /// @notice Marks an address as a DotNS controller for locking semantics.
     /// @dev Only the store owner can grant this role.
-    ///      This role does not grant write access by itself; the address must also be authorized via `authorizeStore`.
-    /// @param controllerAddress The address to mark as DotNS controller.
+    ///      This role does not grant write access by itself; the address must also be authorized
+    /// via `authorizeStore`. @param controllerAddress The address to mark as DotNS controller.
     /// @custom:reverts NotAuthorised if caller is not the owner.
     function authorizeDotnsController(address controllerAddress) external;
 

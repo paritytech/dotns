@@ -50,8 +50,8 @@ contract DotnsNameEscrow is
     ///         claimed but not yet reclaimed.
     uint256 public cooldown;
 
-    /// @notice Total amount of a specific asset reserved across all positions. Keyed by asset address.
-    /// @dev address(0) is used for native token reservations
+    /// @notice Total amount of a specific asset reserved across all positions. Keyed by asset
+    /// address. @dev address(0) is used for native token reservations
     mapping(address asset => uint256 amount) public tokenReserved;
     /// @dev Canonical release and refund state keyed by tokenId.
     mapping(uint256 tokenId => ReleasePosition position) private _positions;
@@ -62,18 +62,22 @@ contract DotnsNameEscrow is
     /// @dev Index + 1 into `_releasedTokens`.
     mapping(uint256 tokenId => uint256 indexPlusOne) private _releasedIndexPlusOne;
 
-    /// @notice Cumulative balance of cross-tier fees and registration excess held against unreleased shortfalls.
-    /// @dev Only debited via `withdraw()` shortfall draw; never refundable directly to any caller.
+    /// @notice Cumulative balance of cross-tier fees and registration excess held against
+    /// unreleased shortfalls. @dev Only debited via `withdraw()` shortfall draw; never refundable
+    /// directly to any caller.
     ///      Increments via `depositInsurance` and `chargeTransferFee`.
     uint256 public insuranceFund;
 
-    /// @notice Highest price ever charged for the name identified by tokenId, across registration and any transfers.
-    /// @dev Monotonic non-decreasing within a token's lifecycle, EXCEPT cleared on `reclaim()` (fresh slate for next registrant).
-    ///      Used to compute transfer-time fee deltas: `fee = max(0, priceForTo - runningMax[tokenId])`.
+    /// @notice Highest price ever charged for the name identified by tokenId, across registration
+    /// and any transfers. @dev Monotonic non-decreasing within a token's lifecycle, EXCEPT cleared
+    /// on `reclaim()` (fresh slate for next registrant).
+    ///      Used to compute transfer-time fee deltas: `fee = max(0, priceForTo -
+    /// runningMax[tokenId])`.
     mapping(uint256 tokenId => uint256 max) public runningMax;
 
-    /// @notice Pending native refund balances credited by `withdraw()` and pulled via `claimWithdrawal()`.
-    /// @dev Pull-payment pattern: `withdraw()` only credits this mapping; the recipient must call
+    /// @notice Pending native refund balances credited by `withdraw()` and pulled via
+    /// `claimWithdrawal()`. @dev Pull-payment pattern: `withdraw()` only credits this mapping; the
+    /// recipient must call
     ///      `claimWithdrawal()` to actually receive the funds. This isolates the external call
     ///      from the position-state mutation and avoids griefing via reverting fallback handlers.
     mapping(address recipient => uint256 amount) private _pendingWithdrawals;

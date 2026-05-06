@@ -55,8 +55,9 @@ contract EscrowHandler is Test {
     ///      escrow position never mutates the lock between deposit and reclaim.
     mapping(uint256 tokenId => address recipient) public lockedRecipient;
 
-    /// @notice Last observed runningMax per tokenId (refreshed after deposit and payable transferFrom).
-    /// @dev Used by the runningMax-monotonicity invariant to confirm the on-chain runningMax
+    /// @notice Last observed runningMax per tokenId (refreshed after deposit and payable
+    /// transferFrom). @dev Used by the runningMax-monotonicity invariant to confirm the on-chain
+    /// runningMax
     ///      only ever climbs between mint and reclaim, then resets to zero on reclaim.
     mapping(uint256 tokenId => uint256 max) public lastObservedRunningMax;
 
@@ -285,7 +286,8 @@ contract EscrowHandler is Test {
         uint256 index = tokenSeed % _depositedTokenIds.length;
         uint256 tokenId = _depositedTokenIds[index];
 
-        // Only release if the deposit has a non-zero amount (NoStatus names with a refundable position)
+        // Only release if the deposit has a non-zero amount (NoStatus names with a refundable
+        // position)
         if (depositAmounts[tokenId] == 0) {
             _removeDeposited(index);
             return;
@@ -395,7 +397,8 @@ contract EscrowHandler is Test {
     }
 
     /// @notice Re-registers a withdrawn (reclaim-ready) name with a (possibly different) actor.
-    /// @dev Exercises the full-cycle custody reuse path: register → release → withdraw → reclaim.
+    /// @dev Exercises the full-cycle custody reuse path: register → release → withdraw →
+    /// reclaim.
     ///      The controller's `register()` routes through `escrow.reclaim()` automatically when
     ///      the token is in escrow custody — no separate finalise step exists.
     /// @param tokenSeed Seed for selecting which withdrawn token to reclaim.

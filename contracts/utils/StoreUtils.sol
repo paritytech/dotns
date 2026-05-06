@@ -7,13 +7,13 @@ import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {DotnsConstants} from "./DotnsConstants.sol";
 
 /// @title DotNS Store Utilities Library
-/// @notice Provides Store acquisition and management utilities for any contract that requires a store.
-///
+/// @notice Provides Store acquisition and management utilities for any contract that requires a
+/// store.
 /// @dev Store Resolution Strategy:
 ///      The library implements a two-tier resolution strategy:
 ///      1. Direct lookup: Store already exists and is mapped to the target owner.
-///      2. Fresh deployment: No store exists; deploy, authorize controllers, and transfer ownership.
-///
+///      2. Fresh deployment: No store exists; deploy, authorize controllers, and transfer
+/// ownership.
 /// @dev Ownership Model:
 ///      Two distinct ownership concepts exist:
 ///      - Factory mapping: Tracks which address has which Store for lookup purposes.

@@ -57,8 +57,9 @@ contract DotnsNameEscrowFuzzTest is BaseDotns {
         );
     }
 
-    /// @notice Fuzz withdrawal timing: warp by random amount after release, expect revert or success.
-    /// @dev Registers a NoStatus name, releases it into escrow, then fuzzes the warp amount.
+    /// @notice Fuzz withdrawal timing: warp by random amount after release, expect revert or
+    /// success. @dev Registers a NoStatus name, releases it into escrow, then fuzzes the warp
+    /// amount.
     ///      If warpAmount < ESCROW_COOLDOWN (7 days), expects WithdrawalTooEarly revert.
     ///      If warpAmount >= ESCROW_COOLDOWN, expects successful withdrawal.
     function testFuzz_withdraw_timing(uint256 warpAmount) public {
