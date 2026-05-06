@@ -5,14 +5,16 @@ import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {
     IDotnsRegistrarController
 } from "../../../contracts/registrars/IDotnsRegistrarController.sol";
+import {IDotnsPopController} from "../../../contracts/registrars/IDotnsPopController.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {StringUtils} from "../../../contracts/utils/StringUtils.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {Vm} from "forge-std/Vm.sol";
 
-/// @title DotnsPopControllerFuzz
-/// @notice Property-based tests for {DotnsPopController}.
-/// @dev Each fuzz replaces a family of near-identical unit tests with a single
-///      property assertion the fuzzer explores across inputs.
+// @title DotnsPopControllerFuzz
+// @notice Property-based tests for {DotnsPopController}.
+// @dev Each fuzz replaces a family of near-identical unit tests with a single
+//      property assertion the fuzzer explores across inputs.
 contract DotnsPopControllerFuzz is BaseDotns {
     // Decimal string of `value` padded to exactly two digits when `value < 10`.
     // Callers bound `value` to `[0, 99]` so the resulting suffix matches the
@@ -108,6 +110,187 @@ contract DotnsPopControllerFuzz is BaseDotns {
             vm.prank(ed);
             dotnsRegistrarController.register{value: cost}(registration);
             assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(fullLabel))), ed);
+        }
+    }
+
+    function testFuzz_reserveLiteName_overloads_equivalent(uint8 suffix, bytes1 keySeed) public {
+        suffix = uint8(bound(uint256(suffix), 0, 99));
+        string memory liteLabel = string.concat("dualli", _twoDigitDecimal(uint256(suffix)));
+        bytes memory chatKey = _validChatKey(keySeed);
+
+        _grantPopLite(ed);
+
+        IDotnsPopController.LiteRegistration memory params = IDotnsPopController.LiteRegistration({
+            liteLabel: liteLabel, user: ed, chatKey: chatKey
+        });
+
+        bytes32 node = _nodeOf(liteLabel);
+        // Snapshot the world once and run both dispatch paths from the same starting
+        // state; post-state and full event log must match for the typed and bytes
+        // overloads to be observably equivalent.
+        uint256 baseline = vm.snapshotState();
+
+        vm.recordLogs();
+        vm.prank(popGateway);
+        dotnsPopController.reserveLiteName(params);
+        Vm.Log[] memory typedLogs = vm.getRecordedLogs();
+        address typedOwner = IERC721(address(dotnsRegistrar)).ownerOf(uint256(node));
+        bytes memory typedKey = dotnsPopResolver.chatKey(node);
+
+        vm.revertToState(baseline);
+
+        vm.recordLogs();
+        vm.prank(popGateway);
+        dotnsPopController.reserveLiteName(abi.encode(params));
+        Vm.Log[] memory bytesLogs = vm.getRecordedLogs();
+
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), typedOwner);
+        assertEq(dotnsPopResolver.chatKey(node), typedKey);
+        _assertLogsEqual(typedLogs, bytesLogs);
+    }
+
+    function testFuzz_reserveBaseName_overloads_equivalent(
+        uint8 suffix,
+        bytes1 keySeed,
+        bool useReservation
+    )
+        public
+    {
+        suffix = uint8(bound(uint256(suffix), 0, 99));
+        string memory liteLabel = string.concat("dualbs", _twoDigitDecimal(uint256(suffix)));
+        bytes memory chatKey = _validChatKey(keySeed);
+        // `useReservation` toggles between the lite-only branch and the lite-plus-
+        // reservation branch so both legs of the entrypoint are exercised.
+        string memory reservedBase = useReservation ? BASE_LABEL_A : "";
+
+        // PopFull covers both legs: the lite label requires PopLite-or-Full and
+        // the base label (PopFull-classified) requires PopFull.
+        _grantPopFull(ed);
+
+        IDotnsPopController.BaseReservation memory params = IDotnsPopController.BaseReservation({
+            lite: IDotnsPopController.LiteRegistration({
+                liteLabel: liteLabel, user: ed, chatKey: chatKey
+            }),
+            reservedBaseLabel: reservedBase
+        });
+
+        bytes32 liteNode = _nodeOf(liteLabel);
+        bytes32 reservedHash = useReservation ? keccak256(bytes(reservedBase)) : bytes32(0);
+        uint256 baseline = vm.snapshotState();
+
+        vm.recordLogs();
+        vm.prank(popGateway);
+        dotnsPopController.reserveBaseName(params);
+        Vm.Log[] memory typedLogs = vm.getRecordedLogs();
+        address typedOwner = IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode));
+        bytes memory typedKey = dotnsPopResolver.chatKey(liteNode);
+        IDotnsPopController.UserReservation memory typedUserRes =
+            dotnsPopController.userReservation(ed);
+        (uint64 typedHead, uint64 typedTail) = useReservation
+            ? dotnsPopController.reservationMeta(reservedHash)
+            : (uint64(0), uint64(0));
+
+        vm.revertToState(baseline);
+
+        vm.recordLogs();
+        vm.prank(popGateway);
+        dotnsPopController.reserveBaseName(abi.encode(params));
+        Vm.Log[] memory bytesLogs = vm.getRecordedLogs();
+
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)), typedOwner);
+        assertEq(dotnsPopResolver.chatKey(liteNode), typedKey);
+        IDotnsPopController.UserReservation memory bytesUserRes =
+            dotnsPopController.userReservation(ed);
+        assertEq(bytesUserRes.labelhash, typedUserRes.labelhash);
+        assertEq(uint256(bytesUserRes.index), uint256(typedUserRes.index));
+        if (useReservation) {
+            (uint64 bytesHead, uint64 bytesTail) = dotnsPopController.reservationMeta(reservedHash);
+            assertEq(bytesHead, typedHead);
+            assertEq(bytesTail, typedTail);
+        }
+        _assertLogsEqual(typedLogs, bytesLogs);
+    }
+
+    function testFuzz_registerBaseName_overloads_equivalent(
+        uint8 suffix,
+        bytes1 keySeed,
+        bool useLiteLink
+    )
+        public
+    {
+        suffix = uint8(bound(uint256(suffix), 0, 99));
+        // Stem `dualbase` (baselength 8) plus a 2-digit suffix classifies as PopLite,
+        // so a single `_grantPopLite(ed)` covers both classification gates the
+        // entrypoint runs. `useLiteLink` toggles between the `None` (fresh chat key)
+        // and `LiteUsername` (inherit from prior lite) branches.
+        string memory baseLabel = string.concat("dualbase", _twoDigitDecimal(uint256(suffix)));
+        bytes memory chatKey = _validChatKey(keySeed);
+
+        _grantPopLite(ed);
+
+        // Pre-register a lite label so the LiteUsername-link branch has a
+        // node to inherit a chat key from. Skipped for the None branch so
+        // the two branches stay isolated under fuzzing.
+        IDotnsPopController.Link memory link;
+        if (useLiteLink) {
+            vm.prank(popGateway);
+            dotnsPopController.reserveLiteName(
+                IDotnsPopController.LiteRegistration({
+                    liteLabel: LITE_LABEL_A, user: ed, chatKey: chatKey
+                })
+            );
+            link = IDotnsPopController.Link({
+                kind: IDotnsPopController.LinkKind.LiteUsername,
+                liteLabel: LITE_LABEL_A,
+                chatKey: ""
+            });
+        } else {
+            link = IDotnsPopController.Link({
+                kind: IDotnsPopController.LinkKind.None, liteLabel: "", chatKey: chatKey
+            });
+        }
+
+        IDotnsPopController.FullRegistration memory params =
+            IDotnsPopController.FullRegistration({label: baseLabel, user: ed, link: link});
+
+        bytes32 baseNode = _nodeOf(baseLabel);
+        uint256 baseline = vm.snapshotState();
+
+        vm.recordLogs();
+        vm.prank(popGateway);
+        dotnsPopController.registerBaseName(params);
+        Vm.Log[] memory typedLogs = vm.getRecordedLogs();
+        address typedOwner = IERC721(address(dotnsRegistrar)).ownerOf(uint256(baseNode));
+        bytes memory typedKey = dotnsPopResolver.chatKey(baseNode);
+        bytes32 typedLiteLink = dotnsPopResolver.liteLink(baseNode);
+
+        vm.revertToState(baseline);
+
+        vm.recordLogs();
+        vm.prank(popGateway);
+        dotnsPopController.registerBaseName(abi.encode(params));
+        Vm.Log[] memory bytesLogs = vm.getRecordedLogs();
+
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(baseNode)), typedOwner);
+        assertEq(dotnsPopResolver.chatKey(baseNode), typedKey);
+        assertEq(dotnsPopResolver.liteLink(baseNode), typedLiteLink);
+        // Event equivalence catches axis-classification drift between the two
+        // paths (e.g. one path emitting `BaseNameClaimed` while the other
+        // emits `StandaloneNameRegistered` would be a regression).
+        _assertLogsEqual(typedLogs, bytesLogs);
+    }
+
+    function _assertLogsEqual(Vm.Log[] memory a, Vm.Log[] memory b) internal {
+        // Compares two recorded log arrays element-wise so any divergence (count,
+        // ordering, emitter, topics, or unindexed payload) fails the test.
+        assertEq(a.length, b.length, "log count mismatch");
+        for (uint256 i = 0; i < a.length; ++i) {
+            assertEq(a[i].emitter, b[i].emitter, "log emitter mismatch");
+            assertEq(a[i].topics.length, b[i].topics.length, "log topic count mismatch");
+            for (uint256 t = 0; t < a[i].topics.length; ++t) {
+                assertEq(a[i].topics[t], b[i].topics[t], "log topic mismatch");
+            }
+            assertEq(keccak256(a[i].data), keccak256(b[i].data), "log data mismatch");
         }
     }
 

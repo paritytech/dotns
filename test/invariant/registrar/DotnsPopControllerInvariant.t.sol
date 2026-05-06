@@ -5,8 +5,8 @@ import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {PopControllerHandler} from "./PopControllerHandler.t.sol";
 import {IDotnsPopController} from "../../../contracts/registrars/IDotnsPopController.sol";
 
-/// @title DotnsPopControllerInvariant
-/// @notice Invariants asserted over arbitrary sequences of PoP-controller actions.
+// @title DotnsPopControllerInvariant
+// @notice Invariants asserted over arbitrary sequences of PoP-controller actions.
 contract DotnsPopControllerInvariant is BaseDotns {
     PopControllerHandler internal handler;
 
