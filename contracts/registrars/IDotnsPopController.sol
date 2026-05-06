@@ -119,7 +119,10 @@ interface IDotnsPopController is IDotnsController {
         string indexed label, bytes32 indexed labelhash, address indexed owner, address store
     );
 
-    /// @notice Thrown when the caller is not the PoP gateway.
+    /// @notice Thrown when the call did not originate from a Root-origin dispatch
+    /// (the access path used by the PoP gateway pallet).
+    /// @dev `caller` is reported as `address(0)`; the gateway gate cannot read
+    /// `msg.sender` because doing so would trap under Root origin.
     error NotGateway(address caller);
 
     /// @notice Thrown when a supplied lite-person label does not match `NAMEXX`.

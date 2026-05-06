@@ -76,6 +76,19 @@ contract PopRules is
         _;
     }
 
+    /// @notice Restricts function to the single PoP controller resolved through
+    ///         the protocol registry under `POP_CONTROLLER`.
+    /// @dev Used by the pop-flow paths (`reserveBaseNameForPop`, `releaseBaseName`)
+    ///      which are only ever called by the dedicated `DotnsPopController`. The
+    ///      tighter gate replaces the broader `onlyRegistry` check on these paths,
+    ///      keeping pop-flow access aligned with the single-controller architecture.
+    ///      The commit-reveal `reserveBaseName` keeps `onlyRegistry` because that
+    ///      path is shared by every registrar-authorised controller.
+    modifier onlyPopController() {
+        _onlyPopController();
+        _;
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -451,6 +464,17 @@ contract PopRules is
         require(registrar.controllers(IDotnsController(msg.sender)), NotRegistry());
     }
 
+    /// @notice Ensures the caller is the configured PoP controller.
+    /// @dev Resolves `POP_CONTROLLER` from the protocol registry on every call so a
+    ///      controller upgrade (a new proxy address registered under the same key)
+    ///      takes effect without PopRules needing its own setter or storage slot.
+    ///      Tighter than `_onlyRegistry` for pop-flow paths because there is exactly
+    ///      one valid pop-flow caller.
+    function _onlyPopController() internal view {
+        address popController = protocolRegistry.get(DotnsConstants.POP_CONTROLLER);
+        require(msg.sender == popController, NotRegistry());
+    }
+
     /// @inheritdoc IPopRules
     function reserveBaseNameForPop(
         string calldata baseName,
@@ -458,7 +482,7 @@ contract PopRules is
     )
         external
         override
-        onlyRegistry
+        onlyPopController
     {
         _requireCanonicalLabel(baseName);
 
@@ -482,7 +506,7 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function releaseBaseName(string calldata baseName) external override onlyRegistry {
+    function releaseBaseName(string calldata baseName) external override onlyPopController {
         _requireCanonicalLabel(baseName);
         Reservation memory reservation = reservations[baseName];
         // Live reservations can only be cleared by the controller that wrote

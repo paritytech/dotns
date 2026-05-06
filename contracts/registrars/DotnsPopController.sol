@@ -15,6 +15,7 @@ import {IDotnsPopController} from "./IDotnsPopController.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {IDotnsPopResolver} from "../resolvers/IDotnsPopResolver.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
+import {ISystem, SYSTEM_ADDR} from "../precompiles/ISystem.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
@@ -137,7 +138,16 @@ contract DotnsPopController is
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
 
-    /// @notice Restricts calls to the privileged PoP gateway address stored in the protocol registry under `POP_GATEWAY`.
+    /// @notice Restricts calls to dispatches whose top-level origin is `Root`.
+    /// @dev The PoP gateway pallet dispatches into pallet-revive with `Root` origin,
+    /// which lets it call the controller without funding a sovereign account for
+    /// storage deposits. The check is performed via the pallet-revive `ISystem`
+    /// precompile (`callerIsRoot`) so we never read `msg.sender` on this path —
+    /// a top-frame `msg.sender` read traps under Root because there is no caller
+    /// account id. Trust radius: any chain entity able to dispatch with Root
+    /// (the gateway pallet, sudo, governance with Root origin) passes this gate;
+    /// this matches the implicit trust radius of every sudo-controlled pallet on
+    /// the chain.
     modifier onlyGateway() {
         _onlyGateway();
         _;
@@ -616,10 +626,17 @@ contract DotnsPopController is
         delete _reservedBaseLabel[labelhash];
     }
 
-    /// @notice Internal check enforcing PoP-gateway-only access.
+    /// @notice Internal check enforcing PoP-gateway-only access via the
+    /// pallet-revive `callerIsRoot` precompile.
+    /// @dev Reading `msg.sender` directly would trap under Root origin (no caller
+    /// account id on the top frame), so we route the check through the
+    /// `ISystem` precompile, which inspects the origin without dereferencing it.
+    /// The `NotGateway` error is emitted with `address(0)` rather than
+    /// `msg.sender`: every failure path through this check covers both signed
+    /// and Root origins, and we keep `msg.sender` out of the require body to
+    /// avoid the trap. The `POP_GATEWAY` registry slot is no longer read.
     function _onlyGateway() internal view {
-        address gateway = protocolRegistry.get(DotnsConstants.POP_GATEWAY);
-        require(msg.sender == gateway, NotGateway(msg.sender));
+        require(ISystem(SYSTEM_ADDR).callerIsRoot(), NotGateway(address(0)));
     }
 
     /// @notice Routes a raw cross-chain payload to the typed entrypoint identified by `selector`.
@@ -632,7 +649,9 @@ contract DotnsPopController is
     ///
     /// Note: `onlyGateway` runs twice, once on the outer bytes overload and again on the
     /// inner typed overload that the delegatecall lands on. The second check is a cheap,
-    /// intentional belt-and-braces; both checks read the same registry slot.
+    /// intentional belt-and-braces; both checks call the same `ISystem.callerIsRoot`
+    /// precompile. `delegatecall` preserves the top-level origin so the precompile resolves
+    /// the same answer in both frames.
     ///
     /// Why the OZ unsafe-allow is acceptable here:
     /// - The destination is hard-coded to `address(this)`, the proxy itself. No external
