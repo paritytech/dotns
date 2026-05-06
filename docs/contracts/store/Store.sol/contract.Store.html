@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="store"><a class="header" href="#store">Store</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/9e646eb57de096431cbba9507d20297c30ce955d/contracts/store/Store.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/3f7ab43f440014be799d3cb08fa211f1e8806f0c/contracts/store/Store.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/store/IStore.sol/interface.IStore.html">IStore</a>, Ownable</p>
 <p><strong>Title:</strong>
@@ -200,30 +200,30 @@ security-contact: admin@parity.io</p>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="store-1"><a class="header" href="#store-1">store</a></h3>
 <p>Primary data structure: user address =&gt; (key =&gt; value)</p>
-<pre><code class="language-solidity">mapping(address user =&gt; mapping(bytes32 key =&gt; string value)) private store;
+<pre><code class="language-solidity">mapping(address user =&gt; mapping(bytes32 key =&gt; string value)) private store
 </code></pre>
 <h3 id="values"><a class="header" href="#values">values</a></h3>
 <p>Secondary structure tracking all values per user in insertion order.</p>
 <p>This is append-only and not pruned on delete.</p>
-<pre><code class="language-solidity">mapping(address user =&gt; string[] userValues) private values;
+<pre><code class="language-solidity">mapping(address user =&gt; string[] userValues) private values
 </code></pre>
 <h3 id="authorizedstores"><a class="header" href="#authorizedstores">authorizedStores</a></h3>
 <p>Tracks which addresses are authorized to call <code>setValueFor</code>.</p>
-<pre><code class="language-solidity">mapping(address storeAddress =&gt; bool isAuthorized) private authorizedStores;
+<pre><code class="language-solidity">mapping(address storeAddress =&gt; bool isAuthorized) private authorizedStores
 </code></pre>
 <h3 id="dotnscontrollers"><a class="header" href="#dotnscontrollers">dotnsControllers</a></h3>
 <p>Tracks which addresses are treated as DotNS controllers for locking semantics.</p>
-<pre><code class="language-solidity">mapping(address controllerAddress =&gt; bool isDotnsController) private dotnsControllers;
+<pre><code class="language-solidity">mapping(address controllerAddress =&gt; bool isDotnsController) private dotnsControllers
 </code></pre>
 <h3 id="lockedkeys"><a class="header" href="#lockedkeys">lockedKeys</a></h3>
 <p>Tracks whether a <code>(user, key)</code> is permanently locked.</p>
-<pre><code class="language-solidity">mapping(address user =&gt; mapping(bytes32 key =&gt; bool isLocked)) private lockedKeys;
+<pre><code class="language-solidity">mapping(address user =&gt; mapping(bytes32 key =&gt; bool isLocked)) private lockedKeys
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlyauthorizedstore"><a class="header" href="#onlyauthorizedstore">onlyAuthorizedStore</a></h3>
 <p>Restricts function access to authorized contracts only.</p>
 <p>DotNS controllers are implicitly authorized.</p>
-<pre><code class="language-solidity">modifier onlyAuthorizedStore();
+<pre><code class="language-solidity">modifier onlyAuthorizedStore() ;
 </code></pre>
 <h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
 <pre><code class="language-solidity">constructor() Ownable(msg.sender);

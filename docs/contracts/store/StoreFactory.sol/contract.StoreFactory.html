@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="storefactory"><a class="header" href="#storefactory">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/9e646eb57de096431cbba9507d20297c30ce955d/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/3f7ab43f440014be799d3cb08fa211f1e8806f0c/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
@@ -193,12 +193,12 @@ security-contact: admin@parity.io</p>
 <h3 id="_deployedstores"><a class="header" href="#_deployedstores">_deployedStores</a></h3>
 <p>Maps owner addresses to their deployed store contracts</p>
 <p>Zero address indicates no store has been deployed for that address</p>
-<pre><code class="language-solidity">mapping(address owner =&gt; IStore store) private _deployedStores;
+<pre><code class="language-solidity">mapping(address owner =&gt; IStore store) private _deployedStores
 </code></pre>
 <h3 id="_allstores"><a class="header" href="#_allstores">_allStores</a></h3>
 <p>Array of all deployed store contracts</p>
 <p>Its possible that some user will have duplicated stores if they transfer ownership</p>
-<pre><code class="language-solidity">IStore[] private _allStores;
+<pre><code class="language-solidity">IStore[] private _allStores
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="deploy"><a class="header" href="#deploy">deploy</a></h3>
