@@ -94,19 +94,16 @@ contract WireDeployments is BaseDeployer {
     function _wireProtocolRegistryKeys(address owner, Addresses memory addr) internal {
         DotnsProtocolRegistry registry = DotnsProtocolRegistry(addr.protocolRegistry);
 
-        // PoP gateway policy (M-04).
-        // The PoP gateway holds broad privileges over reserveBaseName and
-        // registerBaseName. Leaving it equal to the deployer EOA on production
-        // means a forgotten rotation ships with the deployer in full control
-        // of PoP minting. To stop that class of mistake at source, we require
-        // the gateway address to come from the `POP_GATEWAY_ADDRESS` env var
-        // on every non-dev chain, and the resolved value must be non-zero and
-        // distinct from the deployer. On the two dev chain IDs
-        // (paseo-local 420420420 and localhost / fallback) we allow a silent
-        // fall-back to `owner` so local and fork runs do not require extra
-        // setup. All other chain IDs (passethub-testnet 420420422 and
-        // paseo-assethub 420420417, plus any future production chain) MUST
-        // set POP_GATEWAY_ADDRESS to a non-deployer address.
+        // POP_GATEWAY is legacy under the Root-origin auth model.
+        // `DotnsPopController` no longer reads this slot — its `onlyGateway`
+        // modifier delegates to revive's `ISystem.callerIsRoot()`
+        // precompile, so trust is bound to the substrate origin rather than
+        // a registered H160. The slot is still written here purely for
+        // off-chain observability and forward-compat with tooling that may
+        // still index it; the deployer-EOA guard on production chains is
+        // retained as defense-in-depth in case a future auth path ever
+        // re-reads the slot. Removing the constant, this branch, and
+        // `_resolvePopGateway` is tracked as a follow-up cleanup.
         address popGateway = _resolvePopGateway(owner);
 
         vm.startBroadcast(owner);

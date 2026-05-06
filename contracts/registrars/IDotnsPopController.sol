@@ -111,8 +111,15 @@ interface IDotnsPopController is IDotnsController {
         string indexed label, bytes32 indexed labelhash, address indexed owner, address store
     );
 
-    /// @notice Thrown when the caller is not the PoP gateway.
-    /// @param caller The address that attempted the call.
+    /// @notice Thrown when the call's substrate origin is not `Root`.
+    /// @dev The implementation gates entrypoints on revive's
+    ///      `ISystem.callerIsRoot()` precompile rather than on `msg.sender`,
+    ///      because under `RuntimeOrigin::root()` the PVM `caller` syscall
+    ///      traps. The `caller` field is therefore always `address(0)` and
+    ///      is reserved for forward compatibility — indexers must not rely
+    ///      on it to identify a spoofing actor.
+    /// @param caller Reserved; always `address(0)` under the Root-origin
+    ///        auth model.
     error NotGateway(address caller);
 
     /// @notice Thrown when a supplied lite-person label does not match `NAMEXX`.
@@ -143,11 +150,14 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Registers a lite-person username on behalf of `user` and optionally
     ///         enqueues a reservation for a base name the user intends to claim as a
     ///         full person later.
-    /// @dev Callable only by the PoP gateway registered in
-    ///      `DotnsProtocolRegistry.POP_GATEWAY`. Bypasses pricing (PoP tiers pay
-    ///      zero) and commit-reveal, but still honours classification and tier
-    ///      enforcement via `IPopRules.priceWithCheck`, so the gateway cannot mint
-    ///      a name whose classification does not match the user's tier.
+    /// @dev Callable only when the substrate origin is `Root`, verified via
+    ///      revive's `ISystem.callerIsRoot()` precompile. In practice this
+    ///      is the PoP gateway pallet calling through
+    ///      `pallet_revive::bare_call(RuntimeOrigin::root(), …)`.
+    ///      Bypasses pricing (PoP tiers pay zero) and commit-reveal, but
+    ///      still honours classification and tier enforcement via
+    ///      `IPopRules.priceWithCheck`, so the gateway cannot mint a name
+    ///      whose classification does not match the user's tier.
     ///      The lite-person username is minted immediately. If `reservedBaseLabel` is
     ///      non-empty the user is enqueued on the reservation queue for that label; at
     ///      most one active reservation per account is enforced and any prior
@@ -170,11 +180,13 @@ interface IDotnsPopController is IDotnsController {
 
     /// @notice Registers a lite-person username on behalf of `user` without
     ///         touching the base-name reservation queue.
-    /// @dev Callable only by the PoP gateway. Bypasses pricing and commit-reveal
-    ///      but honours classification and tier enforcement via
-    ///      `IPopRules.priceWithCheck`. Compositional counterpart to
-    ///      {reserveBaseName}: for flows that only need to mint the lite name,
-    ///      this entrypoint has no failure modes tied to base queue capacity.
+    /// @dev Callable only when the substrate origin is `Root`, verified via
+    ///      revive's `ISystem.callerIsRoot()` precompile. Bypasses pricing
+    ///      and commit-reveal but honours classification and tier
+    ///      enforcement via `IPopRules.priceWithCheck`. Compositional
+    ///      counterpart to {reserveBaseName}: for flows that only need to
+    ///      mint the lite name, this entrypoint has no failure modes tied
+    ///      to base queue capacity.
     /// @param liteLabel The lite-person `NAMEXX` label to register.
     /// @param user The lite-person account receiving the username.
     /// @param chatKey ECDH chat-key bytes to persist on {IDotnsChatKeyResolver}.
@@ -186,9 +198,11 @@ interface IDotnsPopController is IDotnsController {
         external;
 
     /// @notice Registers a full-person username on behalf of `user`.
-    /// @dev Callable only by the PoP gateway. Bypasses pricing (PoP tiers pay
-    ///      zero) and commit-reveal, but still honours classification and tier
-    ///      enforcement via `IPopRules.priceWithCheck`.
+    /// @dev Callable only when the substrate origin is `Root`, verified via
+    ///      revive's `ISystem.callerIsRoot()` precompile. Bypasses pricing
+    ///      (PoP tiers pay zero) and commit-reveal, but still honours
+    ///      classification and tier enforcement via
+    ///      `IPopRules.priceWithCheck`.
     ///
     ///      Two orthogonal axes decide behaviour:
     ///      1. Reservation axis (derived from state): if `user` holds the live

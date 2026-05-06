@@ -55,11 +55,16 @@ library DotnsConstants {
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant CONTENT_RESOLVER = bytes32("contentResolver");
 
-    /// @notice Well-known key for the privileged PoP gateway address allowed to drive
-    ///         lite/full-person username flows via `DotnsPopController`.
-    /// @dev External account or pallet adapter configured by governance; the
-    ///      `DotnsPopController` reads it to gate its privileged entry points, so
-    ///      rotating the gateway is a single `set` call with no upgrade needed.
+    /// @notice Legacy well-known key historically used to identify the
+    ///         privileged PoP gateway address for `DotnsPopController`.
+    /// @dev No longer consulted by `DotnsPopController` under the
+    ///      Root-origin auth model: the controller now gates entrypoints
+    ///      through revive's `ISystem.callerIsRoot()` precompile rather
+    ///      than comparing `msg.sender` to a registered address. The slot
+    ///      is retained for off-chain observability and to preserve
+    ///      forward-compat with tooling that still reads it; writes to it
+    ///      are no-op for the gateway auth path. Removal is tracked as a
+    ///      follow-up cleanup once indexers have migrated.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant POP_GATEWAY = bytes32("popGateway");
 

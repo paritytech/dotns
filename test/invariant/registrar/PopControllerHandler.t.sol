@@ -109,7 +109,6 @@ contract PopControllerHandler is Test {
         string memory liteLabel = _buildLiteLabel("rsv", actor, _liteSuffix[actor]);
         string memory reservedBase = attachReservation ? _baseLabel(baseIndex) : "";
 
-        vm.prank(GATEWAY);
         try CONTROLLER.reserveBaseName(liteLabel, actor, "", reservedBase) {
             if (attachReservation) _track(keccak256(bytes(reservedBase)));
             bytes32 node = LabelUtils.namehashUnder(
@@ -137,13 +136,11 @@ contract PopControllerHandler is Test {
         _liteSuffix[actor]++;
         string memory liteLabel = _buildLiteLabel("clm", actor, _liteSuffix[actor]);
 
-        vm.prank(GATEWAY);
         try CONTROLLER.reserveBaseName(liteLabel, actor, "", "") {
             IDotnsPopController.Link memory link = IDotnsPopController.Link({
                 kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
             });
 
-            vm.prank(GATEWAY);
             try CONTROLLER.registerBaseName(baseLabel, actor, link) {
                 bytes32 liteLabelhash = LabelUtils.labelhashMemory(liteLabel);
                 bytes32 fullNode = LabelUtils.namehashUnder(
@@ -184,7 +181,6 @@ contract PopControllerHandler is Test {
             kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
         });
 
-        vm.prank(GATEWAY);
         try CONTROLLER.registerBaseName(baseLabel, actor, link) {
             bytes32 liteLabelhash = LabelUtils.labelhashMemory(liteLabel);
             bytes32 fullNode = LabelUtils.namehashUnder(

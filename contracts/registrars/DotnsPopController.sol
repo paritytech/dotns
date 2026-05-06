@@ -19,6 +19,7 @@ import {LabelUtils} from "../utils/LabelUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
+import {ISystem, SYSTEM_ADDR} from "../external/revive/ISystem.sol";
 
 /// @title DotnsPopController
 /// @notice Dedicated PoP controller orchestrating lite-person and full-person
@@ -129,8 +130,16 @@ contract DotnsPopController is
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
 
-    /// @notice Restricts calls to the privileged PoP gateway address stored in the
-    ///         protocol registry under `POP_GATEWAY`.
+    /// @notice Restricts calls to invocations whose substrate origin is `Root`.
+    /// @dev Verified through revive's System precompile (`callerIsRoot`) at
+    ///      {SYSTEM_ADDR}. `msg.sender` is intentionally not consulted —
+    ///      under `RuntimeOrigin::root()` the PVM `caller` syscall traps
+    ///      with `RootNotAllowed`, so any expression that reads
+    ///      `msg.sender` in the outermost frame would revert before the
+    ///      gate could run. The trust boundary therefore moves entirely to
+    ///      the runtime: anything that can construct
+    ///      `RuntimeOrigin::root()` and reach `pallet_revive::bare_call`
+    ///      is accepted as the gateway.
     modifier onlyGateway() {
         _onlyGateway();
         _;
@@ -628,10 +637,16 @@ contract DotnsPopController is
         delete _reservedBaseLabel[labelhash];
     }
 
-    /// @notice Internal check enforcing PoP-gateway-only access.
+    /// @notice Internal check enforcing PoP-gateway-only access through the
+    ///         revive System precompile.
+    /// @dev Calls `ISystem(SYSTEM_ADDR).callerIsRoot()` and reverts with
+    ///      `NotGateway(address(0))` when the substrate origin is not
+    ///      `Root`. The zero address in the revert payload is deliberate:
+    ///      the contract never reads `msg.sender` in the gate (see the
+    ///      modifier docstring), so there is no spoofable identity to
+    ///      surface. Indexers should treat the field as reserved.
     function _onlyGateway() internal view {
-        address gateway = protocolRegistry.get(DotnsConstants.POP_GATEWAY);
-        require(msg.sender == gateway, NotGateway(msg.sender));
+        require(ISystem(SYSTEM_ADDR).callerIsRoot(), NotGateway(address(0)));
     }
 
     /// @inheritdoc UUPSUpgradeable
