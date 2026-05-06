@@ -32,7 +32,7 @@ import {DotnsNameEscrow} from "../../contracts/escrow/DotnsNameEscrow.sol";
 import {StoreUtils} from "../../contracts/utils/StoreUtils.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {LabelUtils} from "../../contracts/utils/LabelUtils.sol";
-import {ISystem, SYSTEM_ADDR} from "../../contracts/external/revive/ISystem.sol";
+import {ISystem} from "../../contracts/external/revive/ISystem.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 /// @title BaseDotns
@@ -89,13 +89,7 @@ abstract contract BaseDotns is Test {
     /// @notice Deployed PoP controller instance (gateway-driven lite/full issuance).
     DotnsPopController public dotnsPopController;
 
-    /// @notice Legacy test account historically pranked as the PoP gateway.
-    /// @dev Retained as a labelled actor for deploy-script parity, but no
-    ///      longer load-bearing in tests: `DotnsPopController` now gates
-    ///      entrypoints through revive's `ISystem.callerIsRoot()`
-    ///      precompile, which {_mockCallerIsRoot} simulates under
-    ///      Foundry. Will be removed alongside the `POP_GATEWAY` registry
-    ///      slot cleanup.
+    /// @notice Test actor used by legacy `prank`-based PoP call sites.
     address public popGateway;
 
     /// @notice Default reservation duration used by the PoP controller.
@@ -154,7 +148,6 @@ abstract contract BaseDotns is Test {
         tiago = _createUser("tiago");
         owner = _createUser("owner");
         popGateway = _createUser("popGateway");
-
         dotLabel = keccak256(bytes("dot"));
         dotNode = _namehash(ZERO_HASH, dotLabel);
 
@@ -279,7 +272,6 @@ abstract contract BaseDotns is Test {
         protocolRegistry.set(DotnsConstants.CONTENT_RESOLVER, dotnsContentResolverAddress);
         protocolRegistry.set(DotnsConstants.POP_RESOLVER, dotnsPopResolverAddress);
         protocolRegistry.set(DotnsConstants.POP_CONTROLLER, dotnsPopControllerAddress);
-        protocolRegistry.set(DotnsConstants.POP_GATEWAY, popGateway);
         protocolRegistry.set(DotnsConstants.NAME_ESCROW, dotnsNameEscrowAddress);
 
         dotnsRegistrar.updateProtocolRegistry(IDotnsProtocolRegistry(address(protocolRegistry)));
@@ -299,26 +291,16 @@ abstract contract BaseDotns is Test {
         vm.stopPrank();
         vm.warp(block.timestamp + 365 days);
 
-        // The PoP controller's `onlyGateway` modifier delegates to revive's
-        // System precompile (`ISystem(SYSTEM_ADDR).callerIsRoot()`), which
-        // is not available under Foundry's EVM simulation. Default the
-        // mocked return to `true` so suites that exercise the gateway
-        // entrypoints work without per-test boilerplate; negative-auth
-        // tests flip it to `false` via {_mockCallerIsRoot}.
+        // Foundry does not provide revive's System precompile. Default it to
+        // Root so existing PoP-flow tests exercise business logic without
+        // per-test auth boilerplate; negative-auth tests flip it to false.
         _mockCallerIsRoot(true);
     }
 
-    /// @notice Mocks revive's System precompile so `callerIsRoot()`
-    ///         returns `returnValue` for every subsequent staticcall.
-    /// @dev Foundry's `vm.mockCall` is sticky for the lifetime of the
-    ///      test until cleared, which mirrors the runtime's stateless
-    ///      precompile. Tests that need a one-off `false` should set
-    ///      `false`, run their negative-auth assertion, then restore
-    ///      `true` for the rest of the test body.
-    /// @param returnValue Value to return from the mocked precompile.
+    /// @notice Mocks revive's System precompile callerIsRoot result.
     function _mockCallerIsRoot(bool returnValue) internal {
         vm.mockCall(
-            SYSTEM_ADDR,
+            DotnsConstants.REVIVE_SYSTEM,
             abi.encodeWithSelector(ISystem.callerIsRoot.selector),
             abi.encode(returnValue)
         );
@@ -380,12 +362,9 @@ abstract contract BaseDotns is Test {
         popRules.setUserPopStatus(IPopRules.PopStatus.NoStatus);
     }
 
-    /// @notice Drives `DotnsPopController.reserveBaseName` through the
-    ///         simulated Root origin set up in {setUp}.
-    /// @dev Single canonical helper for PoP-gateway reservations across
-    ///      unit and fuzz test suites. The default `_mockCallerIsRoot(true)`
-    ///      from {setUp} satisfies the `onlyGateway` modifier irrespective
-    ///      of `msg.sender`, so no `vm.prank` is needed here.
+    /// @notice Drives `DotnsPopController.reserveBaseName` through the simulated Root origin.
+    /// @dev Single canonical helper for PoP-gateway reservations across unit and fuzz
+    ///      test suites. The default {_mockCallerIsRoot} setup satisfies `onlyGateway`.
     function _reservePop(
         address user,
         string memory liteLabel,
@@ -394,7 +373,14 @@ abstract contract BaseDotns is Test {
     )
         internal
     {
-        dotnsPopController.reserveBaseName(liteLabel, user, chatKey, reservedBaseLabel);
+        dotnsPopController.reserveBaseName(
+            IDotnsPopController.BaseReservation({
+                lite: IDotnsPopController.LiteRegistration({
+                    liteLabel: liteLabel, user: user, chatKey: chatKey
+                }),
+                reservedBaseLabel: reservedBaseLabel
+            })
+        );
     }
 
     /// @notice Constructs a `Link` that inherits the chat key from a prior lite label.

@@ -74,7 +74,7 @@ contract DotnsDeployer is BaseDeployer {
     ///         and writes the resulting manifest under `deployments/`.
     /// @dev Network-specific output folder is chosen from `block.chainid`; see
     ///      {_getDeploymentFolder}. The broadcasting account becomes the owner
-    ///      of every proxy and the default `POP_GATEWAY` until governance rotates it.
+    ///      of every deployed proxy.
     function run() external {
         uint256 chainId = block.chainid;
 
@@ -312,9 +312,6 @@ contract DotnsDeployer is BaseDeployer {
         protocolRegistry.set(DotnsConstants.STORE_FACTORY, deployment.storeFactory);
         protocolRegistry.set(DotnsConstants.POP_CONTROLLER, deployment.popController);
         protocolRegistry.set(DotnsConstants.POP_RESOLVER, deployment.popResolver);
-        // `popGateway` defaults to the deploying owner for local deploys. Governance
-        // rotates it post-deploy via `protocolRegistry.set(DotnsConstants.POP_GATEWAY, ...)`.
-        protocolRegistry.set(DotnsConstants.POP_GATEWAY, owner);
         vm.stopBroadcast();
         console.log("Protocol registry keys set");
     }
@@ -402,9 +399,6 @@ contract DotnsDeployer is BaseDeployer {
         require(
             protocolRegistry.get(DotnsConstants.POP_RESOLVER) == popResolverProxy,
             "Key: popResolver"
-        );
-        require(
-            protocolRegistry.get(DotnsConstants.POP_GATEWAY) == expectedOwner, "Key: popGateway"
         );
         console.log("Protocol registry keys verified");
 

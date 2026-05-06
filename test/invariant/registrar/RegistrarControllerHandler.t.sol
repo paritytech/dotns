@@ -440,6 +440,8 @@ contract RegistrarControllerHandler is Test {
 
         bytes memory letters = new bytes(4);
         for (uint256 i; i < 4; ++i) {
+            // encoded % 26 is always 0-25, safely fits in uint8
+            // forge-lint: disable-next-line(unsafe-typecast)
             letters[i] = bytes1(uint8(0x61) + uint8(encoded % 26));
             encoded /= 26;
         }

@@ -34,10 +34,7 @@ abstract contract BaseDeployer is Script {
     ///         if one exists; otherwise begins a fresh in-memory object. Every
     ///         stage must call this first so subsequent `_readAddress` / `logDeployment`
     ///         calls see the correct baseline.
-    /// @dev The disk format is `{"ContractName": "0x..."}`. Using foundry's
-    ///      native serializer keeps parsing and writing symmetric: the same
-    ///      `vm.serializeAddress` value feeds both `vm.writeFile` and
-    ///      `vm.parseJsonAddress`.
+    /// @dev Canonical disk format is `{"contracts": {"ContractName": "0x..."}}`.
     /// @param subdirectory Network-specific folder under `deployments/`.
     /// @param filename Stem of the manifest file (for example `block.chainid`).
     function initDeployment(string memory subdirectory, string memory filename) internal {
@@ -51,19 +48,19 @@ abstract contract BaseDeployer is Script {
             // we have to re-insert every prior address before the first new
             // log.
             string memory priorJson = vm.readFile(manifestPath);
-            string[] memory names = vm.parseJsonKeys(priorJson, "$");
-            for (uint256 i = 0; i < names.length; ++i) {
-                address addr = vm.parseJsonAddress(priorJson, string.concat(".", names[i]));
-                manifestJson = vm.serializeAddress(MANIFEST_OBJECT_KEY, names[i], addr);
+            string[] memory contractNames = vm.parseJsonKeys(priorJson, ".contracts");
+            for (uint256 i = 0; i < contractNames.length; ++i) {
+                address contractAddr =
+                    vm.parseJsonAddress(priorJson, string.concat(".contracts.", contractNames[i]));
+                manifestJson =
+                    vm.serializeAddress(MANIFEST_OBJECT_KEY, contractNames[i], contractAddr);
             }
-            if (names.length == 0) {
-                manifestJson = vm.serializeAddress(MANIFEST_OBJECT_KEY, "_seed", address(0));
+
+            if (contractNames.length == 0) {
+                manifestJson = "{}";
             }
         } else {
-            // `vm.serializeAddress` requires at least one write before it will
-            // emit a valid object. We seed with a sentinel address(0) under
-            // a reserved key so subsequent writes have a base to extend.
-            manifestJson = vm.serializeAddress(MANIFEST_OBJECT_KEY, "_seed", address(0));
+            manifestJson = "{}";
         }
     }
 
@@ -86,7 +83,8 @@ abstract contract BaseDeployer is Script {
         mkdirInputs[2] = _parentDirectory(manifestPath);
         vm.ffi(mkdirInputs);
 
-        vm.writeFile(manifestPath, manifestJson);
+        string memory wrappedManifestJson = string.concat('{"contracts":', manifestJson, "}");
+        vm.writeFile(manifestPath, wrappedManifestJson);
     }
 
     /// @notice Reads an address recorded by a prior stage from the manifest on

@@ -5,6 +5,11 @@ pragma solidity ^0.8.30;
 /// @notice Protocol-level invariants shared across DotNS contracts.
 /// @custom:security-contact admin@parity.io
 library DotnsConstants {
+    /// @notice Address at which revive exposes the System precompile.
+    /// @dev Matches the upstream constant in
+    ///      `substrate/frame/revive/uapi/sol/ISystem.sol`.
+    address internal constant REVIVE_SYSTEM = address(0x0900);
+
     /// @notice Namehash of the .dot TLD node.
     /// @dev keccak256(abi.encodePacked(bytes32(0), keccak256("dot")))
     bytes32 internal constant DOT_NODE =
@@ -54,19 +59,6 @@ library DotnsConstants {
     /// @notice Well-known key for the content resolver storing content hashes and text records.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant CONTENT_RESOLVER = bytes32("contentResolver");
-
-    /// @notice Legacy well-known key historically used to identify the
-    ///         privileged PoP gateway address for `DotnsPopController`.
-    /// @dev No longer consulted by `DotnsPopController` under the
-    ///      Root-origin auth model: the controller now gates entrypoints
-    ///      through revive's `ISystem.callerIsRoot()` precompile rather
-    ///      than comparing `msg.sender` to a registered address. The slot
-    ///      is retained for off-chain observability and to preserve
-    ///      forward-compat with tooling that still reads it; writes to it
-    ///      are no-op for the gateway auth path. Removal is tracked as a
-    ///      follow-up cleanup once indexers have migrated.
-    /// forge-lint: disable-next-line(unsafe-typecast)
-    bytes32 internal constant POP_GATEWAY = bytes32("popGateway");
 
     /// @notice Well-known key for the dedicated PoP controller orchestrating lite/full-person
     ///         username issuance on behalf of the PoP gateway.

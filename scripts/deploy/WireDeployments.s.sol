@@ -94,18 +94,6 @@ contract WireDeployments is BaseDeployer {
     function _wireProtocolRegistryKeys(address owner, Addresses memory addr) internal {
         DotnsProtocolRegistry registry = DotnsProtocolRegistry(addr.protocolRegistry);
 
-        // POP_GATEWAY is legacy under the Root-origin auth model.
-        // `DotnsPopController` no longer reads this slot — its `onlyGateway`
-        // modifier delegates to revive's `ISystem.callerIsRoot()`
-        // precompile, so trust is bound to the substrate origin rather than
-        // a registered H160. The slot is still written here purely for
-        // off-chain observability and forward-compat with tooling that may
-        // still index it; the deployer-EOA guard on production chains is
-        // retained as defense-in-depth in case a future auth path ever
-        // re-reads the slot. Removing the constant, this branch, and
-        // `_resolvePopGateway` is tracked as a follow-up cleanup.
-        address popGateway = _resolvePopGateway(owner);
-
         vm.startBroadcast(owner);
         registry.set(DotnsConstants.REGISTRAR, addr.registrar);
         registry.set(DotnsConstants.CONTROLLER, addr.registrarController);
@@ -118,49 +106,8 @@ contract WireDeployments is BaseDeployer {
         registry.set(DotnsConstants.NAME_ESCROW, addr.nameEscrow);
         registry.set(DotnsConstants.POP_CONTROLLER, addr.popController);
         registry.set(DotnsConstants.POP_RESOLVER, addr.popResolver);
-        registry.set(DotnsConstants.POP_GATEWAY, popGateway);
         vm.stopBroadcast();
         console.log("Protocol registry keys set");
-        console.log("Configured POP_GATEWAY:", popGateway);
-    }
-
-    /// @dev Resolves the gateway address from `POP_GATEWAY_ADDRESS`.
-    ///      On dev chains (paseo-local and the localhost fallback) a missing
-    ///      or zero env var silently falls back to `owner` for convenience.
-    ///      On any other chain the env var MUST be set to a non-zero,
-    ///      non-deployer address or this function reverts.
-    function _resolvePopGateway(address owner) internal view returns (address) {
-        bool isDevChain = _isDevChain(block.chainid);
-
-        // vm.envOr keeps the call non-reverting when the env var is absent so
-        // we can give a bespoke error message below.
-        address configured = vm.envOr("POP_GATEWAY_ADDRESS", address(0));
-
-        if (isDevChain) {
-            // Dev chains: fall back to the deployer when unset or zero.
-            if (configured == address(0)) return owner;
-            return configured;
-        }
-
-        // Production chains: env var is mandatory and must differ from owner.
-        require(
-            configured != address(0),
-            "POP_GATEWAY_ADDRESS must be set to a non-zero, non-deployer address"
-        );
-        require(configured != owner, "POP_GATEWAY must not equal the deployer EOA");
-        return configured;
-    }
-
-    function _isDevChain(uint256 chainId) internal pure returns (bool) {
-        // Mirrors DeploymentNetwork.folder: `paseo-local` is an explicit dev
-        // chain, and anything that falls through the folder mapping resolves
-        // to the `localhost` folder. Only the two known production-ish chains
-        // are treated as non-dev here.
-        // passethub-testnet
-        if (chainId == 420420422) return false;
-        // paseo-assethub
-        if (chainId == 420420417) return false;
-        return true;
     }
 
     function _wireProtocolRegistryPointers(address owner, Addresses memory addr) internal {
@@ -241,16 +188,6 @@ contract WireDeployments is BaseDeployer {
             NameEscrowProtocolRegistryMismatch()
         );
         require(registry.get(DotnsConstants.POP_RESOLVER) == addr.popResolver, "Key: popResolver");
-
-        // PoP gateway sanity (M-04): must be wired to a non-zero address and,
-        // on production chains, must not equal the deployer EOA. Dev chains
-        // are allowed to leave it equal to the deployer as a convenience.
-        address popGateway = registry.get(DotnsConstants.POP_GATEWAY);
-        require(popGateway != address(0), "Key: popGateway must be non-zero");
-        if (!_isDevChain(block.chainid)) {
-            require(popGateway != expectedOwner, "Key: popGateway must not equal deployer");
-        }
-        console.log("Verified POP_GATEWAY:", popGateway);
 
         require(
             DotnsRegistrar(addr.registrar).controllers(IDotnsController(addr.registrarController)),
