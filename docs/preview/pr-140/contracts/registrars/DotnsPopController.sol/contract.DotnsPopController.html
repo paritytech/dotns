@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/57f045bc236b3117a12a18a81f752d1f31160a98/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cced04dc6907e28ab051680274d1e9dbd87775f9/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -330,9 +330,8 @@ initial value through the same event the setter uses later.</p>
     initializer;
 </code></pre>
 <h3 id="reservelitename"><a class="header" href="#reservelitename">reserveLiteName</a></h3>
-<p>Registers a lite-person username on behalf of <code>params.user</code> without touching the
-base-name reservation queue. @dev Callable only when the substrate origin is <code>Root</code>,
-verified via revive's
+<p>Registers a lite-person username on behalf of <code>params.user</code> without touching the base-name reservation queue.</p>
+<p>Callable only when the substrate origin is <code>Root</code>, verified via revive's
 <code>ISystem.callerIsRoot()</code> precompile. Cross-chain callers pass the ABI-encoded
 {LiteRegistration} tuple directly as the call's payload; Solidity decodes it
 from <code>msg.data</code> into <code>params</code>.</p>
@@ -363,7 +362,7 @@ off-chain encoders MUST NOT assume strict length validation; pad-only
 junk past the tail is silently dropped (no state corruption; decoded
 values are unchanged).
 Worked example off-chain:
-<code>bytes payload = abi.encode(LiteRegistration({liteLabel: "alice42", user: u, chatKey: k}));</code> @param payload <code>abi.encode(LiteRegistration)</code> produced by the cross-chain caller.</p>
+<code>bytes payload = abi.encode(LiteRegistration({liteLabel: "alice42", user: u, chatKey: k}));</code></p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
@@ -375,10 +374,14 @@ Worked example off-chain:
 </ul>
 <pre><code class="language-solidity">function reserveLiteName(bytes calldata payload) external override onlyGateway;
 </code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>payload</code></td><td><code>bytes</code></td><td><code>abi.encode(LiteRegistration)</code> produced by the cross-chain caller.</td></tr>
+</tbody></table>
+</div>
 <h3 id="reservebasename"><a class="header" href="#reservebasename">reserveBaseName</a></h3>
-<p>Registers a lite-person username on behalf of <code>params.user</code> and optionally enqueues
-a reservation for a base name they intend to claim as a full person later. @dev Callable
-only when the substrate origin is <code>Root</code>, verified via revive's
+<p>Registers a lite-person username on behalf of <code>params.user</code> and optionally enqueues a reservation for a base name they intend to claim as a full person later.</p>
+<p>Callable only when the substrate origin is <code>Root</code>, verified via revive's
 <code>ISystem.callerIsRoot()</code> precompile. The base-name leg only runs when
 <code>params.reservedBaseLabel</code> is non-empty, and runs PopRules <code>priceWithCheck</code>
 BEFORE any queue mutation so a mis-tiered reservation never even touches the
@@ -730,8 +733,7 @@ when only the labelhash is used.</p>
 <pre><code class="language-solidity">function _syncPopRulesToHead(bytes32 labelhash, address newHead) internal;
 </code></pre>
 <h3 id="_releasepoprulesslot"><a class="header" href="#_releasepoprulesslot">_releasePopRulesSlot</a></h3>
-<p>Clears the PopRules slot and the local label bookkeeping when the queue empties
-(claim, last-relinquish, last-expire).</p>
+<p>Clears the PopRules slot and the local label bookkeeping when the queue empties (claim, last-relinquish, last-expire).</p>
 <pre><code class="language-solidity">function _releasePopRulesSlot(bytes32 labelhash) internal;
 </code></pre>
 <h3 id="_onlygateway"><a class="header" href="#_onlygateway">_onlyGateway</a></h3>

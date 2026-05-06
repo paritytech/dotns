@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrar"><a class="header" href="#dotnsregistrar">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/57f045bc236b3117a12a18a81f752d1f31160a98/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cced04dc6907e28ab051680274d1e9dbd87775f9/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, ReentrancyGuardTransient, <a href="/contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -189,9 +189,8 @@ Dotns Registrar</p>
 <p>This contract is deliberately policy-free.
 Transfers are supported to allow ownership changes without registry hooks.</p>
 <p>Store writes on transfer:
-When an ERC721 name token is transferred between non-zero addresses (i.e. not mint or
-burn), the registrar writes the label to the recipient's Store using the label stored in
-<code>_labels</code>.
+When an ERC721 name token is transferred between non-zero addresses (i.e. not mint or burn),
+the registrar writes the label to the recipient's Store using the label stored in <code>_labels</code>.
 This ensures the recipient's Store contains a record of every name they have received.
 Stores are immutable (locked by DotNS controllers), so the sender's entry is not removed.</p>
 <p><strong>Note:</strong>
@@ -216,9 +215,8 @@ without storing individual references.</p>
 <h3 id="_labelhashes"><a class="header" href="#_labelhashes">_labelhashes</a></h3>
 <p>DEPRECATED as of v1.2.0: Previously stored labelhashes per token ID.</p>
 <p>Retained for UUPS storage layout compatibility. No longer written to.
-The labelhash is now derived on-the-fly from <code>_labels[tokenId]</code> via
-<code>keccak256(bytes(label))</code>. REMOVE this mapping when deploying to a new environment (fresh
-deploy, not upgrade).</p>
+The labelhash is now derived on-the-fly from <code>_labels[tokenId]</code> via <code>keccak256(bytes(label))</code>.
+REMOVE this mapping when deploying to a new environment (fresh deploy, not upgrade).</p>
 <p><strong>Note:</strong>
 oz-retyped-from: mapping(uint256 =&gt; bytes32)</p>
 <pre><code class="language-solidity">mapping(uint256 tokenId =&gt; bytes32 labelhash) private _labelhashes

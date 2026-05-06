@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/57f045bc236b3117a12a18a81f752d1f31160a98/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cced04dc6907e28ab051680274d1e9dbd87775f9/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, ReentrancyGuardTransient, <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -191,8 +191,8 @@ default reverse resolution, and immutable store writing.</p>
 <p>Tokenisation:</p>
 <ul>
 <li>The minted ERC721 tokenId is uint256(node), where node = namehash(DOT_NODE, labelhash).</li>
-<li>The registry stores a sentinel owner (address(0)) for tokenised nodes and derives
-ownership from the ERC721 registrar for authorisation.</li>
+<li>The registry stores a sentinel owner (address(0)) for tokenised nodes and derives ownership
+from the ERC721 registrar for authorisation.</li>
 </ul>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
@@ -263,9 +263,8 @@ TODO: Remove on fresh deploy (not upgrade). Restore __gap accordingly.</p>
 </code></pre>
 <h3 id="onlywhitelistedorowner"><a class="header" href="#onlywhitelistedorowner">onlyWhiteListedOrOwner</a></h3>
 <p>Restricts calls to whitelisted addresses or the owner.</p>
-<p>This is used to gate the <code>registerReserved</code> function, which allows registering reserved
-names without PoP checks or payment. This is necessary to allow the owner to register
-reserved names
+<p>This is used to gate the <code>registerReserved</code> function, which allows registering reserved names
+without PoP checks or payment. This is necessary to allow the owner to register reserved names
 for users who are already known and verified and dont need Pop checks.</p>
 <pre><code class="language-solidity">modifier onlyWhiteListedOrOwner() ;
 </code></pre>

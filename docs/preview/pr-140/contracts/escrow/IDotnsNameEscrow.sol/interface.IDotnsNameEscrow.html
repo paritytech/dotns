@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/57f045bc236b3117a12a18a81f752d1f31160a98/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cced04dc6907e28ab051680274d1e9dbd87775f9/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Name Escrow Interface</p>
 <p>Escrows refundable deposits for .dot registrations and manages the release lifecycle.</p>
@@ -270,8 +270,7 @@ refund address (typically the original <code>msg.sender</code> of <code>register
 <h3 id="depositinsurance"><a class="header" href="#depositinsurance">depositInsurance</a></h3>
 <p>Records a cross-tier registration fee into the insurance fund.</p>
 <p>Callable only by the registrar controller. Used when <code>msg.sender != registration.owner</code>
-AND tier prices differ — the controller forwards the differential to the escrow so
-the
+AND tier prices differ — the controller forwards the differential to the escrow so the
 original payer is recorded for the event and the running max is bumped to keep
 transfer-time fee accounting consistent.</p>
 <pre><code class="language-solidity">function depositInsurance(InsuranceDepositParams calldata params) external payable;
@@ -319,9 +318,8 @@ Reverts <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscr
 </tbody></table>
 </div>
 <h3 id="runningmax"><a class="header" href="#runningmax">runningMax</a></h3>
-<p>Returns the highest price ever charged for a token across registration and
-transfers. @dev Reset to zero on <code>reclaim()</code> so the next registrant starts with a fresh
-baseline.</p>
+<p>Returns the highest price ever charged for a token across registration and transfers.</p>
+<p>Reset to zero on <code>reclaim()</code> so the next registrant starts with a fresh baseline.</p>
 <pre><code class="language-solidity">function runningMax(uint256 tokenId) external view returns (uint256 max);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -346,9 +344,8 @@ also be approved to transfer the token into custody.</p>
 </tbody></table>
 </div>
 <h3 id="withdraw"><a class="header" href="#withdraw">withdraw</a></h3>
-<p>Credits the refundable deposit for a released token to the recipient's pending
-balance. @dev Pull-payment: this function does NOT send native value. It marks the position
-as
+<p>Credits the refundable deposit for a released token to the recipient's pending balance.</p>
+<p>Pull-payment: this function does NOT send native value. It marks the position as
 claimed, debits <code>tokenReserved</code> (and the insurance fund on shortfall), and credits
 the recipient's <code>_pendingWithdrawals</code> entry. The recipient must subsequently call
 <code>claimWithdrawal()</code> to pull the funds.</p>
@@ -555,13 +552,12 @@ registration <code>owner</code>).</p>
 </tbody></table>
 </div>
 <h3 id="insurancedraw"><a class="header" href="#insurancedraw">InsuranceDraw</a></h3>
-<p>Emitted when a withdrawal draws from the insurance fund to cover a shortfall in
-<code>tokenReserved</code>. @param tokenId Token identifier whose refund triggered the draw.</p>
+<p>Emitted when a withdrawal draws from the insurance fund to cover a shortfall in <code>tokenReserved</code>.</p>
 <pre><code class="language-solidity">event InsuranceDraw(uint256 indexed tokenId, uint256 amount);
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td></td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token identifier whose refund triggered the draw.</td></tr>
 <tr><td><code>amount</code></td><td><code>uint256</code></td><td>Amount drawn from the insurance fund.</td></tr>
 </tbody></table>
 </div>

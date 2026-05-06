@@ -180,13 +180,13 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnscontentresolver"><a class="header" href="#dotnscontentresolver">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/57f045bc236b3117a12a18a81f752d1f31160a98/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cced04dc6907e28ab051680274d1e9dbd87775f9/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
 Dotns Content Resolver</p>
-<p>Implements <code>IDotnsContentResolver</code> interface with content hash, text records, and
-operator approvals @dev Stores opaque content hash bytes and text key-value pairs per node
+<p>Implements <code>IDotnsContentResolver</code> interface with content hash, text records, and operator approvals</p>
+<p>Stores opaque content hash bytes and text key-value pairs per node
 Authorisation enforced via DotNS registry ownership or approved operators</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
@@ -292,13 +292,12 @@ oz-upgrades-unsafe-allow: constructor</p>
 </tbody></table>
 </div>
 <h3 id="setapprovalforall"><a class="header" href="#setapprovalforall">setApprovalForAll</a></h3>
-<p>Enable or disable approval for a third party ("operator") to manage all of
-<code>msg.sender</code>'s nodes @param operator Address to authorize or revoke</p>
+<p>Enable or disable approval for a third party ("operator") to manage all of <code>msg.sender</code>'s nodes</p>
 <pre><code class="language-solidity">function setApprovalForAll(address operator, bool approved) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>operator</code></td><td><code>address</code></td><td></td></tr>
+<tr><td><code>operator</code></td><td><code>address</code></td><td>Address to authorize or revoke</td></tr>
 <tr><td><code>approved</code></td><td><code>bool</code></td><td>True to approve, false to revoke</td></tr>
 </tbody></table>
 </div>

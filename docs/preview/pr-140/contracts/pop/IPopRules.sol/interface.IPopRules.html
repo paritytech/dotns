@@ -180,12 +180,11 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/57f045bc236b3117a12a18a81f752d1f31160a98/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cced04dc6907e28ab051680274d1e9dbd87775f9/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
-<p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements,
-and base-name reservation rules @dev Provides the classification logic for Dotns labels,
-enforces suffix constraints, and exposes reservation metadata.
+<p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements, and base-name reservation rules</p>
+<p>Provides the classification logic for Dotns labels, enforces suffix constraints, and exposes reservation metadata.
 Names are evaluated according to the following rules:
 • Length ≤ 5: Reserved
 • Length 6–8 without trailing digits: PopFull required
@@ -194,9 +193,8 @@ Names are evaluated according to the following rules:
 • Length ≥ 9 with 2 trailing digits: NoStatus (open)
 Trailing digits beyond 2 are invalid. Internal digits do not affect classification.
 Reservation rules apply to a label stripped of trailing digits.
-Its also important to note that for Pop Full there are no restrictions to name
-registrations any Character combination is valid, the same is valid for Light and No status
-users with the exception of
+Its also important to note that for Pop Full there are no restrictions to name registrations any
+Character combination is valid, the same is valid for Light and No status users with the exception of
 Requiring 2 suffix digits appended to the username being registered</p>
 <p>The pricing applied is mainly for POP No status users as measure to prevent spam</p>
 <p><strong>Note:</strong>
@@ -359,18 +357,16 @@ are not rejected here either; the caller decides what to do.</p>
 </tbody></table>
 </div>
 <h3 id="reachfee"><a class="header" href="#reachfee">reachFee</a></h3>
-<p>Friction fee owed when <code>account</code> reaches into a label tier above its verification
-level. @dev Returns a length-scaled reach price when the account does not satisfy the
-label's
+<p>Friction fee owed when <code>account</code> reaches into a label tier above its verification level.</p>
+<p>Returns a length-scaled reach price when the account does not satisfy the label's
 required verification tier; zero otherwise. The personhood gate on direct registration
 enforces this same comparison as a revert; this view exposes it as a charge for paths
-that bypass the gate (cross-payer registration, transfer to an under-qualified
-recipient). @param name Domain label being acted on.</p>
+that bypass the gate (cross-payer registration, transfer to an under-qualified recipient).</p>
 <pre><code class="language-solidity">function reachFee(string calldata name, address account) external view returns (uint256 fee);
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>name</code></td><td><code>string</code></td><td></td></tr>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label being acted on.</td></tr>
 <tr><td><code>account</code></td><td><code>address</code></td><td>Account whose verification reach is being measured.</td></tr>
 </tbody></table>
 </div>

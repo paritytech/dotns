@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="storefactory"><a class="header" href="#storefactory">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/57f045bc236b3117a12a18a81f752d1f31160a98/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cced04dc6907e28ab051680274d1e9dbd87775f9/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
@@ -203,8 +203,9 @@ security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="deploy"><a class="header" href="#deploy">deploy</a></h3>
 <p>Deploys a new store contract for the caller</p>
-<p>Creates a store instance owned by msg.sender. Reverts if caller already has a deployed
-store. @custom:reverts AlreadyDeployed if msg.sender has previously deployed a store</p>
+<p>Creates a store instance owned by msg.sender. Reverts if caller already has a deployed store.</p>
+<p><strong>Note:</strong>
+reverts: AlreadyDeployed if msg.sender has previously deployed a store</p>
 <pre><code class="language-solidity">function deploy() external returns (IStore);
 </code></pre>
 <h3 id="transferownership"><a class="header" href="#transferownership">transferOwnership</a></h3>
