@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/713f3c1611212d59660d3060abf6ae83611548b2/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/a2303c5a36507fa7d69e634dd75e3e76010413b6/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -741,7 +741,7 @@ account id on the top frame), so we route the check through the
 The <code>NotGateway</code> error is emitted with <code>address(0)</code> rather than
 <code>msg.sender</code>: every failure path through this check covers both signed
 and Root origins, and we keep <code>msg.sender</code> out of the require body to
-avoid the trap. The <code>POP_GATEWAY</code> registry slot is no longer read.</p>
+avoid the trap.</p>
 <pre><code class="language-solidity">function _onlyGateway() internal view;
 </code></pre>
 <h3 id="_dispatchtyped"><a class="header" href="#_dispatchtyped">_dispatchTyped</a></h3>

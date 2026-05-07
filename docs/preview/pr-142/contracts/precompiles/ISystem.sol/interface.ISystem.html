@@ -180,30 +180,8 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="isystem"><a class="header" href="#isystem">ISystem</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/713f3c1611212d59660d3060abf6ae83611548b2/contracts/precompiles/ISystem.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/a2303c5a36507fa7d69e634dd75e3e76010413b6/contracts/precompiles/ISystem.sol">Git Source</a></p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
-<h3 id="hashblake256"><a class="header" href="#hashblake256">hashBlake256</a></h3>
-<p>Computes the BLAKE2 256-bit hash on the given input.</p>
-<pre><code class="language-solidity">function hashBlake256(bytes memory input) external pure returns (bytes32 digest);
-</code></pre>
-<h3 id="hashblake128"><a class="header" href="#hashblake128">hashBlake128</a></h3>
-<p>Computes the BLAKE2 128-bit hash on the given input.</p>
-<pre><code class="language-solidity">function hashBlake128(bytes memory input) external pure returns (bytes32 digest);
-</code></pre>
-<h3 id="toaccountid"><a class="header" href="#toaccountid">toAccountId</a></h3>
-<p>Retrieve the account id for a specified <code>H160</code> address.
-Calling this function on a native <code>H160</code> chain (<code>type AccountId = H160</code>)
-does not make sense, as it would just return the <code>address</code> that it was
-called with.</p>
-<h1 id="note"><a class="header" href="#note">Note</a></h1>
-<p>If no mapping exists for <code>addr</code>, the fallback account id will be returned.</p>
-<pre><code class="language-solidity">function toAccountId(address input) external view returns (bytes memory account_id);
-</code></pre>
-<h3 id="callerisorigin"><a class="header" href="#callerisorigin">callerIsOrigin</a></h3>
-<p>Checks whether the caller of the contract calling this function is the origin
-of the whole call stack.</p>
-<pre><code class="language-solidity">function callerIsOrigin() external view returns (bool);
-</code></pre>
 <h3 id="callerisroot"><a class="header" href="#callerisroot">callerIsRoot</a></h3>
 <p>Checks whether the caller of the contract calling this function is root.
 Note that only the origin of the call stack can be root. Hence this
@@ -211,56 +189,6 @@ function returning <code>true</code> implies that the contract is being called b
 A return value of <code>true</code> indicates that this contract is being called by a root origin,
 and <code>false</code> indicates that the caller is a signed origin.</p>
 <pre><code class="language-solidity">function callerIsRoot() external view returns (bool);
-</code></pre>
-<h3 id="minimumbalance"><a class="header" href="#minimumbalance">minimumBalance</a></h3>
-<p>Returns the minimum balance that is required for creating an account
-(the existential deposit).</p>
-<pre><code class="language-solidity">function minimumBalance() external view returns (uint256);
-</code></pre>
-<h3 id="owncodehash"><a class="header" href="#owncodehash">ownCodeHash</a></h3>
-<p>Returns the code hash of the caller.</p>
-<pre><code class="language-solidity">function ownCodeHash() external view returns (bytes32);
-</code></pre>
-<h3 id="weightleft"><a class="header" href="#weightleft">weightLeft</a></h3>
-<p>Returns the amount of <code>Weight</code> left.</p>
-<pre><code class="language-solidity">function weightLeft() external view returns (uint64 refTime, uint64 proofSize);
-</code></pre>
-<h3 id="terminate"><a class="header" href="#terminate">terminate</a></h3>
-<p>Terminate the calling contract of this function and send balance to <code>beneficiary</code>.
-This will revert if:</p>
-<ul>
-<li>called from constructor</li>
-<li>called from static context</li>
-<li>called from delegate context</li>
-<li>the contract introduced balance locks</li>
-</ul>
-<pre><code class="language-solidity">function terminate(address beneficiary) external;
-</code></pre>
-<h3 id="sr25519verify"><a class="header" href="#sr25519verify">sr25519Verify</a></h3>
-<p>Verify a sr25519 signature</p>
-<h1 id="parameters"><a class="header" href="#parameters">Parameters</a></h1>
-<ul>
-<li><code>signature</code>: The signature bytes.</li>
-<li><code>message</code>: The message bytes.</li>
-<li><code>publicKey</code>: The public key bytes.</li>
-</ul>
-<pre><code class="language-solidity">function sr25519Verify(
-    uint8[64] calldata signature,
-    bytes calldata message,
-    bytes32 publicKey
-)
-    external
-    view
-    returns (bool);
-</code></pre>
-<h3 id="ecdsatoethaddress"><a class="header" href="#ecdsatoethaddress">ecdsaToEthAddress</a></h3>
-<p>Calculates the Ethereum address from the ECDSA compressed public key.
-This fails if ECDSA recovery of the provided key fails.</p>
-<h1 id="parameters-1"><a class="header" href="#parameters-1">Parameters</a></h1>
-<ul>
-<li><code>publicKey</code>: The public key bytes.</li>
-</ul>
-<pre><code class="language-solidity">function ecdsaToEthAddress(uint8[33] calldata publicKey) external view returns (bytes20);
 </code></pre>
 
                     </main>
