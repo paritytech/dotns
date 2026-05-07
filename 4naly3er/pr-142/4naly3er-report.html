@@ -8,12 +8,12 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">DotNS 4naly3er Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-05-07 11:11 UTC | 39 findings</p>
+<p class="text-sm text-gray-500">Generated 2026-05-07 11:22 UTC | 38 findings</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">Medium</p><p class="text-xl font-mono font-bold text-yellow-400">3</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">7</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Gas</p><p class="text-xl font-mono font-bold text-gray-400">16</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Gas</p><p class="text-xl font-mono font-bold text-gray-400">15</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Informational</p><p class="text-xl font-mono font-bold text-gray-500">13</p></div>
 </div></div>
 <h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Medium (3)</h2>
@@ -82,7 +82,7 @@
 <td class="py-2 px-3 font-mono text-right">144</td>
 </tr>
 </tbody></table></div>
-<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Gas (16)</h2>
+<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Gas (15)</h2>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
 <th class="py-2 px-3 text-left font-semibold text-gray-400">ID</th>
@@ -116,56 +116,51 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-6</td>
-<td class="py-2 px-3 text-gray-200">Use calldata instead of memory for function arguments that do not get mutated</td>
-<td class="py-2 px-3 font-mono text-right">2</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-7</td>
 <td class="py-2 px-3 text-gray-200">For Operations that will not overflow, you could use unchecked</td>
 <td class="py-2 px-3 font-mono text-right">241</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-8</td>
+<td class="py-2 px-3 font-mono text-gray-400">GAS-7</td>
 <td class="py-2 px-3 text-gray-200">Use Custom Errors instead of Revert Strings to save Gas</td>
 <td class="py-2 px-3 font-mono text-right">4</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-9</td>
+<td class="py-2 px-3 font-mono text-gray-400">GAS-8</td>
 <td class="py-2 px-3 text-gray-200">Avoid contract existence checks by using low level calls</td>
 <td class="py-2 px-3 font-mono text-right">1</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-10</td>
+<td class="py-2 px-3 font-mono text-gray-400">GAS-9</td>
 <td class="py-2 px-3 text-gray-200">Functions guaranteed to revert when called by normal users can be marked `payable`</td>
 <td class="py-2 px-3 font-mono text-right">53</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-11</td>
+<td class="py-2 px-3 font-mono text-gray-400">GAS-10</td>
 <td class="py-2 px-3 text-gray-200">`++i` costs less gas compared to `i++` or `i += 1` (same for `--i` vs `i--` or `i -= 1`)</td>
 <td class="py-2 px-3 font-mono text-right">15</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-12</td>
+<td class="py-2 px-3 font-mono text-gray-400">GAS-11</td>
 <td class="py-2 px-3 text-gray-200">Using `private` rather than `public` for constants, saves gas</td>
 <td class="py-2 px-3 font-mono text-right">4</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-13</td>
+<td class="py-2 px-3 font-mono text-gray-400">GAS-12</td>
 <td class="py-2 px-3 text-gray-200">Use shift right/left instead of division/multiplication if possible</td>
 <td class="py-2 px-3 font-mono text-right">1</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-14</td>
+<td class="py-2 px-3 font-mono text-gray-400">GAS-13</td>
 <td class="py-2 px-3 text-gray-200">Splitting require() statements that use && saves gas</td>
 <td class="py-2 px-3 font-mono text-right">2</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-15</td>
+<td class="py-2 px-3 font-mono text-gray-400">GAS-14</td>
 <td class="py-2 px-3 text-gray-200">Increments/decrements can be unchecked in for-loops</td>
 <td class="py-2 px-3 font-mono text-right">10</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">GAS-16</td>
+<td class="py-2 px-3 font-mono text-gray-400">GAS-15</td>
 <td class="py-2 px-3 text-gray-200">Use != 0 instead of > 0 for unsigned integer comparison</td>
 <td class="py-2 px-3 font-mono text-right">12</td>
 </tr>
@@ -185,7 +180,7 @@
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-500">NC-2</td>
 <td class="py-2 px-3 text-gray-200">Control structures do not follow the Solidity Style Guide</td>
-<td class="py-2 px-3 font-mono text-right">63</td>
+<td class="py-2 px-3 font-mono text-right">62</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-500">NC-3</td>
@@ -210,7 +205,7 @@
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-500">NC-7</td>
 <td class="py-2 px-3 text-gray-200">Functions should not be longer than 50 lines</td>
-<td class="py-2 px-3 font-mono text-right">279</td>
+<td class="py-2 px-3 font-mono text-right">271</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-500">NC-8</td>
