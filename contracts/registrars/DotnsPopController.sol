@@ -634,7 +634,7 @@ contract DotnsPopController is
     /// The `NotGateway` error is emitted with `address(0)` rather than
     /// `msg.sender`: every failure path through this check covers both signed
     /// and Root origins, and we keep `msg.sender` out of the require body to
-    /// avoid the trap. The `POP_GATEWAY` registry slot is no longer read.
+    /// avoid the trap.
     function _onlyGateway() internal view {
         require(ISystem(SYSTEM_ADDR).callerIsRoot(), NotGateway(address(0)));
     }

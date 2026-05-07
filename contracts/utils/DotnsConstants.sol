@@ -55,14 +55,6 @@ library DotnsConstants {
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant CONTENT_RESOLVER = bytes32("contentResolver");
 
-    /// @notice Well-known key for the privileged PoP gateway address allowed to drive
-    ///         lite/full-person username flows via `DotnsPopController`.
-    /// @dev External account or pallet adapter configured by governance; the
-    ///      `DotnsPopController` reads it to gate its privileged entry points, so
-    ///      rotating the gateway is a single `set` call with no upgrade needed.
-    /// forge-lint: disable-next-line(unsafe-typecast)
-    bytes32 internal constant POP_GATEWAY = bytes32("popGateway");
-
     /// @notice Well-known key for the dedicated PoP controller orchestrating lite/full-person
     ///         username issuance on behalf of the PoP gateway.
     /// @dev Kept distinct from `CONTROLLER` (commit-reveal public controller) so the

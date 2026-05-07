@@ -272,7 +272,6 @@ abstract contract BaseDotns is Test {
         protocolRegistry.set(DotnsConstants.CONTENT_RESOLVER, dotnsContentResolverAddress);
         protocolRegistry.set(DotnsConstants.POP_RESOLVER, dotnsPopResolverAddress);
         protocolRegistry.set(DotnsConstants.POP_CONTROLLER, dotnsPopControllerAddress);
-        protocolRegistry.set(DotnsConstants.POP_GATEWAY, popGateway);
         protocolRegistry.set(DotnsConstants.NAME_ESCROW, dotnsNameEscrowAddress);
 
         dotnsRegistrar.updateProtocolRegistry(IDotnsProtocolRegistry(address(protocolRegistry)));

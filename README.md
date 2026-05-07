@@ -62,7 +62,7 @@ Commit-reveal controller for the public registration path. A caller first submit
 
 ### `DotnsPopController`
 
-Dedicated controller for the Proof-of-Personhood gateway flow. Lives behind its own UUPS proxy with its own storage and is registered on the registrar via `addController` alongside the commit-reveal controller. Two entry points, both restricted to the address registered under `POP_GATEWAY` on the protocol registry.
+Dedicated controller for the Proof-of-Personhood gateway flow. Lives behind its own UUPS proxy with its own storage and is registered on the registrar via `addController` alongside the commit-reveal controller. Two entry points, both restricted to Root-origin callers via the pallet-revive `ISystem.callerIsRoot` precompile.
 
 The first, `reserveBaseName`, mints a lite label to a lite-verified user. Lite labels are DNS labels with at least two trailing digits (for example `alice42`); the gateway strips any separator the pallet uses before calling so that the on-chain label is flat. The call also persists the user's chat key on the PoP resolver and optionally enqueues a reservation for a base name the user intends to claim later.
 
@@ -112,7 +112,7 @@ On-chain lookup table mapping well-known `bytes32` keys (declared in `DotnsConst
 
 Without it, each contract would store direct addresses to every contract it calls. An upgrade that changes one address would require calling `updateX()` on every contract that references it. With N contracts and M cross-references, that is M separate owner transactions per address change. The protocol registry reduces this to one: update the key in the registry, and every caller picks up the new address on its next call. The indirection also means a governance-driven rotation of, say, the PoP controller does not break any consumer that has already been deployed.
 
-The registered keys include `REGISTRAR`, `CONTROLLER`, `REGISTRY`, `REVERSE_RESOLVER`, `RESOLVER`, `CONTENT_RESOLVER`, `POP_RULES`, `STORE_FACTORY`, `NAME_ESCROW`, `POP_CONTROLLER`, `POP_RESOLVER`, and `POP_GATEWAY`.
+The registered keys include `REGISTRAR`, `CONTROLLER`, `REGISTRY`, `REVERSE_RESOLVER`, `RESOLVER`, `CONTENT_RESOLVER`, `POP_RULES`, `STORE_FACTORY`, `NAME_ESCROW`, `POP_CONTROLLER`, and `POP_RESOLVER`.
 
 ### `DotnsNameEscrow`
 
@@ -245,9 +245,8 @@ Paseo Asset Hub (chainId `420420417`):
 | DotnsNameEscrow          | 0xA73e39D6D4eDbF6db9b3880228f935279f8cC16f |
 | DotnsPopController       | 0x33575240105e9E5fD623516A1a6bA8A8Ba6937BB |
 | DotnsPopResolver         | 0x86B83CA91f8BC2293E304EA7e026C0914c68C793 |
-| POP_GATEWAY (EOA)        | 0x4A519C30DA0EC16AA9a73c26EA6CA6F701CcE099 |
 
-`POP_GATEWAY` is the privileged origin/proxy allowed to drive the PoP controller's lite/full-person flows. It is an EOA registered under the `POP_GATEWAY` key on the protocol registry, not a deployed contract. Currently set to the deployer as a placeholder; rotate to the production gateway with a single `protocolRegistry.set(DotnsConstants.POP_GATEWAY, newAddr)` call from the registry owner.
+The PoP controller's lite/full-person flows are gated by the pallet-revive `ISystem.callerIsRoot` precompile, so only Root-origin callers (the pallet adapter) can drive them — there is no on-chain gateway address to rotate.
 
 ### Mental model for new features
 
