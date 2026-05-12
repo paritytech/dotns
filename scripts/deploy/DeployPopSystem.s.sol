@@ -7,6 +7,9 @@ import {DeploymentNetwork} from "./DeploymentNetwork.sol";
 
 import {DotnsPopResolver} from "../../contracts/resolvers/DotnsPopResolver.sol";
 import {DotnsPopController} from "../../contracts/registrars/DotnsPopController.sol";
+import {
+    RootGatewayDispatcher
+} from "../../contracts/registrars/RootGatewayDispatcher.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
 
 /// @title DeployPopSystem
@@ -30,7 +33,8 @@ contract DeployPopSystem is BaseDeployer {
         address protocolRegistry = _readAddress("DotnsProtocolRegistry");
 
         _deployPopResolver(owner, protocolRegistry);
-        _deployPopController(owner, protocolRegistry);
+        address popController = _deployPopController(owner, protocolRegistry);
+        _deployAndInstallGatewayDispatcher(owner, popController);
 
         saveDeployments();
 
@@ -68,5 +72,37 @@ contract DeployPopSystem is BaseDeployer {
             ),
             "DotnsPopController"
         );
+    }
+
+    /// @notice Deploys the {RootGatewayDispatcher} bound to the controller
+    ///         proxy and installs its address on the controller via
+    ///         `setGateway`.
+    /// @dev Workaround for polkadot-sdk PR #12051: revive's
+    ///      `ISystem.callerIsRoot()` does not survive the controller proxy's
+    ///      `delegatecall` boundary on today's runtime. The dispatcher is a
+    ///      non-upgradeable shim that is the direct callee of Root, performs
+    ///      the precompile check in its own frame, and forwards the calldata
+    ///      to the controller via a regular `CALL`. Wiring it via
+    ///      `setGateway` rather than re-initialising the controller keeps the
+    ///      change upgrade-safe for the existing Paseo deployment.
+    /// @param owner Broadcasting account (also the controller owner; required
+    ///        for the `setGateway` call).
+    /// @param popController Address of the controller proxy from the previous
+    ///        deploy step.
+    /// @return dispatcher Address of the deployed `RootGatewayDispatcher`.
+    function _deployAndInstallGatewayDispatcher(
+        address owner,
+        address popController
+    )
+        internal
+        returns (address dispatcher)
+    {
+        vm.startBroadcast(owner);
+        dispatcher = address(new RootGatewayDispatcher(popController));
+        DotnsPopController(popController).setGateway(dispatcher);
+        vm.stopBroadcast();
+
+        vm.label(dispatcher, "RootGatewayDispatcher");
+        logDeployment("RootGatewayDispatcher", dispatcher);
     }
 }

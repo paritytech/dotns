@@ -130,22 +130,37 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Emitted when the reservation duration is updated.
     event ReservationDurationSet(uint64 duration);
 
+    /// @notice Emitted when the authorised Root-origin gateway is updated.
+    /// @param gateway Address now accepted as the gateway under
+    ///        `msg.sender`-based authorisation.
+    event GatewaySet(address indexed gateway);
+
     /// @notice Emitted when a name is successfully registered via the PoP controller.
     /// @param store The Store instance used to persist the immutable registration record.
     event NameRegistered(
         string indexed label, bytes32 indexed labelhash, address indexed owner, address store
     );
 
-    /// @notice Thrown when the call's substrate origin is not `Root`.
-    /// @dev The implementation gates entrypoints on revive's
-    ///      `ISystem.callerIsRoot()` precompile rather than on `msg.sender`,
-    ///      because under `RuntimeOrigin::root()` the PVM `caller` syscall
-    ///      traps. The `caller` field is therefore always `address(0)` and is
-    ///      reserved for forward compatibility; indexers must not rely on it
-    ///      to identify a spoofing actor.
-    /// @param caller Reserved; always `address(0)` under the Root-origin auth
-    ///        model.
+    /// @notice Thrown when a gated entrypoint is reached without Root authority.
+    /// @dev The implementation accepts a call when *either*
+    ///      `ISystem.callerIsRoot()` (revive's System precompile) returns
+    ///      `true`, *or* `msg.sender` equals the controller's stored
+    ///      `gateway` (the {RootGatewayDispatcher} address). The revert
+    ///      payload is only constructed on the second-leg failure, so
+    ///      `caller` reports the immediate EVM caller observed by this
+    ///      contract on the non-Root path. Under a direct Root-origin failure
+    ///      mode the precompile leg short-circuits before any `msg.sender`
+    ///      read, so this branch is unreachable from that path.
+    /// @param caller Immediate EVM caller on the `msg.sender`-based path.
     error NotGateway(address caller);
+
+    /// @notice Thrown when {setGateway} is called with the zero address.
+    /// @dev Zero is reserved to mean "gateway not yet configured"; the
+    ///      `_onlyGateway` check rejects calls in that state on the
+    ///      `msg.sender` leg, so setting it back to zero would silently
+    ///      disable the dispatcher path. Reverting at the setter forces an
+    ///      explicit rotation instead.
+    error InvalidGateway();
 
     /// @notice Thrown when a supplied lite-person label does not match `NAMEXX`.
     error InvalidLiteLabel();
@@ -305,6 +320,17 @@ interface IDotnsPopController is IDotnsController {
     /// @custom:emits ReservationDurationSet
     /// @custom:reverts OwnableUnauthorizedAccount
     function setReservationDuration(uint64 duration) external;
+
+    /// @notice Installs the address accepted as the substrate Root gateway
+    ///         under the `msg.sender`-based authorisation leg.
+    /// @dev Set to the {RootGatewayDispatcher} deployed against this proxy.
+    ///      Rotating the dispatcher is a single `setGateway` call; the
+    ///      previous address loses authority on the next block.
+    /// @param newGateway Non-zero address authorised as the gateway.
+    /// @custom:emits GatewaySet
+    /// @custom:reverts OwnableUnauthorizedAccount
+    /// @custom:reverts InvalidGateway
+    function setGateway(address newGateway) external;
 
     /// @notice Returns the queue metadata (`head`, `tail`) for `labelhash`.
     /// @dev Read-only accessor over the per-label reservation queue. `head == tail` means

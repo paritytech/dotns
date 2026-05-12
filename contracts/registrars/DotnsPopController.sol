@@ -119,18 +119,38 @@ contract DotnsPopController is
     /// governance via `setReservationDuration`.
     uint64 public reservationDuration;
 
+    /// @notice Authorised Root-origin gateway. When non-zero, calls from this
+    ///         address are accepted as if they were the substrate Root origin.
+    /// @dev Populated by the owner via {setGateway} with the address of the
+    ///      {RootGatewayDispatcher} deployed against this proxy. Exists as the
+    ///      EVM-observable leg of the Root-authority check, because reading
+    ///      `msg.sender` is only safe when an intermediate (non-Root) contract
+    ///      sits between Root and this implementation, and because revive's
+    ///      `ISystem.callerIsRoot()` does not propagate Root authority across
+    ///      the proxy's `delegatecall` boundary (see polkadot-sdk PR #12051).
+    address public gateway;
+
     /// @dev Reserved storage space to allow for layout changes in the future.
-    uint256[50] private __gap;
+    ///      One slot has been consumed by `gateway`; the remaining 49 slots
+    ///      preserve the original 50-slot reservation footprint.
+    uint256[49] private __gap;
 
     /// @notice Restricts calls to invocations whose substrate origin is `Root`.
-    /// @dev Verified through revive's System precompile (`callerIsRoot`) at
-    ///      {DotnsConstants.REVIVE_SYSTEM}. `msg.sender` is intentionally not consulted: under
-    ///      `RuntimeOrigin::root()` the PVM `caller` syscall traps with
-    ///      `RootNotAllowed`, so any expression that reads `msg.sender` in the
-    ///      outermost frame would revert before the gate could run. The trust
-    ///      boundary therefore moves entirely to the runtime: anything that can
-    ///      construct `RuntimeOrigin::root()` and reach `pallet_revive::bare_call`
-    ///      is accepted as the gateway.
+    /// @dev Two-path authorisation:
+    ///      1. `ISystem.callerIsRoot()` at {DotnsConstants.REVIVE_SYSTEM} —
+    ///         passes when the precompile walks back to the Root origin from
+    ///         this call frame. Pre-#12051 polkadot-sdk this only works when
+    ///         no `delegatecall` sits between Root and the precompile call,
+    ///         which is *not* the case from a UUPS implementation frame; the
+    ///         path is retained for forward compatibility once #12051 ships.
+    ///      2. `msg.sender == gateway` — passes when the call arrives via the
+    ///         {RootGatewayDispatcher}, which is the direct Root callee and
+    ///         performs the precompile check in its own (non-delegatecall)
+    ///         frame before forwarding the calldata here via a regular `CALL`.
+    ///         This is the operational path on today's revive runtime.
+    ///      `msg.sender` is safe to read on path (2) because the dispatcher's
+    ///      H160 sits between Root and the controller; the PVM `caller`
+    ///      syscall only traps when the outermost frame's caller is Root.
     modifier onlyGateway() {
         _onlyGateway();
         _;
@@ -328,6 +348,13 @@ contract DotnsPopController is
     function setReservationDuration(uint64 duration) external override onlyOwner {
         reservationDuration = duration;
         emit ReservationDurationSet(duration);
+    }
+
+    /// @inheritdoc IDotnsPopController
+    function setGateway(address newGateway) external override onlyOwner {
+        require(newGateway != address(0), InvalidGateway());
+        gateway = newGateway;
+        emit GatewaySet(newGateway);
     }
 
     /// @inheritdoc IDotnsPopController
@@ -611,15 +638,26 @@ contract DotnsPopController is
         delete _reservedBaseLabel[labelhash];
     }
 
-    /// @notice Internal check enforcing PoP-gateway-only access through the
-    ///         revive System precompile.
-    /// @dev Calls `ISystem(DotnsConstants.REVIVE_SYSTEM).callerIsRoot()` and reverts with
-    ///      `NotGateway(msg.sender)` when the substrate origin is not `Root`.
-    ///      The revert payload is diagnostic only: authorization is determined
-    ///      exclusively by the revive System precompile, while `msg.sender`
-    ///      identifies the immediate EVM caller observed by this contract.
+    /// @notice Internal check enforcing PoP-gateway-only access.
+    /// @dev Authorises a call when *either* leg holds:
+    ///      - revive's System precompile reports `callerIsRoot() == true`, or
+    ///      - `msg.sender` equals the configured {gateway} (set to the
+    ///        {RootGatewayDispatcher} deployed against this proxy).
+    ///      The precompile leg is short-circuited first so direct Root-origin
+    ///      calls do not evaluate `msg.sender` (which would trap when the
+    ///      outermost-frame caller is Root). On today's revive runtime the
+    ///      precompile leg returns `false` from inside the UUPS impl frame, so
+    ///      operational dispatches go through the dispatcher and authorise via
+    ///      the second leg. Reverts with `NotGateway(msg.sender)` on failure;
+    ///      the revert payload is only constructed on the non-Root branch,
+    ///      where `msg.sender` is a regular H160 and safe to read.
     function _onlyGateway() internal view {
-        require(ISystem(DotnsConstants.REVIVE_SYSTEM).callerIsRoot(), NotGateway(msg.sender));
+        address gw = gateway;
+        require(
+            ISystem(DotnsConstants.REVIVE_SYSTEM).callerIsRoot()
+                || (gw != address(0) && msg.sender == gw),
+            NotGateway(msg.sender)
+        );
     }
 
     /// @notice Routes a raw cross-chain payload to the typed entrypoint identified by `selector`.
