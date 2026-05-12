@@ -3,11 +3,10 @@ pragma solidity ^0.8.34;
 
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {IDotnsPopController} from "../../../contracts/registrars/IDotnsPopController.sol";
+import {RootGatewayDispatcher} from "../../../contracts/registrars/RootGatewayDispatcher.sol";
 import {
-    RootGatewayDispatcher
-} from "../../../contracts/registrars/RootGatewayDispatcher.sol";
-import {OwnableUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 // @title RootGatewayDispatcherTests
 // @notice Unit coverage for the non-upgradeable shim that converts revive
