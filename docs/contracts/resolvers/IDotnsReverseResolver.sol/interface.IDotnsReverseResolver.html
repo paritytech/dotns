@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsreverseresolver"><a class="header" href="#idotnsreverseresolver">IDotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Reverse Resolver</p>
 <p>Interface for writing and reading reverse name records for addresses.</p>
@@ -194,16 +194,10 @@ security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="setreversename"><a class="header" href="#setreversename">setReverseName</a></h3>
 <p>Associates an address with a reverse name record.</p>
-<p>Overwrites any existing reverse record for <code>addr</code>.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: ReverseNameSet</p>
-</li>
-<li>
-<p>reverts: NotRegistrarController</p>
-</li>
-</ul>
+<p>Callable only by the configured registrar or its controller, otherwise</p>
+<p><strong>Note:</strong>
+reverts: NotRegistrarController. Overwrites any existing reverse record for
+<code>addr</code> and emits @custom:emits ReverseNameSet on every successful write.</p>
 <pre><code class="language-solidity">function setReverseName(address addr, string calldata name) external;
 </code></pre>
 <p><strong>Parameters</strong></p>

@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p><strong>Author:</strong>
@@ -200,21 +200,13 @@ required.</p>
 </code></pre>
 <h3 id="set"><a class="header" href="#set">set</a></h3>
 <p>Sets or updates the address for a given key.</p>
-<p>Owner-restricted. Idempotent when the new value matches the stored one. Maintains
-a per-address refcount so the same contract can occupy multiple keys without losing
-its registered status until every key is rewired.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: AddressUpdated</p>
-</li>
-<li>
-<p>reverts: OwnableUnauthorizedAccount</p>
-</li>
-<li>
-<p>reverts: ZeroAddress</p>
-</li>
-</ul>
+<p>Owner-restricted, otherwise @custom:reverts OwnableUnauthorizedAccount. <code>addr</code>
+must be non-zero, otherwise @custom:reverts ZeroAddress. Idempotent when the new
+value matches the stored one (no event emitted in that case). Maintains a
+per-address refcount so the same contract can occupy multiple keys without losing
+its registered status until every key is rewired. Emits</p>
+<p><strong>Note:</strong>
+emits: AddressUpdated on each effective change.</p>
 <pre><code class="language-solidity">function set(bytes32 key, address addr) external;
 </code></pre>
 <h3 id="isregisteredaddress"><a class="header" href="#isregisteredaddress">isRegisteredAddress</a></h3>

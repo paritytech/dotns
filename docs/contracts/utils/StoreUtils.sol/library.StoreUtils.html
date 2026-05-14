@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="storeutils"><a class="header" href="#storeutils">StoreUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/utils/StoreUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/utils/StoreUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Store Utilities Library</p>
 <p>Canonical helpers for protocol writes into per-user <code>LabelStore</code> instances.</p>
@@ -192,12 +192,11 @@ security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="ensurelabelstore"><a class="header" href="#ensurelabelstore">ensureLabelStore</a></h3>
 <p>Returns the <code>LabelStore</code> for <code>user</code>, deploying one via the factory if absent.</p>
-<p>Deploy-on-demand: a user's store is created on their first protocol
-write so unused accounts never pay the deployment cost. Callable
-only from addresses that are protocol-registered (otherwise the
-factory's <code>deployLabelStoreFor</code> reverts with <code>NotAuthorised</code>).</p>
+<p>Deploy-on-demand: a user's store is created on their first protocol write so
+unused accounts never pay the deployment cost. The deploy path is gated by the
+factory, so callers that are not the factory owner and not protocol-registered</p>
 <p><strong>Note:</strong>
-reverts: NotAuthorised</p>
+reverts: NotAuthorised when a deployment is required.</p>
 <pre><code class="language-solidity">function ensureLabelStore(IStoreFactory factory, address user)
     internal
     returns (address store);
@@ -215,12 +214,11 @@ reverts: NotAuthorised</p>
 </div>
 <h3 id="writelabel"><a class="header" href="#writelabel">writeLabel</a></h3>
 <p>Writes <code>label</code> under <code>labelhash</code> for <code>user</code>, deploying their <code>LabelStore</code> if needed.</p>
-<p>Idempotent on locked entries: once a label is locked the call is a
-no-op rather than a revert, so retried protocol flows (e.g. an
-ERC721 transfer back to a prior owner) pass through without
-failing on the existing lock.</p>
-<p><strong>Note:</strong>
-reverts: NotAuthorised</p>
+<p>Idempotent on locked entries: once a label is locked the call is a no-op rather
+than a revert, so retried protocol flows (e.g. an ERC721 transfer back to a prior
+owner) pass through without failing on the existing lock. Inherits the factory's
+writer authorisation: callers that are not the factory owner and not
+protocol-registered @custom:reverts NotAuthorised when the user has no store yet.</p>
 <pre><code class="language-solidity">function writeLabel(
     IStoreFactory factory,
     address user,

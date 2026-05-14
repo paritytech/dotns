@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsresolver"><a class="header" href="#dotnsresolver">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
@@ -221,18 +221,11 @@ oz-upgrades-unsafe-allow: constructor</p>
 </code></pre>
 <h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
 <p>Initialises the resolver.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: InvalidInitialization</p>
-</li>
-<li>
-<p>emits: OwnershipTransferred</p>
-</li>
-<li>
-<p>emits: Initialized</p>
-</li>
-</ul>
+<p>Runs once through the UUPS proxy; a repeat call reverts with</p>
+<p><strong>Note:</strong>
+reverts: InvalidInitialization. Emits @custom:emits OwnershipTransferred when
+<code>msg.sender</code> is recorded as the initial owner and @custom:emits Initialized once
+setup completes.</p>
 <pre><code class="language-solidity">function initialize(IDotnsProtocolRegistry registry) external initializer;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -242,15 +235,10 @@ oz-upgrades-unsafe-allow: constructor</p>
 </div>
 <h3 id="setaddress"><a class="header" href="#setaddress">setAddress</a></h3>
 <p>Sets the resolved address for a node.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: AddressSet</p>
-</li>
-<li>
-<p>reverts: NotAuthorised</p>
-</li>
-</ul>
+<p>The caller must be the current owner of <code>node</code> in the forward registry, otherwise</p>
+<p><strong>Note:</strong>
+reverts: NotAuthorised. Emits @custom:emits AddressSet on every successful
+write.</p>
 <pre><code class="language-solidity">function setAddress(bytes32 node, address value) external override onlyNodeOwner(node);
 </code></pre>
 <p><strong>Parameters</strong></p>

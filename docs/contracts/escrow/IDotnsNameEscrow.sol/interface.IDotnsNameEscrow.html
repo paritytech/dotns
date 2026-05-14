@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Name Escrow Interface</p>
 <p>Escrows refundable deposits for .dot registrations and manages the release lifecycle.</p>
@@ -214,8 +214,9 @@ security-contact: admin@parity.io</p>
 </div>
 <h3 id="releasedtokens"><a class="header" href="#releasedtokens">releasedTokens</a></h3>
 <p>Returns a bounded paginated slice of released token identifiers.</p>
+<p><code>limit</code> must be non-zero and at most <code>MAX_RELEASED_PAGE_SIZE</code>, otherwise</p>
 <p><strong>Note:</strong>
-reverts: InvalidPageSize</p>
+reverts: InvalidPageSize.</p>
 <pre><code class="language-solidity">function releasedTokens(
     uint256 start,
     uint256 limit
@@ -232,68 +233,40 @@ reverts: InvalidPageSize</p>
 </div>
 <h3 id="deposit"><a class="header" href="#deposit">deposit</a></h3>
 <p>Records an asset deposit position for a token.</p>
+<p>Only the configured controller may call this, otherwise @custom:reverts NotController.
+<code>params.amount</code> must be non-zero and equal to <code>msg.value</code>, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: NativeDepositRecorded</p>
+<p>reverts: InvalidAmount. Only native deposits are accepted today, so a non-zero
+<code>params.asset</code> triggers @custom:reverts AssetNotSupported, and a zero
+<code>params.recipient</code> triggers @custom:reverts InvalidRecipient. The slot for
+<code>params.tokenId</code> must be empty: a previously funded position triggers</p>
 </li>
 <li>
-<p>reverts: NotController</p>
-</li>
-<li>
-<p>reverts: InvalidAmount</p>
-</li>
-<li>
-<p>reverts: AssetNotSupported</p>
-</li>
-<li>
-<p>reverts: InvalidRecipient</p>
-</li>
-<li>
-<p>reverts: PositionAlreadyFunded</p>
-</li>
-<li>
-<p>reverts: AlreadyReleased</p>
+<p>reverts: PositionAlreadyFunded, and a position already in the released phase
+triggers @custom:reverts AlreadyReleased. Emits @custom:emits NativeDepositRecorded
+once the deposit is booked.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function deposit(DepositParams calldata params) external payable;
 </code></pre>
 <h3 id="depositinsurance"><a class="header" href="#depositinsurance">depositInsurance</a></h3>
 <p>Records a cross-tier registration fee into the insurance fund.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: CrossTierFeePaid</p>
-</li>
-<li>
-<p>reverts: NotController</p>
-</li>
-<li>
-<p>reverts: InvalidAmount</p>
-</li>
-</ul>
+<p>Only the configured controller may call this, otherwise @custom:reverts NotController.
+<code>msg.value</code> must be non-zero, otherwise @custom:reverts InvalidAmount. Emits</p>
+<p><strong>Note:</strong>
+emits: CrossTierFeePaid with <code>isRegistration = true</code> once the fee is booked.</p>
 <pre><code class="language-solidity">function depositInsurance(InsuranceDepositParams calldata params) external payable;
 </code></pre>
 <h3 id="chargetransferfee"><a class="header" href="#chargetransferfee">chargeTransferFee</a></h3>
 <p>Charges the cross-tier transfer-fee delta against the running max for a token.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: CrossTierFeePaid</p>
-</li>
-<li>
-<p>emits: OverpaymentRefunded</p>
-</li>
-<li>
-<p>reverts: NotRegistrar</p>
-</li>
-<li>
-<p>reverts: InsufficientValue</p>
-</li>
-<li>
-<p>reverts: RefundFailed</p>
-</li>
-</ul>
+<p>Only the configured registrar may call this, otherwise @custom:reverts NotRegistrar.
+When a fee is owed, <code>msg.value</code> must cover it or @custom:reverts InsufficientValue.
+Emits @custom:emits CrossTierFeePaid with <code>isRegistration = false</code> when a non-zero
+fee is credited to insurance, and @custom:emits OverpaymentRefunded when surplus
+<code>msg.value</code> (or the full amount when no fee is owed) is returned to <code>params.payer</code>;
+a failed refund transfer triggers @custom:reverts RefundFailed.</p>
 <pre><code class="language-solidity">function chargeTransferFee(ChargeTransferFeeParams calldata params)
     external
     payable
@@ -328,80 +301,46 @@ previous owner's high-water mark.</p>
 </div>
 <h3 id="release"><a class="header" href="#release">release</a></h3>
 <p>Releases a token into escrow and starts the withdrawal cooldown.</p>
-<p>First step of the phased lifecycle. Only the locked refund recipient can trigger this,
-and the current NFT holder must have approved escrow, enforcing two-party cooperation
-so a secondary-market buyer cannot release someone else's deposit.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: NameReleased</p>
-</li>
-<li>
-<p>reverts: NotTokenOwnerOrApproved</p>
-</li>
-<li>
-<p>reverts: DepositNotConfigured</p>
-</li>
-<li>
-<p>reverts: AlreadyReleased</p>
-</li>
-<li>
-<p>reverts: NotRefundRecipient</p>
-</li>
-<li>
-<p>reverts: EscrowNotApproved</p>
-</li>
-</ul>
+<p>First step of the phased lifecycle. The caller must be the current NFT holder or one
+of its approved operators, otherwise @custom:reverts NotTokenOwnerOrApproved. The slot
+for <code>tokenId</code> must already hold a funded position (@custom:reverts
+DepositNotConfigured when empty) that has not yet been released (@custom:reverts
+AlreadyReleased when re-entered). The caller must also be the locked refund recipient,
+otherwise @custom:reverts NotRefundRecipient; combined with the escrow approval check
+(@custom:reverts EscrowNotApproved when escrow may not move the NFT) this enforces
+two-party cooperation so a secondary-market buyer cannot release someone else's
+deposit. Emits @custom:emits NameReleased once the NFT is moved into custody.</p>
 <pre><code class="language-solidity">function release(uint256 tokenId) external;
 </code></pre>
 <h3 id="withdraw"><a class="header" href="#withdraw">withdraw</a></h3>
 <p>Credits the refundable deposit for a released token to the recipient's pending
-balance. @dev Second step of the phased lifecycle. Must be called after
-<code>withdrawAvailableAt</code> has
-elapsed; draws from the per-asset <code>tokenReserved</code> pool first and falls back to the
-shared insurance fund on shortfall. Funds are not transferred here, only credited to
-the pull-payment ledger.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: RefundWithdrawn</p>
-</li>
-<li>
-<p>emits: InsuranceDraw</p>
-</li>
-<li>
-<p>reverts: NotReleased</p>
-</li>
-<li>
-<p>reverts: AlreadyClaimed</p>
-</li>
-<li>
-<p>reverts: NotRefundRecipient</p>
-</li>
-<li>
-<p>reverts: WithdrawalTooEarly</p>
-</li>
-<li>
-<p>reverts: InsufficientFunds</p>
-</li>
-</ul>
+balance.</p>
+<p>Second step of the phased lifecycle. The position must already be released
+(@custom:reverts NotReleased otherwise) and not yet claimed (@custom:reverts
+AlreadyClaimed on re-entry). Only the locked refund recipient may call this,
+otherwise @custom:reverts NotRefundRecipient, and <code>block.timestamp</code> must have reached
+<code>withdrawAvailableAt</code>, otherwise @custom:reverts WithdrawalTooEarly. Draws from the
+per-asset <code>tokenReserved</code> pool first and falls back to the shared insurance fund on
+shortfall; if even the combined balance is short, @custom:reverts InsufficientFunds.
+Funds are not transferred here, only credited to the pull-payment ledger. Emits</p>
+<p><strong>Note:</strong>
+emits: RefundWithdrawn once the credit lands, and @custom:emits InsuranceDraw
+whenever the insurance fund tops up a shortfall.</p>
 <pre><code class="language-solidity">function withdraw(uint256 tokenId) external;
 </code></pre>
 <h3 id="claimwithdrawal"><a class="header" href="#claimwithdrawal">claimWithdrawal</a></h3>
 <p>Pulls the caller's accumulated pending refund balance.</p>
 <p>Final step of the phased lifecycle. Pull-payment isolation: each recipient owns an
 independent ledger entry, so a failing or reentrant receiver cannot block other users'
-withdrawals.</p>
+withdrawals. The caller must have a positive pending balance, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: WithdrawalClaimed</p>
+<p>reverts: NoPendingWithdrawal; a failing native transfer triggers</p>
 </li>
 <li>
-<p>reverts: NoPendingWithdrawal</p>
-</li>
-<li>
-<p>reverts: RefundFailed</p>
+<p>reverts: RefundFailed. Emits @custom:emits WithdrawalClaimed once the transfer
+succeeds.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function claimWithdrawal() external returns (uint256 amount);
@@ -424,19 +363,10 @@ withdrawals.</p>
 <p>Transfers a released-and-claimed token from escrow custody to a new owner.</p>
 <p>Hands the NFT back to the controller for re-registration and clears <code>runningMax</code> so the
 next registrant starts from a fresh price baseline rather than inheriting the previous
-owner's transfer-fee high-water mark.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: NameReclaimed</p>
-</li>
-<li>
-<p>reverts: NotController</p>
-</li>
-<li>
-<p>reverts: NotReclaimable</p>
-</li>
-</ul>
+owner's transfer-fee high-water mark. Only the configured controller may call this,
+otherwise @custom:reverts NotController, and the position must be both released and
+claimed, otherwise @custom:reverts NotReclaimable. Emits @custom:emits NameReclaimed
+once custody is transferred.</p>
 <pre><code class="language-solidity">function reclaim(uint256 tokenId, address newOwner) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -447,17 +377,11 @@ owner's transfer-fee high-water mark.</p>
 </div>
 <h3 id="updatecooldown"><a class="header" href="#updatecooldown">updateCooldown</a></h3>
 <p>Updates the cooldown duration for future releases.</p>
-<p>Affects only releases recorded after this call; positions already released keep the
-<code>withdrawAvailableAt</code> snapshot taken at their release time.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: CooldownUpdated</p>
-</li>
-<li>
-<p>reverts: InvalidCooldown</p>
-</li>
-</ul>
+<p>Owner-only. Affects only releases recorded after this call; positions already released
+keep the <code>withdrawAvailableAt</code> snapshot taken at their release time. <code>newCooldown</code>
+must be non-zero, otherwise @custom:reverts InvalidCooldown. Emits</p>
+<p><strong>Note:</strong>
+emits: CooldownUpdated with the prior and new values.</p>
 <pre><code class="language-solidity">function updateCooldown(uint256 newCooldown) external;
 </code></pre>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>

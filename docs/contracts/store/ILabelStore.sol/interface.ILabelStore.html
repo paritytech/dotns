@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="ilabelstore"><a class="header" href="#ilabelstore">ILabelStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/store/ILabelStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/store/ILabelStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></p>
 <p><strong>Title:</strong>
@@ -197,46 +197,39 @@ security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
 <p>Initialises the store, binding it permanently to <code>user_</code> and <code>protocolRegistry_</code>.</p>
-<p>Callable exactly once via <code>Initializable</code>. Both parameters are immutable post-call.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: InvalidUser</p>
-</li>
-<li>
-<p>reverts: InvalidProtocolRegistry</p>
-</li>
-</ul>
+<p>Callable exactly once via <code>Initializable</code>; both parameters are immutable post-call.
+<code>user_</code> must be non-zero, otherwise @custom:reverts InvalidUser.
+<code>protocolRegistry_</code> must be non-zero, otherwise @custom:reverts
+InvalidProtocolRegistry. @param user_ The user this store is bound to forever.</p>
 <pre><code class="language-solidity">function initialize(address user_, address protocolRegistry_) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>user_</code></td><td><code>address</code></td><td>The user this store is bound to forever.</td></tr>
+<tr><td><code>user_</code></td><td><code>address</code></td><td></td></tr>
 <tr><td><code>protocolRegistry_</code></td><td><code>address</code></td><td>The protocol registry used to authorise writers.</td></tr>
 </tbody></table>
 </div>
 <h3 id="storelabel"><a class="header" href="#storelabel">storeLabel</a></h3>
 <p>Records a label under <code>labelhash</code> and locks the slot permanently.</p>
-<p>Gated to addresses registered in the protocol registry. Reverts on any re-write.</p>
+<p>Gated to addresses currently registered in the protocol registry, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: LabelStored</p>
+<p>reverts: NotAuthorised. <code>labelhash</code> must be non-zero, otherwise</p>
 </li>
 <li>
-<p>emits: LabelLockedPermanently</p>
+<p>reverts: InvalidLabel. The slot must not already be locked (otherwise</p>
 </li>
 <li>
-<p>reverts: NotAuthorised</p>
+<p>reverts: LabelLocked) and must not already hold an entry (otherwise</p>
 </li>
 <li>
-<p>reverts: InvalidLabel</p>
+<p>reverts: LabelAlreadyExists); the two are kept distinct so stack traces can
+disambiguate cross-session from same-session double-writes. Emits</p>
 </li>
 <li>
-<p>reverts: LabelLocked</p>
-</li>
-<li>
-<p>reverts: LabelAlreadyExists</p>
+<p>emits: LabelStored and @custom:emits LabelLockedPermanently together on the
+single write that ever happens for <code>labelhash</code>.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function storeLabel(bytes32 labelhash, string calldata label) external;

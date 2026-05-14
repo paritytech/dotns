@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="istorefactory"><a class="header" href="#istorefactory">IStoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/store/IStoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/store/IStoreFactory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStoreFactory</p>
 <p>Interface for the DotNS per-user store factory.</p>
@@ -219,28 +219,27 @@ security-contact: admin@parity.io</p>
 </div>
 <h3 id="deploylabelstorefor"><a class="header" href="#deploylabelstorefor">deployLabelStoreFor</a></h3>
 <p>Deploys a <code>LabelStore</code> beacon-proxy bound to <code>user</code>.</p>
-<p>Callable by the factory owner OR any address currently registered in the protocol
-registry. @param user The user the store is bound to forever.</p>
+<p>Callable by the factory owner or any address currently registered in the protocol
+registry; any other caller @custom:reverts NotAuthorised. <code>user</code> must be non-zero,
+otherwise @custom:reverts InvalidUser. The user must not already have a
+<code>LabelStore</code>, otherwise @custom:reverts AlreadyDeployed. After deployment the
+freshly initialised proxy must report <code>user</code> as its owner, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: LabelStoreDeployed</p>
+<p>reverts: ImplementationBindingMismatch. Emits</p>
 </li>
 <li>
-<p>reverts: NotAuthorised</p>
-</li>
-<li>
-<p>reverts: InvalidUser</p>
-</li>
-<li>
-<p>reverts: AlreadyDeployed</p>
-</li>
-<li>
-<p>reverts: ImplementationBindingMismatch</p>
+<p>emits: LabelStoreDeployed on success.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function deployLabelStoreFor(address user) external returns (address store);
 </code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>The user the store is bound to forever.</td></tr>
+</tbody></table>
+</div>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>store</code></td><td><code>address</code></td><td>The deployed store address.</td></tr>
@@ -294,17 +293,19 @@ returns an empty array; result length is <code>min(limit, count - offset)</code>
 </div>
 <h3 id="upgradelabelstoreimplementation"><a class="header" href="#upgradelabelstoreimplementation">upgradeLabelStoreImplementation</a></h3>
 <p>Upgrades the <code>LabelStore</code> implementation for every existing and future proxy.</p>
-<p>Callable by the factory owner only. Delegates to <code>UpgradeableBeacon.upgradeTo</code>.</p>
+<p>Callable by the factory owner only, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: LabelStoreImplementationUpgraded</p>
+<p>reverts: OwnableUnauthorizedAccount. <code>newImplementation</code> must be non-zero,
+otherwise @custom:reverts InvalidImplementation. The candidate is sentinel-probed by
+calling <code>ILabelStore.protocolRegistry</code> on it before the beacon is rotated; if the
+address does not implement that selector the probe reverts and the upgrade does not
+land (deliberate fail-fast guard, no named error). Delegates to
+<code>UpgradeableBeacon.upgradeTo</code> and emits</p>
 </li>
 <li>
-<p>reverts: InvalidImplementation</p>
-</li>
-<li>
-<p>reverts: OwnableUnauthorizedAccount</p>
+<p>emits: LabelStoreImplementationUpgraded on success.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function upgradeLabelStoreImplementation(address newImplementation) external;
@@ -317,17 +318,16 @@ returns an empty array; result length is <code>min(limit, count - offset)</code>
 <h3 id="claimuserstore"><a class="header" href="#claimuserstore">claimUserStore</a></h3>
 <p>Caller claims their <code>UserStore</code> beacon-proxy.</p>
 <p>Self-claim only; <code>_owner</code> on the resulting store is always <code>msg.sender</code>,
-regardless of who pays gas. One store per caller, forever.</p>
+regardless of who pays gas. One store per caller, forever: a caller who already
+has a <code>UserStore</code> @custom:reverts AlreadyDeployed. After deployment the freshly
+initialised proxy must report <code>msg.sender</code> as its owner, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: UserStoreClaimed</p>
+<p>reverts: ImplementationBindingMismatch. Emits</p>
 </li>
 <li>
-<p>reverts: AlreadyDeployed</p>
-</li>
-<li>
-<p>reverts: ImplementationBindingMismatch</p>
+<p>emits: UserStoreClaimed on success.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function claimUserStore() external returns (address store);
@@ -385,17 +385,19 @@ returns an empty array; result length is <code>min(limit, count - offset)</code>
 </div>
 <h3 id="upgradeuserstoreimplementation"><a class="header" href="#upgradeuserstoreimplementation">upgradeUserStoreImplementation</a></h3>
 <p>Upgrades the <code>UserStore</code> implementation for every existing and future proxy.</p>
-<p>Callable by the factory owner only. Delegates to <code>UpgradeableBeacon.upgradeTo</code>.</p>
+<p>Callable by the factory owner only, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: UserStoreImplementationUpgraded</p>
+<p>reverts: OwnableUnauthorizedAccount. <code>newImplementation</code> must be non-zero,
+otherwise @custom:reverts InvalidImplementation. The candidate is sentinel-probed by
+calling <code>IUserStore.getKeyCount</code> on it before the beacon is rotated; if the address
+does not implement that selector the probe reverts and the upgrade does not land
+(deliberate fail-fast guard, no named error). Delegates to
+<code>UpgradeableBeacon.upgradeTo</code> and emits</p>
 </li>
 <li>
-<p>reverts: InvalidImplementation</p>
-</li>
-<li>
-<p>reverts: OwnableUnauthorizedAccount</p>
+<p>emits: UserStoreImplementationUpgraded on success.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function upgradeUserStoreImplementation(address newImplementation) external;

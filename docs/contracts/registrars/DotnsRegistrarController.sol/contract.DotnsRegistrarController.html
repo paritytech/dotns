@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, <a href="/contracts/access/DotnsRoleManager.sol/abstract.DotnsRoleManager.html">DotnsRoleManager</a>, ReentrancyGuardTransient, <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -247,22 +247,14 @@ oz-upgrades-unsafe-allow: constructor</p>
 </code></pre>
 <h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
 <p>Initialises the registrar controller.</p>
-<p>Validates commitment window bounds and wires the protocol registry.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: InvalidInitialization</p>
-</li>
-<li>
-<p>reverts: NotInitializing</p>
-</li>
-<li>
-<p>reverts: MaxCommitmentAgeTooHigh</p>
-</li>
-<li>
-<p>reverts: MaxCommitmentAgeTooLow</p>
-</li>
-</ul>
+<p>Callable once through the UUPS proxy; direct calls on the implementation revert
+with @custom:reverts InvalidInitialization, and any nested call outside an active
+initialiser scope reverts with @custom:reverts NotInitializing. Validates the
+commitment window bounds: <code>maxAge</code> must exceed <code>minAge</code> (otherwise</p>
+<p><strong>Note:</strong>
+reverts: MaxCommitmentAgeTooLow) and must stay within
+<code>MAX_ALLOWED_COMMITMENT_AGE</code> (otherwise @custom:reverts MaxCommitmentAgeTooHigh) before
+wiring the protocol registry.</p>
 <pre><code class="language-solidity">function initialize(
     IDotnsProtocolRegistry registry,
     uint256 minAge,
@@ -273,8 +265,10 @@ oz-upgrades-unsafe-allow: constructor</p>
 </code></pre>
 <h3 id="available"><a class="header" href="#available">available</a></h3>
 <p>Returns whether a label is available for registration.</p>
+<p>Validates the canonical DNS-label shape (otherwise @custom:reverts InvalidLabel)
+and rejects labels shorter than the minimum length with</p>
 <p><strong>Note:</strong>
-reverts: InvalidLabel</p>
+reverts: NameNotAvailable before checking ERC721 availability on the registrar.</p>
 <pre><code class="language-solidity">function available(string calldata label) public view override returns (bool);
 </code></pre>
 <h3 id="makecommitment"><a class="header" href="#makecommitment">makeCommitment</a></h3>
@@ -287,39 +281,33 @@ reverts: InvalidLabel</p>
 </code></pre>
 <h3 id="commit"><a class="header" href="#commit">commit</a></h3>
 <p>Submits a commitment for a future registration.</p>
-<p>Idempotent over expiry: re-committing an unexpired hash reverts (front-running guard);
-re-committing a hash whose stored timestamp has passed <code>maxCommitmentAge</code> overwrites the
-slot so storage cannot be permanently griefed.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: NameCommitted</p>
-</li>
-<li>
-<p>reverts: UnexpiredCommitmentExists</p>
-</li>
-</ul>
+<p>Idempotent over expiry: re-committing an unexpired hash reverts with</p>
+<p><strong>Note:</strong>
+reverts: UnexpiredCommitmentExists (front-running guard); re-committing a hash
+whose stored timestamp has passed <code>maxCommitmentAge</code> overwrites the slot so storage
+cannot be permanently griefed. Emits @custom:emits NameCommitted on success.</p>
 <pre><code class="language-solidity">function commit(bytes32 commitment) external override;
 </code></pre>
 <h3 id="register"><a class="header" href="#register">register</a></h3>
 <p>Registers a name after the commitment delay.</p>
-<p>Splits on direct vs cross-payer at <code>msg.sender == registration.owner</code>. The direct
-path runs <code>priceWithCheck</code> (personhood + reservation gate) and routes the fee to a
-refundable escrow deposit owned by <code>registration.owner</code>. The cross-payer path skips
-personhood (a third party may sponsor a verified owner), still enforces base-name
-reservations, applies a length-scaled <code>reachFee</code> friction when the sender's own tier
-is below the label's required tier, and routes funds to the insurance branch when the
-payer's tier price differs from the owner's (genuine cross-tier sponsorship) versus the
-refundable branch when the tier prices match (same-tier-different-address).</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: NameRegistered</p>
-</li>
-<li>
-<p>reverts: CommitmentNotFound</p>
-</li>
-</ul>
+<p>Validates the label shape (otherwise @custom:reverts InvalidLabel) and ERC721
+availability (otherwise @custom:reverts NameNotAvailable), then resolves the configured
+escrow address from the protocol registry (otherwise @custom:reverts EscrowNotConfigured)
+and consumes the prior commitment, which fails with @custom:reverts CommitmentNotFound
+when no commitment exists for the supplied registration, @custom:reverts CommitmentTooNew
+before <code>minCommitmentAge</code>, and @custom:reverts CommitmentTooOld past <code>maxCommitmentAge</code>.
+Splits on direct vs cross-payer at <code>msg.sender == registration.owner</code>. The direct path
+runs <code>priceWithCheck</code> (personhood + reservation gate) and routes the fee to a refundable
+escrow deposit owned by <code>registration.owner</code>. The cross-payer path skips personhood
+(a third party may sponsor a verified owner), still enforces base-name reservations
+(otherwise @custom:reverts NameReserved), applies a length-scaled <code>reachFee</code> friction
+when the sender's own tier is below the label's required tier, and routes funds to the
+insurance branch when the payer's tier price differs from the owner's (genuine
+cross-tier sponsorship) versus the refundable branch when the tier prices match
+(same-tier-different-address). The caller must supply at least the priced amount plus
+any friction (otherwise @custom:reverts InsufficientValue), and any overpayment is
+returned to <code>msg.sender</code> with @custom:emits OverpaymentRefunded; a failed refund call
+reverts with @custom:reverts RefundFailed. Emits @custom:emits NameRegistered on success.</p>
 <pre><code class="language-solidity">function register(Registration calldata registration) external payable override nonReentrant;
 </code></pre>
 <h3 id="iswhitelisted"><a class="header" href="#iswhitelisted">isWhiteListed</a></h3>
@@ -328,16 +316,10 @@ refundable branch when the tier prices match (same-tier-different-address).</p>
 </code></pre>
 <h3 id="whitelistaddress"><a class="header" href="#whitelistaddress">whiteListAddress</a></h3>
 <p>Adds or removes an address from the whitelist for <code>registerReserved</code>.</p>
-<p>Callable by the owner or an account holding <code>DotnsConstants.WHITELIST_OPERATOR_ROLE</code>.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>contract: IDotnsRoleManager.NotRoleOrOwner</p>
-</li>
-<li>
-<p>emits: WhiteListed</p>
-</li>
-</ul>
+<p>Callable by the owner or an account holding <code>DotnsConstants.WHITELIST_OPERATOR_ROLE</code>;
+any other caller reverts with @custom:reverts IDotnsRoleManager.NotRoleOrOwner. Emits</p>
+<p><strong>Note:</strong>
+emits: WhiteListed on success.</p>
 <pre><code class="language-solidity">function whiteListAddress(
     address who,
     bool whiteListStatus
@@ -350,14 +332,16 @@ refundable branch when the tier prices match (same-tier-different-address).</p>
 <p>Registers a name after the commitment delay.</p>
 <p>Whitelisted issuance path used to seed reserved labels at zero base cost: skips the
 PoP price check and the escrow deposit, but reuses the same commit-reveal pipeline so
-the same anti-front-running guarantees apply.</p>
+the same anti-front-running guarantees apply. Restricted to whitelisted callers and the
+owner (otherwise @custom:reverts NotWhiteListedOrOwner). Validates the label shape
+(otherwise @custom:reverts InvalidLabel) and ERC721 availability (otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: NameRegistered</p>
+<p>reverts: NameNotAvailable), then consumes the prior commitment, which fails with</p>
 </li>
 <li>
-<p>reverts: CommitmentNotFound</p>
+<p>emits: NameRegistered on success.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function registerReserved(Registration calldata registration)
@@ -380,8 +364,8 @@ This function call must use less than 30 000 gas.</p>
 </code></pre>
 <h3 id="_validatedlabelnode"><a class="header" href="#_validatedlabelnode">_validatedLabelNode</a></h3>
 <p>Validates label shape and derives <code>(labelhash, node)</code>.</p>
-<p>Delegates hashing to {LabelUtils} so the assembly sequence lives in exactly one
-place across the codebase. Error ownership stays on this interface: short labels
+<p>Delegates hashing to @custom:contract LabelUtils so the assembly sequence lives in
+exactly one place across the codebase. Error ownership stays on this interface: short labels
 revert with <code>NameNotAvailable(label)</code> (pre-existing semantics); shape violations
 revert with <code>InvalidLabel()</code>.</p>
 <pre><code class="language-solidity">function _validatedLabelNode(string calldata label)

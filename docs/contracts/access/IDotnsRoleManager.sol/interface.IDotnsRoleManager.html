@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsrolemanager"><a class="header" href="#idotnsrolemanager">IDotnsRoleManager</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/access/IDotnsRoleManager.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/access/IDotnsRoleManager.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IAccessControl</p>
 <p><strong>Title:</strong>
@@ -194,24 +194,16 @@ security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="setrole"><a class="header" href="#setrole">setRole</a></h3>
 <p>Grants or revokes an operational role.</p>
-<p>Only the owner can manage roles. <code>role</code> must be one of the roles recognised by the
-consuming contract.</p>
+<p>Only the owner can manage roles (otherwise @custom:reverts OwnableUnauthorizedAccount);
+<code>role</code> must be one of the roles recognised by the consuming contract (otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>contract: IAccessControl.RoleGranted</p>
+<p>reverts: UnsupportedRole); <code>account</code> must not be the zero address (otherwise</p>
 </li>
 <li>
-<p>contract: IAccessControl.RoleRevoked</p>
-</li>
-<li>
-<p>reverts: OwnableUnauthorizedAccount</p>
-</li>
-<li>
-<p>reverts: UnsupportedRole</p>
-</li>
-<li>
-<p>reverts: InvalidRoleAccount</p>
+<p>reverts: InvalidRoleAccount). Emits @custom:emits IAccessControl.RoleGranted on
+grant and @custom:emits IAccessControl.RoleRevoked on revoke.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function setRole(bytes32 role, address account, bool enabled) external;

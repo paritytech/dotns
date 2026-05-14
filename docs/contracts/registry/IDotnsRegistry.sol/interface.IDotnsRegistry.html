@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistry"><a class="header" href="#idotnsregistry">IDotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsRegistry</p>
 <p><strong>Author:</strong>
@@ -193,85 +193,67 @@ security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="setsubnodeowner"><a class="header" href="#setsubnodeowner">setSubnodeOwner</a></h3>
 <p>Creates or reassigns a subnode and assigns its owner.</p>
-<p>Callable only by the current owner of <code>record.parentNode</code>. Indexes the subnode
-under the new owner's <code>LabelStore</code> keyed by the namehashed <code>subnode</code> so off-chain
-consumers can enumerate names per address.</p>
+<p>Callable only by the current owner of <code>record.parentNode</code>, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: NewOwner</p>
+<p>reverts: NotAuthorised. The new owner address must be non-zero, otherwise</p>
 </li>
 <li>
-<p>reverts: InvalidLabel</p>
+<p>reverts: NotAllowed. <code>record.subLabel</code> must be a single canonical DNS label
+(otherwise @custom:reverts InvalidLabel) and <code>record.parentLabel</code> must be a name
+path whose namehash matches <code>record.parentNode</code> (otherwise</p>
 </li>
 <li>
-<p>reverts: NotAllowed</p>
-</li>
-<li>
-<p>reverts: NotAuthorised</p>
-</li>
-<li>
-<p>reverts: ParentLabelMismatch</p>
+<p>reverts: ParentLabelMismatch). Indexes the subnode under the new owner's
+<code>LabelStore</code> keyed by the namehashed <code>subnode</code> so off-chain consumers can enumerate
+names per address. Emits @custom:emits NewOwner on each successful assignment.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function setSubnodeOwner(SubnodeRecord calldata record) external returns (bytes32 subnode);
 </code></pre>
 <h3 id="setsubnoderesolver"><a class="header" href="#setsubnoderesolver">setSubnodeResolver</a></h3>
 <p>Sets the resolver for an existing subnode.</p>
-<p>Callable only by the current owner of <code>record.parentNode</code>. The subnode owner can
-still update the resolver directly via <code>setResolver</code>.</p>
+<p>Callable only by the current owner of <code>record.parentNode</code>, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: NewResolver</p>
+<p>reverts: NotAuthorised. The subnode owner can still update the resolver
+directly via <code>setResolver</code>. <code>record.subLabel</code> must be a single canonical DNS label
+(otherwise @custom:reverts InvalidLabel) and <code>record.parentLabel</code> must be a name
+path whose namehash matches <code>record.parentNode</code> (otherwise</p>
 </li>
 <li>
-<p>reverts: InvalidLabel</p>
-</li>
-<li>
-<p>reverts: NotAuthorised</p>
-</li>
-<li>
-<p>reverts: ParentLabelMismatch</p>
+<p>reverts: ParentLabelMismatch). The resulting subnode must already exist,
+otherwise @custom:reverts NotAuthorised. Emits @custom:emits NewResolver on
+success.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function setSubnodeResolver(SubnodeResolverRecord calldata record) external;
 </code></pre>
 <h3 id="setowner"><a class="header" href="#setowner">setOwner</a></h3>
 <p>Creates a node record for a tokenised base registration.</p>
-<p>Restricted to the registrar's controllers. Stores <code>owner = address(0)</code> as a
-sentinel so reads delegate to <code>IDotnsRegistrar.ownerOf</code> and ERC-721 transfers
-remain authoritative.</p>
+<p>Restricted to the registrar's controllers, otherwise @custom:reverts NotAuthorised.
+<code>newOwner</code> must be non-zero (otherwise @custom:reverts NotAllowed) and must match
+the ERC-721 owner reported by the registrar (otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>emits: NodeTransferred</p>
+<p>reverts: NotAuthorised). The node must not already have a record, otherwise</p>
 </li>
 <li>
-<p>reverts: NodeAlreadyOwned</p>
-</li>
-<li>
-<p>reverts: NotAllowed</p>
-</li>
-<li>
-<p>reverts: NotAuthorised</p>
+<p>reverts: NodeAlreadyOwned. Stores <code>owner = address(0)</code> as a sentinel so
+reads delegate to <code>IDotnsRegistrar.ownerOf</code> and ERC-721 transfers remain
+authoritative. Emits @custom:emits NodeTransferred on success.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function setOwner(bytes32 node, address newOwner, address resolverAddr) external;
 </code></pre>
 <h3 id="setresolver"><a class="header" href="#setresolver">setResolver</a></h3>
 <p>Sets or clears the resolver for a node.</p>
-<p>Callable only by the current node owner. For tokenised nodes, authorisation falls
-back to ERC-721 owner / approved / operator-for-all via the registrar.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: NewResolver</p>
-</li>
-<li>
-<p>reverts: NotAuthorised</p>
-</li>
-</ul>
+<p>Callable only by the current node owner, otherwise @custom:reverts NotAuthorised.
+For tokenised nodes, authorisation falls back to ERC-721 owner / approved /
+operator-for-all via the registrar. Emits @custom:emits NewResolver on success.</p>
 <pre><code class="language-solidity">function setResolver(bytes32 node, address resolverAddr) external;
 </code></pre>
 <p><strong>Parameters</strong></p>

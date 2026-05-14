@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnscontentresolver"><a class="header" href="#dotnscontentresolver">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
@@ -221,18 +221,11 @@ oz-upgrades-unsafe-allow: constructor</p>
 </code></pre>
 <h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
 <p>Initialises the content resolver.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: InvalidInitialization</p>
-</li>
-<li>
-<p>emits: OwnershipTransferred</p>
-</li>
-<li>
-<p>emits: Initialized</p>
-</li>
-</ul>
+<p>Runs once through the UUPS proxy; a repeat call reverts with</p>
+<p><strong>Note:</strong>
+reverts: InvalidInitialization. Emits @custom:emits OwnershipTransferred when
+<code>msg.sender</code> is recorded as the initial owner and @custom:emits Initialized once
+setup completes.</p>
 <pre><code class="language-solidity">function initialize(IDotnsProtocolRegistry registry) external initializer;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -242,18 +235,11 @@ oz-upgrades-unsafe-allow: constructor</p>
 </div>
 <h3 id="setcontenthash"><a class="header" href="#setcontenthash">setContenthash</a></h3>
 <p>Sets the content hash for a node.</p>
-<p>The caller must own the node in the DotNS registry or be an approved
-operator. Content hashes are opaque bytes (e.g. an IPFS CID); the
-resolver stores them as-is and never interprets the payload.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: ContentHashUpdated</p>
-</li>
-<li>
-<p>reverts: NotAuthorised</p>
-</li>
-</ul>
+<p>The caller must own the node in the DotNS registry or be an approved operator,
+otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an
+IPFS CID); the resolver stores them as-is and never interprets the payload. Emits</p>
+<p><strong>Note:</strong>
+emits: ContentHashUpdated on every successful write.</p>
 <pre><code class="language-solidity">function setContenthash(bytes32 node, bytes calldata hash) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -278,18 +264,10 @@ resolver stores them as-is and never interprets the payload.</p>
 </div>
 <h3 id="settext"><a class="header" href="#settext">setText</a></h3>
 <p>Sets a text record for a node.</p>
-<p>The caller must own the node in the DotNS registry or be an approved
-operator. Text records are arbitrary key/value strings (e.g. <code>avatar</code>,
-<code>url</code>, <code>description</code>).</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: TextUpdated</p>
-</li>
-<li>
-<p>reverts: NotAuthorised</p>
-</li>
-</ul>
+<p>The caller must own the node in the DotNS registry or be an approved operator,
+otherwise @custom:reverts NotAuthorised. Text records are arbitrary key/value strings
+(e.g. <code>avatar</code>, <code>url</code>, <code>description</code>). Emits @custom:emits TextUpdated on every
+successful write.</p>
 <pre><code class="language-solidity">function setText(bytes32 node, string calldata key, string calldata value) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -323,14 +301,14 @@ operator. Text records are arbitrary key/value strings (e.g. <code>avatar</code>
 </div>
 <h3 id="setapprovalforall"><a class="header" href="#setapprovalforall">setApprovalForAll</a></h3>
 <p>Enable or disable approval for a third party ("operator") to manage all of
-<code>msg.sender</code>'s nodes. @param operator Address to authorise or revoke.</p>
-<p><strong>Note:</strong>
-emits: ApprovalForAll</p>
+<code>msg.sender</code>'s nodes.</p>
+<p>Emits @custom:emits ApprovalForAll whenever the approval flag is written, including
+idempotent writes that do not change the stored value.</p>
 <pre><code class="language-solidity">function setApprovalForAll(address operator, bool approved) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>operator</code></td><td><code>address</code></td><td></td></tr>
+<tr><td><code>operator</code></td><td><code>address</code></td><td>Address to authorise or revoke.</td></tr>
 <tr><td><code>approved</code></td><td><code>bool</code></td><td>True to approve, false to revoke.</td></tr>
 </tbody></table>
 </div>

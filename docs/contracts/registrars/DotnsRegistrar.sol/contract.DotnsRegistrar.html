@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrar"><a class="header" href="#dotnsregistrar">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6c331c6ea242b82a188d8c7fcaa7045d1a715b39/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="/contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -188,15 +188,15 @@ Dotns Registrar</p>
 <p>ERC721-backed registrar implementing permanent name ownership.</p>
 <p>Deliberately policy-free. Transfers are supported to allow ownership changes without
 registry hooks, and the registrar itself does not encode pricing, reservations, or PoP
-gating; those live in the controllers and {IPopRules}. The fee-on-transfer hook in
-<code>_update</code> is a thin enforcement layer that consults the escrow.</p>
+gating; those live in the controllers and @custom:contract IPopRules. The fee-on-transfer hook
+in <code>_update</code> is a thin enforcement layer that consults the escrow.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="controllers"><a class="header" href="#controllers">controllers</a></h3>
 <p>Mapping of authorised controllers.</p>
-<p>Controllers may call <code>register</code>. Keyed by the shared baseline {IDotnsController}
-interface so the registrar doesn't depend on any specific controller shape.
+<p>Controllers may call <code>register</code>. Keyed by the shared baseline @custom:contract
+IDotnsController interface so the registrar doesn't depend on any specific controller shape.
 Commit-reveal, PoP, and future controllers coexist here so long as they implement the
 baseline interface.</p>
 <p><strong>Note:</strong>
@@ -226,16 +226,9 @@ oz-upgrades-unsafe-allow: constructor</p>
 <h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
 <p>Initialises the registrar.</p>
 <p>Uses OpenZeppelin upgradeable initialisers and is callable once through the UUPS
-proxy. <code>_disableInitializers</code> on the implementation makes direct calls revert.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: InvalidInitialization</p>
-</li>
-<li>
-<p>reverts: NotInitializing</p>
-</li>
-</ul>
+proxy; direct calls on the implementation revert with @custom:reverts InvalidInitialization
+because <code>_disableInitializers</code> runs in the constructor, and any nested call outside an
+active initialiser scope reverts with @custom:reverts NotInitializing.</p>
 <pre><code class="language-solidity">function initialize(
     string calldata name,
     string calldata symbol,
@@ -247,32 +240,20 @@ proxy. <code>_disableInitializers</code> on the implementation makes direct call
 <h3 id="addcontroller"><a class="header" href="#addcontroller">addController</a></h3>
 <p>Adds an authorised controller.</p>
 <p>Typed against the baseline <code>IDotnsController</code> (not a concrete subtype) so a single
-authorisation surface accepts every controller flavour (commit-reveal, PoP gateway, future
-variants) without per-flavour setters.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: OwnableUnauthorizedAccount</p>
-</li>
-<li>
-<p>emits: ControllerAdded</p>
-</li>
-</ul>
+authorisation surface accepts every controller flavour (commit-reveal, PoP gateway,
+future variants) without per-flavour setters. Owner-gated (otherwise</p>
+<p><strong>Note:</strong>
+reverts: OwnableUnauthorizedAccount); emits @custom:emits ControllerAdded on
+success.</p>
 <pre><code class="language-solidity">function addController(IDotnsController controller) external onlyOwner;
 </code></pre>
 <h3 id="removecontroller"><a class="header" href="#removecontroller">removeController</a></h3>
 <p>Removes an authorised controller.</p>
 <p>Mirrors {addController}'s baseline-typed signature so any registered controller can
-be revoked through the same entry point.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: OwnableUnauthorizedAccount</p>
-</li>
-<li>
-<p>emits: ControllerRemoved</p>
-</li>
-</ul>
+be revoked through the same entry point. Owner-gated (otherwise</p>
+<p><strong>Note:</strong>
+reverts: OwnableUnauthorizedAccount); emits @custom:emits ControllerRemoved on
+success.</p>
 <pre><code class="language-solidity">function removeController(IDotnsController controller) external onlyOwner;
 </code></pre>
 <h3 id="available"><a class="header" href="#available">available</a></h3>
@@ -286,16 +267,10 @@ that reclaims the token from escrow.</p>
 <p>Registers a name permanently.</p>
 <p>Permanence is by construction: there is no <code>expire</code>, <code>renew</code>, or <code>release</code> path on
 the registrar. Custody only moves via ERC721 transfers (which the registrar polices via
-the fee-on-transfer hook) or via escrow reclaim.</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>emits: NameRegistered</p>
-</li>
-<li>
-<p>reverts: NameNotAvailable</p>
-</li>
-</ul>
+the fee-on-transfer hook) or via escrow reclaim. Restricted to authorised controllers
+(otherwise @custom:reverts NotController) and rejects ids that are not available
+(otherwise @custom:reverts NameNotAvailable). Emits @custom:emits NameRegistered on
+success.</p>
 <pre><code class="language-solidity">function register(
     uint256 id,
     address owner,
@@ -321,11 +296,13 @@ events. Returns the empty string when the token does not exist.</p>
 </code></pre>
 <h3 id="quotetransferfee"><a class="header" href="#quotetransferfee">quoteTransferFee</a></h3>
 <p>Quotes the additional native fee required to transfer a token to <code>to</code>.</p>
-<p>Returns the maximum of (i) the delta between the recipient-tier price and the token's
-running-max paid history and (ii) the length-scaled <code>reachFee</code>, so verified-but-below
-recipients still pay the floor even when the running max would otherwise cover the move.</p>
+<p>Returns the maximum of (i) the delta between the recipient-tier price and the
+token's running-max paid history and (ii) the length-scaled <code>reachFee</code>, so
+verified-but-below recipients still pay the floor even when the running max would
+otherwise cover the move. Rejects a zero <code>to</code> with @custom:reverts ERC721InvalidReceiver
+and requires the protocol registry to have an escrow configured (otherwise</p>
 <p><strong>Note:</strong>
-reverts: ERC721InvalidReceiver</p>
+reverts: EscrowNotConfigured).</p>
 <pre><code class="language-solidity">function quoteTransferFee(
     uint256 tokenId,
     address to
@@ -336,6 +313,10 @@ reverts: ERC721InvalidReceiver</p>
     returns (uint256 requiredFee);
 </code></pre>
 <h3 id="transferfrom"><a class="header" href="#transferfrom">transferFrom</a></h3>
+<p>Subject to the same fee-on-transfer gate as the safe overloads; reverts with</p>
+<p><strong>Note:</strong>
+reverts: TransferFeeRequired when the recipient owes a non-zero delta and the
+caller has not forwarded it as <code>msg.value</code>.</p>
 <pre><code class="language-solidity">function transferFrom(
     address from,
     address to,
@@ -346,6 +327,10 @@ reverts: ERC721InvalidReceiver</p>
     override(ERC721Upgradeable, IDotnsRegistrar);
 </code></pre>
 <h3 id="safetransferfrom"><a class="header" href="#safetransferfrom">safeTransferFrom</a></h3>
+<p>Subject to the same fee-on-transfer gate as the four-argument overload; reverts with</p>
+<p><strong>Note:</strong>
+reverts: TransferFeeRequired when the recipient owes a non-zero delta and the
+caller has not forwarded it as <code>msg.value</code>.</p>
 <pre><code class="language-solidity">function safeTransferFrom(
     address from,
     address to,
@@ -356,6 +341,12 @@ reverts: ERC721InvalidReceiver</p>
     override(ERC721Upgradeable, IDotnsRegistrar);
 </code></pre>
 <h3 id="safetransferfrom-1"><a class="header" href="#safetransferfrom-1">safeTransferFrom</a></h3>
+<p>The registrar's <code>_update</code> hook compares the recipient's running-max paid history and
+tier price against the configured escrow's quote; if the caller does not forward the
+required delta as <code>msg.value</code>, the transfer reverts with</p>
+<p><strong>Note:</strong>
+reverts: TransferFeeRequired. The <code>payable</code> modifier on every transfer overload
+exists so the fee can be forwarded in the same call.</p>
 <pre><code class="language-solidity">function safeTransferFrom(
     address from,
     address to,
