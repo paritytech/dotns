@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/080bcf9dad104773edc64e4e5dafbb83f87c31ee/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/4c09d576405c2da6c0b68e7fe8a047341c3b4326/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
@@ -206,43 +206,45 @@ uncontested window to pull their refund before the controller hands the name out
 <pre><code class="language-solidity">uint256 public cooldown;
 </code></pre>
 <h3 id="tokenreserved"><a class="header" href="#tokenreserved">tokenReserved</a></h3>
-<p>Total amount of a specific asset reserved across all positions. Keyed by asset
-address. @dev Keyed by asset so future ERC20 support can track per-token liabilities
-independently;
+<p>Total amount of a specific asset reserved across all positions.</p>
+<p>Keyed by asset so future ERC20 support can track per-token liabilities independently;
 <code>address(0)</code> represents the native token and is the only asset currently accepted.</p>
 <pre><code class="language-solidity">mapping(address asset =&gt; uint256 amount) public tokenReserved;
 </code></pre>
 <h3 id="_positions"><a class="header" href="#_positions">_positions</a></h3>
+<p>Per-token escrow position storing recipient, amount, lifecycle flags and cooldown.</p>
 <pre><code class="language-solidity">mapping(uint256 tokenId =&gt; ReleasePosition position) private _positions;
 </code></pre>
 <h3 id="_releasedtokens"><a class="header" href="#_releasedtokens">_releasedTokens</a></h3>
+<p>Ordered set of tokens currently in escrow custody, used for paginated enumeration.</p>
 <pre><code class="language-solidity">uint256[] private _releasedTokens;
 </code></pre>
 <h3 id="_releasedindexplusone"><a class="header" href="#_releasedindexplusone">_releasedIndexPlusOne</a></h3>
+<p>Reverse lookup into <code>_releasedTokens</code> (one-based) for O(1) remove-by-swap.</p>
 <pre><code class="language-solidity">mapping(uint256 tokenId =&gt; uint256 indexPlusOne) private _releasedIndexPlusOne;
 </code></pre>
 <h3 id="insurancefund"><a class="header" href="#insurancefund">insuranceFund</a></h3>
-<p>Cumulative balance of cross-tier fees and registration excess held against
-unreleased shortfalls. @dev Credited by cross-tier registration deposits, reach-floor
-friction, and transfer-fee deltas;
-debited only when <code>withdraw</code> needs to top up a refund that exceeds the asset's reserved
-balance.</p>
+<p>Cumulative balance of cross-tier fees held against unreleased shortfalls.</p>
+<p>Credited by cross-tier registration deposits, reach-floor friction, and transfer-fee
+deltas; debited only when <code>withdraw</code> needs to top up a refund that exceeds the
+asset's reserved balance.</p>
 <pre><code class="language-solidity">uint256 public insuranceFund;
 </code></pre>
 <h3 id="runningmax"><a class="header" href="#runningmax">runningMax</a></h3>
-<p>Highest price ever charged for the name identified by tokenId, across registration
-and any transfers. @dev Monotonically increasing per-token watermark; the transfer-fee delta
-is computed against this
-prior value so each onward sale only pays the incremental tier difference, and it
-resets on <code>reclaim</code> only so a fresh registration starts from a clean baseline.</p>
+<p>Highest price ever charged for the name across registration and transfers.</p>
+<p>Monotonically increasing watermark. Each onward sale pays the incremental tier
+difference against this prior value, and <code>reclaim</code> resets it so a fresh registration
+starts from a clean baseline.</p>
 <pre><code class="language-solidity">mapping(uint256 tokenId =&gt; uint256 max) public runningMax;
 </code></pre>
 <h3 id="_pendingwithdrawals"><a class="header" href="#_pendingwithdrawals">_pendingWithdrawals</a></h3>
-<p>Pull-payment ledger isolating each recipient's refund balance so a failing or reentrant
-receiver can never block other users' withdrawals.</p>
+<p>Pull-payment ledger storing each recipient's claimable refund balance.</p>
+<p>Per-recipient isolation ensures a failing or reentrant receiver cannot block other
+users' withdrawals.</p>
 <pre><code class="language-solidity">mapping(address recipient =&gt; uint256 amount) private _pendingWithdrawals;
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
+<p>Reserved storage space to allow for layout changes in the future.</p>
 <pre><code class="language-solidity">uint256[50] private __gap;
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
@@ -337,14 +339,37 @@ reverts: InvalidPageSize.</p>
 <h3 id="deposit"><a class="header" href="#deposit">deposit</a></h3>
 <p>Records an asset deposit position for a token.</p>
 <p>Only the configured controller may call this, otherwise @custom:reverts NotController.
-<code>params.amount</code> must be non-zero and equal to <code>msg.value</code>, otherwise</p>
-<p><strong>Note:</strong>
-reverts: InvalidAmount. Only native deposits are accepted today, so a non-zero
-<code>params.asset</code> triggers @custom:reverts AssetNotSupported, and a zero
-<code>params.recipient</code> triggers @custom:reverts InvalidRecipient. The slot for
-<code>params.tokenId</code> must be empty: a previously funded position triggers</p>
+<code>params.amount</code> must equal <code>msg.value</code>, otherwise @custom:reverts InvalidAmount; a
+zero amount is accepted so cross-payer and free-tier registrations can still seed a
+position that the release lifecycle can advance. Only native deposits are accepted
+today, so a non-zero <code>params.asset</code> triggers @custom:reverts AssetNotSupported, and
+a zero <code>params.recipient</code> triggers @custom:reverts InvalidRecipient. The slot for
+<code>params.tokenId</code> must be empty (sentinel: <code>position.recipient == address(0)</code>):
+a previously funded position triggers @custom:reverts PositionAlreadyFunded, and a
+position already in the released phase triggers @custom:reverts AlreadyReleased.
+Emits @custom:emits NativeDepositRecorded once the deposit is booked.</p>
 <pre><code class="language-solidity">function deposit(DepositParams calldata params) external payable override onlyController;
 </code></pre>
+<h3 id="creditoverpayment"><a class="header" href="#creditoverpayment">creditOverpayment</a></h3>
+<p>Credits <code>msg.value</code> to <code>recipient</code>'s pull-payment ledger so the caller can later
+pull the balance with @custom:func claimWithdrawal.</p>
+<p>Only the configured controller may call this, otherwise @custom:reverts NotController.
+<code>recipient</code> must be non-zero (@custom:reverts InvalidRecipient) and <code>msg.value</code> must
+be non-zero (@custom:reverts InvalidAmount). Used by the registrar controller to
+refund overpayment without pushing native value into a potentially reverting
+contract receiver. Emits @custom:emits OverpaymentRefunded once the credit lands.</p>
+<pre><code class="language-solidity">function creditOverpayment(address recipient)
+    external
+    payable
+    override
+    onlyController
+    nonReentrant;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address whose pending balance should grow by <code>msg.value</code>.</td></tr>
+</tbody></table>
+</div>
 <h3 id="depositinsurance"><a class="header" href="#depositinsurance">depositInsurance</a></h3>
 <p>Records a cross-tier registration fee into the insurance fund.</p>
 <p>Only the configured controller may call this, otherwise @custom:reverts NotController.
@@ -383,13 +408,16 @@ a failed refund transfer triggers @custom:reverts RefundFailed.</p>
 <p>Releases a token into escrow and starts the withdrawal cooldown.</p>
 <p>First step of the phased lifecycle. The caller must be the current NFT holder or one
 of its approved operators, otherwise @custom:reverts NotTokenOwnerOrApproved. The slot
-for <code>tokenId</code> must already hold a funded position (@custom:reverts
-DepositNotConfigured when empty) that has not yet been released (@custom:reverts
-AlreadyReleased when re-entered). The caller must also be the locked refund recipient,
-otherwise @custom:reverts NotRefundRecipient; combined with the escrow approval check
-(@custom:reverts EscrowNotApproved when escrow may not move the NFT) this enforces
-two-party cooperation so a secondary-market buyer cannot release someone else's
-deposit. Emits @custom:emits NameReleased once the NFT is moved into custody.</p>
+for <code>tokenId</code> must already hold a funded position (sentinel:
+<code>position.recipient != address(0)</code>); an unseeded slot triggers @custom:reverts
+DepositNotConfigured, and a position already in the released phase triggers</p>
+<p><strong>Note:</strong>
+reverts: AlreadyReleased. Zero-amount positions are still releasable so every
+minted name has a reachable lifecycle. The caller must also be the locked refund
+recipient, otherwise @custom:reverts NotRefundRecipient; combined with the escrow
+approval check (@custom:reverts EscrowNotApproved when escrow may not move the NFT)
+this enforces two-party cooperation so a secondary-market buyer cannot release someone
+else's deposit. Emits @custom:emits NameReleased once the NFT is moved into custody.</p>
 <pre><code class="language-solidity">function release(uint256 tokenId) external override nonReentrant;
 </code></pre>
 <h3 id="withdraw"><a class="header" href="#withdraw">withdraw</a></h3>
