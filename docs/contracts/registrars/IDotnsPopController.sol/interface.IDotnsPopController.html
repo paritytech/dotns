@@ -180,28 +180,37 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/4c09d576405c2da6c0b68e7fe8a047341c3b4326/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/4dfae476e8017a3e26dbbcbae6dae42c620c9a8d/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
 IDotnsPopController</p>
 <p>Interface for the dedicated PoP controller orchestrating lite-person and full-person
-username issuance on behalf of the PoP gateway pallet. @dev Deliberately disjoint from
-<code>IDotnsRegistrarController</code>. The two controllers coexist
-on <code>DotnsRegistrar</code> via its multi-controller affordance and neither imports the other.
-Collision handling reduces to the registrar's ERC721 availability check (first-to-mint
-wins). Reservation queuing for <code>reservedBaseLabel</code> is an intra-PoP coordination mechanism
-only; it does not block public registrations.
+username issuance on behalf of the PoP gateway pallet.</p>
+<p>Deliberately disjoint from @custom:contract IDotnsRegistrarController. The two
+controllers coexist on @custom:contract DotnsRegistrar via its multi-controller affordance
+and neither imports the other. Collision handling reduces to the registrar's ERC721
+availability check (first-to-mint wins). Reservation queuing for <code>reservedBaseLabel</code> is
+an intra-PoP coordination mechanism only; it does not block public registrations.
 Label formats:
-Lite-person usernames (first argument to <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#reservebasename">reserveBaseName</a> and the <code>liteLabel</code> of a
-<code>LinkKind.LiteUsername</code> link) are DNS labels with at least two trailing digits (e.g.
-<code>alice42</code>) per {StringUtils-isLitePersonLabel}. The gateway strips any separator before
-calling so the on-chain label is flat. Full-person usernames (the <code>label</code> of
-<a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#registerbasename">registerBaseName</a> and the optional <code>reservedBaseLabel</code> of <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#reservebasename">reserveBaseName</a>) follow the
-DNS-label rules enforced by {StringUtils-isSingleLabel} (e.g. <code>alice</code>). Lite and public
-registrations share one namespace; first-to-mint wins at the ERC721 layer. Cross-flow
-priority on the stripped base stem is arbitrated by @custom:function
-IPopRules.reserveBaseNameForPop. @custom:security-contact admin@parity.io</p>
+Lite-person usernames (first argument to @custom:function reserveBaseName and the
+<code>liteLabel</code> of a <code>LinkKind.LiteUsername</code> link) are DNS labels with at least two
+trailing digits (e.g. <code>alice42</code>) per @custom:function StringUtils.isLitePersonLabel.
+The gateway strips any separator before calling so the on-chain label is flat.
+Full-person usernames (the <code>label</code> of @custom:function registerBaseName and the
+optional <code>reservedBaseLabel</code> of @custom:function reserveBaseName) follow the
+DNS-label rules enforced by @custom:function StringUtils.isSingleLabel (e.g.
+<code>alice</code>). Lite and public registrations share one namespace; first-to-mint wins at
+the ERC721 layer. Cross-flow priority on the stripped base stem is arbitrated by</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: IPopRules.reserveBaseNameForPop.</p>
+</li>
+<li>
+<p>security-contact: admin@parity.io</p>
+</li>
+</ul>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="reservebasename"><a class="header" href="#reservebasename">reserveBaseName</a></h3>
 <p>Registers a lite-person username on behalf of the supplied user
@@ -231,7 +240,7 @@ the ABI-encoded reservation tuple as the call's payload, which Solidity decodes 
 </tbody></table>
 </div>
 <h3 id="reservebasename-1"><a class="header" href="#reservebasename-1">reserveBaseName</a></h3>
-<p>Raw-payload variant of <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#reservebasename">reserveBaseName</a> for cross-chain dispatch.</p>
+<p>Raw-payload variant of @custom:function reserveBaseName for cross-chain dispatch.</p>
 <p><code>payload</code> is <code>abi.encode(BaseReservation({...}))</code>, the bare ABI-encoded struct
 with NO function-selector prefix and NO leading bytes-length word. The contract
 prepends the typed selector and <code>delegatecall</code>s itself so the typed entrypoint runs
@@ -284,7 +293,7 @@ payload, which Solidity decodes directly.</p>
 </tbody></table>
 </div>
 <h3 id="reservelitename-1"><a class="header" href="#reservelitename-1">reserveLiteName</a></h3>
-<p>Raw-payload variant of <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#reservelitename">reserveLiteName</a> for cross-chain dispatch.</p>
+<p>Raw-payload variant of @custom:function reserveLiteName for cross-chain dispatch.</p>
 <p><code>payload</code> is <code>abi.encode(LiteRegistration({...}))</code>, the bare ABI-encoded struct
 with NO function-selector prefix and NO leading bytes-length word. The contract
 prepends the typed selector and <code>delegatecall</code>s itself so the typed entrypoint runs
@@ -353,7 +362,7 @@ call's payload, which Solidity decodes directly.</p>
 </tbody></table>
 </div>
 <h3 id="registerbasename-1"><a class="header" href="#registerbasename-1">registerBaseName</a></h3>
-<p>Raw-payload variant of <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#registerbasename">registerBaseName</a> for cross-chain dispatch.</p>
+<p>Raw-payload variant of @custom:function registerBaseName for cross-chain dispatch.</p>
 <p><code>payload</code> is <code>abi.encode(FullRegistration({...}))</code>, the bare ABI-encoded struct
 with NO function-selector prefix and NO leading bytes-length word. The contract
 prepends the typed selector and <code>delegatecall</code>s itself so the typed entrypoint runs
@@ -433,8 +442,8 @@ live queue state without scanning storage.</p>
 <h3 id="reservationentry"><a class="header" href="#reservationentry">reservationEntry</a></h3>
 <p>Returns the queue entry at <code>index</code> for <code>labelhash</code>.</p>
 <p>Sparse storage: a zero <code>entryOwner</code> means the slot was relinquished, expired and
-reaped, or never written. Callers pair this with <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html#reservationmeta">reservationMeta</a> to walk the live
-window <code>[head, tail)</code>.</p>
+reaped, or never written. Callers pair this with @custom:function reservationMeta to walk
+the live window <code>[head, tail)</code>.</p>
 <pre><code class="language-solidity">function reservationEntry(
     bytes32 labelhash,
     uint64 index
@@ -472,6 +481,96 @@ window <code>[head, tail)</code>.</p>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>reservation</code></td><td><code>UserReservation</code></td><td>Per-user reservation pointer; see @custom:struct UserReservation.</td></tr>
+</tbody></table>
+</div>
+<h3 id="claimlabelstore"><a class="header" href="#claimlabelstore">claimLabelStore</a></h3>
+<p>Settles the caller's deferred binding by deploying their <code>LabelStore</code> and
+writing the stashed label and chat key.</p>
+<p>User-signed entrypoint: <code>pallet-revive</code> charges the <code>LabelStore</code> storage
+deposit against <code>msg.sender</code>'s balance through the runtime's configured deposit
+backend. Reverts with @custom:reverts NoPendingClaim when the caller has no
+stashed entry or the entry has lapsed past <code>reservationDuration</code>. On success
+deploys the store via the protocol-registered factory, writes the label keyed by
+its labelhash, persists the chat key on the PoP resolver when non-empty, deletes
+the pending-claim entry, and emits @custom:emits PendingClaimSettled and</p>
+<p><strong>Note:</strong>
+emits: NameRegistered.</p>
+<pre><code class="language-solidity">function claimLabelStore() external;
+</code></pre>
+<h3 id="expirependingclaim"><a class="header" href="#expirependingclaim">expirePendingClaim</a></h3>
+<p>Permissionlessly reaps a deferred binding that sat unsettled past
+<code>pendingClaimDuration</code>.</p>
+<p>Permissionless on purpose: anyone (typically a UI or a bot) can poke a
+stale entry so the slot frees up for the next gateway-path mint. Reverts with</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NoPendingClaim when the user has no stashed entry and with</p>
+</li>
+<li>
+<p>reverts: PendingClaimNotExpired when the entry is still live. Emits</p>
+</li>
+<li>
+<p>emits: PendingClaimExpired on success.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function expirePendingClaim(address user) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Address whose pending claim is being swept.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingclaim"><a class="header" href="#pendingclaim">pendingClaim</a></h3>
+<p>Returns <code>user</code>'s pending-claim entry.</p>
+<p>A zero <code>mintedAt</code> on the returned struct means the user has no pending
+claim; the remaining fields are meaningful only when <code>mintedAt</code> is non-zero.</p>
+<pre><code class="language-solidity">function pendingClaim(address user) external view returns (PendingClaim memory claim);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Account whose pending claim is being read.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>claim</code></td><td><code>PendingClaim</code></td><td>Per-user pending-claim entry; see @custom:struct PendingClaim.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingclaimusercount"><a class="header" href="#pendingclaimusercount">pendingClaimUserCount</a></h3>
+<p>Returns the number of users with a live pending claim.</p>
+<p>Exact live count, not an all-time tally: settled and expired entries are
+removed from the enumeration set so off-chain consumers can page through every
+stalled user without filtering.</p>
+<pre><code class="language-solidity">function pendingClaimUserCount() external view returns (uint256 count);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>count</code></td><td><code>uint256</code></td><td>Number of users currently holding a pending claim.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingclaimusers"><a class="header" href="#pendingclaimusers">pendingClaimUsers</a></h3>
+<p>Returns a paginated slice of users with a live pending claim.</p>
+<p>Pair with @custom:function pendingClaim to read each user's stashed entry.
+Ordering is not chronological; callers MUST NOT assume <code>mintedAt</code> is monotonic
+across the slice. Returns an empty array when <code>offset</code> is past the live count.</p>
+<pre><code class="language-solidity">function pendingClaimUsers(
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    returns (address[] memory users);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>offset</code></td><td><code>uint256</code></td><td>Start index.</td></tr>
+<tr><td><code>limit</code></td><td><code>uint256</code></td><td>Maximum entries to return.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>users</code></td><td><code>address[]</code></td><td>Slice of users currently holding a pending claim.</td></tr>
 </tbody></table>
 </div>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
@@ -530,6 +629,32 @@ window <code>[head, tail)</code>.</p>
 <tr><td><code>store</code></td><td><code>address</code></td><td>The Store instance used to persist the immutable registration record.</td></tr>
 </tbody></table>
 </div>
+<h3 id="pendingclaimstashed"><a class="header" href="#pendingclaimstashed">PendingClaimStashed</a></h3>
+<p>Emitted when a gateway-path mint defers its <code>LabelStore</code> write into the
+pending-claim mapping because the user has no store yet.</p>
+<pre><code class="language-solidity">event PendingClaimStashed(address indexed user, bytes32 indexed labelhash, string label);
+</code></pre>
+<h3 id="pendingclaimsettled"><a class="header" href="#pendingclaimsettled">PendingClaimSettled</a></h3>
+<p>Emitted when a user settles a deferred binding by deploying their
+<code>LabelStore</code> and backfilling the stashed label and chat key.</p>
+<pre><code class="language-solidity">event PendingClaimSettled(address indexed user, bytes32 indexed labelhash, address store);
+</code></pre>
+<h3 id="pendingclaimexpired"><a class="header" href="#pendingclaimexpired">PendingClaimExpired</a></h3>
+<p>Emitted when a deferred binding is reaped because it sat unsettled past
+<code>reservationDuration</code>.</p>
+<pre><code class="language-solidity">event PendingClaimExpired(address indexed user, bytes32 indexed labelhash);
+</code></pre>
+<h3 id="reservationheadadvanced"><a class="header" href="#reservationheadadvanced">ReservationHeadAdvanced</a></h3>
+<p>Emitted when a reservation queue's head transitions to a new user, either via
+expiry of the prior head or via the explicit relinquish path.</p>
+<pre><code class="language-solidity">event ReservationHeadAdvanced(bytes32 indexed labelhash, address indexed newHead);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Base-label hash whose queue head changed.</td></tr>
+<tr><td><code>newHead</code></td><td><code>address</code></td><td>Address now holding the head slot.</td></tr>
+</tbody></table>
+</div>
 <h2 id="errors"><a class="header" href="#errors">Errors</a></h2>
 <h3 id="notgateway"><a class="header" href="#notgateway">NotGateway</a></h3>
 <p>Thrown when a gated entrypoint is reached from an address that
@@ -572,6 +697,68 @@ caller observed by this contract for off-chain diagnostics.</p>
 holds the live head-of-queue reservation.</p>
 <pre><code class="language-solidity">error NotHolder(address user, bytes32 labelhash);
 </code></pre>
+<h3 id="nopendingclaim"><a class="header" href="#nopendingclaim">NoPendingClaim</a></h3>
+<p>Thrown when @custom:function claimLabelStore is called by a user with no
+recorded pending-claim entry.</p>
+<pre><code class="language-solidity">error NoPendingClaim(address user);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Caller observed by the controller.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingclaimexists"><a class="header" href="#pendingclaimexists">PendingClaimExists</a></h3>
+<p>Thrown when the gateway path tries to stash a second pending claim for a
+user who already has one outstanding.</p>
+<pre><code class="language-solidity">error PendingClaimExists(address user);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Address that already holds a pending claim.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingclaimnotexpired"><a class="header" href="#pendingclaimnotexpired">PendingClaimNotExpired</a></h3>
+<p>Thrown when @custom:function expirePendingClaim is invoked before the
+entry's <code>mintedAt + reservationDuration</code> deadline.</p>
+<pre><code class="language-solidity">error PendingClaimNotExpired(address user);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Address whose entry is being inspected.</td></tr>
+</tbody></table>
+</div>
+<h3 id="litelabelnotownedbyuser"><a class="header" href="#litelabelnotownedbyuser">LiteLabelNotOwnedByUser</a></h3>
+<p>Thrown when a lite-link inheritance does not match the registrar-side owner
+of the lite label.</p>
+<p>Prevents identity hijack by ensuring the registrant on the full-name leg actually
+holds the prior lite identity whose chat key is being inherited.</p>
+<pre><code class="language-solidity">error LiteLabelNotOwnedByUser(address user, bytes32 liteLabelhash);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Registrant supplied by the gateway.</td></tr>
+<tr><td><code>liteLabelhash</code></td><td><code>bytes32</code></td><td>Lite label whose ownership did not match.</td></tr>
+</tbody></table>
+</div>
+<h3 id="chatkeytoolong"><a class="header" href="#chatkeytoolong">ChatKeyTooLong</a></h3>
+<p>Thrown when a chat-key payload exceeds the controller's per-entry length cap.</p>
+<pre><code class="language-solidity">error ChatKeyTooLong(uint256 length);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>length</code></td><td><code>uint256</code></td><td>Caller-supplied length, in bytes.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservationdurationtoolow"><a class="header" href="#reservationdurationtoolow">ReservationDurationTooLow</a></h3>
+<p>Thrown when @custom:function setReservationDuration is called with a value below
+the protocol minimum.</p>
+<pre><code class="language-solidity">error ReservationDurationTooLow(uint64 duration);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>duration</code></td><td><code>uint64</code></td><td>Caller-supplied duration, in seconds.</td></tr>
+</tbody></table>
+</div>
 <h2 id="structs"><a class="header" href="#structs">Structs</a></h2>
 <h3 id="link"><a class="header" href="#link">Link</a></h3>
 <p>Tagged union selecting the chat-key source for a full-person registration.</p>
@@ -619,6 +806,26 @@ garbage never accumulates.</p>
     uint64 tail;
 }
 </code></pre>
+<h3 id="pendingclaim-1"><a class="header" href="#pendingclaim-1">PendingClaim</a></h3>
+<p>Deferred per-user binding of a freshly minted name to its <code>LabelStore</code>.</p>
+<p>Recorded by the gateway path when the user has no <code>LabelStore</code>. The user
+later settles the binding via @custom:function claimLabelStore, which deploys
+the store from a signed origin and writes the stashed label and chat key. An
+entry exists iff <code>mintedAt</code> is non-zero; the slot is cleared on settlement or
+expiry. Expiry is measured from <code>mintedAt</code> against <code>reservationDuration</code>.</p>
+<pre><code class="language-solidity">struct PendingClaim {
+    string label;
+    bytes chatKey;
+    uint64 mintedAt;
+}
+</code></pre>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Bare DNS label (no TLD); the TLD is appended at settlement time.</td></tr>
+<tr><td><code>chatKey</code></td><td><code>bytes</code></td><td>Chat-key bytes persisted on the PoP resolver at settlement; empty bytes skip the resolver write.</td></tr>
+<tr><td><code>mintedAt</code></td><td><code>uint64</code></td><td>Timestamp of the originating mint.</td></tr>
+</tbody></table>
+</div>
 <h3 id="literegistration"><a class="header" href="#literegistration">LiteRegistration</a></h3>
 <p>Lite-person registration payload.</p>
 <p>Single struct so the gateway can ABI-encode one tuple as the cross-chain payload

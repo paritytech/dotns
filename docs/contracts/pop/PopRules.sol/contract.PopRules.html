@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="poprules"><a class="header" href="#poprules">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/4c09d576405c2da6c0b68e7fe8a047341c3b4326/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/4dfae476e8017a3e26dbbcbae6dae42c620c9a8d/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -588,7 +588,7 @@ reverts: PopError. If the slot is already live and held by a different user,</p>
 <h3 id="stripdigits"><a class="header" href="#stripdigits">stripDigits</a></h3>
 <p>Returns the bare stem of a label, i.e. the label with any trailing ASCII digits
 removed.</p>
-<p>Mirrors the normalisation that @custom:func reserveBaseName applies before writing
+<p>Mirrors the normalisation that @custom:function reserveBaseName applies before writing
 a reservation, so callers can look up or release a reservation by passing the full
 label without re-implementing the digit-stripping rule. Non-canonical labels
 trigger @custom:reverts PopError.</p>
@@ -623,6 +623,32 @@ another authorised controller attempting to clear a live slot triggers</p>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label whose reservation should be cleared.</td></tr>
+</tbody></table>
+</div>
+<h3 id="releasereservationforreclaim"><a class="header" href="#releasereservationforreclaim">releaseReservationForReclaim</a></h3>
+<p>Clears a reservation when the slot owner matches <code>expectedOwner</code>, allowing any
+registrar-authorised controller (not only the stamping one) to release the slot.</p>
+<p>Narrower than @custom:function releaseBaseName: callers must prove they know the
+slot owner, so cross-controller release is gated on a positive match rather than on
+caller identity. Intended for the public registrar controller's reclaim path, where
+a prior occupant has handed the name back to escrow and the new registrant needs
+the cross-flow guard cleared regardless of which controller originally stamped it.
+Only a registrar-authorised controller may call this (@custom:reverts NotRegistry).
+Non-canonical labels trigger @custom:reverts PopError. A live reservation whose
+owner does not match <code>expectedOwner</code> triggers @custom:reverts PopError; expired
+reservations are cleared regardless. Emits @custom:emits BaseNameReleased.</p>
+<pre><code class="language-solidity">function releaseReservationForReclaim(
+    string calldata baseName,
+    address expectedOwner
+)
+    external
+    override
+    onlyRegistry;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label whose reservation should be cleared.</td></tr>
+<tr><td><code>expectedOwner</code></td><td><code>address</code></td><td>The address the caller expects to be the current reservation owner.</td></tr>
 </tbody></table>
 </div>
                     </main>
