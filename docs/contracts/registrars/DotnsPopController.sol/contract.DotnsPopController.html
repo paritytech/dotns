@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b801b42cfa771865ad38393cce19215e8e049dfb/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -769,12 +769,7 @@ resolver record is independent of whether the owner already has a <code>LabelSto
 <p>Single canonical persistence step shared by the warm gateway path and the
 user-signed @custom:function claimLabelStore. The store key is <code>node</code>, matching
 the registrar's <code>_writeOwnerLabel</code> convention.</p>
-<pre><code class="language-solidity">function _writeRecord(
-    address store,
-    bytes32 node,
-    string memory label
-)
-    internal;
+<pre><code class="language-solidity">function _writeRecord(address store, bytes32 node, string memory label) internal;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -788,12 +783,7 @@ the registrar's <code>_writeOwnerLabel</code> convention.</p>
 <p>Reverts with <code>PendingClaimExists</code> when the user already holds an entry. Emits</p>
 <p><strong>Note:</strong>
 emits: PendingClaimStashed.</p>
-<pre><code class="language-solidity">function _stashPendingClaim(
-    address user,
-    string memory label,
-    bytes32 labelhash
-)
-    internal;
+<pre><code class="language-solidity">function _stashPendingClaim(address user, string memory label, bytes32 labelhash) internal;
 </code></pre>
 <h3 id="_clearpendingclaim"><a class="header" href="#_clearpendingclaim">_clearPendingClaim</a></h3>
 <p>Clears a user's pending claim and removes them from the enumeration set.</p>

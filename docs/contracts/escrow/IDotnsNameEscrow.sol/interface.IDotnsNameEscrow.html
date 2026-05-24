@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b801b42cfa771865ad38393cce19215e8e049dfb/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Name Escrow Interface</p>
 <p>Escrows refundable deposits for .dot registrations and manages the release lifecycle.</p>
@@ -631,8 +631,8 @@ itself is non-refundable.</p>
 <h3 id="chargetransferfeeparams"><a class="header" href="#chargetransferfeeparams">ChargeTransferFeeParams</a></h3>
 <p>Inputs for charging a cross-tier transfer fee.</p>
 <p>The fee charged is <code>max(priceForTo - runningMax, reachFloor)</code>: the delta captures
-cross-tier upgrades against the per-token watermark, while <code>reachFloor</code> enforces a
-length-scaled friction floor whenever the recipient is below the label's required tier.</p>
+cross-tier upgrades against the per-token watermark, while <code>reachFloor</code> enforces the
+flat NoStatus deposit floor whenever the recipient is below the label's required tier.</p>
 <pre><code class="language-solidity">struct ChargeTransferFeeParams {
     uint256 tokenId;
     uint256 priceForTo;

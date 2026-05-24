@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b801b42cfa771865ad38393cce19215e8e049dfb/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -230,7 +230,7 @@ Splits on direct vs cross-payer at <code>msg.sender == registration.owner</code>
 runs <code>priceWithCheck</code> (personhood + reservation gate) and routes the fee to a refundable
 escrow deposit owned by <code>registration.owner</code>. The cross-payer path skips personhood
 (a third party may sponsor a verified owner), still enforces base-name reservations
-(otherwise @custom:reverts NameReserved), applies a length-scaled <code>reachFee</code> friction
+(otherwise @custom:reverts NameReserved), applies the flat NoStatus <code>reachFee</code> friction
 when the sender's own tier is below the label's required tier, and routes funds to the
 insurance branch when the payer's tier price differs from the owner's (genuine
 cross-tier sponsorship) versus the refundable branch when the tier prices match

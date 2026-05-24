@@ -180,18 +180,18 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b801b42cfa771865ad38393cce19215e8e049dfb/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
 <p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements,
 and base-name reservation rules.</p>
 <p>Classifies labels into the PoP tier required for registration and exposes reservation
 metadata. Length &lt;= 5 is reserved for governance; lengths 6-8 require PopFull unless they
-carry exactly two trailing digits (PopLite); lengths &gt;= 9 require PopFull unless they
-carry exactly two trailing digits (NoStatus, open). More than two trailing digits is
+carry exactly two trailing digits (PopLite, gateway-issued); lengths &gt;= 9 are open to
+every caller as NoStatus regardless of trailing digits. More than two trailing digits is
 invalid; internal digits do not affect classification. Reservations are keyed by the
 digit-stripped stem so <code>alice</code> and <code>alice42</code> share a slot.
-Pricing is primarily a spam deterrent for NoStatus users; verified PopLite and PopFull
+Pricing is a flat per-name deposit on the NoStatus tier; verified PopLite and PopFull
 users pay zero.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
@@ -439,11 +439,9 @@ contested.</p>
 <p>Friction fee owed when <code>account</code> reaches into a label tier above its verification
 level.</p>
 <p>Non-zero only when <code>account</code> cannot meet the label's required PoP tier; the value is
-the length-scaled list price. Acts as cross-payer friction at registration time and
-as the transfer-time floor consumed by <code>DotnsNameEscrow.chargeTransferFee</code>.
-Non-canonical labels and labels with more than two trailing digits trigger</p>
-<p><strong>Note:</strong>
-reverts: PopError.</p>
+the flat NoStatus deposit. Acts as cross-payer friction at registration time and as
+the transfer-time floor consumed by <code>DotnsNameEscrow.chargeTransferFee</code>. Non-canonical
+labels and labels with more than two trailing digits trigger @custom:reverts PopError.</p>
 <pre><code class="language-solidity">function reachFee(string calldata name, address account) external view returns (uint256 fee);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -472,8 +470,9 @@ reverts: PopError.</p>
 </div>
 <h3 id="price"><a class="header" href="#price">price</a></h3>
 <p>Calculates registration cost for a label.</p>
-<p>Pure length-based pricing; ignores PoP status and reservation state. Non-canonical
-labels trigger @custom:reverts PopError.</p>
+<p>Returns zero for any label shorter than 9 characters; lengths &gt;= 9 pay the flat
+<code>startingPrice</code> deposit. Ignores the caller's personhood status and reservation
+state. Non-canonical labels trigger @custom:reverts PopError.</p>
 <pre><code class="language-solidity">function price(string calldata name) external view returns (uint256 cost);
 </code></pre>
 <p><strong>Parameters</strong></p>

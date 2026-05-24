@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b801b42cfa771865ad38393cce19215e8e049dfb/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -249,7 +249,7 @@ events. Returns the empty string when the token does not exist.</p>
 <h3 id="quotetransferfee"><a class="header" href="#quotetransferfee">quoteTransferFee</a></h3>
 <p>Quotes the additional native fee required to transfer a token to <code>to</code>.</p>
 <p>Returns the maximum of (i) the delta between the recipient-tier price and the
-token's running-max paid history and (ii) the length-scaled <code>reachFee</code>, so
+token's running-max paid history and (ii) the flat NoStatus <code>reachFee</code>, so
 verified-but-below recipients still pay the floor even when the running max would
 otherwise cover the move. Rejects a zero <code>to</code> with @custom:reverts ERC721InvalidReceiver
 and requires the protocol registry to have an escrow configured (otherwise</p>
