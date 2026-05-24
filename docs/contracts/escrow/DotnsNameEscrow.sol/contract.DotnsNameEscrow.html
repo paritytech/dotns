@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
@@ -192,6 +192,10 @@ security-contact: admin@parity.io</p>
 <h3 id="max_released_page_size"><a class="header" href="#max_released_page_size">MAX_RELEASED_PAGE_SIZE</a></h3>
 <p>Maximum page size for releasedTokens pagination.</p>
 <pre><code class="language-solidity">uint256 public constant MAX_RELEASED_PAGE_SIZE = 200;
+</code></pre>
+<h3 id="max_refund_page_size"><a class="header" href="#max_refund_page_size">MAX_REFUND_PAGE_SIZE</a></h3>
+<p>Maximum page size for pendingRefunds pagination and batch claims.</p>
+<pre><code class="language-solidity">uint256 public constant MAX_REFUND_PAGE_SIZE = 200;
 </code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
@@ -240,8 +244,28 @@ starts from a clean baseline.</p>
 <h3 id="_pendingwithdrawals"><a class="header" href="#_pendingwithdrawals">_pendingWithdrawals</a></h3>
 <p>Pull-payment ledger storing each recipient's claimable refund balance.</p>
 <p>Per-recipient isolation ensures a failing or reentrant receiver cannot block other
-users' withdrawals.</p>
+users' withdrawals. Used as the fallback path for registration overpayments whose
+direct push back to <code>msg.sender</code> failed (because the caller is a contract that
+rejects incoming value).</p>
 <pre><code class="language-solidity">mapping(address recipient =&gt; uint256 amount) private _pendingWithdrawals;
+</code></pre>
+<h3 id="_refundentries"><a class="header" href="#_refundentries">_refundEntries</a></h3>
+<p>Time-locked refund ledger keyed by entryId.</p>
+<p>Every credit allocates a fresh entryId so per-entry cooldowns are independent and
+drip-feed credits cannot reset an existing entry's clock.</p>
+<pre><code class="language-solidity">mapping(uint256 entryId =&gt; RefundEntry entry) private _refundEntries;
+</code></pre>
+<h3 id="_entriesbyrecipient"><a class="header" href="#_entriesbyrecipient">_entriesByRecipient</a></h3>
+<p>Per-recipient list of pending entryIds for paginated enumeration and batch claim.</p>
+<pre><code class="language-solidity">mapping(address recipient =&gt; uint256[] entryIds) private _entriesByRecipient;
+</code></pre>
+<h3 id="_entryindexplusone"><a class="header" href="#_entryindexplusone">_entryIndexPlusOne</a></h3>
+<p>Reverse lookup into <code>_entriesByRecipient</code> (one-based) for O(1) remove-by-swap.</p>
+<pre><code class="language-solidity">mapping(uint256 entryId =&gt; uint256 indexPlusOne) private _entryIndexPlusOne;
+</code></pre>
+<h3 id="_nextentryid"><a class="header" href="#_nextentryid">_nextEntryId</a></h3>
+<p>Monotonic counter assigning entryIds to new refund credits.</p>
+<pre><code class="language-solidity">uint256 private _nextEntryId;
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in the future.</p>
@@ -384,9 +408,12 @@ emits: CrossTierFeePaid with <code>isRegistration = true</code> once the fee is 
     nonReentrant;
 </code></pre>
 <h3 id="chargetransferfee"><a class="header" href="#chargetransferfee">chargeTransferFee</a></h3>
-<p>Charges the cross-tier transfer-fee delta against the running max for a token.</p>
+<p>Charges transfer friction and synchronises the token's escrow position.</p>
 <p>Only the configured registrar may call this, otherwise @custom:reverts NotRegistrar.
 When a fee is owed, <code>msg.value</code> must cover it or @custom:reverts InsufficientValue.
+If a positive deposit position leaves its original recipient, the deposit is cleared
+and credited as a time-locked refund. If a zero-amount lifecycle marker leaves its
+recipient, the marker is rebound to <code>params.to</code> so the new holder can still release.
 Emits @custom:emits CrossTierFeePaid with <code>isRegistration = false</code> when a non-zero
 fee is credited to insurance, and @custom:emits OverpaymentRefunded when surplus
 <code>msg.value</code> (or the full amount when no fee is owed) is returned to <code>params.payer</code>;
@@ -459,6 +486,111 @@ reverts: NoPendingWithdrawal; a failing native transfer triggers</p>
 <tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native amount currently credited to <code>recipient</code> and pullable via <code>claimWithdrawal</code>.</td></tr>
 </tbody></table>
 </div>
+<h3 id="claimrefund"><a class="header" href="#claimrefund">claimRefund</a></h3>
+<p>Pulls a single time-locked refund entry.</p>
+<p>Caller must be the entry's recipient (@custom:reverts NotRefundRecipient otherwise),
+the entry must exist (@custom:reverts NoSuchRefundEntry on a deleted or unknown id),
+and <code>block.timestamp</code> must have reached <code>availableAt</code> (@custom:reverts
+RefundLocked otherwise). The entry is deleted before the transfer; a failing native
+transfer triggers @custom:reverts RefundFailed. Emits @custom:emits RefundClaimed.</p>
+<pre><code class="language-solidity">function claimRefund(uint256 entryId) external override nonReentrant returns (uint256 amount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entryId</code></td><td><code>uint256</code></td><td>Identifier of the entry to claim.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native amount transferred to the caller.</td></tr>
+</tbody></table>
+</div>
+<h3 id="claimrefundsbatch"><a class="header" href="#claimrefundsbatch">claimRefundsBatch</a></h3>
+<p>Pulls multiple time-locked refund entries in one call.</p>
+<p>Atomic: any invalid entry in the batch (wrong recipient, missing, or locked) reverts
+the entire call. The batch size is bounded by <code>MAX_REFUND_PAGE_SIZE</code>
+(@custom:reverts InvalidPageSize otherwise). Aggregates the per-entry amounts and
+transfers once; on transfer failure @custom:reverts RefundFailed. Emits</p>
+<p><strong>Note:</strong>
+emits: RefundClaimed once per entry.</p>
+<pre><code class="language-solidity">function claimRefundsBatch(uint256[] calldata entryIds)
+    external
+    override
+    nonReentrant
+    returns (uint256 totalAmount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entryIds</code></td><td><code>uint256[]</code></td><td>List of entry identifiers to claim.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>totalAmount</code></td><td><code>uint256</code></td><td>Sum of the credited amounts transferred to the caller.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingrefundcount"><a class="header" href="#pendingrefundcount">pendingRefundCount</a></h3>
+<p>Returns the number of pending refund entries owed to <code>recipient</code>.</p>
+<pre><code class="language-solidity">function pendingRefundCount(address recipient) external view override returns (uint256 count);
+</code></pre>
+<h3 id="pendingrefundids"><a class="header" href="#pendingrefundids">pendingRefundIds</a></h3>
+<p>Returns up to <code>limit</code> pending refund entry ids for <code>recipient</code>, starting at
+<code>offset</code>.</p>
+<p>Limit must be in <code>(0, MAX_REFUND_PAGE_SIZE]</code>, otherwise @custom:reverts
+InvalidPageSize.</p>
+<pre><code class="language-solidity">function pendingRefundIds(
+    address recipient,
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    override
+    returns (uint256[] memory entryIds);
+</code></pre>
+<h3 id="pendingrefunds"><a class="header" href="#pendingrefunds">pendingRefunds</a></h3>
+<p>Returns up to <code>limit</code> pending refund entries for <code>recipient</code>, paired with their
+entry ids.</p>
+<p>Limit must be in <code>(0, MAX_REFUND_PAGE_SIZE]</code>, otherwise @custom:reverts
+InvalidPageSize.</p>
+<pre><code class="language-solidity">function pendingRefunds(
+    address recipient,
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    override
+    returns (uint256[] memory entryIds, RefundEntry[] memory entries);
+</code></pre>
+<h3 id="refundentry"><a class="header" href="#refundentry">refundEntry</a></h3>
+<p>Returns a single refund entry by id, or a zero-filled struct if the id is unknown.</p>
+<pre><code class="language-solidity">function refundEntry(uint256 entryId)
+    external
+    view
+    override
+    returns (RefundEntry memory entry);
+</code></pre>
+<h3 id="_creditrefund"><a class="header" href="#_creditrefund">_creditRefund</a></h3>
+<p>Internal helper: allocate a new entryId and credit a refund to <code>recipient</code>.</p>
+<p>Assigns the next monotonic entryId, stores the entry, appends to the recipient's
+enumeration array, and emits @custom:emits RefundCredited. <code>cooldownSeconds</code> may be
+zero when the cooldown has already been served by another mechanism (for example, the
+release-and-withdraw path enforces the cooldown on the position before crediting).</p>
+<pre><code class="language-solidity">function _creditRefund(
+    address recipient,
+    uint256 amount,
+    uint256 tokenId,
+    uint64 cooldownSeconds
+)
+    internal
+    returns (uint256 entryId);
+</code></pre>
+<h3 id="_removerefundentry"><a class="header" href="#_removerefundentry">_removeRefundEntry</a></h3>
+<p>Internal helper: delete a refund entry and swap-pop its slot in the recipient's
+enumeration array.</p>
+<pre><code class="language-solidity">function _removeRefundEntry(uint256 entryId, address recipient) internal;
+</code></pre>
 <h3 id="reclaim"><a class="header" href="#reclaim">reclaim</a></h3>
 <p>Transfers a released-and-claimed token from escrow custody to a new owner.</p>
 <p>Hands the NFT back to the controller for re-registration and clears <code>runningMax</code> so the

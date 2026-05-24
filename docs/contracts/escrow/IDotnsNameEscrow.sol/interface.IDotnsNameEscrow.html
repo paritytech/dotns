@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Name Escrow Interface</p>
 <p>Escrows refundable deposits for .dot registrations and manages the release lifecycle.</p>
@@ -269,9 +269,12 @@ contract receiver. Emits @custom:emits OverpaymentRefunded once the credit lands
 </tbody></table>
 </div>
 <h3 id="chargetransferfee"><a class="header" href="#chargetransferfee">chargeTransferFee</a></h3>
-<p>Charges the cross-tier transfer-fee delta against the running max for a token.</p>
+<p>Charges transfer friction and synchronises the token's escrow position.</p>
 <p>Only the configured registrar may call this, otherwise @custom:reverts NotRegistrar.
 When a fee is owed, <code>msg.value</code> must cover it or @custom:reverts InsufficientValue.
+If a positive deposit position leaves its original recipient, the deposit is cleared
+and credited as a time-locked refund. If a zero-amount lifecycle marker leaves its
+recipient, the marker is rebound to <code>params.to</code> so the new holder can still release.
 Emits @custom:emits CrossTierFeePaid with <code>isRegistration = false</code> when a non-zero
 fee is credited to insurance, and @custom:emits OverpaymentRefunded when surplus
 <code>msg.value</code> (or the full amount when no fee is owed) is returned to <code>params.payer</code>;
@@ -395,6 +398,81 @@ must be non-zero, otherwise @custom:reverts InvalidCooldown. Emits</p>
 emits: CooldownUpdated with the prior and new values.</p>
 <pre><code class="language-solidity">function updateCooldown(uint256 newCooldown) external;
 </code></pre>
+<h3 id="claimrefund"><a class="header" href="#claimrefund">claimRefund</a></h3>
+<p>Pulls a single time-locked refund entry.</p>
+<p>Caller must be the entry's recipient (@custom:reverts NotRefundRecipient otherwise),
+the entry must exist (@custom:reverts NoSuchRefundEntry on a deleted or unknown id),
+and <code>block.timestamp</code> must have reached <code>availableAt</code> (@custom:reverts
+RefundLocked otherwise). The entry is deleted before the transfer; a failing native
+transfer triggers @custom:reverts RefundFailed. Emits @custom:emits RefundClaimed.</p>
+<pre><code class="language-solidity">function claimRefund(uint256 entryId) external returns (uint256 amount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entryId</code></td><td><code>uint256</code></td><td>Identifier of the entry to claim.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native amount transferred to the caller.</td></tr>
+</tbody></table>
+</div>
+<h3 id="claimrefundsbatch"><a class="header" href="#claimrefundsbatch">claimRefundsBatch</a></h3>
+<p>Pulls multiple time-locked refund entries in one call.</p>
+<p>Atomic: any invalid entry in the batch (wrong recipient, missing, or locked) reverts
+the entire call. The batch size is bounded by <code>MAX_REFUND_PAGE_SIZE</code>
+(@custom:reverts InvalidPageSize otherwise). Aggregates the per-entry amounts and
+transfers once; on transfer failure @custom:reverts RefundFailed. Emits</p>
+<p><strong>Note:</strong>
+emits: RefundClaimed once per entry.</p>
+<pre><code class="language-solidity">function claimRefundsBatch(uint256[] calldata entryIds) external returns (uint256 totalAmount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entryIds</code></td><td><code>uint256[]</code></td><td>List of entry identifiers to claim.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>totalAmount</code></td><td><code>uint256</code></td><td>Sum of the credited amounts transferred to the caller.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingrefundcount"><a class="header" href="#pendingrefundcount">pendingRefundCount</a></h3>
+<p>Returns the number of pending refund entries owed to <code>recipient</code>.</p>
+<pre><code class="language-solidity">function pendingRefundCount(address recipient) external view returns (uint256 count);
+</code></pre>
+<h3 id="pendingrefundids"><a class="header" href="#pendingrefundids">pendingRefundIds</a></h3>
+<p>Returns up to <code>limit</code> pending refund entry ids for <code>recipient</code>, starting at
+<code>offset</code>.</p>
+<p>Limit must be in <code>(0, MAX_REFUND_PAGE_SIZE]</code>, otherwise @custom:reverts
+InvalidPageSize.</p>
+<pre><code class="language-solidity">function pendingRefundIds(
+    address recipient,
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    returns (uint256[] memory entryIds);
+</code></pre>
+<h3 id="pendingrefunds"><a class="header" href="#pendingrefunds">pendingRefunds</a></h3>
+<p>Returns up to <code>limit</code> pending refund entries for <code>recipient</code>, paired with their
+entry ids.</p>
+<p>Limit must be in <code>(0, MAX_REFUND_PAGE_SIZE]</code>, otherwise @custom:reverts
+InvalidPageSize.</p>
+<pre><code class="language-solidity">function pendingRefunds(
+    address recipient,
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    returns (uint256[] memory entryIds, RefundEntry[] memory entries);
+</code></pre>
+<h3 id="refundentry"><a class="header" href="#refundentry">refundEntry</a></h3>
+<p>Returns a single refund entry by id, or a zero-filled struct if the id is unknown.</p>
+<pre><code class="language-solidity">function refundEntry(uint256 entryId) external view returns (RefundEntry memory entry);
+</code></pre>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
 <h3 id="nativedepositrecorded"><a class="header" href="#nativedepositrecorded">NativeDepositRecorded</a></h3>
 <p>Emitted when a native-token deposit is recorded.</p>
@@ -437,6 +515,36 @@ emits: CooldownUpdated with the prior and new values.</p>
 <p>Emitted when a recipient pulls their accumulated pending refund balance.</p>
 <pre><code class="language-solidity">event WithdrawalClaimed(address indexed recipient, uint256 amount);
 </code></pre>
+<h3 id="refundcredited"><a class="header" href="#refundcredited">RefundCredited</a></h3>
+<p>Emitted when a refund is credited to the time-locked refund ledger.</p>
+<pre><code class="language-solidity">event RefundCredited(
+    address indexed recipient,
+    uint256 indexed entryId,
+    uint256 amount,
+    uint64 availableAt,
+    uint256 indexed tokenId
+);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address that may claim the entry once <code>availableAt</code> has elapsed.</td></tr>
+<tr><td><code>entryId</code></td><td><code>uint256</code></td><td>Newly-assigned identifier for the credited entry.</td></tr>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native value credited.</td></tr>
+<tr><td><code>availableAt</code></td><td><code>uint64</code></td><td>Earliest block timestamp at which the recipient may claim.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token associated with the credit, retained for traceability.</td></tr>
+</tbody></table>
+</div>
+<h3 id="refundclaimed"><a class="header" href="#refundclaimed">RefundClaimed</a></h3>
+<p>Emitted when a recipient claims a single refund entry.</p>
+<pre><code class="language-solidity">event RefundClaimed(address indexed recipient, uint256 indexed entryId, uint256 amount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address that pulled the entry.</td></tr>
+<tr><td><code>entryId</code></td><td><code>uint256</code></td><td>Identifier of the claimed entry, now deleted.</td></tr>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native value transferred to <code>recipient</code>.</td></tr>
+</tbody></table>
+</div>
 <h3 id="namereclaimed"><a class="header" href="#namereclaimed">NameReclaimed</a></h3>
 <p>Emitted when a released token is reclaimed by a new owner via registration.</p>
 <pre><code class="language-solidity">event NameReclaimed(
@@ -585,6 +693,15 @@ emits: CooldownUpdated with the prior and new values.</p>
 <p>Thrown when <code>claimWithdrawal()</code> is called but the caller has no pending balance.</p>
 <pre><code class="language-solidity">error NoPendingWithdrawal();
 </code></pre>
+<h3 id="nosuchrefundentry"><a class="header" href="#nosuchrefundentry">NoSuchRefundEntry</a></h3>
+<p>Thrown when a refund entry is referenced but does not exist.</p>
+<pre><code class="language-solidity">error NoSuchRefundEntry(uint256 entryId);
+</code></pre>
+<h3 id="refundlocked"><a class="header" href="#refundlocked">RefundLocked</a></h3>
+<p>Thrown when a refund entry is claimed before its <code>availableAt</code> cooldown has
+elapsed.</p>
+<pre><code class="language-solidity">error RefundLocked(uint256 entryId, uint64 availableAt);
+</code></pre>
 <h3 id="notacceptedtransfer"><a class="header" href="#notacceptedtransfer">NotAcceptedTransfer</a></h3>
 <p>Thrown when escrow receives an ERC721 transfer from a non-registrar source.</p>
 <pre><code class="language-solidity">error NotAcceptedTransfer(address caller);
@@ -629,13 +746,14 @@ itself is non-refundable.</p>
 </tbody></table>
 </div>
 <h3 id="chargetransferfeeparams"><a class="header" href="#chargetransferfeeparams">ChargeTransferFeeParams</a></h3>
-<p>Inputs for charging a cross-tier transfer fee.</p>
-<p>The fee charged is <code>max(priceForTo - runningMax, reachFloor)</code>: the delta captures
-cross-tier upgrades against the per-token watermark, while <code>reachFloor</code> enforces the
-flat NoStatus deposit floor whenever the recipient is below the label's required tier.</p>
+<p>Inputs for charging a transfer fee and clearing any stale deposit.</p>
+<p>The fee charged is the flat <code>reachFloor</code> returned by @custom:function
+PopRules.transferFloor. Independently, when an active deposit position exists and the NFT is
+leaving its original
+depositor, the full deposit is refunded to that depositor via the time-locked refund
+ledger. The recipient never inherits a deposit at transfer.</p>
 <pre><code class="language-solidity">struct ChargeTransferFeeParams {
     uint256 tokenId;
-    uint256 priceForTo;
     uint256 reachFloor;
     address payer;
     address to;
@@ -644,10 +762,9 @@ flat NoStatus deposit floor whenever the recipient is below the label's required
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>tokenId</code></td><td><code>uint256</code></td><td></td></tr>
-<tr><td><code>priceForTo</code></td><td><code>uint256</code></td><td>Recipient-tier price quoted from PopRules.</td></tr>
-<tr><td><code>reachFloor</code></td><td><code>uint256</code></td><td>Reach-floor friction when the recipient is below the required tier.</td></tr>
+<tr><td><code>reachFloor</code></td><td><code>uint256</code></td><td>Required fee paid by the sender on a downward or cross-reach transfer.</td></tr>
 <tr><td><code>payer</code></td><td><code>address</code></td><td>Original <code>msg.sender</code> of the registrar transfer entrypoint.</td></tr>
-<tr><td><code>to</code></td><td><code>address</code></td><td>NFT recipient.</td></tr>
+<tr><td><code>to</code></td><td><code>address</code></td><td>NFT recipient. Compared against <code>position.recipient</code> to decide deposit clearance.</td></tr>
 </tbody></table>
 </div>
 <h3 id="releaseposition"><a class="header" href="#releaseposition">ReleasePosition</a></h3>
@@ -672,6 +789,26 @@ ledger). The position is deleted on <code>reclaim</code>, freeing the slot for r
 <tr><td><code>withdrawAvailableAt</code></td><td><code>uint64</code></td><td>Earliest timestamp at which withdrawal is permitted.</td></tr>
 <tr><td><code>released</code></td><td><code>bool</code></td><td></td></tr>
 <tr><td><code>claimed</code></td><td><code>bool</code></td><td></td></tr>
+</tbody></table>
+</div>
+<h3 id="refundentry-1"><a class="header" href="#refundentry-1">RefundEntry</a></h3>
+<p>Time-locked refund entry produced when the protocol owes a recipient value
+outside the registration-overpayment path.</p>
+<p>Every credit creates a fresh entry with its own <code>availableAt</code>; later credits do not
+reset earlier entries' clocks. Recipients claim entries individually or in batches.</p>
+<pre><code class="language-solidity">struct RefundEntry {
+    address recipient;
+    uint256 amount;
+    uint64 availableAt;
+    uint256 tokenId;
+}
+</code></pre>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address that may claim this entry once <code>availableAt</code> has elapsed.</td></tr>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native value credited.</td></tr>
+<tr><td><code>availableAt</code></td><td><code>uint64</code></td><td>Earliest block timestamp at which the recipient may claim.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token this entry was produced for, retained for traceability.</td></tr>
 </tbody></table>
 </div>
                     </main>

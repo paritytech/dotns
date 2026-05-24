@@ -223,15 +223,53 @@ back through the same file. <code>scripts/deploy/run.sh</code> chains the stages
 <code>package.json</code> calls into it. The split keeps each <code>forge script</code> process small
 enough for OpenZeppelin's upgrade-safety validation to run without exhausting
 the simulated EVM.</p>
+<h2 id="economics"><a class="header" href="#economics">Economics</a></h2>
+<p>dotNS uses a single tunable constant, written <strong><code>D</code></strong> throughout the protocol. <code>D</code> is the value returned by <code>PopRules.startingPrice()</code> and equals <code>10 ether</code> (ten DOT) at launch; the owner can adjust it through <code>PopRules.updateStartingPrice</code> under the same governance gate as the upgrade authority. <code>D</code> is the only money quantity the protocol charges; everything else is composition of <code>D</code> with zero.</p>
+<p><code>D</code> plays two distinct roles. As a <strong>deposit</strong> it is the refundable lock a NoStatus user posts to register a NoStatus-tier label; it stays bound to the original depositor through <code>DotnsNameEscrow._positions[tokenId].recipient</code> and is refunded when the NFT leaves them. As a <strong>friction</strong> charge it is the non-refundable amount a sender pays on a cross-tier downward or reach-floor transfer, settled to <code>DotnsNameEscrow.insuranceFund</code> and never returned. The two flows are economically distinct and tracked under different storage.</p>
+<h3 id="registration-matrix"><a class="header" href="#registration-matrix">Registration matrix</a></h3>
+<p><code>DotnsRegistrarController.register</code> computes the charge as <code>max(priced.price, friction)</code>, never their sum, where <code>priced.price</code> is the owner-side flat price from <code>PopRules.priceWithCheck</code> / <code>priceWithoutCheck</code> and <code>friction</code> is the payer-to-owner downward-friction amount from <code>PopRules.transferFloor</code> (zero on a direct registration). The single charge routes to the deposit position on a direct registration and to the insurance fund on a cross-payer registration.</p>
+<div class="table-wrapper"><table><thead><tr><th>Owner tier</th><th>Reserved (stem ≤5)</th><th>PopFull-tier (stem 6-8, no digits)</th><th>PopLite-tier (stem 6-8, two digits)</th><th>NoStatus-tier (stem ≥9)</th></tr></thead><tbody>
+<tr><td><strong>NoStatus user</strong></td><td>revert</td><td>revert</td><td>revert</td><td>direct: pays <code>D</code> into deposit</td></tr>
+<tr><td><strong>PopLite user</strong></td><td>revert</td><td>revert</td><td>gateway-only; free</td><td>free</td></tr>
+<tr><td><strong>PopFull user</strong></td><td>revert</td><td>free</td><td>gateway-only; free</td><td>free</td></tr>
+<tr><td><strong>Whitelisted address</strong></td><td>free (<code>registerReserved</code>)</td><td>free</td><td>free</td><td>free</td></tr>
+</tbody></table>
+</div>
+<p>Cross-payer registrations (<code>msg.sender != registration.owner</code>) bypass the eligibility gate for the owner via <code>priceWithoutCheck</code>, but still pay <code>max(ownerPrice, transferFloor)</code> into insurance. Reserved labels remain forbidden on the cross-payer path because the owner-side gate still rejects them. Whitelist registrations go through the same commit-reveal pipeline as the public path.</p>
+<h3 id="transfer-matrix"><a class="header" href="#transfer-matrix">Transfer matrix</a></h3>
+<p><code>DotnsRegistrar._update</code> consults <code>PopRules.transferFloor(label, from, to)</code>, which returns <code>max(reachComponent, downgradeComponent)</code>. A transfer pays <code>D</code> whenever the recipient's tier is strictly below the sender's, or whenever the recipient cannot reach the label's required tier (a stale PopFull-tier name landing in a PopLite holder, for example, even on a same-tier PopLite-to-PopLite move). Same-tier and upward transfers between holders of the label's own class are free.</p>
+<div class="table-wrapper"><table><thead><tr><th>Sender → Recipient</th><th>Friction (to insurance)</th><th>Deposit movement</th></tr></thead><tbody>
+<tr><td>NoStatus → NoStatus (same tier)</td><td>0</td><td>Refunded to original depositor if the name leaves them</td></tr>
+<tr><td>NoStatus → PopLite or PopFull</td><td>0</td><td>Refunded to original depositor (always leaving)</td></tr>
+<tr><td>PopLite → NoStatus</td><td><code>D</code></td><td>n/a (recipient takes no new deposit)</td></tr>
+<tr><td>PopLite → PopLite (same)</td><td>0</td><td>None, unless reach-floor fires</td></tr>
+<tr><td>PopLite → PopFull (upward)</td><td>0</td><td>None</td></tr>
+<tr><td>PopFull → NoStatus</td><td><code>D</code></td><td>n/a</td></tr>
+<tr><td>PopFull → PopLite (downward)</td><td><code>D</code></td><td>n/a</td></tr>
+<tr><td>PopFull → PopFull (same)</td><td>0</td><td>None, unless reach-floor fires</td></tr>
+</tbody></table>
+</div>
+<p>The friction is constant and additive across downward hops. Every step that crosses a tier boundary downward charges <code>D</code> independently, so routing a name through intermediary tiers never costs less than the equivalent direct transfer. Laundering pays at least as much as the route it tries to avoid.</p>
+<h3 id="refund-and-cooldown-model"><a class="header" href="#refund-and-cooldown-model">Refund and cooldown model</a></h3>
+<p>The escrow maintains two separate pull-payment ledgers. The split is deliberate: the second ledger exists to enforce a cooldown that the first ledger must not impose.</p>
+<ul>
+<li><strong>Overpayment ledger</strong> — <code>_pendingWithdrawals[recipient] =&gt; uint256</code>, claimed via <code>claimWithdrawal()</code>. No cooldown. Used only as the fallback when <code>DotnsRegistrarController.register</code> tries to push a registration overpayment back to <code>msg.sender</code> inline and the push call returns false (contract receivers that reject inbound value).</li>
+<li><strong>Refund ledger</strong> — <code>_refundEntries[entryId] =&gt; RefundEntry { recipient, amount, availableAt, tokenId }</code>, claimed via <code>claimRefund(entryId)</code> or <code>claimRefundsBatch(entryIds[])</code>. Every credit allocates a fresh <code>entryId</code> and stamps its own <code>availableAt = block.timestamp + cooldown</code>, so drip-feed credits cannot reset earlier entries' clocks. Used for two flows: the full deposit refunded when a NoStatus-deposited name leaves its original depositor (the <strong>refund-on-leave</strong> path), and any transfer-fee overpayment a sender attaches above the required <code>reachFloor</code>.</li>
+</ul>
+<p>Only registrations trigger an immediate refund. <code>DotnsRegistrarController.register</code> attempts an inline <code>payable(msg.sender).call{value: refund}("")</code>; on success the surplus is back in the caller's wallet in the same transaction, on failure the surplus lands on the overpayment ledger for later claim. Every other refund path waits behind its own entry-bound cooldown. The cooldown value lives on <code>DotnsNameEscrow.cooldown</code> and is governance-tunable through <code>updateCooldown</code>.</p>
+<p>Enumerate pending refunds with <code>pendingRefundCount(addr)</code> / <code>pendingRefundIds(addr, offset, limit)</code> / <code>pendingRefunds(addr, offset, limit)</code>; inspect a single entry with <code>refundEntry(entryId)</code>. The pagination limit constant is <code>MAX_REFUND_PAGE_SIZE</code> (200).</p>
 <h2 id="contracts"><a class="header" href="#contracts">Contracts</a></h2>
 <p>Two controllers sit on top of a single registrar and a single protocol registry. The registrar holds the ERC721 token per name; the registry holds the forward <code>node =&gt; (owner, resolver)</code> mapping and subname hierarchy; the resolvers hold per-name records; the protocol registry is the indirection layer through which every contract resolves its siblings at runtime. Controllers are the entry points: they mint names and drive the side effects. Neither controller imports the other. The layers underneath arbitrate collision handling: ERC721 uniqueness on the registrar, and a single reservation table on PopRules that both flows read through.</p>
 <h3 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller"><code>DotnsRegistrarController</code></a></h3>
 <p>Commit-reveal controller for the public registration path. A caller first submits a commitment hash, waits out the minimum commitment age, then reveals the registration parameters alongside the payment. The controller validates the commitment, routes price and eligibility through PopRules, and orchestrates every side effect of a successful registration: the mint on the registrar, the forward wire-up on the registry, the reverse record on the reverse resolver, the immutable Store write, and any refund owed on overpayment. Acceptable input is a single DNS label; governance-reserved labels are rejected at the pricing layer.</p>
 <h3 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller"><code>DotnsPopController</code></a></h3>
 <p>Dedicated controller for the Proof-of-Personhood gateway flow. Lives behind its own UUPS proxy with its own storage and is registered on the registrar via <code>addController</code> alongside the commit-reveal controller. Its gated entry points are callable only from the address resolved through the protocol registry under the <code>POP_GATEWAY</code> key, which is the <code>RootGatewayDispatcher</code> deployed against this controller; the dispatcher is the contract that actually proves substrate Root authority before forwarding here.</p>
+<p>Today the Pop gateway does not write a standalone <code>user =&gt; dotNS PopStatus</code> mapping. It materializes the PoP flow through gateway-issued labels, PoP resolver records, and reservation queue state; user tier checks for public pricing still come from the personhood precompile/context read.</p>
 <p>The first, <code>reserveBaseName</code>, mints a lite-person username to a user. The gateway-facing input is a <code>stem.suffix</code> shape: a single DNS label followed by exactly one dot and a digits-only suffix of at least two digits (for example <code>michal.03</code>). The controller normalises that input by stripping the dot before classification, pricing, and minting, so the on-chain label is always flat (<code>michal.03</code> becomes <code>michal03</code>). Inputs with more than one dot, no dot, or a non-digit suffix are rejected at the boundary. The call also persists the user's chat key on the PoP resolver and optionally enqueues a reservation for a full-person base name the user intends to claim later.</p>
 <p>The second, <code>registerBaseName</code>, mints a full-person username. Whether the call is a claim against a prior lite reservation or a fresh standalone registration is derived from on-chain reservation state; the caller does not choose. The link argument selects the chat-key source: inherit from a prior lite label, or accept a fresh one in the payload. When inheriting, the call also writes the <code>liteLink</code> (full =&gt; lite) and <code>fullClaim</code> (lite =&gt; full) records on the PoP resolver in the same transaction so downstream consumers can resolve either direction without scanning events.</p>
 <p>Each base label carries a head/tail-indexed reservation queue with a capacity of <code>MAX_RESERVATION_QUEUE</code> and a governance-configurable <code>reservationDuration</code>. The queue head is mirrored into PopRules on every head transition (enqueue-from-empty, expiry-driven promotion, non-expiry head removal, claim-wipes-queue), so the public commit-reveal flow sees the same cross-flow lock through its existing PopRules price check. Expiry advancement is permissionless: anyone can call <code>expireReservation</code> to garbage-collect a stale head, which is what the pallet does on its own cadence.</p>
+<h4 id="early-mainnet-quirk-labelstore-deployment"><a class="header" href="#early-mainnet-quirk-labelstore-deployment">Early mainnet quirk: <code>LabelStore</code> deployment</a></h4>
+<p>Pop-gateway issuances mint the name and persist its label, but <code>LabelStore</code> deployment is deferred for users who have not yet interacted with the protocol from their own address. The current pallet-revive runtime does not let substrate Root deploy contracts on behalf of an account it does not control, so the per-user <code>LabelStore</code> cannot be created at the moment the gateway writes. The controller stamps a pending-claim entry instead, and the user calls <code>claimLabelStore</code> once from their own address to settle the store. The pending-claim entries have a bounded TTL (<code>expirePendingClaim</code> is permissionless) so the slot frees itself if a user never claims. When the runtime supports root-origin contract deployment, the deferred path collapses to a no-op and the issuance flow becomes one transaction end-to-end. This is a runtime limitation, not a protocol design choice.</p>
 <h3 id="rootgatewaydispatcher"><a class="header" href="#rootgatewaydispatcher"><code>RootGatewayDispatcher</code></a></h3>
 <p>Non-upgradeable shim that translates a substrate Root-origin dispatch into an EVM-observable authority on the PoP controller. The dispatcher is the direct callee of the Root runtime origin, asks the revive System precompile whether its caller is Root, and forwards the calldata to the controller via a regular message call only when that check passes. The forwarded call lands on the controller proxy with the dispatcher as the immediate caller, which the controller authorises against the address registered on the protocol registry under <code>POP_GATEWAY</code>.</p>
 <p>Hosting the Root check in a separate, non-proxy contract is what makes it work at all. The revive System precompile is only meaningful in the frame that is the direct callee of Root, and a UUPS implementation runs inside the proxy's delegatecall, so the controller cannot ask the precompile from its own frame. The dispatcher's target is immutable, set at construction to the controller proxy it serves, and the dispatcher holds no storage of its own and never delegatecalls, so it cannot be repurposed as an arbitrary-target proxy. Rotating the dispatcher is a single <code>set</code> call on the protocol registry; the controller picks up the new gateway on its next call without an upgrade.</p>
@@ -241,14 +279,31 @@ the simulated EVM.</p>
 <p>Forward registry mapping <code>node</code> to <code>(owner, resolver)</code> and supporting subnode creation. When a base name is minted on the registrar, the matching controller wires the node to the new owner through this registry. Privileged node wiring defers to the same <code>controllers</code> mapping on the registrar, so both controllers can write without the registry tracking controllers of its own.</p>
 <p>Subnames are created by the base-name owner. A subname carries its own <code>(owner, resolver)</code> and can in turn carry subnames, so the registry is the place the name hierarchy actually lives.</p>
 <h3 id="poprules"><a class="header" href="#poprules"><code>PopRules</code></a></h3>
-<p>PoP-aware name classification and pricing. Classifies a label into one of four tiers: <code>NoStatus</code> (labels of 9+ characters, open to anyone for a flat deposit regardless of trailing digits), <code>PopLite</code> (6-8 character labels with exactly two trailing digits, gateway-issued to lite-verified users), <code>PopFull</code> (6-8 character labels otherwise, requires full-person verification), and <code>Reserved</code> (labels of 5 characters or fewer, governed by the protocol). The classification determines the price and the eligibility gate the commit-reveal controller enforces.</p>
+<p>PoP-aware name classification and pricing. Classification reads the label's <strong>stem length</strong> (the character count after stripping the trailing digit suffix) and the trailing digit count itself, then maps to one of four tiers: <code>NoStatus</code> (stem of 9+ characters, open to anyone for a flat deposit, with zero or exactly two trailing digits permitted), <code>PopLite</code> (stem of 6-8 characters with exactly two trailing digits, gateway-issued to lite-verified users), <code>PopFull</code> (stem of 6-8 characters with no trailing digits, requires full-person verification), and <code>Reserved</code> (stem of 5 characters or fewer, governed by the protocol). Labels carrying one trailing digit or more than two trailing digits are rejected at the classifier. The classification determines the price and the eligibility gate the commit-reveal controller enforces.</p>
+<h4 id="classification-examples-and-failure-modes"><a class="header" href="#classification-examples-and-failure-modes">Classification examples and failure modes</a></h4>
+<p>The classifier bands on the stem, not the total label length. The stem is the label after removing any trailing digits. Trailing digit count must be zero or exactly two; a one-digit suffix and suffixes longer than two digits are invalid before tier eligibility is considered.</p>
+<div class="table-wrapper"><table><thead><tr><th>Label</th><th>Stem</th><th style="text-align: right">Trailing digits</th><th>Classification</th><th>Eligible public path</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>alice12</code></td><td><code>alice</code></td><td style="text-align: right">2</td><td><code>Reserved</code></td><td>Whitelist only</td><td>The stem is five characters, so the two-digit suffix does not make it PopLite.</td></tr>
+<tr><td><code>andrew01</code></td><td><code>andrew</code></td><td style="text-align: right">2</td><td><code>PopLite</code></td><td>Pop gateway only</td><td>Valid lite shape: six-character stem plus system-supplied two-digit suffix.</td></tr>
+<tr><td><code>alicebob42</code></td><td><code>alicebob</code></td><td style="text-align: right">2</td><td><code>PopLite</code></td><td>Pop gateway only</td><td>Eight-character stem plus two digits; total length is ten.</td></tr>
+<tr><td><code>andrew</code></td><td><code>andrew</code></td><td style="text-align: right">0</td><td><code>PopFull</code></td><td>PopFull user</td><td>Canonical full-person base name.</td></tr>
+<tr><td><code>andrew1</code></td><td><code>andrew</code></td><td style="text-align: right">1</td><td>Rejected</td><td>None</td><td>One trailing digit has no protocol meaning.</td></tr>
+<tr><td><code>andrewsays</code></td><td><code>andrewsays</code></td><td style="text-align: right">0</td><td><code>NoStatus</code></td><td>Anyone</td><td>NoStatus self-registration pays the flat refundable deposit.</td></tr>
+<tr><td><code>andrewsays01</code></td><td><code>andrewsays</code></td><td style="text-align: right">2</td><td><code>NoStatus</code></td><td>Anyone</td><td>Long stem remains NoStatus even with a two-digit suffix.</td></tr>
+<tr><td><code>andrew123</code></td><td><code>andrew</code></td><td style="text-align: right">3</td><td>Rejected</td><td>None</td><td>More than two trailing digits is invalid.</td></tr>
+<tr><td><code>andrew.01</code></td><td>n/a</td><td style="text-align: right">n/a</td><td>Rejected by public label validator</td><td>None</td><td>Dots are not valid in the public flat label. The Pop gateway accepts <code>stem.suffix</code> and normalises it to <code>stemsuffix</code>.</td></tr>
+<tr><td><code>Andrew01</code></td><td>n/a</td><td style="text-align: right">n/a</td><td>Rejected by canonical label validator</td><td>None</td><td>Labels must be lowercase ASCII DNS labels.</td></tr>
+</tbody></table>
+</div>
 <p>Tier assignment is read on every pricing call, not stored: <code>PopRules</code> queries the alias-accounts personhood precompile at <code>DotnsConstants.PERSONHOOD</code> with the dotns context (<code>bytes32("dotns")</code>), and translates the returned <code>status</code> byte into a <code>PopStatus</code> (0=NoStatus, 1=PopLite, 2=PopFull). Unknown tier bytes collapse to <code>NoStatus</code>, so a future precompile addition fails closed rather than silently being treated as a higher tier. There is no on-chain self-attestation; users obtain personhood off-chain through the People-chain ring proof and the alias-accounts pallet propagates the result via XCM.</p>
+<p>Classification is not the same thing as effective holder context. A long label such as <code>andrewsays</code> is always a <code>NoStatus</code>-tier label by shape, but it may be held by a <code>PopFull</code>, <code>PopLite</code>, or <code>NoStatus</code> account. Consumers that need to know what rules apply to that live name should combine three reads: classify the label, query the registrar owner, then query the owner's dotns-context PoP status through the precompile/materialized context. The escrow position is the economic qualifier: if the token has an active release position with a non-zero amount, it came through the refundable NoStatus deposit path; if no such deposit exists, a verified holder can own the same long label without it being deposit-backed. In other words, <code>andrewsays</code> does not become a PopFull-tier label when a PopFull user owns it, but the owner can still be PopFull for transfer pricing, reverse resolution, and UI display.</p>
 <p>Whitelisting is the exception path for users or organisations that need to register without satisfying the live PoP tier check. DotNS still does not accept self-attestation: the contracts only consume PoP status from the personhood precompile, and a user cannot set or prove their own status inside DotNS. Instead, the public registrar controller has an owner-managed whitelist for <code>registerReserved</code>, which bypasses the PoP pricing gate for approved addresses while still using the normal commit-reveal and availability checks.</p>
 <p>To request a whitelist entry, open a <code>Whitelist Request</code> issue in this repository. The issue is labelled <code>whitelist-request</code> by the template and must include the address, address type, target network (<code>Paseo V2</code> or <code>Paseo Review</code>), and a clear description of why the PoP bypass is needed. A maintainer can approve the request by applying <code>whitelist-approved</code>, after which the workflow checks account mapping on the selected network and executes the on-chain whitelist transaction. Whitelisting does not register a name, reserve a label, or bypass ownership rules; it only allows the approved address to use the reserved registration path without a PoP status.</p>
 <p>PopRules also holds the cross-flow reservation table for base names. Two write paths share one mapping keyed by the bare stem. The first, <code>reserveBaseName</code>, is called by the commit-reveal controller during a lite registration: it classifies the incoming label, strips the trailing digits, and writes the bare stem. The second, <code>reserveBaseNameForPop</code>, is called by the PoP controller on every reservation-queue head transition: it takes a bare stem directly and reverts when the slot is held by a different user, so the caller's local queue bookkeeping never silently diverges from the PopRules state.</p>
 <p>Two read paths, <code>priceWithCheck</code> and <code>priceWithoutCheck</code>, are what the public flow consults. Both strip trailing digits before looking up the reservation, so any live entry on a bare stem blocks registrations of any variant under that stem for the reservation window (12 weeks by default).</p>
 <h3 id="dotnsreverseresolver"><a class="header" href="#dotnsreverseresolver"><code>DotnsReverseResolver</code></a></h3>
-<p>Reverse records mapping an address to its primary name. When a direct reserved registration lands and the registrant has no existing primary, the commit-reveal controller calls the reverse resolver to seed it; a subsequent reserved registration does not silently overwrite the primary, which keeps the user's chosen identity stable across multiple registrations. Writes are restricted to the addresses registered under <code>CONTROLLER</code> and <code>REGISTRAR</code> on the protocol registry (the commit-reveal controller and the registrar itself); rotating either is a single <code>protocolRegistry.set</code> call. Reads are open.</p>
+<p>Reverse records mapping an address to its primary name, with two write paths. The first, <code>setReverseName</code>, is the controller-only seeder: when a direct reserved registration lands and the registrant has no existing primary, the commit-reveal controller calls this entry point so a subsequent reserved registration does not silently overwrite the primary. Writes through this path are restricted to the addresses registered under <code>CONTROLLER</code> and <code>REGISTRAR</code> on the protocol registry. The second, <code>claimReverseRecord</code>, is the self-service path open to any current name owner: the caller hands in a label and the resolver checks that <code>registrar.ownerOf(namehash(label))</code> equals the caller before overwriting their reverse entry. Past ownership is never sufficient; the registrar is the single source of truth for the gate.</p>
+<p>Reads are open but fail-closed: <code>nameOf(address)</code> re-validates current ownership against the registrar before returning the stored name, so an address that has transferred their primary away resolves to the empty string until they claim a new name they currently hold. The protocol still best-effort clears reverse entries on transfer (cheaper reads, no behavioural change), but the security guarantee is the fail-closed read, not the eager clear.</p>
 <h3 id="dotnscontentresolver"><a class="header" href="#dotnscontentresolver"><code>DotnsContentResolver</code></a></h3>
 <p>Stores <code>contenthash</code> and text records per node. This is where external content links (for example IPFS hashes) and arbitrary key-value text records (for example social handles, verification metadata) live. Writes require node ownership or an approved operator; reads are open.</p>
 <h3 id="dotnsresolver"><a class="header" href="#dotnsresolver"><code>DotnsResolver</code></a></h3>
@@ -318,7 +373,7 @@ forge test
 <li><a href="contracts/access/IDotnsRoleManager.sol/interface.IDotnsRoleManager.html">IDotnsRoleManager</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsrolemanager"><a class="header" href="#dotnsrolemanager">DotnsRoleManager</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/access/DotnsRoleManager.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/access/DotnsRoleManager.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 AccessControlUpgradeable, OwnableUpgradeable, <a href="contracts/access/DotnsRoleManager.sol//contracts/access/IDotnsRoleManager.sol/interface.IDotnsRoleManager.html">IDotnsRoleManager</a></p>
 <p><strong>Title:</strong>
@@ -420,7 +475,7 @@ with @custom:reverts NotRoleOrOwner.</p>
 <pre><code class="language-solidity">function _isSupportedRole(bytes32 role) internal view virtual returns (bool supported);
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsrolemanager"><a class="header" href="#idotnsrolemanager">IDotnsRoleManager</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/access/IDotnsRoleManager.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/access/IDotnsRoleManager.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IAccessControl</p>
 <p><strong>Title:</strong>
@@ -474,7 +529,7 @@ grant and @custom:emits IAccessControl.RoleRevoked on revoke.</p>
 <li><a href="contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="contracts/escrow/DotnsNameEscrow.sol//contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
@@ -486,6 +541,10 @@ security-contact: admin@parity.io</p>
 <h3 id="max_released_page_size"><a class="header" href="#max_released_page_size">MAX_RELEASED_PAGE_SIZE</a></h3>
 <p>Maximum page size for releasedTokens pagination.</p>
 <pre><code class="language-solidity">uint256 public constant MAX_RELEASED_PAGE_SIZE = 200;
+</code></pre>
+<h3 id="max_refund_page_size"><a class="header" href="#max_refund_page_size">MAX_REFUND_PAGE_SIZE</a></h3>
+<p>Maximum page size for pendingRefunds pagination and batch claims.</p>
+<pre><code class="language-solidity">uint256 public constant MAX_REFUND_PAGE_SIZE = 200;
 </code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
@@ -534,8 +593,28 @@ starts from a clean baseline.</p>
 <h3 id="_pendingwithdrawals"><a class="header" href="#_pendingwithdrawals">_pendingWithdrawals</a></h3>
 <p>Pull-payment ledger storing each recipient's claimable refund balance.</p>
 <p>Per-recipient isolation ensures a failing or reentrant receiver cannot block other
-users' withdrawals.</p>
+users' withdrawals. Used as the fallback path for registration overpayments whose
+direct push back to <code>msg.sender</code> failed (because the caller is a contract that
+rejects incoming value).</p>
 <pre><code class="language-solidity">mapping(address recipient =&gt; uint256 amount) private _pendingWithdrawals;
+</code></pre>
+<h3 id="_refundentries"><a class="header" href="#_refundentries">_refundEntries</a></h3>
+<p>Time-locked refund ledger keyed by entryId.</p>
+<p>Every credit allocates a fresh entryId so per-entry cooldowns are independent and
+drip-feed credits cannot reset an existing entry's clock.</p>
+<pre><code class="language-solidity">mapping(uint256 entryId =&gt; RefundEntry entry) private _refundEntries;
+</code></pre>
+<h3 id="_entriesbyrecipient"><a class="header" href="#_entriesbyrecipient">_entriesByRecipient</a></h3>
+<p>Per-recipient list of pending entryIds for paginated enumeration and batch claim.</p>
+<pre><code class="language-solidity">mapping(address recipient =&gt; uint256[] entryIds) private _entriesByRecipient;
+</code></pre>
+<h3 id="_entryindexplusone"><a class="header" href="#_entryindexplusone">_entryIndexPlusOne</a></h3>
+<p>Reverse lookup into <code>_entriesByRecipient</code> (one-based) for O(1) remove-by-swap.</p>
+<pre><code class="language-solidity">mapping(uint256 entryId =&gt; uint256 indexPlusOne) private _entryIndexPlusOne;
+</code></pre>
+<h3 id="_nextentryid"><a class="header" href="#_nextentryid">_nextEntryId</a></h3>
+<p>Monotonic counter assigning entryIds to new refund credits.</p>
+<pre><code class="language-solidity">uint256 private _nextEntryId;
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in the future.</p>
@@ -678,9 +757,12 @@ emits: CrossTierFeePaid with <code>isRegistration = true</code> once the fee is 
     nonReentrant;
 </code></pre>
 <h3 id="chargetransferfee"><a class="header" href="#chargetransferfee">chargeTransferFee</a></h3>
-<p>Charges the cross-tier transfer-fee delta against the running max for a token.</p>
+<p>Charges transfer friction and synchronises the token's escrow position.</p>
 <p>Only the configured registrar may call this, otherwise @custom:reverts NotRegistrar.
 When a fee is owed, <code>msg.value</code> must cover it or @custom:reverts InsufficientValue.
+If a positive deposit position leaves its original recipient, the deposit is cleared
+and credited as a time-locked refund. If a zero-amount lifecycle marker leaves its
+recipient, the marker is rebound to <code>params.to</code> so the new holder can still release.
 Emits @custom:emits CrossTierFeePaid with <code>isRegistration = false</code> when a non-zero
 fee is credited to insurance, and @custom:emits OverpaymentRefunded when surplus
 <code>msg.value</code> (or the full amount when no fee is owed) is returned to <code>params.payer</code>;
@@ -753,6 +835,111 @@ reverts: NoPendingWithdrawal; a failing native transfer triggers</p>
 <tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native amount currently credited to <code>recipient</code> and pullable via <code>claimWithdrawal</code>.</td></tr>
 </tbody></table>
 </div>
+<h3 id="claimrefund"><a class="header" href="#claimrefund">claimRefund</a></h3>
+<p>Pulls a single time-locked refund entry.</p>
+<p>Caller must be the entry's recipient (@custom:reverts NotRefundRecipient otherwise),
+the entry must exist (@custom:reverts NoSuchRefundEntry on a deleted or unknown id),
+and <code>block.timestamp</code> must have reached <code>availableAt</code> (@custom:reverts
+RefundLocked otherwise). The entry is deleted before the transfer; a failing native
+transfer triggers @custom:reverts RefundFailed. Emits @custom:emits RefundClaimed.</p>
+<pre><code class="language-solidity">function claimRefund(uint256 entryId) external override nonReentrant returns (uint256 amount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entryId</code></td><td><code>uint256</code></td><td>Identifier of the entry to claim.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native amount transferred to the caller.</td></tr>
+</tbody></table>
+</div>
+<h3 id="claimrefundsbatch"><a class="header" href="#claimrefundsbatch">claimRefundsBatch</a></h3>
+<p>Pulls multiple time-locked refund entries in one call.</p>
+<p>Atomic: any invalid entry in the batch (wrong recipient, missing, or locked) reverts
+the entire call. The batch size is bounded by <code>MAX_REFUND_PAGE_SIZE</code>
+(@custom:reverts InvalidPageSize otherwise). Aggregates the per-entry amounts and
+transfers once; on transfer failure @custom:reverts RefundFailed. Emits</p>
+<p><strong>Note:</strong>
+emits: RefundClaimed once per entry.</p>
+<pre><code class="language-solidity">function claimRefundsBatch(uint256[] calldata entryIds)
+    external
+    override
+    nonReentrant
+    returns (uint256 totalAmount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entryIds</code></td><td><code>uint256[]</code></td><td>List of entry identifiers to claim.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>totalAmount</code></td><td><code>uint256</code></td><td>Sum of the credited amounts transferred to the caller.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingrefundcount"><a class="header" href="#pendingrefundcount">pendingRefundCount</a></h3>
+<p>Returns the number of pending refund entries owed to <code>recipient</code>.</p>
+<pre><code class="language-solidity">function pendingRefundCount(address recipient) external view override returns (uint256 count);
+</code></pre>
+<h3 id="pendingrefundids"><a class="header" href="#pendingrefundids">pendingRefundIds</a></h3>
+<p>Returns up to <code>limit</code> pending refund entry ids for <code>recipient</code>, starting at
+<code>offset</code>.</p>
+<p>Limit must be in <code>(0, MAX_REFUND_PAGE_SIZE]</code>, otherwise @custom:reverts
+InvalidPageSize.</p>
+<pre><code class="language-solidity">function pendingRefundIds(
+    address recipient,
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    override
+    returns (uint256[] memory entryIds);
+</code></pre>
+<h3 id="pendingrefunds"><a class="header" href="#pendingrefunds">pendingRefunds</a></h3>
+<p>Returns up to <code>limit</code> pending refund entries for <code>recipient</code>, paired with their
+entry ids.</p>
+<p>Limit must be in <code>(0, MAX_REFUND_PAGE_SIZE]</code>, otherwise @custom:reverts
+InvalidPageSize.</p>
+<pre><code class="language-solidity">function pendingRefunds(
+    address recipient,
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    override
+    returns (uint256[] memory entryIds, RefundEntry[] memory entries);
+</code></pre>
+<h3 id="refundentry"><a class="header" href="#refundentry">refundEntry</a></h3>
+<p>Returns a single refund entry by id, or a zero-filled struct if the id is unknown.</p>
+<pre><code class="language-solidity">function refundEntry(uint256 entryId)
+    external
+    view
+    override
+    returns (RefundEntry memory entry);
+</code></pre>
+<h3 id="_creditrefund"><a class="header" href="#_creditrefund">_creditRefund</a></h3>
+<p>Internal helper: allocate a new entryId and credit a refund to <code>recipient</code>.</p>
+<p>Assigns the next monotonic entryId, stores the entry, appends to the recipient's
+enumeration array, and emits @custom:emits RefundCredited. <code>cooldownSeconds</code> may be
+zero when the cooldown has already been served by another mechanism (for example, the
+release-and-withdraw path enforces the cooldown on the position before crediting).</p>
+<pre><code class="language-solidity">function _creditRefund(
+    address recipient,
+    uint256 amount,
+    uint256 tokenId,
+    uint64 cooldownSeconds
+)
+    internal
+    returns (uint256 entryId);
+</code></pre>
+<h3 id="_removerefundentry"><a class="header" href="#_removerefundentry">_removeRefundEntry</a></h3>
+<p>Internal helper: delete a refund entry and swap-pop its slot in the recipient's
+enumeration array.</p>
+<pre><code class="language-solidity">function _removeRefundEntry(uint256 entryId, address recipient) internal;
+</code></pre>
 <h3 id="reclaim"><a class="header" href="#reclaim">reclaim</a></h3>
 <p>Transfers a released-and-claimed token from escrow custody to a new owner.</p>
 <p>Hands the NFT back to the controller for re-registration and clears <code>runningMax</code> so the
@@ -835,7 +1022,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Name Escrow Interface</p>
 <p>Escrows refundable deposits for .dot registrations and manages the release lifecycle.</p>
@@ -924,9 +1111,12 @@ contract receiver. Emits @custom:emits OverpaymentRefunded once the credit lands
 </tbody></table>
 </div>
 <h3 id="chargetransferfee-1"><a class="header" href="#chargetransferfee-1">chargeTransferFee</a></h3>
-<p>Charges the cross-tier transfer-fee delta against the running max for a token.</p>
+<p>Charges transfer friction and synchronises the token's escrow position.</p>
 <p>Only the configured registrar may call this, otherwise @custom:reverts NotRegistrar.
 When a fee is owed, <code>msg.value</code> must cover it or @custom:reverts InsufficientValue.
+If a positive deposit position leaves its original recipient, the deposit is cleared
+and credited as a time-locked refund. If a zero-amount lifecycle marker leaves its
+recipient, the marker is rebound to <code>params.to</code> so the new holder can still release.
 Emits @custom:emits CrossTierFeePaid with <code>isRegistration = false</code> when a non-zero
 fee is credited to insurance, and @custom:emits OverpaymentRefunded when surplus
 <code>msg.value</code> (or the full amount when no fee is owed) is returned to <code>params.payer</code>;
@@ -1050,6 +1240,81 @@ must be non-zero, otherwise @custom:reverts InvalidCooldown. Emits</p>
 emits: CooldownUpdated with the prior and new values.</p>
 <pre><code class="language-solidity">function updateCooldown(uint256 newCooldown) external;
 </code></pre>
+<h3 id="claimrefund-1"><a class="header" href="#claimrefund-1">claimRefund</a></h3>
+<p>Pulls a single time-locked refund entry.</p>
+<p>Caller must be the entry's recipient (@custom:reverts NotRefundRecipient otherwise),
+the entry must exist (@custom:reverts NoSuchRefundEntry on a deleted or unknown id),
+and <code>block.timestamp</code> must have reached <code>availableAt</code> (@custom:reverts
+RefundLocked otherwise). The entry is deleted before the transfer; a failing native
+transfer triggers @custom:reverts RefundFailed. Emits @custom:emits RefundClaimed.</p>
+<pre><code class="language-solidity">function claimRefund(uint256 entryId) external returns (uint256 amount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entryId</code></td><td><code>uint256</code></td><td>Identifier of the entry to claim.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native amount transferred to the caller.</td></tr>
+</tbody></table>
+</div>
+<h3 id="claimrefundsbatch-1"><a class="header" href="#claimrefundsbatch-1">claimRefundsBatch</a></h3>
+<p>Pulls multiple time-locked refund entries in one call.</p>
+<p>Atomic: any invalid entry in the batch (wrong recipient, missing, or locked) reverts
+the entire call. The batch size is bounded by <code>MAX_REFUND_PAGE_SIZE</code>
+(@custom:reverts InvalidPageSize otherwise). Aggregates the per-entry amounts and
+transfers once; on transfer failure @custom:reverts RefundFailed. Emits</p>
+<p><strong>Note:</strong>
+emits: RefundClaimed once per entry.</p>
+<pre><code class="language-solidity">function claimRefundsBatch(uint256[] calldata entryIds) external returns (uint256 totalAmount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entryIds</code></td><td><code>uint256[]</code></td><td>List of entry identifiers to claim.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>totalAmount</code></td><td><code>uint256</code></td><td>Sum of the credited amounts transferred to the caller.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingrefundcount-1"><a class="header" href="#pendingrefundcount-1">pendingRefundCount</a></h3>
+<p>Returns the number of pending refund entries owed to <code>recipient</code>.</p>
+<pre><code class="language-solidity">function pendingRefundCount(address recipient) external view returns (uint256 count);
+</code></pre>
+<h3 id="pendingrefundids-1"><a class="header" href="#pendingrefundids-1">pendingRefundIds</a></h3>
+<p>Returns up to <code>limit</code> pending refund entry ids for <code>recipient</code>, starting at
+<code>offset</code>.</p>
+<p>Limit must be in <code>(0, MAX_REFUND_PAGE_SIZE]</code>, otherwise @custom:reverts
+InvalidPageSize.</p>
+<pre><code class="language-solidity">function pendingRefundIds(
+    address recipient,
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    returns (uint256[] memory entryIds);
+</code></pre>
+<h3 id="pendingrefunds-1"><a class="header" href="#pendingrefunds-1">pendingRefunds</a></h3>
+<p>Returns up to <code>limit</code> pending refund entries for <code>recipient</code>, paired with their
+entry ids.</p>
+<p>Limit must be in <code>(0, MAX_REFUND_PAGE_SIZE]</code>, otherwise @custom:reverts
+InvalidPageSize.</p>
+<pre><code class="language-solidity">function pendingRefunds(
+    address recipient,
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    returns (uint256[] memory entryIds, RefundEntry[] memory entries);
+</code></pre>
+<h3 id="refundentry-1"><a class="header" href="#refundentry-1">refundEntry</a></h3>
+<p>Returns a single refund entry by id, or a zero-filled struct if the id is unknown.</p>
+<pre><code class="language-solidity">function refundEntry(uint256 entryId) external view returns (RefundEntry memory entry);
+</code></pre>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
 <h3 id="nativedepositrecorded"><a class="header" href="#nativedepositrecorded">NativeDepositRecorded</a></h3>
 <p>Emitted when a native-token deposit is recorded.</p>
@@ -1092,6 +1357,36 @@ emits: CooldownUpdated with the prior and new values.</p>
 <p>Emitted when a recipient pulls their accumulated pending refund balance.</p>
 <pre><code class="language-solidity">event WithdrawalClaimed(address indexed recipient, uint256 amount);
 </code></pre>
+<h3 id="refundcredited"><a class="header" href="#refundcredited">RefundCredited</a></h3>
+<p>Emitted when a refund is credited to the time-locked refund ledger.</p>
+<pre><code class="language-solidity">event RefundCredited(
+    address indexed recipient,
+    uint256 indexed entryId,
+    uint256 amount,
+    uint64 availableAt,
+    uint256 indexed tokenId
+);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address that may claim the entry once <code>availableAt</code> has elapsed.</td></tr>
+<tr><td><code>entryId</code></td><td><code>uint256</code></td><td>Newly-assigned identifier for the credited entry.</td></tr>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native value credited.</td></tr>
+<tr><td><code>availableAt</code></td><td><code>uint64</code></td><td>Earliest block timestamp at which the recipient may claim.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token associated with the credit, retained for traceability.</td></tr>
+</tbody></table>
+</div>
+<h3 id="refundclaimed"><a class="header" href="#refundclaimed">RefundClaimed</a></h3>
+<p>Emitted when a recipient claims a single refund entry.</p>
+<pre><code class="language-solidity">event RefundClaimed(address indexed recipient, uint256 indexed entryId, uint256 amount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address that pulled the entry.</td></tr>
+<tr><td><code>entryId</code></td><td><code>uint256</code></td><td>Identifier of the claimed entry, now deleted.</td></tr>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native value transferred to <code>recipient</code>.</td></tr>
+</tbody></table>
+</div>
 <h3 id="namereclaimed"><a class="header" href="#namereclaimed">NameReclaimed</a></h3>
 <p>Emitted when a released token is reclaimed by a new owner via registration.</p>
 <pre><code class="language-solidity">event NameReclaimed(
@@ -1240,6 +1535,15 @@ emits: CooldownUpdated with the prior and new values.</p>
 <p>Thrown when <code>claimWithdrawal()</code> is called but the caller has no pending balance.</p>
 <pre><code class="language-solidity">error NoPendingWithdrawal();
 </code></pre>
+<h3 id="nosuchrefundentry"><a class="header" href="#nosuchrefundentry">NoSuchRefundEntry</a></h3>
+<p>Thrown when a refund entry is referenced but does not exist.</p>
+<pre><code class="language-solidity">error NoSuchRefundEntry(uint256 entryId);
+</code></pre>
+<h3 id="refundlocked"><a class="header" href="#refundlocked">RefundLocked</a></h3>
+<p>Thrown when a refund entry is claimed before its <code>availableAt</code> cooldown has
+elapsed.</p>
+<pre><code class="language-solidity">error RefundLocked(uint256 entryId, uint64 availableAt);
+</code></pre>
 <h3 id="notacceptedtransfer"><a class="header" href="#notacceptedtransfer">NotAcceptedTransfer</a></h3>
 <p>Thrown when escrow receives an ERC721 transfer from a non-registrar source.</p>
 <pre><code class="language-solidity">error NotAcceptedTransfer(address caller);
@@ -1284,13 +1588,14 @@ itself is non-refundable.</p>
 </tbody></table>
 </div>
 <h3 id="chargetransferfeeparams"><a class="header" href="#chargetransferfeeparams">ChargeTransferFeeParams</a></h3>
-<p>Inputs for charging a cross-tier transfer fee.</p>
-<p>The fee charged is <code>max(priceForTo - runningMax, reachFloor)</code>: the delta captures
-cross-tier upgrades against the per-token watermark, while <code>reachFloor</code> enforces the
-flat NoStatus deposit floor whenever the recipient is below the label's required tier.</p>
+<p>Inputs for charging a transfer fee and clearing any stale deposit.</p>
+<p>The fee charged is the flat <code>reachFloor</code> returned by @custom:function
+PopRules.transferFloor. Independently, when an active deposit position exists and the NFT is
+leaving its original
+depositor, the full deposit is refunded to that depositor via the time-locked refund
+ledger. The recipient never inherits a deposit at transfer.</p>
 <pre><code class="language-solidity">struct ChargeTransferFeeParams {
     uint256 tokenId;
-    uint256 priceForTo;
     uint256 reachFloor;
     address payer;
     address to;
@@ -1299,10 +1604,9 @@ flat NoStatus deposit floor whenever the recipient is below the label's required
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>tokenId</code></td><td><code>uint256</code></td><td></td></tr>
-<tr><td><code>priceForTo</code></td><td><code>uint256</code></td><td>Recipient-tier price quoted from PopRules.</td></tr>
-<tr><td><code>reachFloor</code></td><td><code>uint256</code></td><td>Reach-floor friction when the recipient is below the required tier.</td></tr>
+<tr><td><code>reachFloor</code></td><td><code>uint256</code></td><td>Required fee paid by the sender on a downward or cross-reach transfer.</td></tr>
 <tr><td><code>payer</code></td><td><code>address</code></td><td>Original <code>msg.sender</code> of the registrar transfer entrypoint.</td></tr>
-<tr><td><code>to</code></td><td><code>address</code></td><td>NFT recipient.</td></tr>
+<tr><td><code>to</code></td><td><code>address</code></td><td>NFT recipient. Compared against <code>position.recipient</code> to decide deposit clearance.</td></tr>
 </tbody></table>
 </div>
 <h3 id="releaseposition"><a class="header" href="#releaseposition">ReleasePosition</a></h3>
@@ -1328,6 +1632,26 @@ ledger). The position is deleted on <code>reclaim</code>, freeing the slot for r
 <tr><td><code>released</code></td><td><code>bool</code></td><td></td></tr>
 <tr><td><code>claimed</code></td><td><code>bool</code></td><td></td></tr>
 </tbody></table>
+</div>
+<h3 id="refundentry-2"><a class="header" href="#refundentry-2">RefundEntry</a></h3>
+<p>Time-locked refund entry produced when the protocol owes a recipient value
+outside the registration-overpayment path.</p>
+<p>Every credit creates a fresh entry with its own <code>availableAt</code>; later credits do not
+reset earlier entries' clocks. Recipients claim entries individually or in batches.</p>
+<pre><code class="language-solidity">struct RefundEntry {
+    address recipient;
+    uint256 amount;
+    uint64 availableAt;
+    uint256 tokenId;
+}
+</code></pre>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address that may claim this entry once <code>availableAt</code> has elapsed.</td></tr>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native value credited.</td></tr>
+<tr><td><code>availableAt</code></td><td><code>uint64</code></td><td>Earliest block timestamp at which the recipient may claim.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token this entry was produced for, retained for traceability.</td></tr>
+</tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="contents-2"><a class="header" href="#contents-2">Contents</a></h1>
 <ul>
 <li><a href="contracts/external//contracts/external/personhood">personhood</a></li>
@@ -1338,7 +1662,7 @@ ledger). The position is deleted on <code>reclaim</code>, freeing the slot for r
 <li><a href="contracts/external/personhood/IPersonhood.sol/interface.IPersonhood.html">IPersonhood</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ipersonhood"><a class="header" href="#ipersonhood">IPersonhood</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/external/personhood/IPersonhood.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/external/personhood/IPersonhood.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IPersonhood - Proof of Personhood Precompile</p>
 <p>Query personhood status of an account.</p>
@@ -1396,7 +1720,7 @@ If we add more types in the future, the existing ones remain unchanged.</p>
 <li><a href="contracts/external/revive/ISystem.sol/interface.ISystem.html">ISystem</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="isystem"><a class="header" href="#isystem">ISystem</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/external/revive/ISystem.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/external/revive/ISystem.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 ISystem</p>
 <p>Minimal subset of revive's System precompile, vendored from
@@ -1418,7 +1742,7 @@ Reverts on a <code>RuntimeOrigin::Signed(_)</code> or non-Root origin.</p>
 <li><a href="contracts/pop/PopRules.sol/contract.PopRules.html">PopRules</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
 <p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements,
@@ -1426,9 +1750,10 @@ and base-name reservation rules.</p>
 <p>Classifies labels into the PoP tier required for registration and exposes reservation
 metadata. Length &lt;= 5 is reserved for governance; lengths 6-8 require PopFull unless they
 carry exactly two trailing digits (PopLite, gateway-issued); lengths &gt;= 9 are open to
-every caller as NoStatus regardless of trailing digits. More than two trailing digits is
-invalid; internal digits do not affect classification. Reservations are keyed by the
-digit-stripped stem so <code>alice</code> and <code>alice42</code> share a slot.
+every caller as NoStatus when they carry zero or exactly two trailing digits. Any one-digit
+suffix, and any suffix longer than two digits, is invalid; internal digits do not affect
+classification. Reservations are keyed by the digit-stripped stem so <code>alice</code> and <code>alice42</code>
+share a slot.
 Pricing is a flat per-name deposit on the NoStatus tier; verified PopLite and PopFull
 users pay zero.</p>
 <p><strong>Note:</strong>
@@ -1438,8 +1763,8 @@ security-contact: admin@parity.io</p>
 <p>Classifies a name into a required PoP tier per DotNS naming rules.</p>
 <p>Pure; inputs are the label bytes only. Callers use the returned tier to decide which
 pricing and verification branch applies. Non-canonical labels (anything other than a
-single lowercase ASCII DNS label) and labels with more than two trailing digits both
-trigger @custom:reverts PopError.</p>
+single lowercase ASCII DNS label) and labels with exactly one or more than two
+trailing digits both trigger @custom:reverts PopError.</p>
 <pre><code class="language-solidity">function classifyName(string calldata name)
     external
     pure
@@ -1677,15 +2002,43 @@ contested.</p>
 <p>Friction fee owed when <code>account</code> reaches into a label tier above its verification
 level.</p>
 <p>Non-zero only when <code>account</code> cannot meet the label's required PoP tier; the value is
-the flat NoStatus deposit. Acts as cross-payer friction at registration time and as
-the transfer-time floor consumed by <code>DotnsNameEscrow.chargeTransferFee</code>. Non-canonical
-labels and labels with more than two trailing digits trigger @custom:reverts PopError.</p>
+the flat NoStatus deposit. Acts as cross-payer friction at registration time. Use</p>
+<p><strong>Note:</strong>
+function: transferFloor for transfer-time friction, which folds in the
+sender-tier-downgrade component as well. Non-canonical labels and labels with exactly
+one or more than two trailing digits trigger @custom:reverts PopError.</p>
 <pre><code class="language-solidity">function reachFee(string calldata name, address account) external view returns (uint256 fee);
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>name</code></td><td><code>string</code></td><td>Domain label being acted on.</td></tr>
 <tr><td><code>account</code></td><td><code>address</code></td><td>Account whose verification reach is being measured.</td></tr>
+</tbody></table>
+</div>
+<h3 id="transferfloor"><a class="header" href="#transferfloor">transferFloor</a></h3>
+<p>Transfer-time friction floor: the greater of the recipient-reach component and
+the sender-tier-downgrade component.</p>
+<p>Returns the flat NoStatus deposit when either (i) the recipient does not meet the
+label's required tier, or (ii) the recipient's personhood tier is strictly below the
+sender's. Returns zero when neither condition holds. The two components overlap on
+pure tier mismatches, so the function takes their maximum rather than their sum to
+avoid double-charging. Consumed by @custom:function DotnsRegistrar.quoteTransferFee.
+Non-canonical labels and labels with exactly one or more than two trailing digits
+trigger @custom:reverts PopError.</p>
+<pre><code class="language-solidity">function transferFloor(
+    string calldata name,
+    address from,
+    address to
+)
+    external
+    view
+    returns (uint256 floor);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label being transferred.</td></tr>
+<tr><td><code>from</code></td><td><code>address</code></td><td>Current holder of the name.</td></tr>
+<tr><td><code>to</code></td><td><code>address</code></td><td>Incoming holder of the name.</td></tr>
 </tbody></table>
 </div>
 <h3 id="isbasename"><a class="header" href="#isbasename">isBaseName</a></h3>
@@ -1817,7 +2170,7 @@ another user through the reservation table.</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="poprules-1"><a class="header" href="#poprules-1">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/pop/PopRules.sol//contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -1825,11 +2178,10 @@ PopRules</p>
 <p>Implements DotNS classification, flat NoStatus pricing, and base-name reservations.</p>
 <p>Tier shape: lengths &lt;= 5 are governance-reserved, lengths 6-8 require PopFull (or
 PopLite when carrying exactly two trailing digits, for gateway-issued lite names),
-lengths &gt;= 9 are open to any caller as NoStatus regardless of trailing digits.
-NoStatus users pay a single flat deposit (<code>startingPrice</code>) per name; verified users
-pay zero.</p>
-<p><strong>Note:</strong>
-security-contact: admin@parity.io</p>
+lengths &gt;= 9 are open to any caller as NoStatus when they carry zero or exactly two
+trailing digits. A one-digit suffix and more than two trailing digits are invalid.
+NoStatus users pay a single flat deposit (<code>startingPrice</code>) per name; verified users pay
+zero. @custom:security-contact admin@parity.io</p>
 <h2 id="constants-1"><a class="header" href="#constants-1">Constants</a></h2>
 <h3 id="max_reservation_time"><a class="header" href="#max_reservation_time">MAX_RESERVATION_TIME</a></h3>
 <p>Maximum time a base name can be reserved.</p>
@@ -1913,8 +2265,8 @@ and new values.</p>
 <p>Classifies a name into a required PoP tier per DotNS naming rules.</p>
 <p>Pure; inputs are the label bytes only. Callers use the returned tier to decide which
 pricing and verification branch applies. Non-canonical labels (anything other than a
-single lowercase ASCII DNS label) and labels with more than two trailing digits both
-trigger @custom:reverts PopError.</p>
+single lowercase ASCII DNS label) and labels with exactly one or more than two
+trailing digits both trigger @custom:reverts PopError.</p>
 <pre><code class="language-solidity">function classifyName(string calldata name)
     public
     pure
@@ -2094,9 +2446,11 @@ state. Non-canonical labels trigger @custom:reverts PopError.</p>
 <p>Friction fee owed when <code>account</code> reaches into a label tier above its verification
 level.</p>
 <p>Non-zero only when <code>account</code> cannot meet the label's required PoP tier; the value is
-the flat NoStatus deposit. Acts as cross-payer friction at registration time and as
-the transfer-time floor consumed by <code>DotnsNameEscrow.chargeTransferFee</code>. Non-canonical
-labels and labels with more than two trailing digits trigger @custom:reverts PopError.</p>
+the flat NoStatus deposit. Acts as cross-payer friction at registration time. Use</p>
+<p><strong>Note:</strong>
+function: transferFloor for transfer-time friction, which folds in the
+sender-tier-downgrade component as well. Non-canonical labels and labels with exactly
+one or more than two trailing digits trigger @custom:reverts PopError.</p>
 <pre><code class="language-solidity">function reachFee(
     string calldata name,
     address account
@@ -2110,6 +2464,33 @@ labels and labels with more than two trailing digits trigger @custom:reverts Pop
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>name</code></td><td><code>string</code></td><td>Domain label being acted on.</td></tr>
 <tr><td><code>account</code></td><td><code>address</code></td><td>Account whose verification reach is being measured.</td></tr>
+</tbody></table>
+</div>
+<h3 id="transferfloor-1"><a class="header" href="#transferfloor-1">transferFloor</a></h3>
+<p>Transfer-time friction floor: the greater of the recipient-reach component and
+the sender-tier-downgrade component.</p>
+<p>Returns the flat NoStatus deposit when either (i) the recipient does not meet the
+label's required tier, or (ii) the recipient's personhood tier is strictly below the
+sender's. Returns zero when neither condition holds. The two components overlap on
+pure tier mismatches, so the function takes their maximum rather than their sum to
+avoid double-charging. Consumed by @custom:function DotnsRegistrar.quoteTransferFee.
+Non-canonical labels and labels with exactly one or more than two trailing digits
+trigger @custom:reverts PopError.</p>
+<pre><code class="language-solidity">function transferFloor(
+    string calldata name,
+    address from,
+    address to
+)
+    external
+    view
+    override
+    returns (uint256 floor);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label being transferred.</td></tr>
+<tr><td><code>from</code></td><td><code>address</code></td><td>Current holder of the name.</td></tr>
+<tr><td><code>to</code></td><td><code>address</code></td><td>Incoming holder of the name.</td></tr>
 </tbody></table>
 </div>
 <h3 id="_personhoodtier"><a class="header" href="#_personhoodtier">_personhoodTier</a></h3>
@@ -2303,7 +2684,7 @@ reservations are cleared regardless. Emits @custom:emits BaseNameReleased.</p>
 <li><a href="contracts/registrars/RootGatewayDispatcher.sol/contract.RootGatewayDispatcher.html">RootGatewayDispatcher</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspopcontroller-1"><a class="header" href="#dotnspopcontroller-1">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/registrars/DotnsPopController.sol//contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -2436,7 +2817,7 @@ measured from <code>mintedAt</code> against <code>reservationDuration</code>.</p
 </code></pre>
 <h3 id="__gap-2"><a class="header" href="#__gap-2">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in the future.</p>
-<pre><code class="language-solidity">uint256[47] private __gap;
+<pre><code class="language-solidity">uint256[50] private __gap;
 </code></pre>
 <h2 id="functions-8"><a class="header" href="#functions-8">Functions</a></h2>
 <h3 id="onlygateway"><a class="header" href="#onlygateway">onlyGateway</a></h3>
@@ -3050,7 +3431,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrar-1"><a class="header" href="#dotnsregistrar-1">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="contracts/registrars/DotnsRegistrar.sol//contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -3281,10 +3662,6 @@ NOTE: If overriding this function in a way that tracks balances, see also {_incr
     view
     returns (string memory fullName);
 </code></pre>
-<h3 id="_striptld"><a class="header" href="#_striptld">_stripTld</a></h3>
-<p>Strips the configured <code>.tld</code> suffix from a stored full name.</p>
-<pre><code class="language-solidity">function _stripTld(string memory fullName) private pure returns (string memory label);
-</code></pre>
 <h3 id="_escrow"><a class="header" href="#_escrow">_escrow</a></h3>
 <p>Resolves the configured name escrow address from the protocol registry.</p>
 <pre><code class="language-solidity">function _escrow() private view returns (address escrow);
@@ -3303,13 +3680,13 @@ NOTE: If overriding this function in a way that tracks balances, see also {_incr
 <pre><code class="language-solidity">function _writeOwnerLabel(address owner, uint256 tokenId, string calldata label) private;
 </code></pre>
 <h3 id="_quotetransferfee"><a class="header" href="#_quotetransferfee">_quoteTransferFee</a></h3>
-<p>Quotes the recipient-tier price and required delta for a transfer.</p>
-<p>Required fee is <code>max(deltaFee, reachFloor)</code>: <code>deltaFee</code> covers the gap between
-the per-token running max and the recipient-tier price (so a higher tier always tops up
-to its tier), while <code>reachFloor</code> enforces the flat <code>NoStatus</code> deposit when the recipient
-cannot meet the label's required tier even when the running max already covers the move.
-Returns <code>(escrow, 0, 0, 0)</code> for self-transfers and escrow-touching transfers so
-legitimate custody moves do not pay a fee.</p>
+<p>Quotes the friction fee required for a transfer.</p>
+<p>Required fee is <code>reachFloor</code> (the value returned by @custom:function
+PopRules.transferFloor). It is paid by the sender on every downward or cross-reach transfer
+and settles to the
+insurance fund. The recipient never locks a fresh deposit at transfer; any prior deposit
+is refunded to its original depositor by the escrow when the NFT leaves that depositor.
+Self-transfers and escrow-touching transfers return zero.</p>
 <pre><code class="language-solidity">function _quoteTransferFee(
     address from,
     address to,
@@ -3317,7 +3694,7 @@ legitimate custody moves do not pay a fee.</p>
 )
     private
     view
-    returns (address escrow, uint256 priceForTo, uint256 reachFloor, uint256 requiredFee);
+    returns (address escrow, uint256 reachFloor, uint256 requiredFee);
 </code></pre>
 <h3 id="_authorizeupgrade-3"><a class="header" href="#_authorizeupgrade-3">_authorizeUpgrade</a></h3>
 <p>Function that should revert when <code>msg.sender</code> is not authorized to upgrade the contract. Called by
@@ -3328,7 +3705,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrarcontroller-1"><a class="header" href="#dotnsregistrarcontroller-1">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, <a href="contracts/registrars/DotnsRegistrarController.sol//contracts/access/DotnsRoleManager.sol/abstract.DotnsRoleManager.html">DotnsRoleManager</a>, ReentrancyGuardTransient, <a href="contracts/registrars/DotnsRegistrarController.sol//contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -3460,14 +3837,16 @@ reverts with @custom:reverts RefundFailed. Emits @custom:emits NameRegistered on
 </code></pre>
 <h3 id="_settleescrow"><a class="header" href="#_settleescrow">_settleEscrow</a></h3>
 <p>Settles every escrow side-effect of a successful registration.</p>
-<p>Extracted to keep <code>register</code> under the stack-depth ceiling.</p>
+<p>Extracted to keep <code>register</code> under the stack-depth ceiling. On a direct
+registration the full <code>chargeAmount</code> lands in the refundable deposit position;
+on a cross-payer registration the same amount routes to the friction reserve
+and no deposit position is seeded.</p>
 <pre><code class="language-solidity">function _settleEscrow(
     address escrow,
     uint256 tokenId,
     address nameOwner,
     bool isDirect,
-    uint256 ownerPrice,
-    uint256 friction
+    uint256 chargeAmount
 )
     internal;
 </code></pre>
@@ -3596,7 +3975,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscontroller"><a class="header" href="#idotnscontroller">IDotnsController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/IDotnsController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registrars/IDotnsController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC165</p>
 <p><strong>Title:</strong>
@@ -3610,7 +3989,7 @@ which concrete controller interface a given address implements.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/IDotnsPopController.sol//contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -4314,7 +4693,7 @@ username (<code>link.liteLabel</code>) and inherits its chat key.</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -4464,7 +4843,7 @@ a non-zero fee delta.</p>
 <pre><code class="language-solidity">error TransferFeeRequired(uint256 tokenId, address to, uint256 requiredFee);
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/IDotnsRegistrarController.sol//contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -4673,7 +5052,7 @@ user.</p>
 <tr><td><code>reserved</code></td><td><code>bool</code></td><td></td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="rootgatewaydispatcher-1"><a class="header" href="#rootgatewaydispatcher-1">RootGatewayDispatcher</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registrars/RootGatewayDispatcher.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registrars/RootGatewayDispatcher.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 RootGatewayDispatcher</p>
 <p>Non-upgradeable shim that translates a substrate Root-origin
@@ -4751,7 +5130,7 @@ on a non-Root origin, so the gate has to surface its own error.</p>
 <li><a href="contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsprotocolregistry-1"><a class="header" href="#dotnsprotocolregistry-1">DotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsProtocolRegistry.sol//contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></p>
 <p><strong>Title:</strong>
@@ -4834,7 +5213,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistry-1"><a class="header" href="#dotnsregistry-1">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsRegistry.sol//contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -5008,7 +5387,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p><strong>Author:</strong>
@@ -5056,7 +5435,7 @@ refcount.</p>
 <pre><code class="language-solidity">error ZeroAddress();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistry"><a class="header" href="#idotnsregistry">IDotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsRegistry</p>
 <p><strong>Author:</strong>
@@ -5258,7 +5637,7 @@ back to <code>IDotnsRegistrar.ownerOf(uint256(node))</code>.</p>
 <li><a href="contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnscontentresolver-1"><a class="header" href="#dotnscontentresolver-1">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsContentResolver.sol//contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
@@ -5444,7 +5823,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspopresolver-1"><a class="header" href="#dotnspopresolver-1">DotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsPopResolver.sol//contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html">IDotnsPopResolver</a></p>
 <p><strong>Title:</strong>
@@ -5634,7 +6013,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsresolver-1"><a class="header" href="#dotnsresolver-1">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsResolver.sol//contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
@@ -5747,7 +6126,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsreverseresolver-1"><a class="header" href="#dotnsreverseresolver-1">DotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsReverseResolver.sol//contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></p>
 <p><strong>Title:</strong>
@@ -5811,9 +6190,24 @@ reverts: NotRegistrarController. Overwrites any existing reverse record for
 <tr><td><code>name</code></td><td><code>string</code></td><td>The human-readable name associated with the address.</td></tr>
 </tbody></table>
 </div>
+<h3 id="claimreverserecord"><a class="header" href="#claimreverserecord">claimReverseRecord</a></h3>
+<p>Self-service claim: associates <code>msg.sender</code> with <code>&lt;label&gt;.dot</code>.</p>
+<p>The caller must currently own the NFT for <code>label</code> per the configured registrar,
+otherwise @custom:reverts NotNameOwner. Overwrites any existing record for the caller
+and emits @custom:emits ReverseNameSet on every successful write. Transferring the
+name away does not eagerly clear the record; @custom:function nameOf fails closed at
+read time when the stored record no longer matches current ownership.</p>
+<pre><code class="language-solidity">function claimReverseRecord(string calldata label) external override;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The label (without <code>.dot</code>) the caller is claiming a reverse record for.</td></tr>
+</tbody></table>
+</div>
 <h3 id="nameof"><a class="header" href="#nameof">nameOf</a></h3>
-<p>Returns the reverse name for an address.</p>
-<p>Returns an empty string if no reverse name is set.</p>
+<p>Returns the reverse name for an address, fail-closed against current ownership.</p>
+<p>Returns the empty string when no record is set, when the record is malformed, or
+when the address no longer owns the name pointed to by the stored record.</p>
 <pre><code class="language-solidity">function nameOf(address addr) external view override returns (string memory name);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -5823,7 +6217,7 @@ reverts: NotRegistrarController. Overwrites any existing reverse record for
 </div>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>name</code></td><td><code>string</code></td><td>The reverse name associated with <code>addr</code>.</td></tr>
+<tr><td><code>name</code></td><td><code>string</code></td><td>The reverse name associated with <code>addr</code>, or the empty string.</td></tr>
 </tbody></table>
 </div>
 <h3 id="supportsinterface-8"><a class="header" href="#supportsinterface-8">supportsInterface</a></h3>
@@ -5855,7 +6249,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscontentresolver"><a class="header" href="#idotnscontentresolver">IDotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Content Resolver</p>
 <p>Defines storage and retrieval for content hash, text records, and operator approvals for
@@ -5996,7 +6390,7 @@ idempotent writes that do not change the stored value.</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopresolver"><a class="header" href="#idotnspopresolver">IDotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopResolver</p>
 <p>Resolver for per-name records produced by the PoP username flow.</p>
@@ -6153,7 +6547,7 @@ has never been linked to a full claim.</p>
 <tr><td><code>length</code></td><td><code>uint256</code></td><td>The length of the payload that was rejected.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsresolver"><a class="header" href="#idotnsresolver">IDotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Resolver</p>
 <p>Defines forward-resolution address records for DotNS nodes.</p>
@@ -6212,15 +6606,15 @@ write.</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsreverseresolver"><a class="header" href="#idotnsreverseresolver">IDotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Reverse Resolver</p>
 <p>Interface for writing and reading reverse name records for addresses.</p>
-<p>Defines the minimal surface required to associate an address with a
-human-readable name. Reverse records bind to an EOA rather than a
-registry node, so implementations are expected to enforce a
-writer-policy gate (typically the registrar or its controller) rather
-than node ownership.</p>
+<p>Reverse records bind to an EOA rather than a registry node. Two write paths exist:
+a registrar-only setter used by the controller during reserved registration, and a
+self-service claim path callable by the current NFT owner. Reads are fail-closed:
+if the stored record no longer maps to a name owned by the address, @custom:function nameOf
+returns the empty string.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions-26"><a class="header" href="#functions-26">Functions</a></h2>
@@ -6238,9 +6632,24 @@ reverts: NotRegistrarController. Overwrites any existing reverse record for
 <tr><td><code>name</code></td><td><code>string</code></td><td>The human-readable name associated with the address.</td></tr>
 </tbody></table>
 </div>
+<h3 id="claimreverserecord-1"><a class="header" href="#claimreverserecord-1">claimReverseRecord</a></h3>
+<p>Self-service claim: associates <code>msg.sender</code> with <code>&lt;label&gt;.dot</code>.</p>
+<p>The caller must currently own the NFT for <code>label</code> per the configured registrar,
+otherwise @custom:reverts NotNameOwner. Overwrites any existing record for the caller
+and emits @custom:emits ReverseNameSet on every successful write. Transferring the
+name away does not eagerly clear the record; @custom:function nameOf fails closed at
+read time when the stored record no longer matches current ownership.</p>
+<pre><code class="language-solidity">function claimReverseRecord(string calldata label) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The label (without <code>.dot</code>) the caller is claiming a reverse record for.</td></tr>
+</tbody></table>
+</div>
 <h3 id="nameof-1"><a class="header" href="#nameof-1">nameOf</a></h3>
-<p>Returns the reverse name for an address.</p>
-<p>Returns an empty string if no reverse name is set.</p>
+<p>Returns the reverse name for an address, fail-closed against current ownership.</p>
+<p>Returns the empty string when no record is set, when the record is malformed, or
+when the address no longer owns the name pointed to by the stored record.</p>
 <pre><code class="language-solidity">function nameOf(address addr) external view returns (string memory name);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -6250,7 +6659,7 @@ reverts: NotRegistrarController. Overwrites any existing reverse record for
 </div>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>name</code></td><td><code>string</code></td><td>The reverse name associated with <code>addr</code>.</td></tr>
+<tr><td><code>name</code></td><td><code>string</code></td><td>The reverse name associated with <code>addr</code>, or the empty string.</td></tr>
 </tbody></table>
 </div>
 <h2 id="events-10"><a class="header" href="#events-10">Events</a></h2>
@@ -6273,6 +6682,16 @@ reverts: NotRegistrarController. Overwrites any existing reverse record for
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
 </tbody></table>
+</div>
+<h3 id="notnameowner"><a class="header" href="#notnameowner">NotNameOwner</a></h3>
+<p>Thrown when a caller attempts to claim a reverse record for a name they do not own.</p>
+<pre><code class="language-solidity">error NotNameOwner(address caller, uint256 tokenId);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the claim.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>The token identifier derived from the claimed label.</td></tr>
+</tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="contents-9"><a class="header" href="#contents-9">Contents</a></h1>
 <ul>
 <li><a href="contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></li>
@@ -6284,7 +6703,7 @@ reverts: NotRegistrarController. Overwrites any existing reverse record for
 <li><a href="contracts/store/UserStore.sol/contract.UserStore.html">UserStore</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsstore"><a class="header" href="#idotnsstore">IDotnsStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/store/IDotnsStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/store/IDotnsStore.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsStore</p>
 <p>Baseline interface implemented by every per-user DotNS store.</p>
@@ -6309,7 +6728,7 @@ and immutable thereafter.</p>
 <tr><td><code>owner_</code></td><td><code>address</code></td><td>The bound user address.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="ilabelstore"><a class="header" href="#ilabelstore">ILabelStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/store/ILabelStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/store/ILabelStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/ILabelStore.sol//contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></p>
 <p><strong>Title:</strong>
@@ -6587,7 +7006,7 @@ from cross-session double-writes.</p>
 <tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>The conflicting labelhash.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="istorefactory"><a class="header" href="#istorefactory">IStoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/store/IStoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/store/IStoreFactory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStoreFactory</p>
 <p>Interface for the DotNS per-user store factory.</p>
@@ -6901,7 +7320,7 @@ upgrade. @param implementation The invalid implementation argument.</p>
 <pre><code class="language-solidity">error ImplementationBindingMismatch();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="iuserstore"><a class="header" href="#iuserstore">IUserStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/store/IUserStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/store/IUserStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/IUserStore.sol//contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></p>
 <p><strong>Title:</strong>
@@ -7115,7 +7534,7 @@ snapshotted. @param value The prior value that was just superseded.</p>
 <tr><td><code>timestamp</code></td><td><code>uint256</code></td><td>Block timestamp at the moment of supersession.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="labelstore"><a class="header" href="#labelstore">LabelStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/store/LabelStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/store/LabelStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, <a href="contracts/store/LabelStore.sol//contracts/store/ILabelStore.sol/interface.ILabelStore.html">ILabelStore</a></p>
 <p><strong>Title:</strong>
@@ -7380,7 +7799,7 @@ labelhashes. Length is <code>min(limit, getLabelCount() - offset)</code>;
 <pre><code class="language-solidity">function _onlyAuthorisedProtocol() internal view;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="storefactory"><a class="header" href="#storefactory">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Ownable, <a href="contracts/store/StoreFactory.sol//contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
@@ -7695,7 +8114,7 @@ does not implement that selector the probe reverts and the upgrade does not land
 <tr><td><code>slice</code></td><td><code>address[]</code></td><td>Result slice; empty when <code>offset &gt;= source.length</code>.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="userstore"><a class="header" href="#userstore">UserStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/store/UserStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/store/UserStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, <a href="contracts/store/UserStore.sol//contracts/store/IUserStore.sol/interface.IUserStore.html">IUserStore</a></p>
 <p><strong>Title:</strong>
@@ -7946,7 +8365,7 @@ and immutable thereafter.</p>
 <li><a href="contracts/utils/StringUtils.sol/library.StringUtils.html">StringUtils</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Constants</p>
 <p>Protocol-level invariants shared across DotNS contracts.</p>
@@ -8101,7 +8520,7 @@ forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant POP_GATEWAY = bytes32("popGateway");
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="labelutils"><a class="header" href="#labelutils">LabelUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/utils/LabelUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/utils/LabelUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Label Utilities Library</p>
 <p>Canonical keccak labelhash and <code>.dot</code>-TLD namehash helpers shared by every
@@ -8209,8 +8628,15 @@ recomputing.</p>
 <tr><td><code>hash</code></td><td><code>bytes32</code></td><td><code>keccak256(bytes(label))</code>.</td></tr>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td><code>namehash(DOT_NODE, hash)</code>.</td></tr>
 </tbody></table>
-</div><div style="break-before: page; page-break-before: always;"></div><h1 id="registrationutils"><a class="header" href="#registrationutils">RegistrationUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
+</div>
+<h3 id="stripdottld"><a class="header" href="#stripdottld">stripDotTld</a></h3>
+<p>Strips the configured <code>.dot</code> TLD suffix from a stored full name.</p>
+<p>Returns the empty string when the input does not end in the TLD; callers treat
+an empty return as a "do not trust this record" signal.</p>
+<pre><code class="language-solidity">function stripDotTld(string memory fullName) internal pure returns (string memory label);
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="registrationutils"><a class="header" href="#registrationutils">RegistrationUtils</a></h1>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Registration Utilities Library</p>
 <p>Single canonical implementation of the "mint + forward-registry + store-write"
@@ -8304,7 +8730,7 @@ callers; kept in memory for the lifetime of one <code>registerAndStore</code>.</
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="storeutils"><a class="header" href="#storeutils">StoreUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/utils/StoreUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/utils/StoreUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Store Utilities Library</p>
 <p>Canonical helpers for protocol writes into per-user <code>LabelStore</code> instances.</p>
@@ -8365,7 +8791,7 @@ protocol-registered @custom:reverts NotAuthorised when the user has no store yet
 <tr><td><code>store</code></td><td><code>address</code></td><td>The resolved or newly deployed store address.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="stringutils"><a class="header" href="#stringutils">StringUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/813b54a47ace3b07f252bf86067a6e7a65720873/contracts/utils/StringUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/77b8a32645496aac399b2a87f542feec62b7b9b3/contracts/utils/StringUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 String Utilities Library</p>
 <p>Provides string manipulation utilities for DotNS contracts.</p>
