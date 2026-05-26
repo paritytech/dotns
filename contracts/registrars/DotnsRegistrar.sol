@@ -235,12 +235,12 @@ contract DotnsRegistrar is
             _quoteTransferFee(from, to, tokenId);
         require(requiredFee == 0 || msg.value != 0, TransferFeeRequired(tokenId, to, requiredFee));
 
-        // Deposits bind to the original depositor and never follow NFT custody. Zero-amount
-        // positions are only lifecycle markers, so escrow still needs to see owner changes
-        // and rebind the marker to the new holder. Escrow-touching transfers (release into
-        // escrow, reclaim out of it) are excluded because the escrow is mid-call and its
-        // non-reentrancy guard would reject a re-entry; the release/reclaim paths manage the
-        // position directly.
+        // Deposits follow the NFT, not the depositor: every transfer that moves a name off the
+        // prior position recipient rebinds the escrow position to the new holder, so the locked
+        // deposit (when funded) and the lifecycle marker (when zero-amount) both travel with the
+        // name. Escrow-touching transfers (release into escrow, reclaim out of it) are excluded
+        // because the escrow is mid-call and its non-reentrancy guard would reject a re-entry;
+        // the release/reclaim paths manage the position directly.
         bool isEscrowTouching = to == escrow || from == escrow;
         bool positionSyncNeeded;
         if (!isEscrowTouching) {
@@ -328,12 +328,11 @@ contract DotnsRegistrar is
     }
 
     /// @notice Quotes the friction fee required for a transfer.
-    /// @dev Required fee is `reachFloor` (the value returned by @custom:function
-    /// PopRules.transferFloor). It is paid by the sender on every downward or cross-reach transfer
-    /// and settles to the
-    /// insurance fund. The recipient never locks a fresh deposit at transfer; any prior deposit
-    /// is refunded to its original depositor by the escrow when the NFT leaves that depositor.
-    /// Self-transfers and escrow-touching transfers return zero.
+    /// @dev Required fee is the reach floor returned by @custom:function PopRules.transferFloor.
+    /// It is paid by the sender on every downward or cross-reach transfer and settles to the
+    /// insurance fund. Any prior deposit travels with the NFT: the escrow rebinds the position to
+    /// the new holder rather than refunding the sender, so transferring a funded name forfeits the
+    /// locked deposit to the recipient. Self-transfers and escrow-touching transfers return zero.
     function _quoteTransferFee(
         address from,
         address to,

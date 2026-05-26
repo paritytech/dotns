@@ -103,7 +103,7 @@ interface ILabelStore is IDotnsStore {
 
     /// @notice Returns the human-readable label at the given insertion-order index.
     /// @dev Primary read for "give me my names"; does not require the caller to know any
-    ///      labelhash. For the underlying labelhash key see {getLabelhashAt}.
+    ///      labelhash. For the underlying labelhash key see @custom:function getLabelhashAt.
     /// @param index Zero-based index into the insertion-order list.
     /// @return label The stored label string at `index`.
     function getLabelAt(uint256 index) external view returns (string memory label);
@@ -124,7 +124,7 @@ interface ILabelStore is IDotnsStore {
 
     /// @notice Paginated read over the labelhash keys, in insertion order.
     /// @dev Advanced read for callers that need the raw labelhash keys. Symmetric with
-    ///      {getLabels}; same indices map to the same entries.
+    ///      @custom:function getLabels; same indices map to the same entries.
     /// @param offset Start index.
     /// @param limit Maximum entries to return.
     /// @return labelhashes Slice of labelhash keys.

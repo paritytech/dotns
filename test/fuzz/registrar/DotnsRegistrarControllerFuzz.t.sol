@@ -244,12 +244,15 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
     }
 
     /// @notice For an arbitrary non-depositor NoStatus recipient, a transfer must
-    ///         credit a refund entry to the original depositor equal to RENT_PRICE.
-    /// @dev Exercises the depositor-binding invariant: the deposit is for personhood
-    ///      friction on the depositor; it never follows NFT custody and is fully
-    ///      refunded whenever the NFT leaves the depositor, regardless of who the
-    ///      recipient is or what reach floor they cross.
-    function testFuzz_NoStatus_transfer_credits_full_refund_to_depositor(
+    ///         rebind the escrow position to the new holder without crediting any
+    ///         refund entry, so the deposit follows the NFT.
+    /// @dev Exercises the deposit-follows-name invariant: the deposit is for personhood
+    ///      friction on the live holder; it travels with the NFT and only the current
+    ///      holder can release into escrow to recover it. No transfer-time refund
+    ///      fires, the per-asset reserves stay put, and the recycle that would
+    ///      otherwise let one D underwrite an unbounded number of NoStatus names is
+    ///      closed off.
+    function testFuzz_NoStatus_transfer_rebinds_position_to_new_holder(
         uint256 salt,
         address recipientSeed
     )
@@ -285,9 +288,11 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
 
         IDotnsNameEscrow.ReleasePosition memory atMint = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(atMint.amount, RENT_PRICE, "position must hold full deposit after register");
-        assertEq(atMint.recipient, depositor, "position recipient must be the depositor");
+        assertEq(atMint.recipient, depositor, "position recipient must be the depositor at mint");
 
-        uint256 priorRefundCount = dotnsNameEscrow.pendingRefundCount(depositor);
+        uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
+        uint256 depositorRefundsBefore = dotnsNameEscrow.pendingRefundCount(depositor);
+        uint256 recipientRefundsBefore = dotnsNameEscrow.pendingRefundCount(recipientSeed);
 
         uint256 transferFee = dotnsRegistrar.quoteTransferFee(tokenId, recipientSeed);
 
@@ -298,31 +303,28 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
 
         IDotnsNameEscrow.ReleasePosition memory afterTransfer =
             dotnsNameEscrow.getReleasePosition(tokenId);
-        assertEq(afterTransfer.amount, 0, "deposit must fully clear on the leaving leg");
+        assertEq(afterTransfer.amount, RENT_PRICE, "deposit amount must travel with the NFT");
         assertEq(
             afterTransfer.recipient,
-            address(0),
-            "position must be deleted; recipient must never inherit"
+            recipientSeed,
+            "position must rebind to the new holder when the NFT leaves the depositor"
         );
 
         assertEq(
+            dotnsNameEscrow.reserves(address(0)),
+            reservesBefore,
+            "per-asset reserves must not move when the deposit follows the NFT"
+        );
+        assertEq(
             dotnsNameEscrow.pendingRefundCount(depositor),
-            priorRefundCount + 1,
-            "depositor must receive exactly one new refund entry"
+            depositorRefundsBefore,
+            "no refund entry may be credited to the prior depositor at transfer time"
         );
         assertEq(
             dotnsNameEscrow.pendingRefundCount(recipientSeed),
-            0,
-            "recipient must never receive any refund entry"
+            recipientRefundsBefore,
+            "no refund entry may be credited to the new holder at transfer time"
         );
-
-        uint256[] memory entries =
-            dotnsNameEscrow.pendingRefundIds(depositor, 0, priorRefundCount + 1);
-        IDotnsNameEscrow.RefundEntry memory entry =
-            dotnsNameEscrow.refundEntry(entries[entries.length - 1]);
-        assertEq(entry.recipient, depositor, "entry must be owed to the depositor");
-        assertEq(entry.amount, RENT_PRICE, "entry must equal the full RENT_PRICE deposit");
-        assertEq(entry.tokenId, tokenId, "entry must trace back to the transferred token");
     }
 
     function testFuzz_transfer_clears_sender_primary_reverse(uint256 salt) public {

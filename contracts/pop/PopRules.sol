@@ -78,8 +78,9 @@ contract PopRules is
 
     /// @notice Initialises the oracle (public entry point).
     /// @dev Runs once behind the proxy; subsequent calls trigger @custom:reverts
-    ///      InvalidInitialization via the `initializer` modifier. Forwards to {_popRulesInit},
-    ///      which seeds `startingPrice` through {updateStartingPrice}.
+    ///      InvalidInitialization via the `initializer` modifier. Forwards to
+    ///      @custom:function _popRulesInit, which seeds `startingPrice` through
+    ///      @custom:function updateStartingPrice.
     /// @param _startingPrice Base price in wei for NoStatus users.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
     function initialize(
@@ -112,35 +113,20 @@ contract PopRules is
 
     /// @inheritdoc IPopRules
     function reserveBaseName(
-        string calldata name,
+        string calldata stem,
         address userAddress
     )
         external
         override
         onlyRegistry
     {
-        _requireCanonicalLabel(name);
-
-        (PopStatus requiredStatus,) = _classifyValidatedName(name);
+        _requireCanonicalLabel(stem);
+        uint256 stemLength = bytes(stem).length;
         require(
-            requiredStatus == PopStatus.PopLite,
-            PopError("Base reservation requires a lite-eligible name")
+            stemLength >= 6 && stemLength <= 8 && _countTrailingDigits(stem) == 0,
+            PopError("Reservation stem must be 6-8 chars with no trailing digits")
         );
-
-        string memory strippedBase = _stripDigits(name);
-
-        Reservation memory existingReservation = reservations[strippedBase];
-        if (!_isLive(existingReservation)) {
-            // `block.timestamp + MAX_RESERVATION_TIME` cannot overflow `uint64`:
-            // `MAX_RESERVATION_TIME` is bounded (1 year of seconds, ~3.15e7),
-            // and `uint64` saturates at ~5.84e11; that horizon doesn't arrive
-            // until year 2554. Truncation under the cast is therefore unreachable.
-            // forge-lint: disable-next-line(unsafe-typecast)
-            uint64 expiryTime = uint64(block.timestamp + MAX_RESERVATION_TIME);
-            reservations[strippedBase] =
-                Reservation({owner: userAddress, expires: expiryTime, controller: msg.sender});
-            emit BaseNameReserved(strippedBase, userAddress, expiryTime);
-        }
+        _writeReservation(stem, userAddress);
     }
 
     /// @inheritdoc IPopRules
@@ -451,32 +437,19 @@ contract PopRules is
 
     /// @inheritdoc IPopRules
     function reserveBaseNameForPop(
-        string calldata baseName,
+        string calldata stem,
         address userAddress
     )
         external
         override
         onlyRegistry
     {
-        _requireCanonicalLabel(baseName);
-
-        Reservation memory existing = reservations[baseName];
-        if (_isLive(existing)) {
-            // An earlier reserver still holds the live slot. A silent no-op here
-            // would let the PoP controller's local queue state diverge from
-            // PopRules (controller writes head-bookkeeping assuming the write
-            // landed). Reverting propagates the collision back to the caller so
-            // both sides stay consistent. Refresh-own-expiry still goes through.
-            require(existing.owner == userAddress, PopError("Base name held by another user"));
-        }
-
-        // casting to 'uint64' is safe because MAX_RESERVATION_TIME will never be
-        // large enough to cause a revert.
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint64 expiryTime = uint64(block.timestamp + MAX_RESERVATION_TIME);
-        reservations[baseName] =
-            Reservation({owner: userAddress, expires: expiryTime, controller: msg.sender});
-        emit BaseNameReserved(baseName, userAddress, expiryTime);
+        _requireCanonicalLabel(stem);
+        require(
+            _countTrailingDigits(stem) == 0,
+            PopError("Reservation stem must have no trailing digits")
+        );
+        _writeReservation(stem, userAddress);
     }
 
     /// @inheritdoc IPopRules
@@ -486,9 +459,13 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function releaseBaseName(string calldata baseName) external override onlyRegistry {
-        _requireCanonicalLabel(baseName);
-        Reservation memory reservation = reservations[baseName];
+    function releaseBaseName(string calldata stem) external override onlyRegistry {
+        _requireCanonicalLabel(stem);
+        require(
+            _countTrailingDigits(stem) == 0,
+            PopError("Reservation stem must have no trailing digits")
+        );
+        Reservation memory reservation = reservations[stem];
         // Live reservations can only be cleared by the controller that wrote
         // them, so one registrar-authorised controller cannot wipe another's
         // active slot. Expired reservations are dead weight and may be cleared
@@ -499,21 +476,24 @@ contract PopRules is
                 PopError("Only reserving controller can release")
             );
         }
-        delete reservations[baseName];
-        emit BaseNameReleased(baseName);
+        delete reservations[stem];
+        emit BaseNameReleased(stem);
     }
 
     /// @inheritdoc IPopRules
     function releaseReservationForReclaim(
-        string calldata baseName,
+        string calldata stem,
         address expectedOwner
     )
         external
         override
         onlyRegistry
     {
-        _requireCanonicalLabel(baseName);
-        string memory stem = _stripDigits(baseName);
+        _requireCanonicalLabel(stem);
+        require(
+            _countTrailingDigits(stem) == 0,
+            PopError("Reservation stem must have no trailing digits")
+        );
         Reservation memory reservation = reservations[stem];
         // Cross-controller release is gated on owner match rather than controller match,
         // so the public registrar controller can clear a PoP-stamped slot during reclaim
@@ -523,5 +503,29 @@ contract PopRules is
         }
         delete reservations[stem];
         emit BaseNameReleased(stem);
+    }
+
+    /// @notice Internal single-source-of-truth writer for stem reservations.
+    /// @dev Routes both @custom:function reserveBaseName and @custom:function reserveBaseNameForPop
+    ///      through one path so the cross-user collision semantics stay identical: a live slot held
+    ///      by a different user @custom:reverts PopError, and any other case writes a fresh expiry
+    ///      and emits @custom:emits BaseNameReserved. Same-owner re-reservations refresh the expiry
+    ///      to `block.timestamp + MAX_RESERVATION_TIME`. Callers are responsible for validating
+    ///      `stem` is canonical and stem-shaped (no trailing digits); this helper does no input
+    ///      validation of its own so each public entry can layer additional eligibility checks.
+    function _writeReservation(string memory stem, address userAddress) internal {
+        Reservation memory existing = reservations[stem];
+        if (_isLive(existing)) {
+            require(existing.owner == userAddress, PopError("Base name held by another user"));
+        }
+
+        // `block.timestamp + MAX_RESERVATION_TIME` cannot overflow `uint64`: `MAX_RESERVATION_TIME`
+        // is bounded (one year, ~3.15e7) and `uint64` saturates at ~5.84e11, a horizon that does
+        // not arrive until year 2554.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint64 expiryTime = uint64(block.timestamp + MAX_RESERVATION_TIME);
+        reservations[stem] =
+            Reservation({owner: userAddress, expires: expiryTime, controller: msg.sender});
+        emit BaseNameReserved(stem, userAddress, expiryTime);
     }
 }

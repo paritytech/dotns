@@ -130,28 +130,14 @@ contract DotnsRegistrarController is
         override
         returns (bytes32 commitment)
     {
-        string calldata registrationLabel = registration.label;
-        address registrationOwner = registration.owner;
-        bytes32 registrationSecret = registration.secret;
-        bool registrationReserved = registration.reserved;
-
-        assembly ("memory-safe") {
-            let freeMemoryPointer := mload(0x40)
-
-            let labelByteLength := registrationLabel.length
-            calldatacopy(freeMemoryPointer, registrationLabel.offset, labelByteLength)
-
-            mstore(add(freeMemoryPointer, labelByteLength), registrationOwner)
-
-            mstore(add(freeMemoryPointer, add(labelByteLength, 0x20)), registrationSecret)
-
-            mstore8(
-                add(freeMemoryPointer, add(labelByteLength, 0x40)),
-                iszero(iszero(registrationReserved))
+        // `abi.encode` length-prefixes the variable-width `label` so the boundary between the
+        // label bytes and the fixed-width `owner`, `secret`, and `reserved` fields is unambiguous,
+        // and the commitment uniquely identifies the (label, owner, secret, reserved) tuple.
+        commitment = keccak256(
+            abi.encode(
+                registration.label, registration.owner, registration.secret, registration.reserved
             )
-
-            commitment := keccak256(freeMemoryPointer, add(labelByteLength, 0x41))
-        }
+        );
     }
 
     /// @inheritdoc IDotnsRegistrarController
@@ -189,7 +175,7 @@ contract DotnsRegistrarController is
             address previousOccupant =
                 IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId).recipient;
             if (reservationOwner != address(0) && reservationOwner == previousOccupant) {
-                rules.releaseReservationForReclaim(registration.label, previousOccupant);
+                rules.releaseReservationForReclaim(stem, previousOccupant);
             }
         }
 
@@ -241,7 +227,7 @@ contract DotnsRegistrarController is
             priced.status == IPopRules.PopStatus.PopLite
                 && priced.userStatus == IPopRules.PopStatus.PopLite
         ) {
-            rules.reserveBaseName(registration.label, registration.owner);
+            rules.reserveBaseName(rules.stripDigits(registration.label), registration.owner);
         }
 
         // Overpayment credited to the pull-payment ledger so contract wallets

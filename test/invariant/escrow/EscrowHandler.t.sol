@@ -21,8 +21,10 @@ contract EscrowHandler is Test {
     bytes32 private constant DOT_NODE =
         0x3fce7d1364a893e213bc4212792b517ffc88f5b13b86c8ef9c8d390c3a1370ce;
 
-    /// @notice Escrow cooldown period (7 days).
-    uint256 private constant ESCROW_COOLDOWN = 7 days;
+    /// @notice Escrow cooldown period used by handler-driven flows; mirrors the
+    ///         test base and the deploy script so warps to clear the cooldown stay
+    ///         consistent with the escrow's enforced upper bound.
+    uint256 private constant ESCROW_COOLDOWN = 15 minutes;
 
     /// @notice The registrar controller under test.
     DotnsRegistrarController public controller;
@@ -50,18 +52,6 @@ contract EscrowHandler is Test {
 
     /// @notice Snapshotted recipient per tokenId (set at release time).
     mapping(uint256 tokenId => address recipient) public depositRecipients;
-
-    /// @notice Recipient locked at deposit-time per tokenId (mirrors `_positions[id].recipient`).
-    /// @dev Distinct from `depositRecipients`, which only fills at release time. This snapshots
-    ///      the address that paid the deposit so the recipient-locked invariant can verify the
-    ///      escrow position never mutates the lock between deposit and reclaim.
-    mapping(uint256 tokenId => address recipient) public lockedRecipient;
-
-    /// @notice Last observed runningMax per tokenId (refreshed after deposit and payable
-    ///         transferFrom).
-    /// @dev Used by the runningMax-monotonicity invariant to confirm the on-chain runningMax
-    ///      only ever climbs between mint and reclaim, then resets to zero on reclaim.
-    mapping(uint256 tokenId => uint256 max) public lastObservedRunningMax;
 
     /// @notice Label used to register each tokenId; required for re-registration after finalise.
     mapping(uint256 tokenId => string label) public labelByTokenId;
@@ -160,10 +150,6 @@ contract EscrowHandler is Test {
         _depositedTokenIds.push(tokenId);
         depositAmounts[tokenId] = price;
         labelByTokenId[tokenId] = label;
-        lockedRecipient[tokenId] = actor;
-        if (price > lastObservedRunningMax[tokenId]) {
-            lastObservedRunningMax[tokenId] = price;
-        }
     }
 
     /// @notice Performs a cross-tier registration where payer != owner.
@@ -260,7 +246,6 @@ contract EscrowHandler is Test {
             // Cross-payer registrations seed a zero-amount refundable position;
             // ghost-state mirrors that by leaving `depositAmounts` at zero.
             depositAmounts[tokenId] = 0;
-            lockedRecipient[tokenId] = address(0);
 
             if (newInsurance > priorInsurance) {
                 ghost_insurancePaidIn += (newInsurance - priorInsurance);
@@ -269,11 +254,6 @@ contract EscrowHandler is Test {
             // Track InsuranceDraw outflows surfaced by this transaction (defensive; the
             // register path itself does not draw insurance, but recordLogs is already on).
             _accountInsuranceDraws(logs);
-
-            uint256 currentMax = escrow.runningMax(tokenId);
-            if (currentMax > lastObservedRunningMax[tokenId]) {
-                lastObservedRunningMax[tokenId] = currentMax;
-            }
         } catch {
             return;
         }
@@ -456,9 +436,6 @@ contract EscrowHandler is Test {
             depositAmounts[tokenId] = price;
             depositRecipients[tokenId] = address(0);
             labelByTokenId[tokenId] = label;
-            // Reclaim resets runningMax on-chain; mirror that into ghost state.
-            lastObservedRunningMax[tokenId] = price;
-            lockedRecipient[tokenId] = price == 0 ? address(0) : actor;
         } catch {
             return;
         }
@@ -466,8 +443,8 @@ contract EscrowHandler is Test {
 
     /// @notice Transfers a deposited token to a different actor without paying a cross-tier fee.
     /// @dev Plain transferFrom path; no fee branch is hit because escrow custody is not
-    ///      involved and tier prices may match. Used to seed the recipient-locked invariant
-    ///      (the locked recipient must NOT change despite NFT custody moving).
+    ///      involved and tier prices may match. Used to exercise the position-rebind path that
+    ///      moves `position.recipient` to the new holder on every NFT transfer.
     /// @param tokenSeed Seed for selecting which deposited token to transfer.
     /// @param actorSeed Seed for selecting the recipient.
     function transferDeposited(uint256 tokenSeed, uint256 actorSeed) external {
@@ -491,10 +468,11 @@ contract EscrowHandler is Test {
 
         vm.prank(currentOwner);
         try registrar.transferFrom(currentOwner, recipient, tokenId) {
-            // Sync the amount because position state can shrink under future
-            // downgrade paths, but never the recipient: under the new design
-            // the deposit position is bound to the original depositor and
-            // does not follow NFT custody.
+            // Sync the amount as a safety net against future downgrade paths that
+            // might shrink it. Under the deposit-follows-name design the position
+            // rebinds to the new holder on every transfer; the locked amount itself
+            // travels with the NFT, so on a zero-fee same-tier hop we expect both
+            // the amount and the per-asset reserves to stay put.
             IDotnsNameEscrow.ReleasePosition memory pos = escrow.getReleasePosition(tokenId);
             depositAmounts[tokenId] = pos.amount;
         } catch {
@@ -504,10 +482,10 @@ contract EscrowHandler is Test {
 
     /// @notice Transfers a deposited token using payable `transferFrom`, exercising the
     ///         cross-tier fee path through `chargeTransferFee`.
-    /// @dev Bounds inputs and computes the recipient-tier delta against `runningMax` so
-    ///      the call is funded with exactly the required charge. Revert-safe: returns
-    ///      early when the recipient's price is zero (no fee path needed) or the inner
-    ///      call reverts.
+    /// @dev Funds the call with whatever the registrar's `quoteTransferFee` returns, so the
+    ///      handler stays drift-resistant against future fee additions. Revert-safe: returns
+    ///      early when the recipient's price is zero (no fee path needed) or the inner call
+    ///      reverts.
     /// @param tokenIdSeed Seed for selecting which deposited token to transfer.
     /// @param fromSeed Unused (current owner is derived on-chain). Retained for fuzzer entropy.
     /// @param toSeed Seed for selecting the recipient.
@@ -544,25 +522,22 @@ contract EscrowHandler is Test {
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
             // Read the on-chain insurance delta rather than predicting it. The
-            // chargeTransferFee path credits `reachFloor` to insurance and, if
-            // the NFT is leaving its original depositor, simultaneously refunds
-            // the full deposit via the time-locked refund ledger. Mirroring the
-            // formula in the handler would re-create the drift this guard is
-            // meant to prevent.
+            // chargeTransferFee path credits the reach floor to insurance; when
+            // the NFT is leaving its prior position recipient the position is
+            // rebound to the new holder rather than refunded, so reserves stay
+            // put and only insurance moves. Mirroring the formula in the handler
+            // would re-create the drift this guard is meant to prevent.
             uint256 newInsurance = escrow.insuranceFund();
             if (newInsurance > priorInsurance) {
                 ghost_insurancePaidIn += (newInsurance - priorInsurance);
             }
-            uint256 newMax = escrow.runningMax(tokenId);
-            if (newMax > lastObservedRunningMax[tokenId]) {
-                lastObservedRunningMax[tokenId] = newMax;
-            }
             _accountInsuranceDraws(logs);
 
-            // Sync the amount because the leaving-depositor branch can zero out
-            // the position. Under the new design the deposit is bound to the
-            // original depositor and is refunded in full when the NFT leaves
-            // them, never reassigned to the new owner.
+            // Sync the amount as a safety net against future downgrade paths.
+            // Under the deposit-follows-name design the leaving-recipient branch
+            // rebinds the position to the new holder rather than refunding, so
+            // the locked amount and per-asset reserves stay put while the
+            // recipient pointer moves.
             IDotnsNameEscrow.ReleasePosition memory pos = escrow.getReleasePosition(tokenId);
             depositAmounts[tokenId] = pos.amount;
         } catch {
@@ -614,10 +589,11 @@ contract EscrowHandler is Test {
     }
 
     /// @notice Returns the sum of outstanding time-locked refund entries across all actors.
-    /// @dev Used by the full-solvency invariant to capture the refund-on-leave liability
-    ///      that `chargeTransferFee` credits via `_creditRefund` whenever an active
-    ///      deposit position's NFT moves away from its original depositor. Iterates each
-    ///      actor's entry list and sums each entry's `amount`.
+    /// @dev Used by the full-solvency invariant to capture overpayment refunds that
+    ///      @custom:function chargeTransferFee credits via @custom:function _creditRefund when the
+    ///      attached value exceeds the reach floor. Under the deposit-follows-name model the
+    ///      deposit itself never lands on this ledger; only payer overpayments do. Iterates each
+    ///      actor's entry list and sums each entry's amount.
     /// @return total Aggregate refund-ledger liability owed to the actor set.
     function totalPendingRefundEntries() external view returns (uint256 total) {
         uint256 length = actors.length;

@@ -12,9 +12,10 @@ import {IDotnsRoleManager} from "./IDotnsRoleManager.sol";
 
 /// @title Dotns Role Manager
 /// @notice Shared owner-administered role layer for DotNS contracts with operational roles.
-/// @dev Consuming contracts define their supported role set in {_isSupportedRole}. The owner
-///      remains the only account that can grant or revoke roles; role holders receive only the
-///      operational permissions each consuming contract explicitly gates with {_checkRoleOrOwner}.
+/// @dev Consuming contracts define their supported role set in @custom:function _isSupportedRole.
+///      The owner remains the only account that can grant or revoke roles; role holders receive
+///      only the operational permissions each consuming contract explicitly gates with
+///      @custom:function _checkRoleOrOwner.
 /// @custom:security-contact admin@parity.io
 abstract contract DotnsRoleManager is
     AccessControlUpgradeable,

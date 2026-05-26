@@ -6,17 +6,19 @@ import {IDotnsNameEscrow} from "../../contracts/escrow/IDotnsNameEscrow.sol";
 
 /// @title NoStatusDepositLifecycle
 /// @notice Integration coverage for the NoStatus refundable-deposit hurdle as it
-///         binds to the original depositor across registration, NFT transfer,
-///         cooldown elapse, and refund claim.
-/// @dev Asserts the post-redesign rule: a NoStatus depositor's stake clears in
-///      full the moment the NFT leaves their address and is routed through the
-///      time-locked refund ledger, claimable by the depositor only after the
-///      cooldown elapses. The recipient never inherits the deposit.
+///         follows the NFT across registration, transfer, release, cooldown, and
+///         withdrawal.
+/// @dev Asserts the post-redesign rule: a NoStatus depositor's stake travels with
+///      the NFT on every transfer. The escrow position rebinds to the new holder
+///      rather than refunding the original payer, and only the current holder can
+///      release into escrow and pull the deposit after the cooldown elapses. This
+///      closes the same-tier recycle that would otherwise let one D underwrite an
+///      unbounded number of NoStatus names over time.
 contract NoStatusDepositLifecycle is BaseDotns {
     /// @notice NoStatus label fixture (baselength >= 9 classifies as NoStatus).
     string internal constant DEPOSIT_LABEL = "depositname01";
 
-    function test_NoStatus_register_then_transfer_then_claim_refund() public {
+    function test_NoStatus_register_then_transfer_then_holder_claims_refund() public {
         address depositor = ed;
         address recipient = leonardo;
 
@@ -29,7 +31,7 @@ contract NoStatusDepositLifecycle is BaseDotns {
 
         IDotnsNameEscrow.ReleasePosition memory atMint = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(atMint.amount, RENT_PRICE, "position must hold full RENT_PRICE deposit");
-        assertEq(atMint.recipient, depositor, "position recipient must be the depositor");
+        assertEq(atMint.recipient, depositor, "position recipient must be the depositor at mint");
         assertEq(
             dotnsNameEscrow.reserves(address(0)),
             RENT_PRICE,
@@ -38,12 +40,12 @@ contract NoStatusDepositLifecycle is BaseDotns {
         assertEq(
             dotnsNameEscrow.pendingRefundCount(depositor),
             0,
-            "no refund must exist before the depositor-leaving transfer"
+            "no refund must exist before the transfer"
         );
 
-        // Transfer the NFT away from the depositor with zero fee. NoStatus-to-NoStatus
-        // transferFloor is zero, so msg.value == 0 must still route through escrow
-        // because the deposit needs clearing.
+        // Transfer the NFT away from the depositor. Same-tier NoStatus floor is
+        // zero, so msg.value is zero; the escrow is still consulted so the
+        // position rebinds to the new holder.
         uint256 transferFee = dotnsRegistrar.quoteTransferFee(tokenId, recipient);
         assertEq(transferFee, 0, "NoStatus to NoStatus transfer floor is zero");
 
@@ -52,74 +54,88 @@ contract NoStatusDepositLifecycle is BaseDotns {
 
         IDotnsNameEscrow.ReleasePosition memory afterTransfer =
             dotnsNameEscrow.getReleasePosition(tokenId);
-        assertEq(afterTransfer.amount, 0, "deposit must clear when NFT leaves the depositor");
         assertEq(
-            afterTransfer.recipient,
-            address(0),
-            "position must be deleted; recipient must not inherit"
+            afterTransfer.amount, RENT_PRICE, "deposit must travel with the NFT, not be cleared"
+        );
+        assertEq(
+            afterTransfer.recipient, recipient, "position recipient must rebind to the new holder"
         );
         assertEq(
             dotnsNameEscrow.reserves(address(0)),
-            0,
-            "tokenReserved must drop by the cleared deposit"
+            RENT_PRICE,
+            "tokenReserved must not move while the deposit follows the NFT"
         );
-
-        // The refund is credited to the original depositor, never the new owner.
         assertEq(
             dotnsNameEscrow.pendingRefundCount(depositor),
-            1,
-            "depositor must receive a single refund entry on the leaving leg"
+            0,
+            "original depositor must not be credited a refund at transfer time"
         );
         assertEq(
             dotnsNameEscrow.pendingRefundCount(recipient),
             0,
-            "recipient must never inherit the deposit"
+            "new holder must not be credited a refund at transfer time"
+        );
+
+        // Only the current holder can release into escrow.
+        vm.startPrank(recipient);
+        dotnsRegistrar.approve(address(dotnsNameEscrow), tokenId);
+        dotnsNameEscrow.release(tokenId);
+        vm.stopPrank();
+
+        IDotnsNameEscrow.ReleasePosition memory released =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertTrue(released.released, "current holder may release into escrow");
+        assertEq(released.recipient, recipient, "release recipient mirrors the current NFT holder");
+
+        // Withdraw before cooldown is locked.
+        vm.prank(recipient);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsNameEscrow.WithdrawalTooEarly.selector,
+                tokenId,
+                released.withdrawAvailableAt,
+                block.timestamp
+            )
+        );
+        dotnsNameEscrow.withdraw(tokenId);
+
+        // Warp past the cooldown and pull the refund through the pull-payment
+        // ledger. The current holder's balance must grow by exactly D.
+        vm.warp(uint256(released.withdrawAvailableAt) + 1);
+
+        vm.prank(recipient);
+        dotnsNameEscrow.withdraw(tokenId);
+
+        assertEq(
+            dotnsNameEscrow.pendingWithdrawal(recipient),
+            RENT_PRICE,
+            "deposit lands on the current holder's pull-payment ledger"
         );
         assertEq(
             dotnsNameEscrow.pendingWithdrawal(depositor),
             0,
-            "deposit refund routes through the time-locked refund ledger, not pendingWithdrawals"
+            "original depositor never accrues a pending withdrawal"
         );
 
-        // The entry is locked by the escrow cooldown; an early claim must revert.
-        uint256[] memory entries = dotnsNameEscrow.pendingRefundIds(
-            depositor, 0, dotnsNameEscrow.pendingRefundCount(depositor)
-        );
-        assertEq(entries.length, 1, "exactly one entry must be claimable");
-        uint256 entryId = entries[0];
-
-        IDotnsNameEscrow.RefundEntry memory entry = dotnsNameEscrow.refundEntry(entryId);
-        assertEq(entry.recipient, depositor, "entry recipient must be the depositor");
-        assertEq(entry.amount, RENT_PRICE, "entry amount must equal the full deposit");
-        assertEq(entry.tokenId, tokenId, "entry must trace back to the transferred token");
-
-        vm.prank(depositor);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.RefundLocked.selector, entryId, entry.availableAt
-            )
-        );
-        dotnsNameEscrow.claimRefund(entryId);
-
-        // Warp past the cooldown and pull the refund. The depositor's balance
-        // must grow by exactly D.
-        vm.warp(uint256(entry.availableAt) + 1);
-
-        uint256 balanceBefore = depositor.balance;
-
-        vm.prank(depositor);
-        uint256 claimed = dotnsNameEscrow.claimRefund(entryId);
+        uint256 balanceBefore = recipient.balance;
+        vm.prank(recipient);
+        uint256 claimed = dotnsNameEscrow.claimWithdrawal();
 
         assertEq(claimed, RENT_PRICE, "claim must return the full deposit");
         assertEq(
-            depositor.balance - balanceBefore,
+            recipient.balance - balanceBefore,
             RENT_PRICE,
-            "depositor balance must increase by the full deposit"
+            "current holder balance must increase by the full deposit"
         );
         assertEq(
             dotnsNameEscrow.pendingRefundCount(depositor),
             0,
-            "claimed entry must be removed from the depositor's pending list"
+            "original depositor must never accrue a refund entry"
+        );
+        assertEq(
+            dotnsNameEscrow.pendingRefundCount(recipient),
+            0,
+            "release-and-withdraw uses pendingWithdrawals, not the time-locked refund ledger"
         );
     }
 }

@@ -18,6 +18,13 @@ library StringUtils {
     ///      what People Chain emits and what DotNS accepts.
     uint256 internal constant MIN_LITE_SUFFIX_DIGITS = 2;
 
+    /// @notice Maximum number of octets in a single DNS label.
+    /// @dev RFC 1035 caps each label at 63 octets. Enforced inside @custom:function _isDnsLabel so
+    ///      every public validator (@custom:function isSingleLabel, @custom:function isNamePath,
+    ///      @custom:function isSingleDotLiteLabel, @custom:function isLitePersonLabel) inherits
+    ///      the bound and oversized labels never reach the registrar.
+    uint256 internal constant MAX_DNS_LABEL_OCTETS = 63;
+
     /// @notice Computes the character length of a UTF-8 encoded string.
     /// @dev Counts Unicode code points, not bytes. Handles multi-byte UTF-8 sequences:
     ///      - 1 byte:  0x00-0x7F (ASCII)
@@ -43,9 +50,10 @@ library StringUtils {
     }
 
     /// @notice Validates that `s` is a single canonical DNS label.
-    /// @dev Lowercase ASCII letters, digits, and hyphen only; hyphen may not be
-    ///      the first or last character. No dots allowed; use {isNamePath} for
-    ///      dotted forms. Mirrors the label rules enforced at the registrar.
+    /// @dev Lowercase ASCII letters, digits, and hyphen only; hyphen may not be the first or last
+    ///      character; length must be in `(0, MAX_DNS_LABEL_OCTETS]`. No dots allowed; use
+    ///      @custom:function isNamePath for dotted forms. Mirrors the label rules enforced at the
+    ///      registrar.
     /// @param value Candidate label.
     /// @return isValid True if `value` is a canonical DNS label.
     function isSingleLabel(string calldata value) internal pure returns (bool isValid) {
@@ -165,7 +173,7 @@ library StringUtils {
     }
 
     /// @notice Validates that `s` is a dot-separated path of canonical DNS labels.
-    /// @dev Each segment between dots must satisfy {isSingleLabel}. Empty
+    /// @dev Each segment between dots must satisfy @custom:function isSingleLabel. Empty
     ///      segments (leading, trailing, or consecutive dots) fail. Used when
     ///      callers submit multi-label paths (e.g. `alice.dot`) rather than
     ///      bare labels.
@@ -196,6 +204,7 @@ library StringUtils {
         returns (bool isValid)
     {
         if (end <= start) return false;
+        if (end - start > MAX_DNS_LABEL_OCTETS) return false;
         if (label[start] == bytes1(0x2d) || label[end - 1] == bytes1(0x2d)) return false;
 
         for (uint256 i = start; i < end; ++i) {

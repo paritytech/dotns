@@ -136,7 +136,8 @@ interface IDotnsRegistrarController is IDotnsController {
     /// (otherwise @custom:reverts InvalidLabel) and ERC721 availability (otherwise
     /// @custom:reverts NameNotAvailable), then consumes the prior commitment, which fails with
     /// @custom:reverts CommitmentNotFound, @custom:reverts CommitmentTooNew, or
-    /// @custom:reverts CommitmentTooOld under the same conditions as {register}. Emits
+    /// @custom:reverts CommitmentTooOld under the same conditions as @custom:function register.
+    /// Emits
     /// @custom:emits NameRegistered on success.
     function registerReserved(Registration calldata registration) external;
 

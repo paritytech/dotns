@@ -35,7 +35,7 @@ library LabelUtils {
     /// @notice Computes `keccak256(bytes(label))` for a `memory` string.
     /// @dev Overload used by call sites that hold the label in memory (e.g. the
     ///      registrar's transfer sync path reading `_labels[tokenId]`). Same
-    ///      semantics as {labelhash}, different calldata shape.
+    ///      semantics as @custom:function labelhash, different calldata shape.
     /// @param label Label string held in memory.
     /// @return hash `keccak256(bytes(label))`.
     function labelhashMemory(string memory label) internal pure returns (bytes32 hash) {
@@ -45,10 +45,10 @@ library LabelUtils {
     }
 
     /// @notice Computes `namehash(parent, labelhash)` against an arbitrary parent.
-    /// @dev General form of {namehash}; use when the parent is not the `.dot` TLD
+    /// @dev General form of @custom:function namehash; use when the parent is not the `.dot` TLD
     ///      (e.g. subnode derivation under a non-TLD parent in the forward registry,
     ///      or a PoP namespace root). For top-level `.dot` registrations prefer
-    ///      {namehash} which hard-codes `DOT_NODE`.
+    ///      @custom:function namehash which hard-codes `DOT_NODE`.
     /// @param parent Parent node.
     /// @param labelhash_ `keccak256(bytes(label))`.
     /// @return node `namehash(parent, labelhash)`.
@@ -66,7 +66,7 @@ library LabelUtils {
     }
 
     /// @notice Computes `namehash(DOT_NODE, labelhash)` via memory-safe scratch space.
-    /// @dev Specialised to the `.dot` TLD; cheaper than {namehashUnder} because
+    /// @dev Specialised to the `.dot` TLD; cheaper than @custom:function namehashUnder because
     ///      the parent constant is folded in at compile time.
     /// @param labelhash_ `keccak256(bytes(label))`.
     /// @return node The node identifier under the `.dot` TLD.

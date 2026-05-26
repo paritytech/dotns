@@ -34,6 +34,12 @@ contract DotnsNameEscrow is
     /// @notice Maximum page size for pendingRefunds pagination and batch claims.
     uint256 public constant MAX_REFUND_PAGE_SIZE = 200;
 
+    /// @notice Upper bound on the configurable release-cooldown.
+    /// @dev The cooldown gates only the release-to-reclaim window, not the long-lived deposit lock,
+    ///      so it is intentionally kept short. Capping at one hour also keeps the cast to `uint64`
+    ///      well below the saturation point at every plausible block timestamp.
+    uint256 public constant MAX_COOLDOWN = 1 hours;
+
     /// @notice The protocol registry for resolving sibling contract addresses.
     IDotnsProtocolRegistry public protocolRegistry;
 
@@ -62,12 +68,6 @@ contract DotnsNameEscrow is
     ///      deltas; debited only when `withdraw` needs to top up a refund that exceeds the
     ///      asset's reserved balance.
     uint256 public insuranceFund;
-
-    /// @notice Highest price ever charged for the name across registration and transfers.
-    /// @dev Monotonically increasing watermark. Each onward sale pays the incremental tier
-    ///      difference against this prior value, and `reclaim` resets it so a fresh registration
-    ///      starts from a clean baseline.
-    mapping(uint256 tokenId => uint256 max) public runningMax;
 
     /// @notice Pull-payment ledger storing each recipient's claimable refund balance.
     /// @dev Per-recipient isolation ensures a failing or reentrant receiver cannot block other
@@ -114,8 +114,10 @@ contract DotnsNameEscrow is
     /// @dev Runs once behind the proxy; subsequent calls trigger @custom:reverts
     ///      InvalidInitialization via the `initializer` modifier. `registry` must be non-zero,
     ///      otherwise @custom:reverts InvalidAsset; `cooldownSeconds` is forwarded to
-    ///      {updateCooldown}, which requires a non-zero value (@custom:reverts InvalidCooldown)
-    ///      and emits @custom:emits CooldownUpdated as part of seeding the initial cooldown.
+    ///      @custom:function updateCooldown, which rejects a zero value (@custom:reverts
+    ///      InvalidCooldown) and any value above @custom:constant MAX_COOLDOWN (@custom:reverts
+    ///      CooldownTooLong), and emits @custom:emits CooldownUpdated as part of seeding the
+    ///      initial cooldown.
     /// @param registry Protocol registry used to resolve registrar and controller addresses.
     /// @param cooldownSeconds Refund cooldown after release.
     function initialize(
@@ -137,6 +139,7 @@ contract DotnsNameEscrow is
     /// @inheritdoc IDotnsNameEscrow
     function updateCooldown(uint256 newCooldown) public override onlyOwner {
         require(newCooldown != 0, InvalidCooldown());
+        require(newCooldown <= MAX_COOLDOWN, CooldownTooLong(newCooldown, MAX_COOLDOWN));
 
         uint256 currentCooldown = cooldown;
         cooldown = newCooldown;
@@ -213,10 +216,6 @@ contract DotnsNameEscrow is
 
         tokenReserved[position.asset] += params.amount;
 
-        if (params.amount > runningMax[params.tokenId]) {
-            runningMax[params.tokenId] = params.amount;
-        }
-
         emit NativeDepositRecorded(params.tokenId, params.amount);
     }
 
@@ -245,9 +244,6 @@ contract DotnsNameEscrow is
         require(msg.value > 0, InvalidAmount());
 
         insuranceFund += msg.value;
-        if (msg.value > runningMax[params.tokenId]) {
-            runningMax[params.tokenId] = msg.value;
-        }
 
         emit CrossTierFeePaid(
             params.tokenId,
@@ -269,34 +265,21 @@ contract DotnsNameEscrow is
         returns (uint256 charged)
     {
         ReleasePosition storage position = _positions[params.tokenId];
-        uint256 currentDeposit = position.amount;
         address priorRecipient = position.recipient;
-
-        // Deposits bind to the original depositor and never follow NFT custody.
-        // Zero-amount positions are lifecycle markers only; they rebind to the
-        // new holder so a free/cross-payer name remains releasable after transfer.
-        bool leavingPositionRecipient = priorRecipient != address(0) && params.to != priorRecipient;
 
         uint256 fee = params.reachFloor;
         require(msg.value >= fee, InsufficientValue());
 
-        if (leavingPositionRecipient) {
-            if (currentDeposit > 0) {
-                tokenReserved[address(0)] -= currentDeposit;
-                delete _positions[params.tokenId];
-                // `cooldown` is owner-bounded well under uint64; truncation cannot occur.
-                // forge-lint: disable-next-line(unsafe-typecast)
-                _creditRefund(priorRecipient, currentDeposit, params.tokenId, uint64(cooldown));
-            } else {
-                position.recipient = params.to;
-            }
+        // Deposits follow the NFT, not the depositor. When the position is funded the locked
+        // deposit travels with the name; when it is a zero-amount lifecycle marker the marker
+        // travels with it. In both cases the position is rebound to the new holder so only
+        // the current holder can later release into escrow and claim the refund.
+        if (priorRecipient != address(0) && params.to != priorRecipient) {
+            position.recipient = params.to;
         }
 
         if (fee > 0) {
             insuranceFund += fee;
-            if (fee > runningMax[params.tokenId]) {
-                runningMax[params.tokenId] = fee;
-            }
         }
 
         charged = fee;
@@ -312,7 +295,8 @@ contract DotnsNameEscrow is
 
         uint256 overpayment = msg.value - fee;
         if (overpayment > 0) {
-            // `cooldown` is owner-bounded well under uint64; truncation cannot occur.
+            // `cooldown` is capped at @custom:constant MAX_COOLDOWN (one hour), so the cast to
+            // `uint64` cannot truncate for any plausible block timestamp.
             // forge-lint: disable-next-line(unsafe-typecast)
             _creditRefund(params.payer, overpayment, params.tokenId, uint64(cooldown));
         }
@@ -330,17 +314,15 @@ contract DotnsNameEscrow is
         require(callerAuthorised, NotTokenOwnerOrApproved(msg.sender, tokenId));
 
         ReleasePosition storage position = _positions[tokenId];
-        // Recipient is the canonical "is this position funded?" sentinel; zero-
+        // Recipient is the canonical "is this position present?" sentinel; zero-
         // amount positions seeded for free PopFull / PopLite registrations are
         // still releasable so every minted name has a reachable lifecycle.
         require(position.recipient != address(0), DepositNotConfigured(tokenId));
         require(!position.released, AlreadyReleased(tokenId));
 
-        // Only the locked refund recipient (= original deposit payer) can pull the release
-        // trigger. Combined with the approval check below, this enforces a two-party
-        // cooperation model: the current NFT holder must approve escrow, and the original
-        // payer initiates the release. Closes the secondary-market vector where a
-        // buyer of a NoStatus NFT could release someone else's deposit.
+        // Position recipient mirrors the current NFT holder (rebound on every transfer), so this
+        // gate is the holder-only check. Belt-and-braces with the approval check below: the
+        // holder must both initiate the release and approve escrow to move the NFT.
         require(msg.sender == position.recipient, NotRefundRecipient(msg.sender, tokenId));
 
         bool approvedForEscrow = registrar.getApproved(tokenId) == address(this)
@@ -348,8 +330,9 @@ contract DotnsNameEscrow is
 
         require(approvedForEscrow, EscrowNotApproved(tokenId));
 
-        // recipient is locked at deposit time; release does not mutate it
-        // casting to 'uint64' is safe because we bound cooldown to only minutes
+        // Position recipient already mirrors the caller (the current holder) thanks to the
+        // transfer rebind, so release does not need to touch it. The cast to `uint64` is safe
+        // because `cooldown` is bounded by @custom:constant MAX_COOLDOWN.
         // forge-lint: disable-next-line(unsafe-typecast)
         position.withdrawAvailableAt = uint64(block.timestamp + cooldown);
         position.released = true;
@@ -620,7 +603,6 @@ contract DotnsNameEscrow is
         address previousRecipient = position.recipient;
 
         delete _positions[tokenId];
-        delete runningMax[tokenId];
         _removeReleasedToken(tokenId);
 
         _registrar().safeTransferFrom(address(this), newOwner, tokenId);

@@ -114,29 +114,29 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         );
     }
 
-    /// @notice The deposit position is bound to the original depositor and is never
-    ///         re-assigned by NFT custody changes. Whenever an active (non-released)
-    ///         deposit position still holds a non-zero amount, its recipient must
-    ///         match the address that opened it, which the handler captures into
-    ///         @custom:function lockedRecipient at deposit time.
-    /// @dev Released positions are exempt because the position is consumed by the
-    ///      release leg and the recipient is the prior payer by definition. Positions
-    ///      whose amount has been refunded to zero in a downgrade can also have
-    ///      `position.recipient == address(0)` after the slot is deleted, so the
-    ///      `amount == 0` skip covers that case as well.
-    function invariant_position_recipient_is_bound_to_original_depositor() public view {
+    /// @notice The deposit follows the NFT: the active escrow position's recipient
+    ///         must always equal the current NFT holder. Every transfer that moves a
+    ///         name off the prior position recipient rebinds the position to the new
+    ///         holder, so a depositor cannot recover D by transferring the name to a
+    ///         fresh address.
+    /// @dev Released positions are exempt because the NFT then sits in escrow custody
+    ///      and `position.recipient` is the locked refund recipient for the
+    ///      release-and-withdraw leg rather than the NFT holder. Positions whose slot
+    ///      has been deleted (after reclaim) are also exempt via the `amount == 0`
+    ///      and `recipient == address(0)` skip.
+    function invariant_position_recipient_mirrors_current_nft_holder() public view {
         uint256[] memory deposited = handler.getDepositedTokenIds();
         for (uint256 i; i < deposited.length; ++i) {
             uint256 tokenId = deposited[i];
             IDotnsNameEscrow.ReleasePosition memory position =
                 dotnsNameEscrow.getReleasePosition(tokenId);
 
-            if (position.amount == 0 || position.released) continue;
+            if (position.recipient == address(0) || position.released) continue;
 
             assertEq(
                 position.recipient,
-                handler.lockedRecipient(tokenId),
-                "active deposit recipient must remain the original depositor"
+                dotnsRegistrar.ownerOf(tokenId),
+                "active deposit recipient must mirror the current NFT holder"
             );
         }
     }

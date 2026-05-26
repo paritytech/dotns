@@ -37,9 +37,10 @@ contract DotnsDeployer is BaseDeployer {
     uint64 public constant DEFAULT_RESERVATION_DURATION = 7 days;
 
     /// @notice Default refund cooldown for the freshly-deployed name escrow.
-    /// @dev The protocol owner rotates this post-deploy via
-    ///      `DotnsNameEscrow.updateCooldown`.
-    uint256 public constant ESCROW_COOLDOWN = 7 days;
+    /// @dev Sized to the release-and-withdraw safety window, well below the escrow's
+    ///      @custom:constant MAX_COOLDOWN ceiling. The protocol owner rotates this
+    ///      post-deploy via @custom:function DotnsNameEscrow.updateCooldown.
+    uint256 public constant ESCROW_COOLDOWN = 15 minutes;
 
     /// @notice Operator address granted `WHITELIST_OPERATOR_ROLE` on the
     ///         registrar controller at fresh-deploy time.

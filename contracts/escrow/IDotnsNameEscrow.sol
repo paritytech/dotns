@@ -6,11 +6,12 @@ pragma solidity ^0.8.34;
 /// @custom:security-contact admin@parity.io
 interface IDotnsNameEscrow {
     /// @notice Parameters for recording a deposit position.
-    /// @dev `recipient` is locked at deposit time and snapshotted into the position so the original
-    ///      payer remains the only address that can ever pull a refund, regardless of subsequent
-    ///      NFT transfers on the registrar.
-    /// @param asset Deposit asset. `address(0)` denotes native token.
-    /// @param recipient Refund recipient locked at deposit time.
+    /// @dev The refund recipient is seeded at deposit time but is not locked: it rebinds to the
+    ///      current NFT holder on every transfer that moves the name off the prior recipient, so
+    ///      the deposit follows the name rather than the original payer. Only the current holder
+    ///      can release into escrow and pull the refund.
+    /// @param asset Deposit asset. The zero address denotes the native token.
+    /// @param recipient Initial refund recipient; rebound to the current NFT holder on transfer.
     struct DepositParams {
         uint256 tokenId;
         address asset;
@@ -30,15 +31,15 @@ interface IDotnsNameEscrow {
         address recipient;
     }
 
-    /// @notice Inputs for charging a transfer fee and clearing any stale deposit.
-    /// @dev The fee charged is the flat `reachFloor` returned by @custom:function
-    /// PopRules.transferFloor. Independently, when an active deposit position exists and the NFT is
-    /// leaving its original
-    ///      depositor, the full deposit is refunded to that depositor via the time-locked refund
-    ///      ledger. The recipient never inherits a deposit at transfer.
+    /// @notice Inputs for charging transfer friction and rebinding the escrow position.
+    /// @dev The fee charged is the flat reach floor returned by @custom:function
+    ///      PopRules.transferFloor, settled to the insurance fund. The deposit, when present,
+    ///      travels with the NFT: the position is rebound to the recipient so the new holder is
+    ///      the only address that can later release into escrow and unlock the locked value.
+    ///      There is no transfer-time refund path.
     /// @param reachFloor Required fee paid by the sender on a downward or cross-reach transfer.
-    /// @param payer Original `msg.sender` of the registrar transfer entrypoint.
-    /// @param to NFT recipient. Compared against `position.recipient` to decide deposit clearance.
+    /// @param payer Original sender of the registrar transfer entrypoint.
+    /// @param to NFT recipient. Becomes the new position recipient whenever a position exists.
     struct ChargeTransferFeeParams {
         uint256 tokenId;
         uint256 reachFloor;
@@ -173,6 +174,11 @@ interface IDotnsNameEscrow {
     /// @notice Thrown when the configured cooldown is invalid.
     error InvalidCooldown();
 
+    /// @notice Thrown when the supplied cooldown exceeds the contract's configured upper bound.
+    /// @param supplied Cooldown value the caller asked for.
+    /// @param maxAllowed Upper bound enforced by the contract.
+    error CooldownTooLong(uint256 supplied, uint256 maxAllowed);
+
     /// @notice Thrown when the supplied amount is invalid.
     error InvalidAmount();
 
@@ -283,16 +289,17 @@ interface IDotnsNameEscrow {
     /// @param recipient Address whose pending balance should grow by `msg.value`.
     function creditOverpayment(address recipient) external payable;
 
-    /// @notice Charges transfer friction and synchronises the token's escrow position.
+    /// @notice Charges transfer friction and rebinds the token's escrow position to the new holder.
     /// @dev Only the configured registrar may call this, otherwise @custom:reverts NotRegistrar.
-    ///      When a fee is owed, `msg.value` must cover it or @custom:reverts InsufficientValue.
-    ///      If a positive deposit position leaves its original recipient, the deposit is cleared
-    ///      and credited as a time-locked refund. If a zero-amount lifecycle marker leaves its
-    ///      recipient, the marker is rebound to `params.to` so the new holder can still release.
-    ///      Emits @custom:emits CrossTierFeePaid with `isRegistration = false` when a non-zero
-    ///      fee is credited to insurance, and @custom:emits OverpaymentRefunded when surplus
-    ///      `msg.value` (or the full amount when no fee is owed) is returned to `params.payer`;
-    ///      a failed refund transfer triggers @custom:reverts RefundFailed.
+    ///      When a fee is owed, the attached value must cover it or @custom:reverts
+    ///      InsufficientValue. Whenever a position exists for the token and the NFT is leaving its
+    ///      prior recipient, the position recipient is rebound to the new holder so the deposit
+    ///      (when funded) and the lifecycle marker (when zero-amount) both follow the NFT. The
+    ///      escrow does not refund anyone at transfer time; the only path back to the locked
+    ///      deposit is for the current holder to release into escrow and wait the cooldown.
+    ///      Emits @custom:emits CrossTierFeePaid (non-registration) when a non-zero fee is credited
+    ///      to insurance, and credits any surplus value to the payer on the time-locked refund
+    ///      ledger via @custom:emits RefundCredited.
     /// @return charged Amount actually credited to insurance.
     function chargeTransferFee(ChargeTransferFeeParams calldata params)
         external
@@ -303,32 +310,27 @@ interface IDotnsNameEscrow {
     /// @return balance Current insurance fund balance, in wei.
     function insuranceFund() external view returns (uint256 balance);
 
-    /// @notice Returns the highest price ever charged for a token.
-    /// @dev Monotonically non-decreasing across registration and transfers while a position is
-    ///      live; only `reclaim` resets it so a fresh registration starts from a clean baseline
-    ///      rather than inheriting the previous owner's high-water mark.
-    /// @return max The current running maximum, in wei.
-    function runningMax(uint256 tokenId) external view returns (uint256 max);
-
     /// @notice Releases a token into escrow and starts the withdrawal cooldown.
     /// @dev First step of the phased lifecycle. The caller must be the current NFT holder or one
     ///      of its approved operators, otherwise @custom:reverts NotTokenOwnerOrApproved. The slot
-    ///      for `tokenId` must already hold a funded position (sentinel:
+    ///      for `tokenId` must already hold a position (sentinel:
     ///      `position.recipient != address(0)`); an unseeded slot triggers @custom:reverts
     ///      DepositNotConfigured, and a position already in the released phase triggers
     ///      @custom:reverts AlreadyReleased. Zero-amount positions are still releasable so every
-    ///      minted name has a reachable lifecycle. The caller must also be the locked refund
-    ///      recipient, otherwise @custom:reverts NotRefundRecipient; combined with the escrow
-    ///      approval check (@custom:reverts EscrowNotApproved when escrow may not move the NFT)
-    ///      this enforces two-party cooperation so a secondary-market buyer cannot release someone
-    ///      else's deposit. Emits @custom:emits NameReleased once the NFT is moved into custody.
+    ///      minted name has a reachable lifecycle. The caller must also be the current position
+    ///      recipient, which is rebound to the NFT holder on every transfer that moves the name
+    ///      off the prior recipient, otherwise @custom:reverts NotRefundRecipient. Combined with
+    ///      the escrow approval check (@custom:reverts EscrowNotApproved when escrow may not move
+    ///      the NFT) this ensures only the live holder can release the name and unlock its locked
+    ///      deposit. Emits @custom:emits NameReleased once the NFT is moved into custody.
     function release(uint256 tokenId) external;
 
     /// @notice Credits the refundable deposit for a released token to the recipient's pending
     /// balance.
     /// @dev Second step of the phased lifecycle. The position must already be released
     ///      (@custom:reverts NotReleased otherwise) and not yet claimed (@custom:reverts
-    ///      AlreadyClaimed on re-entry). Only the locked refund recipient may call this,
+    ///      AlreadyClaimed on re-entry). Only the current position recipient (the address that
+    ///      released the name, which mirrored the NFT holder at that moment) may call this,
     ///      otherwise @custom:reverts NotRefundRecipient, and `block.timestamp` must have reached
     ///      `withdrawAvailableAt`, otherwise @custom:reverts WithdrawalTooEarly. Draws from the
     ///      per-asset `tokenReserved` pool first and falls back to the shared insurance fund on
@@ -354,20 +356,21 @@ interface IDotnsNameEscrow {
     function pendingWithdrawal(address recipient) external view returns (uint256 amount);
 
     /// @notice Transfers a released-and-claimed token from escrow custody to a new owner.
-    /// @dev Hands the NFT back to the controller for re-registration and clears `runningMax` so the
-    ///      next registrant starts from a fresh price baseline rather than inheriting the previous
-    ///      owner's transfer-fee high-water mark. Only the configured controller may call this,
-    ///      otherwise @custom:reverts NotController, and the position must be both released and
-    ///      claimed, otherwise @custom:reverts NotReclaimable. Emits @custom:emits NameReclaimed
-    ///      once custody is transferred.
+    /// @dev Hands the NFT back to the controller for re-registration. Only the configured
+    ///      controller may call this, otherwise @custom:reverts NotController, and the position
+    ///      must be both released and claimed, otherwise @custom:reverts NotReclaimable. Emits
+    ///      @custom:emits NameReclaimed once custody is transferred.
     /// @param newOwner Address of the new registrant taking over the name.
     function reclaim(uint256 tokenId, address newOwner) external;
 
     /// @notice Updates the cooldown duration for future releases.
     /// @dev Owner-only. Affects only releases recorded after this call; positions already released
     ///      keep the `withdrawAvailableAt` snapshot taken at their release time. `newCooldown`
-    ///      must be non-zero, otherwise @custom:reverts InvalidCooldown. Emits
-    ///      @custom:emits CooldownUpdated with the prior and new values.
+    ///      must be non-zero, otherwise @custom:reverts InvalidCooldown, and must not exceed the
+    ///      contract's `MAX_COOLDOWN` upper bound, otherwise @custom:reverts CooldownTooLong; the
+    ///      bound keeps the release-to-reclaim window short and protects the `uint64` cast in
+    ///      release from truncation. Emits @custom:emits CooldownUpdated with the prior and new
+    ///      values.
     function updateCooldown(uint256 newCooldown) external;
 
     /// @notice Pulls a single time-locked refund entry.

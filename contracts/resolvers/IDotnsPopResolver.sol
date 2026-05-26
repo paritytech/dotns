@@ -76,7 +76,7 @@ interface IDotnsPopResolver {
     function liteLink(bytes32 fullNode) external view returns (bytes32 liteLabelhash);
 
     /// @notice Returns the full-person node a given lite label has claimed.
-    /// @dev Reverse of {liteLink}. Written by the same `setLiteLink` call so the
+    /// @dev Reverse of @custom:function liteLink. Written by the same `setLiteLink` call so the
     ///      two directions stay in lockstep. Returns zero when the lite label
     ///      has never been linked to a full claim.
     /// @param liteLabelhash The labelhash of the lite-person username to query.

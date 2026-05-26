@@ -310,7 +310,7 @@ contract DotnsNameEscrowTest is BaseDotns {
     }
 
     function test_update_cooldown() public {
-        uint256 newCooldown = 14 days;
+        uint256 newCooldown = 30 minutes;
 
         vm.prank(owner);
         vm.expectEmit(true, true, false, false);
@@ -320,7 +320,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(dotnsNameEscrow.cooldown(), newCooldown, "cooldown should be updated");
     }
 
-    function test_same_tier_NoStatus_transfer_refunds_original_depositor() public {
+    function test_same_tier_NoStatus_transfer_rebinds_position_to_new_holder() public {
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
         IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
@@ -331,48 +331,39 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(quotedFee, 0, "same-tier NoStatus transfer should be free");
 
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
-        uint256 refundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
+        uint256 edRefundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
+        uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(leonardo);
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
-        // Under the new design the refundable deposit binds to the original
-        // NoStatus depositor and clears whenever the NFT leaves them. The
-        // position slot is deleted, reserves drop by the deposit, and a
-        // time-locked refund entry is credited to the depositor so the
-        // personhood-tier hurdle is not laundered by an NFT transfer.
+        // Deposits follow the NFT: the position is rebound to the new holder rather than refunded
+        // to the original payer, so transferring a funded NoStatus name forfeits the locked
+        // deposit. The recycle that drove the old refund-and-delete model is closed off: the only
+        // path back to D is for the current holder to release into escrow.
         IDotnsNameEscrow.ReleasePosition memory afterTransfer =
             dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(
             afterTransfer.recipient,
-            address(0),
-            "position must be deleted once the depositor parts with the NFT"
+            leonardo,
+            "position must rebind to the new holder when the NFT leaves the depositor"
         );
-        assertEq(afterTransfer.amount, 0, "position amount must zero out on full refund");
+        assertEq(afterTransfer.amount, RENT_PRICE, "deposit must travel with the name");
 
         assertEq(
             dotnsNameEscrow.reserves(address(0)),
-            reservesBefore - RENT_PRICE,
-            "reserves must decrement by the refunded deposit"
+            reservesBefore,
+            "reserves must not move on a same-tier rebind"
         );
-
         assertEq(
             dotnsNameEscrow.pendingRefundCount(ed),
-            refundsBefore + 1,
-            "depositor must have a single new refund entry"
+            edRefundsBefore,
+            "no refund may be credited to the prior depositor at transfer time"
         );
-        uint256[] memory entryIds = dotnsNameEscrow.pendingRefundIds(ed, 0, 200);
-        IDotnsNameEscrow.RefundEntry memory entry =
-            dotnsNameEscrow.refundEntry(entryIds[entryIds.length - 1]);
-        assertEq(entry.recipient, ed, "refund entry must be credited to ed");
-        assertEq(entry.amount, RENT_PRICE, "refund entry must carry the full deposit");
-        assertEq(entry.tokenId, tokenId, "refund entry must reference the transferred token");
         assertEq(
-            entry.availableAt,
-            // `ESCROW_COOLDOWN` is fixed well below uint64 max in the test base.
-            // forge-lint: disable-next-line(unsafe-typecast)
-            uint64(block.timestamp + ESCROW_COOLDOWN),
-            "refund entry must respect the configured cooldown"
+            dotnsNameEscrow.pendingRefundCount(leonardo),
+            leonardoRefundsBefore,
+            "no refund may be credited to the new holder at transfer time"
         );
     }
 
@@ -449,14 +440,14 @@ contract DotnsNameEscrowTest is BaseDotns {
         );
     }
 
-    function test_transfer_full_refund_with_downgrade_friction() public {
-        // Both legs of `chargeTransferFee` settle in one call: the friction fee is
-        // credited to insurance and the bound deposit is refunded in full to the
-        // original depositor. The most direct way to fire both legs together on a
-        // NoStatus label is to promote ed to PopFull after the mint and route the
-        // NFT to a NoStatus recipient, so the downgrade leg of
-        // @custom:function PopRules.transferFloor returns `startingPrice` while the
-        // position still carries the original RENT_PRICE deposit.
+    function test_transfer_charges_friction_and_rebinds_position() public {
+        // Downward cross-tier transfer of a funded NoStatus name: the friction fee settles to
+        // insurance and the deposit travels with the NFT. There is no transfer-time refund:
+        // `position.recipient` rebinds to the new holder, the locked deposit follows, and only
+        // the new holder can later release into escrow. Promoting `ed` to PopFull before the
+        // transfer forces `PopRules.transferFloor` to return `startingPrice` while the position
+        // still carries the original `RENT_PRICE` deposit, so both legs of `chargeTransferFee`
+        // run in one call.
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
         _grantPopFull(ed);
@@ -467,46 +458,46 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
         uint256 insuranceBefore = dotnsNameEscrow.insuranceFund();
-        uint256 refundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
+        uint256 edRefundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
+        uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(leonardo);
 
         vm.deal(ed, quotedFee);
         vm.prank(ed);
         dotnsRegistrar.transferFrom{value: quotedFee}(ed, leonardo, tokenId);
 
         IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
-        assertEq(pos.recipient, address(0), "position cleared on leaving the depositor");
-        assertEq(pos.amount, 0, "position amount zeroed on full refund");
+        assertEq(pos.recipient, leonardo, "position must rebind to the new holder");
+        assertEq(pos.amount, RENT_PRICE, "deposit amount untouched on rebind");
 
         assertEq(
             dotnsNameEscrow.reserves(address(0)),
-            reservesBefore - RENT_PRICE,
-            "reserves drop by the refunded deposit"
+            reservesBefore,
+            "reserves must not move when the deposit follows the NFT"
         );
         assertEq(
             dotnsNameEscrow.insuranceFund() - insuranceBefore,
             startingPrice,
-            "friction fee settles to insurance independently of the refund"
+            "friction fee settles to insurance independently of the deposit"
         );
         assertEq(
             dotnsNameEscrow.pendingRefundCount(ed),
-            refundsBefore + 1,
-            "depositor receives a single new refund entry"
+            edRefundsBefore,
+            "no refund credited to the prior depositor"
         );
-
-        uint256[] memory entryIds = dotnsNameEscrow.pendingRefundIds(ed, 0, 200);
-        IDotnsNameEscrow.RefundEntry memory entry =
-            dotnsNameEscrow.refundEntry(entryIds[entryIds.length - 1]);
-        assertEq(entry.amount, RENT_PRICE, "refund amount equals the original deposit");
-        assertEq(entry.recipient, ed, "refund credit returns to the original depositor");
+        assertEq(
+            dotnsNameEscrow.pendingRefundCount(leonardo),
+            leonardoRefundsBefore,
+            "no refund credited to the new holder at transfer time"
+        );
     }
 
-    function test_transfer_no_refund_when_to_equals_position_recipient() public {
+    function test_transfer_no_rebind_when_to_equals_position_recipient() public {
         // Defensive: if `chargeTransferFee` is ever invoked with `to == position.recipient`
-        // (only reachable through a future code path or a direct registrar-pranked call),
-        // the leaving-depositor branch must not fire. The position stays funded, no
-        // refund entry is credited, and the fee leg behaves exactly as for any other
-        // payable transfer. Drives the call from the registrar's address so the
-        // `onlyRegistrar` guard passes without trying to perform an NFT move.
+        // (only reachable through a future code path or a direct registrar-pranked call), the
+        // rebind branch must not fire. The position stays funded with the same recipient, no
+        // refund entry is credited, and the fee leg behaves exactly as for any other payable
+        // transfer. Drives the call from the registrar's address so the `onlyRegistrar` guard
+        // passes without trying to perform an NFT move.
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
         IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
@@ -547,76 +538,101 @@ contract DotnsNameEscrowTest is BaseDotns {
         );
     }
 
-    function test_refund_credit_subject_to_cooldown() public {
-        // The refund entry produced when the NFT leaves its depositor is gated by the
-        // configured cooldown. Claiming before `availableAt` must revert; claiming
-        // afterwards must deliver the full deposit. This is the lock that prevents a
-        // register-transfer-reclaim loop from being run inside a single block.
+    function test_release_and_withdraw_subject_to_cooldown_after_transfer() public {
+        // Deposits follow the NFT: a NoStatus name transferred to a new holder carries its
+        // locked D with it. The only path back to the deposit is for the current holder to
+        // release into escrow and withdraw after the configured cooldown. This is the lock
+        // that prevents a register-transfer-reclaim loop from being run inside a single block.
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
-        uint256[] memory entryIds = dotnsNameEscrow.pendingRefundIds(ed, 0, 200);
-        assertEq(entryIds.length, 1, "exactly one refund entry must be credited");
-        uint256 entryId = entryIds[0];
-        IDotnsNameEscrow.RefundEntry memory entry = dotnsNameEscrow.refundEntry(entryId);
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(pos.recipient, leonardo, "position recipient must follow the NFT");
+        assertEq(pos.amount, RENT_PRICE, "deposit amount untouched on rebind");
+        assertEq(
+            dotnsNameEscrow.pendingRefundCount(ed),
+            0,
+            "no refund entry may be credited at transfer time"
+        );
 
-        // Cannot claim before cooldown.
-        vm.prank(ed);
+        vm.startPrank(leonardo);
+        dotnsRegistrar.approve(address(dotnsNameEscrow), tokenId);
+        dotnsNameEscrow.release(tokenId);
+        vm.stopPrank();
+
+        IDotnsNameEscrow.ReleasePosition memory released =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertTrue(released.released, "current holder may release into escrow");
+        uint64 availableAt = released.withdrawAvailableAt;
+
+        // Withdraw before cooldown is locked.
+        vm.prank(leonardo);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IDotnsNameEscrow.RefundLocked.selector, entryId, entry.availableAt
+                IDotnsNameEscrow.WithdrawalTooEarly.selector, tokenId, availableAt, block.timestamp
             )
         );
-        dotnsNameEscrow.claimRefund(entryId);
+        dotnsNameEscrow.withdraw(tokenId);
 
         // Still locked one second before cooldown.
-        vm.warp(entry.availableAt - 1);
-        vm.prank(ed);
+        vm.warp(uint256(availableAt) - 1);
+        vm.prank(leonardo);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IDotnsNameEscrow.RefundLocked.selector, entryId, entry.availableAt
+                IDotnsNameEscrow.WithdrawalTooEarly.selector, tokenId, availableAt, block.timestamp
             )
         );
-        dotnsNameEscrow.claimRefund(entryId);
+        dotnsNameEscrow.withdraw(tokenId);
 
-        // Unlocks exactly at `availableAt`.
-        vm.warp(entry.availableAt);
-        uint256 balanceBefore = ed.balance;
-        vm.prank(ed);
-        uint256 claimed = dotnsNameEscrow.claimRefund(entryId);
+        // Unlocks exactly at `availableAt`: withdraw credits the pull-payment ledger.
+        vm.warp(uint256(availableAt));
+        vm.prank(leonardo);
+        dotnsNameEscrow.withdraw(tokenId);
+
+        assertEq(
+            dotnsNameEscrow.pendingWithdrawal(leonardo),
+            RENT_PRICE,
+            "deposit lands on the new holder's pull-payment ledger"
+        );
+
+        uint256 balanceBefore = leonardo.balance;
+        vm.prank(leonardo);
+        uint256 claimed = dotnsNameEscrow.claimWithdrawal();
 
         assertEq(claimed, RENT_PRICE, "claim returns the full deposit");
-        assertEq(ed.balance - balanceBefore, RENT_PRICE, "depositor receives the full refund");
-        assertEq(dotnsNameEscrow.pendingRefundCount(ed), 0, "entry removed after claim");
+        assertEq(leonardo.balance - balanceBefore, RENT_PRICE, "current holder receives the refund");
+        assertEq(
+            dotnsNameEscrow.pendingRefundCount(ed),
+            0,
+            "original depositor never accrues a refund entry"
+        );
     }
 
-    function test_transfer_clears_deposit_then_followup_transfer_is_pure_pass_through() public {
-        // First transfer ed -> leonardo clears the deposit and credits ed's refund.
-        // The second transfer leonardo -> tiago carries no position to clear, no fee
-        // to charge, and no msg.value, so the registrar must short-circuit before
-        // ever touching the escrow. Asserts via insuranceFund, reserves and refund
-        // ledger snapshots that none of the escrow accounting mutated on the second
-        // hop.
+    function test_funded_position_follows_NFT_through_multiple_transfers() public {
+        // Deposits travel with the NFT. The first hop ed -> leonardo rebinds the position to
+        // leonardo; the second hop leonardo -> tiago rebinds it again to tiago. The locked
+        // deposit and the per-asset reserves stay put across the chain of transfers, no
+        // friction or refund accounting fires for same-tier moves, and only the final holder
+        // can release into escrow.
         uint256 tokenId = _registerNoStatus(LABEL, ed);
+
+        uint256 reservesAtStart = dotnsNameEscrow.reserves(address(0));
+        uint256 insuranceAtStart = dotnsNameEscrow.insuranceFund();
+        uint256 edRefundsAtStart = dotnsNameEscrow.pendingRefundCount(ed);
+        uint256 leonardoRefundsAtStart = dotnsNameEscrow.pendingRefundCount(leonardo);
+        uint256 tiagoRefundsAtStart = dotnsNameEscrow.pendingRefundCount(tiago);
+        uint256 escrowBalanceAtStart = address(dotnsNameEscrow).balance;
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
-        // Snapshot every escrow surface the second transfer could plausibly touch.
-        uint256 reservesAfterFirst = dotnsNameEscrow.reserves(address(0));
-        uint256 insuranceAfterFirst = dotnsNameEscrow.insuranceFund();
-        uint256 refundsForEdAfterFirst = dotnsNameEscrow.pendingRefundCount(ed);
-        uint256 refundsForLeonardoAfterFirst = dotnsNameEscrow.pendingRefundCount(leonardo);
-        uint256 refundsForTiagoAfterFirst = dotnsNameEscrow.pendingRefundCount(tiago);
-        uint256 escrowBalanceAfterFirst = address(dotnsNameEscrow).balance;
-
         IDotnsNameEscrow.ReleasePosition memory midPos = dotnsNameEscrow.getReleasePosition(tokenId);
-        assertEq(midPos.recipient, address(0), "position cleared after first transfer");
-        assertEq(midPos.amount, 0, "amount zeroed after first transfer");
+        assertEq(midPos.recipient, leonardo, "position rebinds to leonardo on the first hop");
+        assertEq(midPos.amount, RENT_PRICE, "deposit amount untouched on the first hop");
 
-        // Same-tier free transfer; quote must agree this is a pass-through.
+        // Same-tier free transfer; quote must agree this is a zero-fee move that still rebinds.
         uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, tiago);
         assertEq(quotedFee, 0, "follow-up same-tier transfer must be free");
 
@@ -625,41 +641,41 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), tiago, "tiago receives the NFT on the second hop");
 
+        IDotnsNameEscrow.ReleasePosition memory tailPos =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(tailPos.recipient, tiago, "position rebinds again to tiago on the second hop");
+        assertEq(tailPos.amount, RENT_PRICE, "deposit amount untouched on the second hop");
+
         assertEq(
             dotnsNameEscrow.reserves(address(0)),
-            reservesAfterFirst,
-            "second hop must not move reserves"
+            reservesAtStart,
+            "reserves must stay put while the deposit follows the NFT"
         );
         assertEq(
             dotnsNameEscrow.insuranceFund(),
-            insuranceAfterFirst,
-            "second hop must not credit insurance"
+            insuranceAtStart,
+            "same-tier hops must not credit insurance"
         );
         assertEq(
             dotnsNameEscrow.pendingRefundCount(ed),
-            refundsForEdAfterFirst,
-            "second hop must not touch the depositor's refund ledger"
+            edRefundsAtStart,
+            "original depositor's refund ledger never accrues"
         );
         assertEq(
             dotnsNameEscrow.pendingRefundCount(leonardo),
-            refundsForLeonardoAfterFirst,
-            "second hop must not credit leonardo"
+            leonardoRefundsAtStart,
+            "intermediate holder accrues no refund"
         );
         assertEq(
             dotnsNameEscrow.pendingRefundCount(tiago),
-            refundsForTiagoAfterFirst,
-            "second hop must not credit tiago"
+            tiagoRefundsAtStart,
+            "final holder accrues no refund at transfer time"
         );
         assertEq(
             address(dotnsNameEscrow).balance,
-            escrowBalanceAfterFirst,
-            "second hop must not move native value into escrow"
+            escrowBalanceAtStart,
+            "escrow native balance unchanged across same-tier hops"
         );
-
-        IDotnsNameEscrow.ReleasePosition memory tailPos =
-            dotnsNameEscrow.getReleasePosition(tokenId);
-        assertEq(tailPos.recipient, address(0), "position remains cleared after second hop");
-        assertEq(tailPos.amount, 0, "amount remains zero after second hop");
     }
 
     /// @notice Builds, commits and registers `label` for `nameOwner` paid by `payer`, returning

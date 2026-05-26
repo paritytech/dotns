@@ -60,13 +60,11 @@ contract PopRulesFuzzTest is BaseDotns {
     }
 
     function testFuzz_reservation_blocks_other_users(uint256 seed) public {
-        string memory nameLabel = string(abi.encodePacked(_makeAlpha(seed, 6), "01"));
+        string memory baseName = _makeAlpha(seed, 6);
 
         _authoriseTestAsController();
 
-        popRules.reserveBaseName(nameLabel, leonardo);
-
-        string memory baseName = _makeAlpha(seed, 6);
+        popRules.reserveBaseName(baseName, leonardo);
 
         (bool isReserved, address reservedFor,) = popRules.isBaseNameReserved(baseName);
 
@@ -90,12 +88,10 @@ contract PopRulesFuzzTest is BaseDotns {
         public
     {
         string memory baseName = _makeAlpha(seed, 6);
-        string memory firstName = string(abi.encodePacked(baseName, "01"));
-        string memory secondName = string(abi.encodePacked(baseName, "02"));
 
         _authoriseTestAsController();
 
-        popRules.reserveBaseName(firstName, leonardo);
+        popRules.reserveBaseName(baseName, leonardo);
 
         (bool isReserved, address firstOwner, uint64 firstExpiry) =
             popRules.isBaseNameReserved(baseName);
@@ -105,7 +101,7 @@ contract PopRulesFuzzTest is BaseDotns {
 
         vm.warp(uint256(firstExpiry) + 1);
 
-        popRules.reserveBaseName(secondName, tiago);
+        popRules.reserveBaseName(baseName, tiago);
 
         (bool rolledReserved, address rolledOwner, uint64 rolledExpiry) =
             popRules.isBaseNameReserved(baseName);

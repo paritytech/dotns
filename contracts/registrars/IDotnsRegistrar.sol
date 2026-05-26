@@ -65,7 +65,8 @@ interface IDotnsRegistrar is IERC721 {
     function addController(IDotnsController controller) external;
 
     /// @notice Removes an authorised controller.
-    /// @dev Mirrors {addController}'s baseline-typed signature so any registered controller can
+    /// @dev Mirrors the @custom:function addController baseline-typed signature so any registered
+    /// controller can
     /// be revoked through the same entry point. Owner-gated (otherwise
     /// @custom:reverts OwnableUnauthorizedAccount); emits @custom:emits ControllerRemoved on
     /// success.

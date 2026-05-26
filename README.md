@@ -30,7 +30,7 @@ Current network addresses and deployment notes are listed in [DEPLOYMENTS.md](./
 
 dotNS uses a single tunable constant, written **D** throughout the protocol. D is the starting price used by PopRules and equals ten DOT at launch; governance can adjust it under the same gate as the upgrade authority. D is the only money quantity the protocol charges; everything else is a composition of D with zero.
 
-D plays two distinct roles. As a **deposit** it is the refundable lock a NoStatus user posts to register a NoStatus-tier label; it stays bound to the original depositor and is refunded when the name leaves them. As a **friction** charge it is the non-refundable amount a sender pays on a cross-tier downward or reach-floor transfer. The two flows are economically distinct.
+D plays two distinct roles. As a **deposit** it is the refundable lock a NoStatus user posts to register a NoStatus-tier label; the deposit is bound to the name, not to the depositor, so it travels with the NFT on every transfer and only unlocks when the current holder releases the name back to escrow. Transferring a funded name forfeits the deposit to the new holder, who inherits the locked D and the right to release later. As a **friction** charge it is the non-refundable amount a sender pays on a cross-tier downward or reach-floor transfer. The two flows are economically distinct: the deposit gates a count of names (one D per NoStatus name in existence), the friction gates the rate of tier laundering.
 
 ### Registration matrix
 
@@ -47,29 +47,31 @@ Cross-payer registrations pay the greater of the owner-side price and the transf
 
 ### Transfer matrix
 
-The registrar consults PopRules for the transfer floor. A transfer pays D whenever the recipient's tier is strictly below the sender's, or whenever the recipient cannot reach the label's required tier. A stale PopFull-tier name landing with a PopLite holder, for example, can still owe friction even when the holder-to-holder move otherwise looks same-tier. Same-tier and upward transfers between holders of the label's own class are free.
+The registrar consults PopRules for the transfer floor. A transfer pays D whenever the recipient's tier is strictly below the sender's, or whenever the recipient cannot reach the label's required tier. A stale PopFull-tier name landing with a PopLite holder, for example, can still owe friction even when the holder-to-holder move otherwise looks same-tier. Same-tier and upward transfers between holders of the label's own class are free of friction.
+
+The deposit, when present, is bound to the name and rides with it on every transfer. The escrow position is rebound to the new holder rather than refunded; only releasing the name back to escrow ever unlocks the locked D. Transferring a funded name is therefore a real forfeiture: the sender hands the locked deposit over to the recipient along with the NFT.
 
 | Sender → Recipient                | Friction (to insurance) | Deposit movement |
 |---|---|---|
-| NoStatus → NoStatus (same tier)   | 0                      | Refunded to original depositor if the name leaves them |
-| NoStatus → PopLite or PopFull     | 0                      | Refunded to original depositor (always leaving) |
-| PopLite → NoStatus                | D                    | n/a (recipient takes no new deposit) |
-| PopLite → PopLite (same)          | 0                      | None, unless reach-floor fires |
-| PopLite → PopFull (upward)        | 0                      | None |
-| PopFull → NoStatus                | D                    | n/a |
-| PopFull → PopLite (downward)      | D                    | n/a |
-| PopFull → PopFull (same)          | 0                      | None, unless reach-floor fires |
+| NoStatus → NoStatus (same tier)   | 0                      | Travels with the name; position rebinds to recipient |
+| NoStatus → PopLite or PopFull     | 0                      | Travels with the name; position rebinds to recipient |
+| PopLite → NoStatus                | D                      | Any inherited deposit travels with the name |
+| PopLite → PopLite (same)          | 0                      | Any inherited deposit stays bound to the name |
+| PopLite → PopFull (upward)        | 0                      | Any inherited deposit stays bound to the name |
+| PopFull → NoStatus                | D                      | Any inherited deposit travels with the name |
+| PopFull → PopLite (downward)      | D                      | Any inherited deposit stays bound to the name |
+| PopFull → PopFull (same)          | 0                      | Any inherited deposit stays bound to the name |
 
-The friction is constant and additive across downward hops. Every step that crosses a tier boundary downward charges D independently, so routing a name through intermediary tiers never costs less than the equivalent direct transfer. Laundering pays at least as much as the route it tries to avoid.
+The friction is constant and additive across downward hops. Every step that crosses a tier boundary downward charges D independently, so routing a name through intermediary tiers never costs less than the equivalent direct transfer. Laundering pays at least as much as the route it tries to avoid. Because the deposit follows the NFT, a NoStatus user cannot recover their D by handing the name to a fresh address and registering again; the only path back to D is releasing the current name into escrow. This binds Sybil cost to one D per live NoStatus name in existence, independent of how often names change hands.
 
 ### Refund and cooldown model
 
 The escrow maintains two separate pull-payment ledgers. The split is deliberate: one ledger is for immediate overpayment withdrawals, and the other is for refunds that must wait behind a cooldown.
 
 - **Overpayment ledger.** No cooldown. Used only as the fallback when a direct registration overpayment cannot be returned to the sender inline.
-- **Refund ledger.** Every refund has its own cooldown clock. Used for the deposit refunded when a NoStatus-deposited name leaves its original depositor, and for transfer-fee overpayments.
+- **Refund ledger.** Every refund has its own cooldown clock. Used for the deposit unlocked when a holder releases a funded name back to escrow, and for transfer-fee overpayments. Transfers never credit the refund ledger because the position rides with the name; only release-and-withdraw does.
 
-Only registrations try to return surplus immediately. Every other refund path waits behind its own cooldown. Governance can tune the cooldown value.
+Only registrations try to return surplus immediately. Every other refund path waits behind its own cooldown. The cooldown is bounded to minutes: it is the window between release and reclaim during which the original payer has an uncontested chance to pull their refund before the controller hands the name out again, not a long-lived lock. Governance can tune it within that band.
 
 Clients can enumerate pending refunds through the escrow's public refund views. Pagination is capped so refund discovery remains bounded.
 
@@ -96,6 +98,8 @@ Each base label carries a head/tail-indexed reservation queue with a capacity of
 #### Early testnet quirk: LabelStore deployment
 
 Pop-gateway issuances mint the name and persist its label, but LabelStore deployment is deferred for users who have not yet interacted with the protocol from their own address. The current pallet-revive runtime does not let substrate Root deploy contracts on behalf of an account it does not control, so the per-user LabelStore cannot be created at the moment the gateway writes. The controller stamps a pending-claim entry instead, and the user calls claimLabelStore once from their own address to settle the store. The pending-claim entries have a bounded TTL (expirePendingClaim is permissionless) so the slot frees itself if a user never claims. When the runtime supports root-origin contract deployment, the deferred path collapses to a no-op and the issuance flow becomes one transaction end-to-end. This is a runtime limitation, not a protocol design choice.
+
+Operational consequence for transfers: the registrar derives the transfer-floor price by reading the label from the sender's LabelStore. A gateway-issued name held by a user who has not yet called claimLabelStore has no readable label on the sender side, so `_quoteTransferFee` returns zero regardless of the recipient's tier. Until the holder settles their LabelStore, a downward transfer (for example PopFull to NoStatus) does not charge the cross-tier friction it would otherwise owe. Clients that consume gateway-issued names should treat claimLabelStore as a prerequisite for accurate transfer-time pricing, not just for label discovery.
 
 ### RootGatewayDispatcher
 

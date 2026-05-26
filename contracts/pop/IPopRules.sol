@@ -34,7 +34,7 @@ interface IPopRules {
     event BaseNameReserved(string indexed baseName, address indexed owner, uint64 expires);
 
     /// @notice Emitted when the spam-deterrent NoStatus starting price is rotated.
-    /// @dev Owner-only setter {updateStartingPrice}; the new value is consumed
+    /// @dev Owner-only setter @custom:function updateStartingPrice; the new value is consumed
     ///      by `_priceValidatedName` on the next pricing read.
     /// @param oldPrice Previous wei value.
     /// @param newPrice New wei value.
@@ -92,15 +92,18 @@ interface IPopRules {
     /// @param newStartingPrice New base price in wei.
     function updateStartingPrice(uint256 newStartingPrice) external;
 
-    /// @notice Creates a reservation entry for the digit-stripped version of a name.
+    /// @notice Creates or refreshes a reservation entry for a PopLite-eligible stem.
     /// @dev Commit-reveal reservation path. Only an authorised controller on the registrar may
-    ///      call this, otherwise @custom:reverts NotRegistry. Non-canonical labels and labels
-    ///      that do not classify as `PopLite` trigger @custom:reverts PopError. No-ops when the
-    ///      slot is already live so concurrent registrations cannot stomp the original reserver;
-    ///      otherwise emits @custom:emits BaseNameReserved.
-    /// @param baseName The base label with trailing digits removed.
+    ///      call this, otherwise @custom:reverts NotRegistry. The caller passes the
+    /// already-stripped stem; the contract enforces stem shape (no trailing digits) and
+    /// PopLite-eligibility
+    ///      (length in `[6, 8]`), and a non-canonical label or a label outside that shape triggers
+    ///      @custom:reverts PopError. Cross-user collision on a live slot triggers @custom:reverts
+    ///      PopError so the caller cannot silently overwrite another user's reservation; same-user
+    ///      refresh and writes into an empty or expired slot emit @custom:emits BaseNameReserved.
+    /// @param stem The base label with no trailing digits.
     /// @param user The address receiving reservation rights.
-    function reserveBaseName(string calldata baseName, address user) external;
+    function reserveBaseName(string calldata stem, address user) external;
 
     /// @notice Emitted when a base-name reservation is cleared.
     /// @param baseName The base label whose reservation was released.
@@ -109,27 +112,28 @@ interface IPopRules {
     /// @notice Writes or refreshes a reservation for a bare base-name stem.
     /// @dev Gateway-driven reservation path used by the PoP controller. Only a controller in the
     ///      registrar's `controllers` set may call this, otherwise @custom:reverts NotRegistry.
-    ///      Does not apply the lite-format classification that `reserveBaseName` enforces; the
-    ///      caller supplies the bare stem directly, and a non-canonical label triggers
-    ///      @custom:reverts PopError. If the slot is already live and held by a different user,
-    ///      @custom:reverts PopError so the caller's local bookkeeping and PopRules state stay in
-    ///      lockstep; if it is live for the same user, expiry is refreshed to `block.timestamp +
-    ///      MAX_RESERVATION_TIME`. Emits @custom:emits BaseNameReserved on every successful write.
-    /// @param baseName The base label to reserve (no trailing digits).
+    ///      Does not apply the lite-format length window that @custom:function reserveBaseName
+    ///      enforces, but does require the input to be canonical and stem-shaped (no trailing
+    ///      digits); a non-canonical or non-stem label triggers @custom:reverts PopError. If the
+    ///      slot is already live and held by a different user, @custom:reverts PopError so the
+    ///      caller's local bookkeeping and PopRules state stay in lockstep; if it is live for the
+    ///      same user, expiry is refreshed to `block.timestamp + MAX_RESERVATION_TIME`. Emits
+    ///      @custom:emits BaseNameReserved on every successful write.
+    /// @param stem The base label with no trailing digits.
     /// @param user The address receiving reservation rights.
-    function reserveBaseNameForPop(string calldata baseName, address user) external;
+    function reserveBaseNameForPop(string calldata stem, address user) external;
 
     /// @notice Clears a reservation for a base-name stem.
     /// @dev Only a controller in the registrar's `controllers` set may call this, otherwise
-    ///      @custom:reverts NotRegistry. Non-canonical labels trigger @custom:reverts PopError.
-    ///      Live reservations may only be cleared by the same controller that wrote them;
-    ///      another authorised controller attempting to clear a live slot triggers
+    ///      @custom:reverts NotRegistry. Non-canonical or non-stem labels trigger
+    ///      @custom:reverts PopError. Live reservations may only be cleared by the same controller
+    ///      that wrote them; another authorised controller attempting to clear a live slot triggers
     ///      @custom:reverts PopError. Expired reservations may be cleared by any authorised
     ///      controller as garbage collection. Used by the PoP controller when a reservation is
     ///      claimed, relinquished, or a queue head promotion leaves the slot empty. Emits
     ///      @custom:emits BaseNameReleased once the slot is cleared.
-    /// @param baseName The base label whose reservation should be cleared.
-    function releaseBaseName(string calldata baseName) external;
+    /// @param stem The base label whose reservation should be cleared (no trailing digits).
+    function releaseBaseName(string calldata stem) external;
 
     /// @notice Clears a reservation when the slot owner matches `expectedOwner`, allowing any
     ///         registrar-authorised controller (not only the stamping one) to release the slot.
@@ -139,15 +143,16 @@ interface IPopRules {
     ///      a prior occupant has handed the name back to escrow and the new registrant needs
     ///      the cross-flow guard cleared regardless of which controller originally stamped it.
     ///      Only a registrar-authorised controller may call this (@custom:reverts NotRegistry).
-    ///      Non-canonical labels trigger @custom:reverts PopError. A live reservation whose
-    ///      owner does not match `expectedOwner` triggers @custom:reverts PopError; expired
+    ///      Non-canonical or non-stem labels trigger @custom:reverts PopError. A live reservation
+    ///      whose owner does not match `expectedOwner` triggers @custom:reverts PopError; expired
     ///      reservations are cleared regardless. Emits @custom:emits BaseNameReleased.
-    /// @param baseName The base label whose reservation should be cleared.
+    /// @param stem The base label whose reservation should be cleared (no trailing digits).
     /// @param expectedOwner The address the caller expects to be the current reservation owner.
-    function releaseReservationForReclaim(string calldata baseName, address expectedOwner) external;
+    function releaseReservationForReclaim(string calldata stem, address expectedOwner) external;
 
     /// @notice Retrieves reservation information for a base name.
-    /// @dev Raw accessor: returns the stored slot regardless of expiry. Use {isBaseNameReserved}
+    /// @dev Raw accessor: returns the stored slot regardless of expiry. Use
+    ///      @custom:function isBaseNameReserved
     ///      when live-window semantics are needed. Non-canonical labels trigger
     ///      @custom:reverts PopError.
     /// @param baseName The base label without trailing digits.

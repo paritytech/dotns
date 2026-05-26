@@ -119,10 +119,11 @@ contract PopRulesTests is BaseDotns {
 
     function test_base_reservation_blocks_others() public {
         // Authorise this test contract as a registrar controller so it may call
-        // reserveBaseName (gated by DotnsRegistrar.controllers).
+        // reserveBaseName (gated by DotnsRegistrar.controllers). Passes the stem
+        // directly per the stems-only public boundary.
         _authoriseTestAsController();
 
-        popRules.reserveBaseName("lights01", leonardo);
+        popRules.reserveBaseName("lights", leonardo);
 
         (bool isReserved, address reservationOwner, uint64 expiryTimestamp) =
             popRules.isBaseNameReserved("lights");
@@ -142,7 +143,7 @@ contract PopRulesTests is BaseDotns {
     function test_price_without_check_returns_price_for_reserved() public {
         _authoriseTestAsController();
 
-        popRules.reserveBaseName("lights01", leonardo);
+        popRules.reserveBaseName("lights", leonardo);
 
         IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithoutCheck("lights", tiago);
 

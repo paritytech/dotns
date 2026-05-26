@@ -17,7 +17,7 @@ import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolReg
 contract DeployPolicy is BaseDeployer {
     uint64 public constant MIN_COMMITMENT_AGE = 6 seconds;
     uint64 public constant MAX_COMMITMENT_AGE = 1 days;
-    uint256 public constant ESCROW_COOLDOWN = 7 days;
+    uint256 public constant ESCROW_COOLDOWN = 15 minutes;
 
     function run() external {
         address owner = msg.sender;

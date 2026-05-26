@@ -134,8 +134,9 @@ abstract contract BaseDotns is Test {
     ///      directly.
     uint256 public constant RENT_PRICE = DotnsConstants.RENT_PRICE;
 
-    /// @notice Default escrow cooldown used in tests.
-    uint256 public constant ESCROW_COOLDOWN = 7 days;
+    /// @notice Default escrow cooldown used in tests. Bounded by the escrow's
+    ///         @custom:constant MAX_COOLDOWN ceiling.
+    uint256 public constant ESCROW_COOLDOWN = 15 minutes;
 
     /// @notice Zero hash constant.
     bytes32 public constant ZERO_HASH = bytes32(0);
