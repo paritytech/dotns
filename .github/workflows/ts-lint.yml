@@ -1,0 +1,37 @@
+name: TS Lint
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "**/*.ts"
+      - "eslint.config.js"
+      - ".github/workflows/ts-lint.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "**/*.ts"
+      - "eslint.config.js"
+      - ".github/workflows/ts-lint.yml"
+
+concurrency:
+  group: ts-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: parity-int-ubuntu-xl
+    steps:
+      - uses: actions/checkout@v4
+      # `oven-sh/setup-bun@v2` unzips its tarball at install time and needs
+      # `unzip` on PATH, which parity-int-* images do not ship by default.
+      - name: Install unzip
+        run: sudo apt-get update && sudo apt-get install -y unzip
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.6"
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run lint

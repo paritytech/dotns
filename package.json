@@ -1,23 +1,37 @@
 {
-  "name": "@dotns/dotns-contracts",
-  "version": "2.0.0",
-  "description": "Dotns contracts",
+  "name": "dotns",
+  "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "test": "forge test -vvvvv",
     "deploy": "./scripts/deploy/run.sh",
     "deploy:anvil": "forge clean && forge build && ./scripts/deploy/run.sh",
     "deploy:testnet": "./scripts/deploy/run.sh '--timeout 1000'",
     "postinstall": "./setup.bash",
-    "reset": "forge clean"
+    "reset": "forge clean",
+    "pack:release": "bun scripts/release/pack.ts",
+    "format": "prettier --check \"packages/**/*.{ts,json,md}\" \"scripts/release/**/*.ts\" \"package.json\"",
+    "format:fix": "prettier --write \"packages/**/*.{ts,json,md}\" \"scripts/release/**/*.ts\" \"package.json\"",
+    "lint": "eslint packages scripts/release",
+    "lint:fix": "eslint packages scripts/release --fix",
+    "typecheck": "tsc --noEmit -p scripts/release/tsconfig.json && bun --filter '@dotns/*' typecheck"
   },
   "engines": {
     "bun": ">=1.2.6"
   },
   "devDependencies": {
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@wagmi/cli": "^2.5.6",
     "cross-env": "^10.1.0",
     "dotenv": "^16.4.5",
-    "prettier": "^2.6.2",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "prettier": "^3.3.0",
     "prettier-plugin-solidity": "^1.0.0-beta.24",
     "ts-node": "^10.9.2",
     "typescript": "5.9.2",
@@ -31,7 +45,6 @@
     "type": "git",
     "url": "git+https://github.com/paritytech/dotns.git"
   },
-  "author": "",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/paritytech/dotns/issues"

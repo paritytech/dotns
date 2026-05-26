@@ -1,0 +1,14 @@
+node_modules
+lib
+out
+cache
+broadcast
+packages/*/dist
+packages/*/src/generated.ts
+contracts
+test
+deployments
+.claude
+bun.lock
+foundry.lock
+*.sol

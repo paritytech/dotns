@@ -1,0 +1,139 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: parity-int-ubuntu-xl
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      # Parity internal runners ship a minimal image; `oven-sh/setup-bun@v2`
+      # extracts a zip archive at install time and needs `unzip` on PATH.
+      - name: Install unzip (required by oven-sh/setup-bun on parity-int-* images)
+        run: sudo apt-get update && sudo apt-get install -y unzip
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.6"
+
+      # `openzeppelin-foundry-upgrades` shells out to `npx @openzeppelin/upgrades-core`
+      # via `vm.ffi` during tests; bun does not provide `npx`, so install Node here.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Classify tag
+        id: tag
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            echo "prerelease=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "prerelease=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build contracts
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+        # Remove any prior build-info so the OZ validator (vm.ffi inside
+        # upgrade tests in the next step) reads the complete artefact this
+        # build emits. Preserving `cache/` keeps incremental compile fast.
+        run: rm -rf out/build-info && forge build --sizes
+
+      - name: Run tests
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+        run: forge test -vv
+
+      - name: Extract ABIs (for GitHub Release zip)
+        run: |
+          mkdir -p release/abis
+          mapfile -t contracts < <(bun scripts/release/list-contracts.ts)
+          for name in "${contracts[@]}"; do
+            abi_file="out/${name}.sol/${name}.json"
+            if [ ! -f "$abi_file" ]; then
+              echo "Error: ${abi_file} not found"
+              exit 1
+            fi
+            jq '.abi' "$abi_file" > "release/abis/${name}.json"
+            echo "Extracted ${name}"
+          done
+
+      - name: Package ABI zip
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          cd release
+          zip -r "../dotns-abis-${TAG}.zip" abis/
+
+      - name: Pack npm packages
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+        run: bun scripts/release/pack.ts "${GITHUB_REF_NAME}"
+
+      - name: Generate release body
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PRERELEASE_NOTE=""
+          if [[ "${{ steps.tag.outputs.prerelease }}" == "true" ]]; then
+            PRERELEASE_NOTE="> **This is a pre-release.** ABIs and addresses may change before the stable release."
+          fi
+
+          cat > release-body.md << ENDOFBODY
+          ## DotNS Release ${TAG}
+
+          ${PRERELEASE_NOTE}
+
+          ### npm packages
+
+          - \`@dotns/abi@${TAG#v}\` — typed \`as const\` ABIs.
+          - \`@dotns/deployments@${TAG#v}\` — addresses keyed by network name.
+
+          Install:
+          \`\`\`bash
+          bun add @dotns/abi @dotns/deployments
+          \`\`\`
+
+          ### Raw artifacts
+
+          - \`dotns-abis-${TAG}.zip\` — per-contract ABI JSONs (for non-npm consumers).
+          - \`*.tgz\` — npm tarballs (the same content that gets published to npm).
+          ENDOFBODY
+
+      - name: Create release with artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dotns-abis-*.zip
+            release/abis/*.json
+            packs/*.tgz
+          body_path: release-body.md
+          # No `draft:` — release publishes immediately so npm-release.yml can
+          # `gh release download` the tgzs. The existing draft-then-review gate
+          # is replaced by the npm_publish_automation allow-list check.
+          prerelease: ${{ steps.tag.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+
+      - name: Dispatch npm publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run npm-release.yml \
+            --ref master \
+            -f "tag=${GITHUB_REF_NAME}" \
+            -R "${{ github.repository }}"

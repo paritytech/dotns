@@ -1,0 +1,42 @@
+{
+  "name": "@dotns/abi",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Typed `as const` ABIs for the DotNS contracts.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "generate": "wagmi generate",
+    "build": "wagmi generate && tsc -p tsconfig.json",
+    "clean": "rm -rf dist src/generated.ts",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paritytech/dotns.git",
+    "directory": "packages/abi"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/paritytech/dotns/issues"
+  },
+  "homepage": "https://github.com/paritytech/dotns/#readme"
+}

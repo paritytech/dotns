@@ -1,0 +1,40 @@
+name: TS Typecheck
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "**/*.ts"
+      - "**/tsconfig.json"
+      - ".github/workflows/ts-typecheck.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "**/*.ts"
+      - "**/tsconfig.json"
+      - ".github/workflows/ts-typecheck.yml"
+
+concurrency:
+  group: ts-typecheck-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: parity-int-ubuntu-xl
+    steps:
+      - uses: actions/checkout@v4
+      # `oven-sh/setup-bun@v2` unzips its tarball at install time and needs
+      # `unzip` on PATH, which parity-int-* images do not ship by default.
+      - name: Install unzip
+        run: sudo apt-get update && sudo apt-get install -y unzip
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.6"
+      - run: bun install --frozen-lockfile --ignore-scripts
+      # `wagmi generate` requires Foundry artefacts in `out/`, which aren't
+      # built in this lightweight typecheck job. The committed `generated.ts`
+      # stub already satisfies the type surface for downstream checks.
+      - run: bun run typecheck
