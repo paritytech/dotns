@@ -134,11 +134,19 @@ contract DotnsNameEscrow is
         __ERC165_init();
 
         protocolRegistry = registry;
-        updateCooldown(cooldownSeconds);
+        _updateCooldown(cooldownSeconds);
     }
 
     /// @inheritdoc IDotnsNameEscrow
     function updateCooldown(uint256 newCooldown) public override onlyOwner {
+        _updateCooldown(newCooldown);
+    }
+
+    /// @dev Ownership-unchecked body so the initialiser can seed the cooldown
+    ///      before `Ownable._msgSender()` resolves to the proxy's caller —
+    ///      during proxy construction `msg.sender` is the deploying contract
+    ///      (e.g. the CREATE2 factory), not the owner we just set.
+    function _updateCooldown(uint256 newCooldown) internal {
         require(newCooldown != 0, InvalidCooldown());
         require(newCooldown <= MAX_COOLDOWN, CooldownTooLong(newCooldown, MAX_COOLDOWN));
 

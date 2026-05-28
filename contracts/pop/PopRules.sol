@@ -73,7 +73,7 @@ contract PopRules is
     {
         __Ownable_init(initialOwner);
         __ERC165_init();
-        updateStartingPrice(_startingPrice);
+        _updateStartingPrice(_startingPrice);
         protocolRegistry = registry;
     }
 
@@ -97,6 +97,14 @@ contract PopRules is
 
     /// @inheritdoc IPopRules
     function updateStartingPrice(uint256 newStartingPrice) public override onlyOwner {
+        _updateStartingPrice(newStartingPrice);
+    }
+
+    /// @dev Ownership-unchecked body so the initialiser can seed the starting
+    ///      price before `Ownable._msgSender()` resolves to the proxy's caller
+    ///      — during proxy construction `msg.sender` is the deploying contract
+    ///      (e.g. the CREATE2 factory), not the owner we just set.
+    function _updateStartingPrice(uint256 newStartingPrice) internal {
         require(newStartingPrice > 0, PopError("Price must be greater than 0"));
         emit StartingPriceUpdated(startingPrice, newStartingPrice);
         startingPrice = newStartingPrice;
