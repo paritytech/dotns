@@ -108,6 +108,16 @@ if [ "${DOTNS_DEPLOY_SKIP_CLEAN_BUILD:-0}" != "1" ]; then
   forge build
 fi
 
+# Each `forge script` below recompiles with a narrower source graph and writes
+# its own build-info file. Foundry's incremental compiler emits empty
+# `outputSelection` entries for the files it sees as cached, which trips
+# `@openzeppelin/upgrades-core`'s "not from a full compilation" check when the
+# validator iterates every build-info file in the directory. We pin the file
+# produced by the full `forge build` above and let `BaseDeployer` purge the
+# partial files inside each stage, just before the validator runs.
+DOTNS_GOOD_BUILD_INFO=$(ls -t out/build-info/*.json 2>/dev/null | head -1)
+export DOTNS_GOOD_BUILD_INFO
+
 case "$CHAIN_ID" in
   420420422) DEPLOYMENT_FOLDER="passethub-testnet" ;;
   420420417) DEPLOYMENT_FOLDER="paseo-assethub" ;;

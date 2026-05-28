@@ -105,12 +105,68 @@ abstract contract BaseDeployer is Script {
     ///      `run.sh` is responsible for bootstrapping the factory and
     ///      exporting `CREATE2_FACTORY` before invoking the stage.
     function initFactory() internal {
+        _pinBuildInfo();
         // forge-lint: disable-next-line(unsafe-cheatcode)
         address factory = vm.envAddress(CREATE2_FACTORY_ENV);
         require(factory != address(0), "CREATE2_FACTORY unset");
         require(factory.code.length != 0, "CREATE2_FACTORY: no code at address");
         create2Factory = factory;
         vm.label(factory, "Create2Factory");
+    }
+
+    /// @notice Removes per-stage `forge script` build-info files so the OZ
+    ///         upgrade-safety validator only sees the full build-info produced
+    ///         by `forge build`.
+    /// @dev `forge script` recompiles with a narrower source graph and writes
+    ///      a new build-info file whose `outputSelection` contains empty
+    ///      entries for files served from foundry's incremental cache. The OZ
+    ///      upgrades-core CLI iterates every file in `out/build-info/` and
+    ///      rejects any one with an empty entry — even when the contract under
+    ///      validation lives in a different, well-formed file. We side-step
+    ///      the validator's directory scan by keeping only the good file.
+    ///      `run.sh` records the good path in `DOTNS_GOOD_BUILD_INFO`; when
+    ///      unset (e.g. running a stage by hand) this helper is a no-op so the
+    ///      script remains usable outside the pipeline.
+    function _pinBuildInfo() internal {
+        // forge-lint: disable-next-line(unsafe-cheatcode)
+        string memory good = vm.envOr("DOTNS_GOOD_BUILD_INFO", string(""));
+        if (bytes(good).length == 0) return;
+
+        string[] memory inputs = new string[](3);
+        inputs[0] = "bash";
+        inputs[1] = "-c";
+        inputs[2] = string.concat(
+            "find out/build-info -maxdepth 1 -type f -name '*.json' ! -path ",
+            _shellQuote(good),
+            " -delete"
+        );
+        // forge-lint: disable-next-line(unsafe-cheatcode)
+        vm.ffi(inputs);
+    }
+
+    /// @notice Wraps `s` in single quotes for safe interpolation into a `bash
+    ///         -c` command line.
+    /// @dev Single-quote-aware escape: any embedded single quote is replaced
+    ///      with the standard `'\''` close-open-escape sequence.
+    function _shellQuote(string memory s) private pure returns (string memory) {
+        bytes memory b = bytes(s);
+        bytes memory out = new bytes(b.length * 4 + 2);
+        uint256 j = 0;
+        out[j++] = "'";
+        for (uint256 i = 0; i < b.length; ++i) {
+            if (b[i] == "'") {
+                out[j++] = "'";
+                out[j++] = "\\";
+                out[j++] = "'";
+                out[j++] = "'";
+            } else {
+                out[j++] = b[i];
+            }
+        }
+        out[j++] = "'";
+        bytes memory trimmed = new bytes(j);
+        for (uint256 k = 0; k < j; ++k) trimmed[k] = out[k];
+        return string(trimmed);
     }
 
     /// @notice Appends a single `name => address` entry to the in-memory manifest.
