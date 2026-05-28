@@ -266,8 +266,7 @@ abstract contract BaseDeployer is Script {
     ///      so call sites stay declarative — they pass role + version, never
     ///      raw bytes32 — and so the salt scheme can evolve in one place.
     function _saltFor(string memory role, uint256 version) internal pure returns (bytes32) {
-        return
-            keccak256(abi.encodePacked(SALT_PREFIX, role, ":v", Strings.toString(version)));
+        return keccak256(abi.encodePacked(SALT_PREFIX, role, ":v", Strings.toString(version)));
     }
 
     function _deploymentPath(
