@@ -23,6 +23,7 @@ contract DeployRecords is BaseDeployer {
         vm.label(owner, "OWNER");
 
         initDeployment(DeploymentNetwork.folder(block.chainid), vm.toString(block.chainid));
+        initFactory();
 
         address protocolRegistry = _readAddress("DotnsProtocolRegistry");
 
@@ -42,10 +43,12 @@ contract DeployRecords is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsResolver.sol:DotnsResolver",
             abi.encodeCall(DotnsResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
+            "resolver",
+            1,
             "DotnsResolver"
         );
     }
@@ -57,12 +60,14 @@ contract DeployRecords is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsContentResolver.sol:DotnsContentResolver",
             abi.encodeCall(
                 DotnsContentResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))
             ),
+            "contentResolver",
+            1,
             "DotnsContentResolver"
         );
     }
@@ -74,13 +79,15 @@ contract DeployRecords is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "PopRules.sol:PopRules",
             abi.encodeCall(
                 PopRules.initialize,
                 (DotnsConstants.RENT_PRICE, IDotnsProtocolRegistry(protocolRegistry))
             ),
+            "popRules",
+            1,
             "PopRules"
         );
     }

@@ -24,6 +24,7 @@ contract DeployPolicy is BaseDeployer {
         vm.label(owner, "OWNER");
 
         initDeployment(DeploymentNetwork.folder(block.chainid), vm.toString(block.chainid));
+        initFactory();
 
         address protocolRegistry = _readAddress("DotnsProtocolRegistry");
         _deployNameEscrow(owner, protocolRegistry);
@@ -41,13 +42,15 @@ contract DeployPolicy is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsRegistrarController.sol:DotnsRegistrarController",
             abi.encodeCall(
                 DotnsRegistrarController.initialize,
                 (IDotnsProtocolRegistry(protocolRegistry), MIN_COMMITMENT_AGE, MAX_COMMITMENT_AGE)
             ),
+            "registrarController",
+            1,
             "DotnsRegistrarController"
         );
     }
@@ -59,13 +62,15 @@ contract DeployPolicy is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsNameEscrow.sol:DotnsNameEscrow",
             abi.encodeCall(
                 DotnsNameEscrow.initialize,
                 (IDotnsProtocolRegistry(protocolRegistry), ESCROW_COOLDOWN)
             ),
+            "nameEscrow",
+            1,
             "DotnsNameEscrow"
         );
     }

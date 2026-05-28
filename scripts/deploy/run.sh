@@ -154,9 +154,12 @@ validate_manifest_contracts() {
       failed=1
     fi
   done < <(
+    # Underscore-prefixed keys are reserved meta entries (e.g. _seed, _factory)
+    # and either point to non-protocol contracts or to sentinel zero values.
+    # Skip them all so per-stage validation only checks protocol deploys.
     jq -r '
       to_entries[]
-      | select(.key != "_seed")
+      | select(.key | startswith("_") | not)
       | select(.value != "0x0000000000000000000000000000000000000000")
       | "\(.key) \(.value)"
     ' "$MANIFEST_PATH"
@@ -165,12 +168,101 @@ validate_manifest_contracts() {
   return "$failed"
 }
 
+# Capture any previously-recorded factory address BEFORE we wipe the manifest
+# for a fresh stage run. The factory contract itself lives on-chain forever
+# once deployed via CREATE2 (it has no admin and cannot be removed), so a
+# manifest wipe should not trigger a redeploy — we just reattach to the
+# existing address on this chain.
+EXISTING_FACTORY=""
+if [ -f "$MANIFEST_PATH" ]; then
+  EXISTING_FACTORY=$(jq -r '._factory // ""' "$MANIFEST_PATH" 2>/dev/null || echo "")
+fi
+
 if [ "${DOTNS_DEPLOY_KEEP_MANIFEST:-0}" != "1" ] && [ -f "$MANIFEST_PATH" ]; then
   ARCHIVE_PATH="${MANIFEST_PATH}.pre-fresh.$(date +%Y%m%d%H%M%S)"
   cp "$MANIFEST_PATH" "$ARCHIVE_PATH"
   rm -f "$MANIFEST_PATH"
   echo "Archived existing manifest for fresh deploy: $ARCHIVE_PATH"
 fi
+
+# ---------------------------------------------------------------------------
+# Bootstrap the singleton CREATE2 factory.
+#
+# Every protocol contract is deployed via this factory so that role-versioned
+# salts give the same addresses on every chain. The factory's address itself
+# is plain CREATE (depends only on the deployer EOA and the nonce at the time
+# it was broadcast). To get a matching factory address across chains, the
+# factory must be deployed at deployer nonce 0 on each chain — the default
+# behaviour. Set DOTNS_DEPLOY_ACCEPT_FACTORY_DRIFT=1 to bypass the nonce
+# check on a chain where the deployer EOA has already transacted; the
+# pipeline will still work, but addresses on that chain will not line up
+# with addresses on the canonical chains.
+# ---------------------------------------------------------------------------
+if [ -n "$EXISTING_FACTORY" ] && [ "$EXISTING_FACTORY" != "null" ]; then
+  CODE=$(cast code "$EXISTING_FACTORY" --rpc-url "$RPC_URL" 2>/dev/null || echo "0x")
+  if [ "$CODE" = "0x" ] || [ -z "$CODE" ]; then
+    echo "ERROR: prior manifest pointed at factory $EXISTING_FACTORY but no code lives there on this RPC." >&2
+    echo "       Either the manifest is for a different chain, or the factory was wiped." >&2
+    echo "       Remove _factory from the manifest archive to force a fresh bootstrap." >&2
+    exit 1
+  fi
+  CREATE2_FACTORY="$EXISTING_FACTORY"
+  echo "Reusing existing CREATE2 factory: $CREATE2_FACTORY"
+else
+  DEPLOYER_NONCE=$(cast nonce "$SENDER" --rpc-url "$RPC_URL")
+  if [ "$DEPLOYER_NONCE" -ne 0 ] && [ "${DOTNS_DEPLOY_ACCEPT_FACTORY_DRIFT:-0}" != "1" ]; then
+    echo "ERROR: deployer $SENDER has nonce $DEPLOYER_NONCE on $RPC_URL." >&2
+    echo "       The CREATE2 factory must land at the canonical address," >&2
+    echo "       which requires the deployer to broadcast its FIRST transaction" >&2
+    echo "       (nonce 0) here. Use a fresh deployer EOA on this chain, or" >&2
+    echo "       set DOTNS_DEPLOY_ACCEPT_FACTORY_DRIFT=1 to accept a non-canonical" >&2
+    echo "       factory address on this chain (protocol addresses then will not" >&2
+    echo "       match other networks)." >&2
+    exit 1
+  fi
+
+  # Pre-compute the CREATE address from (sender, nonce) so we know where the
+  # factory should land before we broadcast. Verifying post-deploy guards
+  # against any mismatch.
+  PREDICTED_FACTORY=$(cast compute-address "$SENDER" --nonce "$DEPLOYER_NONCE" --rpc-url "$RPC_URL" \
+    | awk '{print $NF}')
+  echo "Predicted CREATE2 factory address at nonce $DEPLOYER_NONCE: $PREDICTED_FACTORY"
+
+  echo "=== Deploying Create2Factory ==="
+  if ! forge script scripts/deploy/DeployCreate2Factory.s.sol:DeployCreate2Factory \
+        --rpc-url "$RPC_URL" \
+        --account "$ACCOUNT_NAME" \
+        --password "$ACCOUNT_PASSWORD" \
+        --sender "$SENDER" \
+        --broadcast --slow --legacy \
+        --gas-limit 2000000000 \
+        --gas-estimate-multiplier 10000 \
+        -vvvvv; then
+    echo "ERROR: Create2Factory deploy failed" >&2
+    exit 1
+  fi
+
+  CODE=$(cast code "$PREDICTED_FACTORY" --rpc-url "$RPC_URL" 2>/dev/null || echo "0x")
+  if [ "$CODE" = "0x" ] || [ -z "$CODE" ]; then
+    echo "ERROR: Create2Factory did not appear at predicted address $PREDICTED_FACTORY." >&2
+    echo "       The deployer may have broadcast extra transactions between the" >&2
+    echo "       nonce check and this script — re-run from a clean shell." >&2
+    exit 1
+  fi
+  CREATE2_FACTORY="$PREDICTED_FACTORY"
+  echo "Create2Factory deployed at $CREATE2_FACTORY"
+fi
+
+# Persist the factory address back into the manifest so future runs reuse
+# it (and so the address is visible alongside the other protocol addresses).
+if [ -f "$MANIFEST_PATH" ]; then
+  jq --arg f "$CREATE2_FACTORY" '. + {"_factory": $f}' "$MANIFEST_PATH" > "$MANIFEST_PATH.tmp"
+  mv "$MANIFEST_PATH.tmp" "$MANIFEST_PATH"
+else
+  printf '{"_factory": "%s"}\n' "$CREATE2_FACTORY" > "$MANIFEST_PATH"
+fi
+
+export CREATE2_FACTORY
 
 common=(
   --rpc-url "$RPC_URL"

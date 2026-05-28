@@ -11,7 +11,6 @@ import {DotnsReverseResolver} from "../../contracts/resolvers/DotnsReverseResolv
 import {DotnsRegistry} from "../../contracts/registry/DotnsRegistry.sol";
 import {DotnsProtocolRegistry} from "../../contracts/registry/DotnsProtocolRegistry.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
-import {Multicall3} from "../../contracts/utils/Multicall3.sol";
 
 /// @title DeployCore
 /// @notice First stage of the DotNS fresh-deploy pipeline. Deploys the
@@ -22,6 +21,8 @@ import {Multicall3} from "../../contracts/utils/Multicall3.sol";
 ///         and tooling batching.
 /// @dev Runs in its own `forge script` process; the OpenZeppelin validator's
 ///      per-call memory never crosses the process boundary into later stages.
+///      Every contract is routed through the singleton CREATE2 factory so
+///      addresses match across chains.
 /// @custom:security-contact admin@parity.io
 contract DeployCore is BaseDeployer {
     function run() external {
@@ -29,6 +30,7 @@ contract DeployCore is BaseDeployer {
         vm.label(owner, "OWNER");
 
         initDeployment(DeploymentNetwork.folder(block.chainid), vm.toString(block.chainid));
+        initFactory();
 
         address protocolRegistry = _deployProtocolRegistry(owner);
         _deployMulticall3(owner);
@@ -43,32 +45,39 @@ contract DeployCore is BaseDeployer {
     }
 
     function _deployProtocolRegistry(address owner) internal returns (address proxy) {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
             abi.encodeCall(DotnsProtocolRegistry.initialize, ()),
+            "protocolRegistry",
+            1,
             "DotnsProtocolRegistry"
         );
     }
 
     function _deployStoreFactory(address owner, address protocolRegistry) internal {
-        vm.startBroadcast(owner);
-        StoreFactory factory = new StoreFactory(protocolRegistry);
-        vm.stopBroadcast();
-        vm.label(address(factory), "StoreFactory");
+        address factoryAddr = _deployContractCreate2(
+            owner,
+            "StoreFactory.sol:StoreFactory",
+            abi.encode(protocolRegistry),
+            "storeFactory",
+            1,
+            "StoreFactory"
+        );
+        // StoreFactory deploys its two beacons in its constructor (plain
+        // CREATE under the factory's own nonce), so the beacon addresses are
+        // deterministic too once the factory's address is fixed.
+        StoreFactory factory = StoreFactory(factoryAddr);
         vm.label(factory.labelStoreBeacon(), "LabelStoreBeacon");
         vm.label(factory.userStoreBeacon(), "UserStoreBeacon");
-        logDeployment("StoreFactory", address(factory));
         logDeployment("LabelStoreBeacon", factory.labelStoreBeacon());
         logDeployment("UserStoreBeacon", factory.userStoreBeacon());
     }
 
     function _deployMulticall3(address owner) internal {
-        vm.startBroadcast(owner);
-        Multicall3 multicall3 = new Multicall3();
-        vm.stopBroadcast();
-        vm.label(address(multicall3), "Multicall3");
-        logDeployment("Multicall3", address(multicall3));
+        _deployContractCreate2(
+            owner, "Multicall3.sol:Multicall3", "", "multicall3", 1, "Multicall3"
+        );
     }
 
     function _deployRegistrar(
@@ -78,13 +87,15 @@ contract DeployCore is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsRegistrar.sol:DotnsRegistrar",
             abi.encodeCall(
                 DotnsRegistrar.initialize,
                 ("Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistry))
             ),
+            "registrar",
+            1,
             "DotnsRegistrar"
         );
     }
@@ -96,12 +107,14 @@ contract DeployCore is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsReverseResolver.sol:DotnsReverseResolver",
             abi.encodeCall(
                 DotnsReverseResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))
             ),
+            "reverseResolver",
+            1,
             "DotnsReverseResolver"
         );
     }
@@ -113,10 +126,12 @@ contract DeployCore is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsRegistry.sol:DotnsRegistry",
             abi.encodeCall(DotnsRegistry.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
+            "registry",
+            1,
             "DotnsRegistry"
         );
     }

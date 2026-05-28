@@ -7,7 +7,6 @@ import {DeploymentNetwork} from "./DeploymentNetwork.sol";
 
 import {DotnsPopResolver} from "../../contracts/resolvers/DotnsPopResolver.sol";
 import {DotnsPopController} from "../../contracts/registrars/DotnsPopController.sol";
-import {RootGatewayDispatcher} from "../../contracts/registrars/RootGatewayDispatcher.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
 
 /// @title DeployPopSystem
@@ -27,6 +26,7 @@ contract DeployPopSystem is BaseDeployer {
         vm.label(owner, "OWNER");
 
         initDeployment(DeploymentNetwork.folder(block.chainid), vm.toString(block.chainid));
+        initFactory();
 
         address protocolRegistry = _readAddress("DotnsProtocolRegistry");
 
@@ -46,10 +46,12 @@ contract DeployPopSystem is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsPopResolver.sol:DotnsPopResolver",
             abi.encodeCall(DotnsPopResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
+            "popResolver",
+            1,
             "DotnsPopResolver"
         );
     }
@@ -61,13 +63,15 @@ contract DeployPopSystem is BaseDeployer {
         internal
         returns (address proxy)
     {
-        proxy = _broadcastDeployUups(
+        proxy = _deployUupsCreate2(
             owner,
             "DotnsPopController.sol:DotnsPopController",
             abi.encodeCall(
                 DotnsPopController.initialize,
                 (IDotnsProtocolRegistry(protocolRegistry), DEFAULT_RESERVATION_DURATION)
             ),
+            "popController",
+            1,
             "DotnsPopController"
         );
     }
@@ -90,11 +94,13 @@ contract DeployPopSystem is BaseDeployer {
         internal
         returns (address dispatcher)
     {
-        vm.startBroadcast(owner);
-        dispatcher = address(new RootGatewayDispatcher(popController));
-        vm.stopBroadcast();
-
-        vm.label(dispatcher, "RootGatewayDispatcher");
-        logDeployment("RootGatewayDispatcher", dispatcher);
+        dispatcher = _deployContractCreate2(
+            owner,
+            "RootGatewayDispatcher.sol:RootGatewayDispatcher",
+            abi.encode(popController),
+            "rootGatewayDispatcher",
+            1,
+            "RootGatewayDispatcher"
+        );
     }
 }
