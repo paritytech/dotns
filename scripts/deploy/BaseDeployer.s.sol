@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -233,8 +233,11 @@ abstract contract BaseDeployer is Script {
     /// @param role Short role identifier such as `"registry"` or `"registrar"`
     ///        — combined with `version` and the project salt prefix to form the
     ///        per-contract salt.
-    /// @param version Per-contract version, embedded in the salt. Start at 1;
-    ///        bump only when intentionally re-deploying to a fresh address.
+    /// @param version Per-contract version, embedded in the salt. Start at 1.
+    ///        A redeploy from unchanged init code is reattached automatically
+    ///        (`computeAddress` + code-length check), so bump the version only
+    ///        when you deliberately want a fresh address despite identical
+    ///        init code.
     /// @param label Trace / manifest identifier.
     /// @return proxy Address of the deployed UUPS proxy.
     function _deployUupsCreate2(
@@ -263,13 +266,39 @@ abstract contract BaseDeployer is Script {
         bytes memory implInitCode = vm.getCode(artefact);
         Create2Factory factory = Create2Factory(create2Factory);
 
-        vm.startBroadcast(owner);
-        address impl = factory.deploy(implSalt, implInitCode);
+        address impl = factory.computeAddress(implSalt, keccak256(implInitCode));
         bytes memory proxyInitCode = abi.encodePacked(
             type(ERC1967Proxy).creationCode, abi.encode(impl, initialiserCalldata)
         );
-        proxy = factory.deploy(proxySalt, proxyInitCode);
-        vm.stopBroadcast();
+        proxy = factory.computeAddress(proxySalt, keccak256(proxyInitCode));
+
+        // Reuse-if-exists: a CREATE2 address fully captures its init code, so
+        // any code already at `impl` or `proxy` must have been deployed from
+        // the exact same bytecode this stage would broadcast. Reattaching is
+        // therefore equivalent to redeploying — and skipping the redundant tx
+        // avoids the `CreateCollision` that CREATE2 raises on the second
+        // attempt. Only broadcast the pieces that are missing.
+        bool deployImpl = impl.code.length == 0;
+        bool deployProxy = proxy.code.length == 0;
+
+        if (deployImpl || deployProxy) {
+            vm.startBroadcast(owner);
+            if (deployImpl) {
+                require(
+                    factory.deploy(implSalt, implInitCode) == impl,
+                    "Create2Factory: impl address mismatch"
+                );
+            }
+            if (deployProxy) {
+                require(
+                    factory.deploy(proxySalt, proxyInitCode) == proxy,
+                    "Create2Factory: proxy address mismatch"
+                );
+            }
+            vm.stopBroadcast();
+        }
+        if (!deployImpl) console.log(string.concat("Reusing ", label, ":impl at"), impl);
+        if (!deployProxy) console.log(string.concat("Reusing ", label, " at"), proxy);
 
         vm.label(impl, string.concat(label, ":impl"));
         vm.label(proxy, label);
@@ -288,8 +317,9 @@ abstract contract BaseDeployer is Script {
     /// @param constructorArgs ABI-encoded constructor arguments; pass `""` for
     ///        contracts with no constructor params.
     /// @param role Short role identifier — same scheme as `_deployUupsCreate2`.
-    /// @param version Per-contract version. Bump only when intentionally
-    ///        re-deploying to a fresh address.
+    /// @param version Per-contract version. Same reattach-on-match semantics
+    ///        as `_deployUupsCreate2`; bump only when you deliberately want a
+    ///        fresh address despite identical init code.
     /// @param label Trace / manifest identifier.
     /// @return deployed Address of the deployed contract.
     function _deployContractCreate2(
@@ -308,10 +338,20 @@ abstract contract BaseDeployer is Script {
         bytes32 salt = _saltFor(role, version);
         // forge-lint: disable-next-line(unsafe-cheatcode)
         bytes memory initCode = abi.encodePacked(vm.getCode(artefact), constructorArgs);
+        Create2Factory factory = Create2Factory(create2Factory);
+        deployed = factory.computeAddress(salt, keccak256(initCode));
 
-        vm.startBroadcast(owner);
-        deployed = Create2Factory(create2Factory).deploy(salt, initCode);
-        vm.stopBroadcast();
+        // Reuse-if-exists: see `_deployUupsCreate2` for the safety argument.
+        if (deployed.code.length == 0) {
+            vm.startBroadcast(owner);
+            require(
+                factory.deploy(salt, initCode) == deployed,
+                "Create2Factory: address mismatch"
+            );
+            vm.stopBroadcast();
+        } else {
+            console.log(string.concat("Reusing ", label, " at"), deployed);
+        }
 
         vm.label(deployed, label);
         logDeployment(label, deployed);

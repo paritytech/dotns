@@ -76,7 +76,7 @@ contract DeployCore is BaseDeployer {
 
     function _deployMulticall3(address owner) internal {
         _deployContractCreate2(
-            owner, "Multicall3.sol:Multicall3", "", "multicall3", 3, "Multicall3"
+            owner, "Multicall3.sol:Multicall3", "", "multicall3", 2, "Multicall3"
         );
     }
 
