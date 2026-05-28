@@ -74,12 +74,13 @@ contract DotnsRegistrar is
     function initialize(
         string calldata name,
         string calldata symbol,
-        IDotnsProtocolRegistry registry
+        IDotnsProtocolRegistry registry,
+        address initialOwner
     )
         external
         initializer
     {
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC721_init(name, symbol);
         protocolRegistry = registry;
     }

@@ -172,7 +172,8 @@ contract DotnsPopController is
     /// through the same event the setter uses later.
     function initialize(
         IDotnsProtocolRegistry registry,
-        uint64 reservationDuration_
+        uint64 reservationDuration_,
+        address initialOwner
     )
         external
         initializer
@@ -181,7 +182,7 @@ contract DotnsPopController is
             reservationDuration_ >= MIN_RESERVATION_DURATION,
             ReservationDurationTooLow(reservationDuration_)
         );
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
         reservationDuration = reservationDuration_;

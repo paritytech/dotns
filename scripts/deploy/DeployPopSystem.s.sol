@@ -49,7 +49,9 @@ contract DeployPopSystem is BaseDeployer {
         proxy = _deployUupsCreate2(
             owner,
             "DotnsPopResolver.sol:DotnsPopResolver",
-            abi.encodeCall(DotnsPopResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
+            abi.encodeCall(
+                DotnsPopResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
+            ),
             "popResolver",
             1,
             "DotnsPopResolver"
@@ -68,7 +70,7 @@ contract DeployPopSystem is BaseDeployer {
             "DotnsPopController.sol:DotnsPopController",
             abi.encodeCall(
                 DotnsPopController.initialize,
-                (IDotnsProtocolRegistry(protocolRegistry), DEFAULT_RESERVATION_DURATION)
+                (IDotnsProtocolRegistry(protocolRegistry), DEFAULT_RESERVATION_DURATION, owner)
             ),
             "popController",
             1,

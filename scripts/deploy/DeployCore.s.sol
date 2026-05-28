@@ -48,7 +48,7 @@ contract DeployCore is BaseDeployer {
         proxy = _deployUupsCreate2(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ()),
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner)),
             "protocolRegistry",
             1,
             "DotnsProtocolRegistry"
@@ -76,7 +76,7 @@ contract DeployCore is BaseDeployer {
 
     function _deployMulticall3(address owner) internal {
         _deployContractCreate2(
-            owner, "Multicall3.sol:Multicall3", "", "multicall3", 1, "Multicall3"
+            owner, "Multicall3.sol:Multicall3", "", "multicall3", 2, "Multicall3"
         );
     }
 
@@ -92,7 +92,7 @@ contract DeployCore is BaseDeployer {
             "DotnsRegistrar.sol:DotnsRegistrar",
             abi.encodeCall(
                 DotnsRegistrar.initialize,
-                ("Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistry))
+                ("Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "registrar",
             1,
@@ -111,7 +111,7 @@ contract DeployCore is BaseDeployer {
             owner,
             "DotnsReverseResolver.sol:DotnsReverseResolver",
             abi.encodeCall(
-                DotnsReverseResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))
+                DotnsReverseResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "reverseResolver",
             1,
@@ -129,7 +129,9 @@ contract DeployCore is BaseDeployer {
         proxy = _deployUupsCreate2(
             owner,
             "DotnsRegistry.sol:DotnsRegistry",
-            abi.encodeCall(DotnsRegistry.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
+            abi.encodeCall(
+                DotnsRegistry.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
+            ),
             "registry",
             1,
             "DotnsRegistry"

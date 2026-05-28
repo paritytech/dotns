@@ -58,13 +58,22 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     ///      @custom:reverts NotAllowed. Seeds the root node (`bytes32(0)`) with the deployer
     ///      as owner so sub-TLD bootstrap writes can pass the `authorised(parentNode)` check.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(IDotnsProtocolRegistry registry) external initializer {
-        __Ownable_init(msg.sender);
+    /// @param initialOwner Account that receives both the `Ownable` ownership and the root-node
+    ///        owner record, so sub-TLD bootstrap writes can pass the `authorised(parentNode)`
+    ///        check regardless of which contract relays the proxy init.
+    function initialize(
+        IDotnsProtocolRegistry registry,
+        address initialOwner
+    )
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
 
         require(address(registry) != address(0), NotAllowed());
         protocolRegistry = registry;
 
-        records[bytes32(0)] = Record({owner: msg.sender, resolver: address(0), exists: true});
+        records[bytes32(0)] = Record({owner: initialOwner, resolver: address(0), exists: true});
     }
 
     /// @inheritdoc IDotnsRegistry

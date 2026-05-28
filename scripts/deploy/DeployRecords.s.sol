@@ -46,7 +46,9 @@ contract DeployRecords is BaseDeployer {
         proxy = _deployUupsCreate2(
             owner,
             "DotnsResolver.sol:DotnsResolver",
-            abi.encodeCall(DotnsResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
+            abi.encodeCall(
+                DotnsResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
+            ),
             "resolver",
             1,
             "DotnsResolver"
@@ -64,7 +66,7 @@ contract DeployRecords is BaseDeployer {
             owner,
             "DotnsContentResolver.sol:DotnsContentResolver",
             abi.encodeCall(
-                DotnsContentResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))
+                DotnsContentResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "contentResolver",
             1,
@@ -84,7 +86,7 @@ contract DeployRecords is BaseDeployer {
             "PopRules.sol:PopRules",
             abi.encodeCall(
                 PopRules.initialize,
-                (DotnsConstants.RENT_PRICE, IDotnsProtocolRegistry(protocolRegistry))
+                (DotnsConstants.RENT_PRICE, IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "popRules",
             1,

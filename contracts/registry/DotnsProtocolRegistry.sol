@@ -39,9 +39,13 @@ contract DotnsProtocolRegistry is
 
     /// @notice Initialises the protocol registry.
     /// @dev Callable exactly once via `Initializable`, otherwise
-    ///      @custom:reverts InvalidInitialization. Sets the deployer as owner.
-    function initialize() external initializer {
-        __Ownable_init(msg.sender);
+    ///      @custom:reverts InvalidInitialization. The supplied `initialOwner`
+    ///      becomes the `Ownable` owner so that proxies deployed through an
+    ///      intermediary (e.g. a CREATE2 factory) inherit the right account
+    ///      rather than the deploying contract.
+    /// @param initialOwner Account that receives ownership.
+    function initialize(address initialOwner) external initializer {
+        __Ownable_init(initialOwner);
     }
 
     /// @inheritdoc IDotnsProtocolRegistry

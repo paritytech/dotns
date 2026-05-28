@@ -65,12 +65,13 @@ contract PopRules is
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
     function _popRulesInit(
         uint256 _startingPrice,
-        IDotnsProtocolRegistry registry
+        IDotnsProtocolRegistry registry,
+        address initialOwner
     )
         internal
         onlyInitializing
     {
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC165_init();
         updateStartingPrice(_startingPrice);
         protocolRegistry = registry;
@@ -85,12 +86,13 @@ contract PopRules is
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
     function initialize(
         uint256 _startingPrice,
-        IDotnsProtocolRegistry registry
+        IDotnsProtocolRegistry registry,
+        address initialOwner
     )
         public
         initializer
     {
-        _popRulesInit(_startingPrice, registry);
+        _popRulesInit(_startingPrice, registry, initialOwner);
     }
 
     /// @inheritdoc IPopRules

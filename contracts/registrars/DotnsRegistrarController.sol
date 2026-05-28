@@ -98,12 +98,13 @@ contract DotnsRegistrarController is
     function initialize(
         IDotnsProtocolRegistry registry,
         uint256 minAge,
-        uint256 maxAge
+        uint256 maxAge,
+        address initialOwner
     )
         external
         initializer
     {
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         _dotnsRoleManagerInit();
 
         require(maxAge > minAge, MaxCommitmentAgeTooLow());

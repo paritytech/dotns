@@ -68,8 +68,14 @@ contract DotnsPopResolver is
     ///      `POP_CONTROLLER`. Emits @custom:emits OwnershipTransferred when `msg.sender` is
     ///      recorded as the initial owner and @custom:emits Initialized once setup completes.
     /// @param registry Protocol-level address registry used for writer resolution.
-    function initialize(IDotnsProtocolRegistry registry) external initializer {
-        __Ownable_init(msg.sender);
+    function initialize(
+        IDotnsProtocolRegistry registry,
+        address initialOwner
+    )
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
     }

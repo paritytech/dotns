@@ -201,7 +201,7 @@ abstract contract BaseDotns is Test {
         // initialisers might otherwise race with the key lookups.
         address protocolRegistryAddress = Upgrades.deployUUPSProxy(
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ())
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner))
         );
         protocolRegistry = DotnsProtocolRegistry(protocolRegistryAddress);
         vm.label(protocolRegistryAddress, "DotnsProtocolRegistry");
@@ -212,46 +212,51 @@ abstract contract BaseDotns is Test {
 
         address dotnsRegistrarAddress = Upgrades.deployUUPSProxy(
             "DotnsRegistrar.sol:DotnsRegistrar",
-            abi.encodeCall(DotnsRegistrar.initialize, ("Dotns", "Dotns", registry))
+            abi.encodeCall(DotnsRegistrar.initialize, ("Dotns", "Dotns", registry, owner))
         );
         dotnsRegistrar = DotnsRegistrar(dotnsRegistrarAddress);
         vm.label(dotnsRegistrarAddress, "DotnsRegistrar");
 
         address dotnsReverseResolverAddress = Upgrades.deployUUPSProxy(
             "DotnsReverseResolver.sol:DotnsReverseResolver",
-            abi.encodeCall(DotnsReverseResolver.initialize, (registry))
+            abi.encodeCall(DotnsReverseResolver.initialize, (registry, owner))
         );
         dotnsReverseResolver = DotnsReverseResolver(dotnsReverseResolverAddress);
         vm.label(dotnsReverseResolverAddress, "DotnsReverseResolver");
 
         address dotnsRegistryAddress = Upgrades.deployUUPSProxy(
-            "DotnsRegistry.sol:DotnsRegistry", abi.encodeCall(DotnsRegistry.initialize, (registry))
+            "DotnsRegistry.sol:DotnsRegistry",
+            abi.encodeCall(DotnsRegistry.initialize, (registry, owner))
         );
         dotnsRegistry = DotnsRegistry(dotnsRegistryAddress);
         vm.label(dotnsRegistryAddress, "DotnsRegistry");
 
         address dotnsContentResolverAddress = Upgrades.deployUUPSProxy(
             "DotnsContentResolver.sol:DotnsContentResolver",
-            abi.encodeCall(DotnsContentResolver.initialize, (registry))
+            abi.encodeCall(DotnsContentResolver.initialize, (registry, owner))
         );
         dotnsContentResolver = DotnsContentResolver(dotnsContentResolverAddress);
         vm.label(dotnsContentResolverAddress, "DotnsContentResolver");
 
         address popRulesAddress = Upgrades.deployUUPSProxy(
-            "PopRules.sol:PopRules", abi.encodeCall(PopRules.initialize, (RENT_PRICE, registry))
+            "PopRules.sol:PopRules",
+            abi.encodeCall(PopRules.initialize, (RENT_PRICE, registry, owner))
         );
         popRules = PopRules(popRulesAddress);
         vm.label(popRulesAddress, "PopRules");
 
         address dotnsResolverAddress = Upgrades.deployUUPSProxy(
-            "DotnsResolver.sol:DotnsResolver", abi.encodeCall(DotnsResolver.initialize, (registry))
+            "DotnsResolver.sol:DotnsResolver",
+            abi.encodeCall(DotnsResolver.initialize, (registry, owner))
         );
         dotnsResolver = DotnsResolver(dotnsResolverAddress);
         vm.label(dotnsResolverAddress, "DotnsResolver");
 
         address dotnsRegistrarControllerAddress = Upgrades.deployUUPSProxy(
             "DotnsRegistrarController.sol:DotnsRegistrarController",
-            abi.encodeCall(DotnsRegistrarController.initialize, (registry, 6 seconds, 1 days))
+            abi.encodeCall(
+                DotnsRegistrarController.initialize, (registry, 6 seconds, 1 days, owner)
+            )
         );
         dotnsRegistrarController = DotnsRegistrarController(dotnsRegistrarControllerAddress);
         vm.label(dotnsRegistrarControllerAddress, "DotnsRegistrarController");
@@ -260,14 +265,16 @@ abstract contract BaseDotns is Test {
 
         address dotnsPopResolverAddress = Upgrades.deployUUPSProxy(
             "DotnsPopResolver.sol:DotnsPopResolver",
-            abi.encodeCall(DotnsPopResolver.initialize, (registry))
+            abi.encodeCall(DotnsPopResolver.initialize, (registry, owner))
         );
         dotnsPopResolver = DotnsPopResolver(dotnsPopResolverAddress);
         vm.label(dotnsPopResolverAddress, "DotnsPopResolver");
 
         address dotnsPopControllerAddress = Upgrades.deployUUPSProxy(
             "DotnsPopController.sol:DotnsPopController",
-            abi.encodeCall(DotnsPopController.initialize, (registry, DEFAULT_RESERVATION_DURATION))
+            abi.encodeCall(
+                DotnsPopController.initialize, (registry, DEFAULT_RESERVATION_DURATION, owner)
+            )
         );
         dotnsPopController = DotnsPopController(dotnsPopControllerAddress);
         vm.label(dotnsPopControllerAddress, "DotnsPopController");
@@ -281,7 +288,7 @@ abstract contract BaseDotns is Test {
             "DotnsNameEscrow.sol:DotnsNameEscrow",
             abi.encodeCall(
                 DotnsNameEscrow.initialize,
-                (IDotnsProtocolRegistry(protocolRegistryAddress), ESCROW_COOLDOWN)
+                (IDotnsProtocolRegistry(protocolRegistryAddress), ESCROW_COOLDOWN, owner)
             )
         );
         dotnsNameEscrow = DotnsNameEscrow(payable(dotnsNameEscrowAddress));

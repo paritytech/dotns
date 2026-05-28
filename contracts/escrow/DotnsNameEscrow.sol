@@ -122,14 +122,15 @@ contract DotnsNameEscrow is
     /// @param cooldownSeconds Refund cooldown after release.
     function initialize(
         IDotnsProtocolRegistry registry,
-        uint256 cooldownSeconds
+        uint256 cooldownSeconds,
+        address initialOwner
     )
         external
         initializer
     {
         require(address(registry) != address(0), InvalidAsset());
 
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC165_init();
 
         protocolRegistry = registry;
