@@ -50,7 +50,7 @@ contract DeployRecords is BaseDeployer {
                 DotnsResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "resolver",
-            1,
+            2,
             "DotnsResolver"
         );
     }
@@ -69,7 +69,7 @@ contract DeployRecords is BaseDeployer {
                 DotnsContentResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "contentResolver",
-            1,
+            2,
             "DotnsContentResolver"
         );
     }
@@ -89,7 +89,7 @@ contract DeployRecords is BaseDeployer {
                 (DotnsConstants.RENT_PRICE, IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "popRules",
-            1,
+            2,
             "PopRules"
         );
     }

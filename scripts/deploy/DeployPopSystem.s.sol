@@ -53,7 +53,7 @@ contract DeployPopSystem is BaseDeployer {
                 DotnsPopResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "popResolver",
-            1,
+            2,
             "DotnsPopResolver"
         );
     }
@@ -73,7 +73,7 @@ contract DeployPopSystem is BaseDeployer {
                 (IDotnsProtocolRegistry(protocolRegistry), DEFAULT_RESERVATION_DURATION, owner)
             ),
             "popController",
-            1,
+            2,
             "DotnsPopController"
         );
     }
@@ -101,7 +101,7 @@ contract DeployPopSystem is BaseDeployer {
             "RootGatewayDispatcher.sol:RootGatewayDispatcher",
             abi.encode(popController),
             "rootGatewayDispatcher",
-            1,
+            2,
             "RootGatewayDispatcher"
         );
     }

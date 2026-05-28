@@ -55,7 +55,7 @@ contract DeployPolicy is BaseDeployer {
                 )
             ),
             "registrarController",
-            1,
+            2,
             "DotnsRegistrarController"
         );
     }
@@ -75,7 +75,7 @@ contract DeployPolicy is BaseDeployer {
                 (IDotnsProtocolRegistry(protocolRegistry), ESCROW_COOLDOWN, owner)
             ),
             "nameEscrow",
-            1,
+            2,
             "DotnsNameEscrow"
         );
     }

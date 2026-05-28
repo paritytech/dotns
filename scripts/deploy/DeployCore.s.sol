@@ -50,7 +50,7 @@ contract DeployCore is BaseDeployer {
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
             abi.encodeCall(DotnsProtocolRegistry.initialize, (owner)),
             "protocolRegistry",
-            1,
+            2,
             "DotnsProtocolRegistry"
         );
     }
@@ -61,7 +61,7 @@ contract DeployCore is BaseDeployer {
             "StoreFactory.sol:StoreFactory",
             abi.encode(protocolRegistry),
             "storeFactory",
-            1,
+            2,
             "StoreFactory"
         );
         // StoreFactory deploys its two beacons in its constructor (plain
@@ -95,7 +95,7 @@ contract DeployCore is BaseDeployer {
                 ("Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "registrar",
-            1,
+            2,
             "DotnsRegistrar"
         );
     }
@@ -114,7 +114,7 @@ contract DeployCore is BaseDeployer {
                 DotnsReverseResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "reverseResolver",
-            1,
+            2,
             "DotnsReverseResolver"
         );
     }
@@ -133,7 +133,7 @@ contract DeployCore is BaseDeployer {
                 DotnsRegistry.initialize, (IDotnsProtocolRegistry(protocolRegistry), owner)
             ),
             "registry",
-            1,
+            2,
             "DotnsRegistry"
         );
     }
