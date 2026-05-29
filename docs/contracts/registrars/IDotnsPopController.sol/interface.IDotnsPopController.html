@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -219,20 +219,33 @@ claim as a full person later.</p>
 <p>Callable only via the registered PoP gateway (otherwise @custom:reverts NotGateway);
 the gateway is responsible for asserting substrate Root authority before forwarding
 here. The lite leg validates the dotted <code>stem.NN</code> shape and requires the flattened label
-to classify as PopLite (otherwise @custom:reverts InvalidLiteLabel), emitting</p>
-<p><strong>Note:</strong>
-emits: LiteNameReserved and @custom:emits NameRegistered on success. The base-name
-leg only runs when <code>reservedBaseLabel</code> is non-empty: it validates the DNS-label shape and
-requires a true base label with no trailing digits (otherwise @custom:reverts
-InvalidBaseLabel) before any queue mutation so a bad reservation never touches the queue,
-advances the head
-past expired entries (emitting @custom:emits ReservationExpired for each one), removes the
-user from any prior queue position so a single user holds at most one live reservation
-across all labels, and enqueues a fresh entry (emitting @custom:emits ReservationQueued).
-The enqueue rejects with @custom:reverts AlreadyReserved when the user already holds a
-reservation that was not cleared by the prior removal and with @custom:reverts QueueFull
-when the per-label queue has reached <code>MAX_RESERVATION_QUEUE</code>. Cross-chain callers pass
-the ABI-encoded reservation tuple as the call's payload, which Solidity decodes directly.</p>
+to classify as PopLite (otherwise @custom:reverts InvalidLiteLabel), and rejects a
+supplied chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code>
+(otherwise @custom:reverts InvalidChatKey). On a warm-path mint (user already has a
+<code>LabelStore</code>) it emits @custom:emits LiteNameReserved and @custom:emits NameRegistered;
+on a cold-path mint it emits @custom:emits LiteNameReserved and</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>emits: PendingClaimStashed, with @custom:emits NameRegistered deferred to</p>
+</li>
+<li>
+<p>function: claimLabelStore when the user settles. The base-name leg only runs
+when <code>reservedBaseLabel</code> is non-empty: it validates the DNS-label shape and requires a
+true base label with no trailing digits (otherwise @custom:reverts InvalidBaseLabel)
+before any queue mutation so a bad reservation never touches the queue, advances the
+head past expired entries (emitting @custom:emits ReservationExpired for each one),
+removes the user from any prior queue position so a single user holds at most one live
+reservation across all labels, and enqueues a fresh entry (emitting</p>
+</li>
+<li>
+<p>emits: ReservationQueued). The enqueue rejects with @custom:reverts
+AlreadyReserved when the user already holds a reservation that was not cleared by the
+prior removal and with @custom:reverts QueueFull when the per-label queue has reached
+<code>MAX_RESERVATION_QUEUE</code>. Cross-chain callers pass the ABI-encoded reservation tuple as
+the call's payload, which Solidity decodes directly.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function reserveBaseName(BaseReservation calldata params) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -281,10 +294,21 @@ user without touching the base-name reservation queue.</p>
 <p>Callable only via the registered PoP gateway (otherwise @custom:reverts NotGateway);
 the gateway is responsible for asserting substrate Root authority before forwarding
 here. The supplied label must satisfy the dotted <code>stem.NN</code> shape and the flattened label
-must classify as PopLite (otherwise @custom:reverts InvalidLiteLabel) before mint and
-resolver writes run. Emits @custom:emits LiteNameReserved and @custom:emits NameRegistered
-on success. Cross-chain callers pass the ABI-encoded lite-registration tuple as the call's
+must classify as PopLite (otherwise @custom:reverts InvalidLiteLabel); a supplied chat
+key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code> reverts</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: InvalidChatKey before mint and resolver writes run. On a warm-path mint
+emits @custom:emits LiteNameReserved and @custom:emits NameRegistered. On a cold-path
+mint emits @custom:emits LiteNameReserved and @custom:emits PendingClaimStashed, with</p>
+</li>
+<li>
+<p>emits: NameRegistered deferred to @custom:function claimLabelStore when the user
+settles. Cross-chain callers pass the ABI-encoded lite-registration tuple as the call's
 payload, which Solidity decodes directly.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function reserveLiteName(LiteRegistration calldata params) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -326,32 +350,46 @@ Worked example off-chain:
 <p>Registers a full-person username on behalf of the supplied user.</p>
 <p>Callable only via the registered PoP gateway (otherwise @custom:reverts NotGateway);
 the gateway is responsible for asserting substrate Root authority before forwarding
-here. The base label must satisfy the DNS-label shape (otherwise</p>
+here. The base label must satisfy the DNS-label shape and be a true base label with no
+trailing digits (otherwise @custom:reverts InvalidBaseLabel), and the label must not
+classify as governance-reserved (otherwise @custom:reverts InvalidBaseLabel). The
+gateway also defers to PopRules as the single cross-flow authority: when PopRules
+carries a live base-name slot held by another user (stamped by the public commit-reveal
+flow or this controller's prior queue head), the call reverts @custom:reverts NotHolder
+before any queue mutation. Two orthogonal axes drive the state machine. The reservation
+axis treats the user as claiming if and only if they hold the live head-of-queue
+reservation on the base label: a claim wipes the entire queue, releases the PopRules
+slot, and emits @custom:emits BaseNameClaimed; a non-claim silently relinquishes any
+pending entry the user holds and emits @custom:emits StandaloneNameRegistered. Advancing
+the queue head past expired entries emits @custom:emits ReservationExpired for each
+one. The chat-key axis selects whether a fresh key is persisted on the resolver or the
+new entry inherits its key from a prior lite-person username. The fresh-key branch
+rejects a chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code> (otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>reverts: InvalidBaseLabel) and PopRules price-with-check runs first so a
-mis-tiered request never touches the queue. Two orthogonal axes drive the state
-machine. The reservation axis treats the user as claiming if and only if they hold the
-live head-of-queue reservation on the base label: a claim wipes the entire queue,
-releases the PopRules slot, and emits @custom:emits BaseNameClaimed, while a non-claim
-silently relinquishes any pending entry the user holds and emits</p>
+<p>reverts: InvalidChatKey). The <code>LiteUsername</code> branch validates the lite label's
+<code>NAMEXX</code> shape (otherwise @custom:reverts InvalidLiteLabel), requires the registrant to
+own the lite token (otherwise @custom:reverts LiteLabelNotOwnedByUser), reads the lite
+node's chat key from the resolver and copies it across; if the lite node carries no chat
+key the inherited value is empty and the full node's chat-key write is silently skipped
+(the <code>LiteToFullLinked</code> event still fires). Emits @custom:emits LiteToFullLinked
+alongside the registration event. On a warm-path mint the event order is</p>
 </li>
 <li>
-<p>emits: StandaloneNameRegistered, reverting with @custom:reverts NotHolder when
-another live head blocks the mint. Advancing the queue head past expired entries emits</p>
+<p>emits: NameRegistered first (from the inner mint), then</p>
 </li>
 <li>
-<p>emits: ReservationExpired for each one. The chat-key axis selects whether a
-fresh key is persisted on the resolver or the new entry inherits its key from a prior
-lite-person username; the <code>LiteUsername</code> branch validates the lite label's <code>NAMEXX</code>
-shape (otherwise @custom:reverts InvalidLiteLabel) and emits</p>
+<p>emits: BaseNameClaimed or @custom:emits StandaloneNameRegistered, then</p>
 </li>
 <li>
-<p>emits: LiteToFullLinked alongside the registration event. Every successful path
-emits @custom:emits NameRegistered. The two axes are independent, so any combination is
-reachable. Cross-chain callers pass the ABI-encoded full-registration tuple as the
-call's payload, which Solidity decodes directly.</p>
+<p>emits: LiteToFullLinked when applicable. On a cold-path mint</p>
+</li>
+<li>
+<p>emits: PendingClaimStashed replaces the initial @custom:emits NameRegistered;
+the deferred @custom:emits NameRegistered fires later from @custom:function
+claimLabelStore. Cross-chain callers pass the ABI-encoded full-registration tuple as
+the call's payload, which Solidity decodes directly.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function registerBaseName(FullRegistration calldata params) external;
@@ -390,7 +428,10 @@ encoders MUST NOT assume strict length validation.</p>
 <p>Permissionless on purpose: anyone (typically a UI or a bot) can poke a stale queue
 so the next live head takes over without waiting for the next gateway call. Validates
 the DNS-label shape of <code>reservedBaseLabel</code> (otherwise @custom:reverts InvalidBaseLabel)
-and emits @custom:emits ReservationExpired for every expired entry reaped from the head.</p>
+and emits @custom:emits ReservationExpired for every expired entry reaped from the
+head. Only base-shaped labels (no trailing digits) ever key a reservation queue, so a
+lite-shaped label still passes the shape check but resolves to an empty queue and the
+call is a no-op.</p>
 <pre><code class="language-solidity">function expireReservation(string calldata reservedBaseLabel) external;
 </code></pre>
 <h3 id="relinquishreservation"><a class="header" href="#relinquishreservation">relinquishReservation</a></h3>
@@ -484,23 +525,26 @@ the live window <code>[head, tail)</code>.</p>
 </tbody></table>
 </div>
 <h3 id="claimlabelstore"><a class="header" href="#claimlabelstore">claimLabelStore</a></h3>
-<p>Settles the caller's deferred binding by deploying their <code>LabelStore</code> and
-writing the stashed label.</p>
-<p>User-signed entrypoint: <code>pallet-revive</code> charges the <code>LabelStore</code> storage
+<p>Settles the caller's deferred binding by writing the stashed label into
+the caller's <code>LabelStore</code>, deploying the store first if the caller doesn't yet
+have one.</p>
+<p>User-signed entrypoint: <code>pallet-revive</code> charges any <code>LabelStore</code> storage
 deposit against <code>msg.sender</code>'s balance through the runtime's configured deposit
 backend. Reverts with @custom:reverts NoPendingClaim when the caller has no
-stashed entry or the entry has lapsed past <code>reservationDuration</code>. On success
-deploys the store via the protocol-registered factory, writes the label keyed by
-its labelhash, deletes the pending-claim entry, and emits</p>
+stashed entry or the entry has lapsed past <code>reservationDuration</code>. Reuses any
+existing <code>LabelStore</code> returned by the factory (settling via this controller after a
+concurrent public-flow mint, or settling twice through this controller, both find
+a live store and skip deployment), otherwise deploys a fresh store via the
+protocol-registered factory. Writes the label keyed by its <code>node</code> (namehash),
+deletes the pending-claim entry, and emits @custom:emits PendingClaimSettled and</p>
 <p><strong>Note:</strong>
-emits: PendingClaimSettled and @custom:emits NameRegistered. Chat-key and
-lite-link records are not touched here; they are persisted on the PoP resolver at
-mint time, not at settlement.</p>
+emits: NameRegistered. Chat-key and lite-link records are not touched here;
+they are persisted on the PoP resolver at mint time, not at settlement.</p>
 <pre><code class="language-solidity">function claimLabelStore() external;
 </code></pre>
 <h3 id="expirependingclaim"><a class="header" href="#expirependingclaim">expirePendingClaim</a></h3>
 <p>Permissionlessly reaps a deferred binding that sat unsettled past
-<code>pendingClaimDuration</code>.</p>
+<code>reservationDuration</code>.</p>
 <p>Permissionless on purpose: anyone (typically a UI or a bot) can poke a
 stale entry so the slot frees up for the next gateway-path mint. Reverts with</p>
 <p><strong>Notes:</strong></p>
@@ -681,6 +725,17 @@ caller observed by this contract for off-chain diagnostics.</p>
 <p>Thrown when a supplied base label is not a canonical DNS label.</p>
 <pre><code class="language-solidity">error InvalidBaseLabel();
 </code></pre>
+<h3 id="invalidchatkey"><a class="header" href="#invalidchatkey">InvalidChatKey</a></h3>
+<p>Thrown when a supplied chat key is non-empty and not exactly 65 bytes long.</p>
+<p>Mirrors the resolver's <code>InvalidChatKeyLength</code> so the controller surfaces a
+controller-local error before the mint runs.</p>
+<pre><code class="language-solidity">error InvalidChatKey(uint256 length);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>length</code></td><td><code>uint256</code></td><td>Caller-supplied chat key length, in bytes.</td></tr>
+</tbody></table>
+</div>
 <h3 id="noactivereservation"><a class="header" href="#noactivereservation">NoActiveReservation</a></h3>
 <p>Thrown when a user tries to claim or relinquish a reservation that they do not hold.</p>
 <pre><code class="language-solidity">error NoActiveReservation(address user);

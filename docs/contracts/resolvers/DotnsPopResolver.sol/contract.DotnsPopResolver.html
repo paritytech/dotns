@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopresolver"><a class="header" href="#dotnspopresolver">DotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html">IDotnsPopResolver</a></p>
 <p><strong>Title:</strong>
@@ -328,7 +328,7 @@ to a new <code>fullNode</code> clears <code>liteLink(oldFull)</code>. The invari
 </div>
 <h3 id="fullclaim"><a class="header" href="#fullclaim">fullClaim</a></h3>
 <p>Returns the full-person node a given lite label has claimed.</p>
-<p>Reverse of {liteLink}. Written by the same <code>setLiteLink</code> call so the
+<p>Reverse of @custom:function liteLink. Written by the same <code>setLiteLink</code> call so the
 two directions stay in lockstep. Returns zero when the lite label
 has never been linked to a full claim.</p>
 <pre><code class="language-solidity">function fullClaim(bytes32 liteLabelhash) external view override returns (bytes32);

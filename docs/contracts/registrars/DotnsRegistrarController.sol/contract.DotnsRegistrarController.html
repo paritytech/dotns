@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, <a href="/contracts/access/DotnsRoleManager.sol/abstract.DotnsRoleManager.html">DotnsRoleManager</a>, ReentrancyGuardTransient, <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -225,10 +225,6 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">uint256[50] private __gap;
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
-<h3 id="onlyregistry"><a class="header" href="#onlyregistry">onlyRegistry</a></h3>
-<p>Restricts calls to the forward registry contract.</p>
-<pre><code class="language-solidity">modifier onlyRegistry();
-</code></pre>
 <h3 id="onlywhitelistedorowner"><a class="header" href="#onlywhitelistedorowner">onlyWhiteListedOrOwner</a></h3>
 <p>Restricts calls to whitelisted addresses or the owner.</p>
 <p>Used to gate <code>registerReserved</code>, which allows registering reserved names without
@@ -250,11 +246,19 @@ oz-upgrades-unsafe-allow: constructor</p>
 <p>Callable once through the UUPS proxy; direct calls on the implementation revert
 with @custom:reverts InvalidInitialization, and any nested call outside an active
 initialiser scope reverts with @custom:reverts NotInitializing. Validates the
-commitment window bounds: <code>maxAge</code> must exceed <code>minAge</code> (otherwise</p>
-<p><strong>Note:</strong>
-reverts: MaxCommitmentAgeTooLow) and must stay within
+commitment window bounds: <code>minAge</code> must be strictly positive (otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: MinCommitmentAgeZero) so a reveal cannot land in the same block as
+its commit; <code>maxAge</code> must exceed <code>minAge</code> (otherwise</p>
+</li>
+<li>
+<p>reverts: MaxCommitmentAgeTooLow) and must stay within
 <code>MAX_ALLOWED_COMMITMENT_AGE</code> (otherwise @custom:reverts MaxCommitmentAgeTooHigh) before
 wiring the protocol registry.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function initialize(
     IDotnsProtocolRegistry registry,
     uint256 minAge,
@@ -266,13 +270,16 @@ wiring the protocol registry.</p>
 <h3 id="available"><a class="header" href="#available">available</a></h3>
 <p>Returns whether a label is available for registration.</p>
 <p>Validates the canonical DNS-label shape (otherwise @custom:reverts InvalidLabel)
-and rejects labels shorter than the minimum length with</p>
+and rejects labels below the minimum-length policy with</p>
 <p><strong>Note:</strong>
-reverts: NameNotAvailable before checking ERC721 availability on the registrar.</p>
+reverts: LabelTooShort before checking ERC721 availability on the registrar.</p>
 <pre><code class="language-solidity">function available(string calldata label) public view override returns (bool);
 </code></pre>
 <h3 id="makecommitment"><a class="header" href="#makecommitment">makeCommitment</a></h3>
 <p>Computes the commitment hash for a registration.</p>
+<p>Uses <code>abi.encode</code> so the variable-width <code>label</code> is length-prefixed and the boundary
+between <code>label</code> and the fixed-width <code>owner</code>, <code>secret</code>, and <code>reserved</code> fields is
+unambiguous, binding the commitment to the exact tuple.</p>
 <pre><code class="language-solidity">function makeCommitment(Registration calldata registration)
     public
     pure
@@ -283,39 +290,35 @@ reverts: NameNotAvailable before checking ERC721 availability on the registrar.<
 <p>Submits a commitment for a future registration.</p>
 <p>Idempotent over expiry: re-committing an unexpired hash reverts with</p>
 <p><strong>Note:</strong>
-reverts: UnexpiredCommitmentExists (front-running guard); re-committing a hash
-whose stored timestamp has passed <code>maxCommitmentAge</code> overwrites the slot so storage
-cannot be permanently griefed. Emits @custom:emits NameCommitted on success.</p>
+reverts: UnexpiredCommitmentExists (front-running guard); a hash whose stored
+timestamp has passed <code>maxCommitmentAge</code> overwrites the slot so storage cannot be
+permanently griefed. The expiry boundary is inclusive on the commit side
+(<code>committedAt + maxCommitmentAge &lt;= block.timestamp</code> overwrites) and exclusive on the
+reveal side (<code>register</code> rejects at the same instant with @custom:reverts
+CommitmentTooOld), so the slot is overwritable from exactly the timestamp at which
+reveal begins rejecting it. Emits @custom:emits NameCommitted on success.</p>
 <pre><code class="language-solidity">function commit(bytes32 commitment) external override;
 </code></pre>
 <h3 id="register"><a class="header" href="#register">register</a></h3>
 <p>Registers a name after the commitment delay.</p>
-<p>Validates the label shape (otherwise @custom:reverts InvalidLabel) and ERC721
-availability (otherwise @custom:reverts NameNotAvailable), then resolves the configured
-escrow address from the protocol registry (otherwise @custom:reverts EscrowNotConfigured)
-and consumes the prior commitment, which fails with @custom:reverts CommitmentNotFound
-when no commitment exists for the supplied registration, @custom:reverts CommitmentTooNew
-before <code>minCommitmentAge</code>, and @custom:reverts CommitmentTooOld past <code>maxCommitmentAge</code>.
-Splits on direct vs cross-payer at <code>msg.sender == registration.owner</code>. The direct path
-runs <code>priceWithCheck</code> (personhood + reservation gate) and routes the fee to a refundable
-escrow deposit owned by <code>registration.owner</code>. The cross-payer path skips personhood
-(a third party may sponsor a verified owner), still enforces base-name reservations
-(otherwise @custom:reverts NameReserved), applies the flat NoStatus <code>reachFee</code> friction
-when the sender's own tier is below the label's required tier, and routes funds to the
-insurance branch when the payer's tier price differs from the owner's (genuine
-cross-tier sponsorship) versus the refundable branch when the tier prices match
-(same-tier-different-address). The caller must supply at least the priced amount plus
-any friction (otherwise @custom:reverts InsufficientValue), and any overpayment is
-returned to <code>msg.sender</code> with @custom:emits OverpaymentRefunded; a failed refund call
-reverts with @custom:reverts RefundFailed. Emits @custom:emits NameRegistered on success.</p>
+<p>Validates the label shape (otherwise @custom:reverts InvalidLabel), rejects labels
+below the minimum length policy (@custom:reverts LabelTooShort), and ERC721 availability
+(otherwise @custom:reverts NameNotAvailable), then consumes the prior commitment, which
+fails with @custom:reverts CommitmentNotFound when no commitment exists for the supplied
+registration, @custom:reverts CommitmentTooNew before <code>minCommitmentAge</code>, and</p>
+<p><strong>Note:</strong>
+reverts: CommitmentTooOld past <code>maxCommitmentAge</code>, and finally resolves the
+configured escrow address from the protocol registry (otherwise</p>
 <pre><code class="language-solidity">function register(Registration calldata registration) external payable override nonReentrant;
 </code></pre>
 <h3 id="_settleescrow"><a class="header" href="#_settleescrow">_settleEscrow</a></h3>
 <p>Settles every escrow side-effect of a successful registration.</p>
 <p>Extracted to keep <code>register</code> under the stack-depth ceiling. On a direct
-registration the full <code>chargeAmount</code> lands in the refundable deposit position;
-on a cross-payer registration the same amount routes to the friction reserve
-and no deposit position is seeded.</p>
+registration the full <code>chargeAmount</code> lands in the refundable deposit position
+keyed to <code>nameOwner</code>. On a cross-payer registration the deposit position is
+seeded with a zero amount so the release lifecycle stays reachable, and the same
+<code>chargeAmount</code> routes to the insurance fund via <code>depositInsurance</code> keyed to
+<code>msg.sender</code> as the payer.</p>
 <pre><code class="language-solidity">function _settleEscrow(
     address escrow,
     uint256 tokenId,
@@ -380,9 +383,10 @@ This function call must use less than 30 000 gas.</p>
 <h3 id="_validatedlabelnode"><a class="header" href="#_validatedlabelnode">_validatedLabelNode</a></h3>
 <p>Validates label shape and derives <code>(labelhash, node)</code>.</p>
 <p>Delegates hashing to @custom:contract LabelUtils so the assembly sequence lives in
-exactly one place across the codebase. Error ownership stays on this interface: short labels
-revert with <code>NameNotAvailable(label)</code> (pre-existing semantics); shape violations
-revert with <code>InvalidLabel()</code>.</p>
+exactly one place across the codebase. Error ownership stays on this interface: shape
+violations revert with <code>InvalidLabel()</code>; labels below the minimum length revert with
+<code>LabelTooShort(label)</code> so off-chain consumers can distinguish "shape-valid but below
+the policy minimum" from "shape-valid but already minted".</p>
 <pre><code class="language-solidity">function _validatedLabelNode(string calldata label)
     internal
     pure
@@ -413,6 +417,7 @@ commit-reveal-specific policy.</p>
     bytes32 node,
     uint256 baseCost,
     bool setReverseRecord,
+    IDotnsReverseResolver reverse,
     bool isReclaim
 )
     internal;
@@ -433,10 +438,6 @@ commit-reveal-specific policy.</p>
 <h3 id="_onlywhitelistedorowner"><a class="header" href="#_onlywhitelistedorowner">_onlyWhiteListedOrOwner</a></h3>
 <p>Internal check enforcing whitelist-or-owner access.</p>
 <pre><code class="language-solidity">function _onlyWhiteListedOrOwner() internal view;
-</code></pre>
-<h3 id="_onlyregistry"><a class="header" href="#_onlyregistry">_onlyRegistry</a></h3>
-<p>Internal check enforcing registry-only access.</p>
-<pre><code class="language-solidity">function _onlyRegistry() internal view;
 </code></pre>
 <h3 id="_issupportedrole"><a class="header" href="#_issupportedrole">_isSupportedRole</a></h3>
 <pre><code class="language-solidity">function _isSupportedRole(bytes32 role) internal view override returns (bool supported);

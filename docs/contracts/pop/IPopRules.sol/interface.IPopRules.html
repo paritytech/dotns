@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
 <p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements,
@@ -235,17 +235,21 @@ and new values.</p>
 </tbody></table>
 </div>
 <h3 id="reservebasename"><a class="header" href="#reservebasename">reserveBaseName</a></h3>
-<p>Creates a reservation entry for the digit-stripped version of a name.</p>
+<p>Creates or refreshes a reservation entry for a PopLite-eligible stem.</p>
 <p>Commit-reveal reservation path. Only an authorised controller on the registrar may
-call this, otherwise @custom:reverts NotRegistry. Non-canonical labels and labels
-that do not classify as <code>PopLite</code> trigger @custom:reverts PopError. No-ops when the
-slot is already live so concurrent registrations cannot stomp the original reserver;
-otherwise emits @custom:emits BaseNameReserved.</p>
-<pre><code class="language-solidity">function reserveBaseName(string calldata baseName, address user) external;
+call this, otherwise @custom:reverts NotRegistry. The caller passes the
+already-stripped stem; the contract enforces stem shape (no trailing digits) and
+PopLite-eligibility
+(length in <code>[6, 8]</code>), and a non-canonical label or a label outside that shape triggers</p>
+<p><strong>Note:</strong>
+reverts: PopError. Cross-user collision on a live slot triggers @custom:reverts
+PopError so the caller cannot silently overwrite another user's reservation; same-user
+refresh and writes into an empty or expired slot emit @custom:emits BaseNameReserved.</p>
+<pre><code class="language-solidity">function reserveBaseName(string calldata stem, address user) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label with trailing digits removed.</td></tr>
+<tr><td><code>stem</code></td><td><code>string</code></td><td>The base label with no trailing digits.</td></tr>
 <tr><td><code>user</code></td><td><code>address</code></td><td>The address receiving reservation rights.</td></tr>
 </tbody></table>
 </div>
@@ -253,23 +257,19 @@ otherwise emits @custom:emits BaseNameReserved.</p>
 <p>Writes or refreshes a reservation for a bare base-name stem.</p>
 <p>Gateway-driven reservation path used by the PoP controller. Only a controller in the
 registrar's <code>controllers</code> set may call this, otherwise @custom:reverts NotRegistry.
-Does not apply the lite-format classification that <code>reserveBaseName</code> enforces; the
-caller supplies the bare stem directly, and a non-canonical label triggers</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: PopError. If the slot is already live and held by a different user,</p>
-</li>
-<li>
-<p>reverts: PopError so the caller's local bookkeeping and PopRules state stay in
-lockstep; if it is live for the same user, expiry is refreshed to <code>block.timestamp + MAX_RESERVATION_TIME</code>. Emits @custom:emits BaseNameReserved on every successful write.</p>
-</li>
-</ul>
-<pre><code class="language-solidity">function reserveBaseNameForPop(string calldata baseName, address user) external;
+Does not apply the lite-format length window that @custom:function reserveBaseName
+enforces, but does require the input to be canonical and stem-shaped (no trailing
+digits); a non-canonical or non-stem label triggers @custom:reverts PopError. If the
+slot is already live and held by a different user, @custom:reverts PopError so the
+caller's local bookkeeping and PopRules state stay in lockstep; if it is live for the
+same user, expiry is refreshed to <code>block.timestamp + MAX_RESERVATION_TIME</code>. Emits</p>
+<p><strong>Note:</strong>
+emits: BaseNameReserved on every successful write.</p>
+<pre><code class="language-solidity">function reserveBaseNameForPop(string calldata stem, address user) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label to reserve (no trailing digits).</td></tr>
+<tr><td><code>stem</code></td><td><code>string</code></td><td>The base label with no trailing digits.</td></tr>
 <tr><td><code>user</code></td><td><code>address</code></td><td>The address receiving reservation rights.</td></tr>
 </tbody></table>
 </div>
@@ -279,9 +279,11 @@ lockstep; if it is live for the same user, expiry is refreshed to <code>block.ti
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>reverts: NotRegistry. Non-canonical labels trigger @custom:reverts PopError.
-Live reservations may only be cleared by the same controller that wrote them;
-another authorised controller attempting to clear a live slot triggers</p>
+<p>reverts: NotRegistry. Non-canonical or non-stem labels trigger</p>
+</li>
+<li>
+<p>reverts: PopError. Live reservations may only be cleared by the same controller
+that wrote them; another authorised controller attempting to clear a live slot triggers</p>
 </li>
 <li>
 <p>reverts: PopError. Expired reservations may be cleared by any authorised
@@ -292,11 +294,11 @@ claimed, relinquished, or a queue head promotion leaves the slot empty. Emits</p
 <p>emits: BaseNameReleased once the slot is cleared.</p>
 </li>
 </ul>
-<pre><code class="language-solidity">function releaseBaseName(string calldata baseName) external;
+<pre><code class="language-solidity">function releaseBaseName(string calldata stem) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label whose reservation should be cleared.</td></tr>
+<tr><td><code>stem</code></td><td><code>string</code></td><td>The base label whose reservation should be cleared (no trailing digits).</td></tr>
 </tbody></table>
 </div>
 <h3 id="releasereservationforreclaim"><a class="header" href="#releasereservationforreclaim">releaseReservationForReclaim</a></h3>
@@ -308,23 +310,30 @@ caller identity. Intended for the public registrar controller's reclaim path, wh
 a prior occupant has handed the name back to escrow and the new registrant needs
 the cross-flow guard cleared regardless of which controller originally stamped it.
 Only a registrar-authorised controller may call this (@custom:reverts NotRegistry).
-Non-canonical labels trigger @custom:reverts PopError. A live reservation whose
-owner does not match <code>expectedOwner</code> triggers @custom:reverts PopError; expired
+Non-canonical or non-stem labels trigger @custom:reverts PopError. A live reservation
+whose owner does not match <code>expectedOwner</code> triggers @custom:reverts PopError; expired
 reservations are cleared regardless. Emits @custom:emits BaseNameReleased.</p>
-<pre><code class="language-solidity">function releaseReservationForReclaim(string calldata baseName, address expectedOwner) external;
+<pre><code class="language-solidity">function releaseReservationForReclaim(string calldata stem, address expectedOwner) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label whose reservation should be cleared.</td></tr>
+<tr><td><code>stem</code></td><td><code>string</code></td><td>The base label whose reservation should be cleared (no trailing digits).</td></tr>
 <tr><td><code>expectedOwner</code></td><td><code>address</code></td><td>The address the caller expects to be the current reservation owner.</td></tr>
 </tbody></table>
 </div>
 <h3 id="getbasenamereservation"><a class="header" href="#getbasenamereservation">getBaseNameReservation</a></h3>
 <p>Retrieves reservation information for a base name.</p>
-<p>Raw accessor: returns the stored slot regardless of expiry. Use <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html#isbasenamereserved">isBaseNameReserved</a>
+<p>Raw accessor: returns the stored slot regardless of expiry. Use</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: isBaseNameReserved
 when live-window semantics are needed. Non-canonical labels trigger</p>
-<p><strong>Note:</strong>
-reverts: PopError.</p>
+</li>
+<li>
+<p>reverts: PopError.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function getBaseNameReservation(string calldata baseName)
     external
     view
@@ -528,7 +537,7 @@ state. Non-canonical labels trigger @custom:reverts PopError.</p>
 </div>
 <h3 id="startingpriceupdated"><a class="header" href="#startingpriceupdated">StartingPriceUpdated</a></h3>
 <p>Emitted when the spam-deterrent NoStatus starting price is rotated.</p>
-<p>Owner-only setter <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html#updatestartingprice">updateStartingPrice</a>; the new value is consumed
+<p>Owner-only setter @custom:function updateStartingPrice; the new value is consumed
 by <code>_priceValidatedName</code> on the next pricing read.</p>
 <pre><code class="language-solidity">event StartingPriceUpdated(uint256 oldPrice, uint256 newPrice);
 </code></pre>

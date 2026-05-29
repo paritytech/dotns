@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -197,13 +197,16 @@ security-contact: admin@parity.io</p>
 <h3 id="available"><a class="header" href="#available">available</a></h3>
 <p>Returns whether a label is available for registration.</p>
 <p>Validates the canonical DNS-label shape (otherwise @custom:reverts InvalidLabel)
-and rejects labels shorter than the minimum length with</p>
+and rejects labels below the minimum-length policy with</p>
 <p><strong>Note:</strong>
-reverts: NameNotAvailable before checking ERC721 availability on the registrar.</p>
+reverts: LabelTooShort before checking ERC721 availability on the registrar.</p>
 <pre><code class="language-solidity">function available(string calldata label) external view returns (bool isAvailable);
 </code></pre>
 <h3 id="makecommitment"><a class="header" href="#makecommitment">makeCommitment</a></h3>
 <p>Computes the commitment hash for a registration.</p>
+<p>Uses <code>abi.encode</code> so the variable-width <code>label</code> is length-prefixed and the boundary
+between <code>label</code> and the fixed-width <code>owner</code>, <code>secret</code>, and <code>reserved</code> fields is
+unambiguous, binding the commitment to the exact tuple.</p>
 <pre><code class="language-solidity">function makeCommitment(Registration calldata registration)
     external
     pure
@@ -213,31 +216,51 @@ reverts: NameNotAvailable before checking ERC721 availability on the registrar.<
 <p>Submits a commitment for a future registration.</p>
 <p>Idempotent over expiry: re-committing an unexpired hash reverts with</p>
 <p><strong>Note:</strong>
-reverts: UnexpiredCommitmentExists (front-running guard); re-committing a hash
-whose stored timestamp has passed <code>maxCommitmentAge</code> overwrites the slot so storage
-cannot be permanently griefed. Emits @custom:emits NameCommitted on success.</p>
+reverts: UnexpiredCommitmentExists (front-running guard); a hash whose stored
+timestamp has passed <code>maxCommitmentAge</code> overwrites the slot so storage cannot be
+permanently griefed. The expiry boundary is inclusive on the commit side
+(<code>committedAt + maxCommitmentAge &lt;= block.timestamp</code> overwrites) and exclusive on the
+reveal side (<code>register</code> rejects at the same instant with @custom:reverts
+CommitmentTooOld), so the slot is overwritable from exactly the timestamp at which
+reveal begins rejecting it. Emits @custom:emits NameCommitted on success.</p>
 <pre><code class="language-solidity">function commit(bytes32 commitment) external;
 </code></pre>
 <h3 id="register"><a class="header" href="#register">register</a></h3>
 <p>Registers a name after the commitment delay.</p>
-<p>Validates the label shape (otherwise @custom:reverts InvalidLabel) and ERC721
-availability (otherwise @custom:reverts NameNotAvailable), then resolves the configured
-escrow address from the protocol registry (otherwise @custom:reverts EscrowNotConfigured)
-and consumes the prior commitment, which fails with @custom:reverts CommitmentNotFound
-when no commitment exists for the supplied registration, @custom:reverts CommitmentTooNew
-before <code>minCommitmentAge</code>, and @custom:reverts CommitmentTooOld past <code>maxCommitmentAge</code>.
-Splits on direct vs cross-payer at <code>msg.sender == registration.owner</code>. The direct path
-runs <code>priceWithCheck</code> (personhood + reservation gate) and routes the fee to a refundable
-escrow deposit owned by <code>registration.owner</code>. The cross-payer path skips personhood
-(a third party may sponsor a verified owner), still enforces base-name reservations
-(otherwise @custom:reverts NameReserved), applies the flat NoStatus <code>reachFee</code> friction
-when the sender's own tier is below the label's required tier, and routes funds to the
-insurance branch when the payer's tier price differs from the owner's (genuine
-cross-tier sponsorship) versus the refundable branch when the tier prices match
-(same-tier-different-address). The caller must supply at least the priced amount plus
-any friction (otherwise @custom:reverts InsufficientValue), and any overpayment is
-returned to <code>msg.sender</code> with @custom:emits OverpaymentRefunded; a failed refund call
-reverts with @custom:reverts RefundFailed. Emits @custom:emits NameRegistered on success.</p>
+<p>Validates the label shape (otherwise @custom:reverts InvalidLabel), rejects labels
+below the minimum length policy (@custom:reverts LabelTooShort), and ERC721 availability
+(otherwise @custom:reverts NameNotAvailable), then consumes the prior commitment, which
+fails with @custom:reverts CommitmentNotFound when no commitment exists for the supplied
+registration, @custom:reverts CommitmentTooNew before <code>minCommitmentAge</code>, and</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: CommitmentTooOld past <code>maxCommitmentAge</code>, and finally resolves the
+configured escrow address from the protocol registry (otherwise</p>
+</li>
+<li>
+<p>reverts: EscrowNotConfigured). Splits on direct vs cross-payer at
+<code>msg.sender == registration.owner</code>. The direct path runs <code>priceWithCheck</code> (personhood</p>
+</li>
+</ul>
+<ul>
+<li>reservation gate) and routes the charge to a refundable escrow deposit owned by
+<code>registration.owner</code>. The cross-payer path skips the personhood revert in
+<code>priceWithCheck</code> but applies it directly via @custom:reverts OwnerStatusInsufficient
+when the owner's recorded tier does not meet the label's required tier, and still
+rejects governance-reserved labels with @custom:reverts GovernanceReserved and live
+cross-user stem reservations with @custom:reverts NameReserved. The total
+charge on the cross-payer path is the greater of the owner-side registration price and
+the owner-tier <code>transferFloor</code> friction (never their sum); friction is computed against
+the owner's tier so a verified payer cannot pay around an unverified owner. The entire
+charge routes to the escrow insurance fund while seeding a zero-amount deposit slot so
+the release lifecycle stays reachable. The caller must supply at least the charge
+(otherwise @custom:reverts InsufficientValue); any overpayment is pushed back to
+<code>msg.sender</code> inline and, on failure, credited to the escrow's pull-payment ledger so
+contract receivers cannot block registration. Emits @custom:emits OverpaymentRefunded
+on the inline branch, the escrow's own @custom:emits OverpaymentRefunded on the pull
+fallback, and @custom:emits NameRegistered on success.</li>
+</ul>
 <pre><code class="language-solidity">function register(Registration calldata registration) external payable;
 </code></pre>
 <h3 id="registerreserved"><a class="header" href="#registerreserved">registerReserved</a></h3>
@@ -256,7 +279,8 @@ owner (otherwise @custom:reverts NotWhiteListedOrOwner). Validates the label sha
 <p>reverts: CommitmentNotFound, @custom:reverts CommitmentTooNew, or</p>
 </li>
 <li>
-<p>reverts: CommitmentTooOld under the same conditions as <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html#register">register</a>. Emits</p>
+<p>reverts: CommitmentTooOld under the same conditions as @custom:function register.
+Emits</p>
 </li>
 <li>
 <p>emits: NameRegistered on success.</p>
@@ -333,11 +357,50 @@ emits: WhiteListed on success.</p>
 <p>Thrown when attempting to register an unavailable name.</p>
 <pre><code class="language-solidity">error NameNotAvailable(string label);
 </code></pre>
+<h3 id="labeltooshort"><a class="header" href="#labeltooshort">LabelTooShort</a></h3>
+<p>Thrown when a label is below the minimum-length policy.</p>
+<p>Distinct from @custom:reverts NameNotAvailable so off-chain consumers can tell a
+too-short label apart from a name that is already minted.</p>
+<pre><code class="language-solidity">error LabelTooShort(string label);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Caller-supplied label that failed the minimum-length policy.</td></tr>
+</tbody></table>
+</div>
 <h3 id="namereserved"><a class="header" href="#namereserved">NameReserved</a></h3>
-<p>Thrown when attempting to register a name whose base stem is reserved by another
-user.</p>
+<p>Thrown when attempting to register a name whose base stem is held as a live
+reservation by another user.</p>
 <pre><code class="language-solidity">error NameReserved(string label);
 </code></pre>
+<h3 id="governancereserved"><a class="header" href="#governancereserved">GovernanceReserved</a></h3>
+<p>Thrown when attempting to register a label that classifies as
+governance-reserved at the protocol level.</p>
+<p>Distinct from @custom:reverts NameReserved so off-chain consumers can tell
+"wait for the holder to relinquish" apart from "this label is permanently held by
+governance".</p>
+<pre><code class="language-solidity">error GovernanceReserved(string label);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Caller-supplied label that the rules engine classifies as governance-reserved.</td></tr>
+</tbody></table>
+</div>
+<h3 id="ownerstatusinsufficient"><a class="header" href="#ownerstatusinsufficient">OwnerStatusInsufficient</a></h3>
+<p>Thrown on the cross-payer path when the owner's recorded PoP tier does not
+meet the label's required tier. The direct path's @custom:contract IPopRules
+<code>priceWithCheck</code> covers this same condition via its own revert.</p>
+<pre><code class="language-solidity">error OwnerStatusInsufficient(
+    string label, IPopRules.PopStatus userStatus, IPopRules.PopStatus required
+);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Label whose tier requirement was unmet.</td></tr>
+<tr><td><code>userStatus</code></td><td><code>IPopRules.PopStatus</code></td><td>Owner's recorded tier.</td></tr>
+<tr><td><code>required</code></td><td><code>IPopRules.PopStatus</code></td><td>Required tier for the label.</td></tr>
+</tbody></table>
+</div>
 <h3 id="invalidlabel"><a class="header" href="#invalidlabel">InvalidLabel</a></h3>
 <p>Thrown when a label is not a canonical lowercase ASCII DNS label.</p>
 <pre><code class="language-solidity">error InvalidLabel();
@@ -346,13 +409,14 @@ user.</p>
 <p>Thrown when supplied payment is insufficient.</p>
 <pre><code class="language-solidity">error InsufficientValue();
 </code></pre>
-<h3 id="refundfailed"><a class="header" href="#refundfailed">RefundFailed</a></h3>
-<p>Thrown when refund fails.</p>
-<pre><code class="language-solidity">error RefundFailed();
-</code></pre>
 <h3 id="escrownotconfigured"><a class="header" href="#escrownotconfigured">EscrowNotConfigured</a></h3>
 <p>Thrown when escrow is not configured in the protocol registry.</p>
 <pre><code class="language-solidity">error EscrowNotConfigured();
+</code></pre>
+<h3 id="mincommitmentagezero"><a class="header" href="#mincommitmentagezero">MinCommitmentAgeZero</a></h3>
+<p>Thrown when min commitment age is zero, which would allow same-block
+commit-reveal and defeat the front-running guard.</p>
+<pre><code class="language-solidity">error MinCommitmentAgeZero();
 </code></pre>
 <h3 id="maxcommitmentagetoolow"><a class="header" href="#maxcommitmentagetoolow">MaxCommitmentAgeTooLow</a></h3>
 <p>Thrown when max commitment age is invalid (must be &gt; minCommitmentAge).</p>
@@ -361,14 +425,6 @@ user.</p>
 <h3 id="maxcommitmentagetoohigh"><a class="header" href="#maxcommitmentagetoohigh">MaxCommitmentAgeTooHigh</a></h3>
 <p>Thrown when max commitment age is invalid (exceeds implementation limit).</p>
 <pre><code class="language-solidity">error MaxCommitmentAgeTooHigh();
-</code></pre>
-<h3 id="invalidstore"><a class="header" href="#invalidstore">InvalidStore</a></h3>
-<p>Thrown when an invalid Store instance is encountered.</p>
-<pre><code class="language-solidity">error InvalidStore();
-</code></pre>
-<h3 id="notregistry"><a class="header" href="#notregistry">NotRegistry</a></h3>
-<p>Thrown when the caller is not the registry.</p>
-<pre><code class="language-solidity">error NotRegistry();
 </code></pre>
 <h2 id="structs"><a class="header" href="#structs">Structs</a></h2>
 <h3 id="registration"><a class="header" href="#registration">Registration</a></h3>
@@ -384,9 +440,9 @@ user.</p>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>label</code></td><td><code>string</code></td><td>Label being registered (e.g. "alice").</td></tr>
-<tr><td><code>owner</code></td><td><code>address</code></td><td></td></tr>
-<tr><td><code>secret</code></td><td><code>bytes32</code></td><td></td></tr>
-<tr><td><code>reserved</code></td><td><code>bool</code></td><td></td></tr>
+<tr><td><code>owner</code></td><td><code>address</code></td><td>Beneficiary the registered name is minted to.</td></tr>
+<tr><td><code>secret</code></td><td><code>bytes32</code></td><td>Caller-chosen entropy that hides the registration intent in the commit hash; revealed verbatim at registration time.</td></tr>
+<tr><td><code>reserved</code></td><td><code>bool</code></td><td>True when the registration flows through the whitelisted reserved pipeline (<code>registerReserved</code>); false for the standard public flow (<code>register</code>).</td></tr>
 </tbody></table>
 </div>
                     </main>

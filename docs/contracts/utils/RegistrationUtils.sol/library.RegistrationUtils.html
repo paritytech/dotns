@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="registrationutils"><a class="header" href="#registrationutils">RegistrationUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Registration Utilities Library</p>
 <p>Single canonical implementation of the "mint + forward-registry + store-write"
@@ -264,12 +264,11 @@ be made additively without breaking call sites.</p>
 <h3 id="siblings"><a class="header" href="#siblings">Siblings</a></h3>
 <p>Resolved sibling contracts for a registration call.</p>
 <p>Held as a struct internally so the helper can pass a single value to the
-downstream steps rather than four separate locals. Never returned to
+downstream steps rather than three separate locals. Never returned to
 callers; kept in memory for the lifetime of one <code>registerAndStore</code>.</p>
 <pre><code class="language-solidity">struct Siblings {
     IDotnsRegistrar registrar;
     IDotnsRegistry registry;
-    IDotnsReverseResolver reverseResolver;
     IStoreFactory storeFactory;
 }
 </code></pre>

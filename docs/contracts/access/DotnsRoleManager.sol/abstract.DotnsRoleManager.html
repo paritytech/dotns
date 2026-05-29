@@ -180,17 +180,24 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsrolemanager"><a class="header" href="#dotnsrolemanager">DotnsRoleManager</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/access/DotnsRoleManager.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/access/DotnsRoleManager.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 AccessControlUpgradeable, OwnableUpgradeable, <a href="/contracts/access/IDotnsRoleManager.sol/interface.IDotnsRoleManager.html">IDotnsRoleManager</a></p>
 <p><strong>Title:</strong>
 Dotns Role Manager</p>
 <p>Shared owner-administered role layer for DotNS contracts with operational roles.</p>
-<p>Consuming contracts define their supported role set in <a href="/contracts/access/DotnsRoleManager.sol/abstract.DotnsRoleManager.html#_issupportedrole">_isSupportedRole</a>. The owner
-remains the only account that can grant or revoke roles; role holders receive only the
-operational permissions each consuming contract explicitly gates with <a href="/contracts/access/DotnsRoleManager.sol/abstract.DotnsRoleManager.html#_checkroleorowner">_checkRoleOrOwner</a>.</p>
-<p><strong>Note:</strong>
-security-contact: admin@parity.io</p>
+<p>Consuming contracts define their supported role set in @custom:function _isSupportedRole.
+The owner remains the only account that can grant or revoke roles; role holders receive
+only the operational permissions each consuming contract explicitly gates with</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: _checkRoleOrOwner.</p>
+</li>
+<li>
+<p>security-contact: admin@parity.io</p>
+</li>
+</ul>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="_dotnsrolemanagerinit"><a class="header" href="#_dotnsrolemanagerinit">_dotnsRoleManagerInit</a></h3>
 <p>Initialises the OpenZeppelin access-control state for consuming contracts.</p>

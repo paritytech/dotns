@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="labelutils"><a class="header" href="#labelutils">LabelUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/utils/LabelUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/utils/LabelUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Label Utilities Library</p>
 <p>Canonical keccak labelhash and <code>.dot</code>-TLD namehash helpers shared by every
@@ -220,7 +220,7 @@ security-contact: admin@parity.io</p>
 <p>Computes <code>keccak256(bytes(label))</code> for a <code>memory</code> string.</p>
 <p>Overload used by call sites that hold the label in memory (e.g. the
 registrar's transfer sync path reading <code>_labels[tokenId]</code>). Same
-semantics as <a href="/contracts/utils/LabelUtils.sol/library.LabelUtils.html#labelhash">labelhash</a>, different calldata shape.</p>
+semantics as @custom:function labelhash, different calldata shape.</p>
 <pre><code class="language-solidity">function labelhashMemory(string memory label) internal pure returns (bytes32 hash);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -235,10 +235,11 @@ semantics as <a href="/contracts/utils/LabelUtils.sol/library.LabelUtils.html#la
 </div>
 <h3 id="namehashunder"><a class="header" href="#namehashunder">namehashUnder</a></h3>
 <p>Computes <code>namehash(parent, labelhash)</code> against an arbitrary parent.</p>
-<p>General form of <a href="/contracts/utils/LabelUtils.sol/library.LabelUtils.html#namehash">namehash</a>; use when the parent is not the <code>.dot</code> TLD
+<p>General form of @custom:function namehash; use when the parent is not the <code>.dot</code> TLD
 (e.g. subnode derivation under a non-TLD parent in the forward registry,
-or a PoP namespace root). For top-level <code>.dot</code> registrations prefer
-<a href="/contracts/utils/LabelUtils.sol/library.LabelUtils.html#namehash">namehash</a> which hard-codes <code>DOT_NODE</code>.</p>
+or a PoP namespace root). For top-level <code>.dot</code> registrations prefer</p>
+<p><strong>Note:</strong>
+function: namehash which hard-codes <code>DOT_NODE</code>.</p>
 <pre><code class="language-solidity">function namehashUnder(bytes32 parent, bytes32 labelhash_)
     internal
     pure
@@ -257,7 +258,7 @@ or a PoP namespace root). For top-level <code>.dot</code> registrations prefer
 </div>
 <h3 id="namehash"><a class="header" href="#namehash">namehash</a></h3>
 <p>Computes <code>namehash(DOT_NODE, labelhash)</code> via memory-safe scratch space.</p>
-<p>Specialised to the <code>.dot</code> TLD; cheaper than <a href="/contracts/utils/LabelUtils.sol/library.LabelUtils.html#namehashunder">namehashUnder</a> because
+<p>Specialised to the <code>.dot</code> TLD; cheaper than @custom:function namehashUnder because
 the parent constant is folded in at compile time.</p>
 <pre><code class="language-solidity">function namehash(bytes32 labelhash_) internal pure returns (bytes32 node);
 </code></pre>

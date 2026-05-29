@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrar"><a class="header" href="#dotnsregistrar">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="/contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -249,7 +249,8 @@ success.</p>
 </code></pre>
 <h3 id="removecontroller"><a class="header" href="#removecontroller">removeController</a></h3>
 <p>Removes an authorised controller.</p>
-<p>Mirrors {addController}'s baseline-typed signature so any registered controller can
+<p>Mirrors the @custom:function addController baseline-typed signature so any registered
+controller can
 be revoked through the same entry point. Owner-gated (otherwise</p>
 <p><strong>Note:</strong>
 reverts: OwnableUnauthorizedAccount); emits @custom:emits ControllerRemoved on
@@ -257,10 +258,14 @@ success.</p>
 <pre><code class="language-solidity">function removeController(IDotnsController controller) external onlyOwner;
 </code></pre>
 <h3 id="available"><a class="header" href="#available">available</a></h3>
-<p>Returns whether a name is available for registration.</p>
-<p>Treats escrow custody as available: a token whose current owner is the configured
-<code>NAME_ESCROW</code> is considered claimable, so the controller can drive a fresh registration
-that reclaims the token from escrow.</p>
+<p>Returns whether a registration call may proceed for <code>id</code>.</p>
+<p>Signals two distinct paths to the controller. Returns <code>true</code> when the owner slot is
+empty (a fresh @custom:function register call may mint) AND when the current owner is
+the configured escrow (the controller must then route through</p>
+<p><strong>Note:</strong>
+function: IDotnsNameEscrow.reclaim instead of @custom:function register, because
+<code>register</code> calls <code>_mint</code> which rejects existing tokens). All other holders return
+<code>false</code>. The controller distinguishes the two <code>true</code> cases via @custom:function exists.</p>
 <pre><code class="language-solidity">function available(uint256 id) public view override returns (bool isAvailable);
 </code></pre>
 <h3 id="register"><a class="header" href="#register">register</a></h3>
@@ -296,13 +301,29 @@ events. Returns the empty string when the token does not exist.</p>
 </code></pre>
 <h3 id="quotetransferfee"><a class="header" href="#quotetransferfee">quoteTransferFee</a></h3>
 <p>Quotes the additional native fee required to transfer a token to <code>to</code>.</p>
-<p>Returns the maximum of (i) the delta between the recipient-tier price and the
-token's running-max paid history and (ii) the flat NoStatus <code>reachFee</code>, so
-verified-but-below recipients still pay the floor even when the running max would
-otherwise cover the move. Rejects a zero <code>to</code> with @custom:reverts ERC721InvalidReceiver
-and requires the protocol registry to have an escrow configured (otherwise</p>
-<p><strong>Note:</strong>
-reverts: EscrowNotConfigured).</p>
+<p>Returns the reach floor from @custom:function PopRules.transferFloor: the
+maximum of (i) the flat reach component charged when the recipient does not meet
+the label's required tier and (ii) the downgrade component charged when the
+recipient tier is strictly below the sender tier. Self-transfers and
+escrow-touching transfers (release into escrow, reclaim out of escrow) return
+zero. A token whose sender has no stored label also returns zero because there
+is no label-derived price to charge against; this covers gateway-cold PoP mints
+(the controller passes an empty label to @custom:function register so substrate
+Root does not have to deploy a <code>LabelStore</code>) until the user settles via</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: IDotnsPopController.claimLabelStore. Because settlement writes
+the label into the original claimant's store, a transfer that happens before
+settlement leaves the recipient with no label entry and the zero-fee branch
+persists for that token under all future holders. A token registered with no
+label that is moved off-chain prior to settlement therefore carries no PoP-tier
+transfer friction. Off-chain consumers integrating PoP mints should treat</p>
+</li>
+<li>
+<p>reverts: ERC721InvalidReceiver, an unminted <code>tokenId</code> with</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function quoteTransferFee(
     uint256 tokenId,
     address to
@@ -315,8 +336,8 @@ reverts: EscrowNotConfigured).</p>
 <h3 id="transferfrom"><a class="header" href="#transferfrom">transferFrom</a></h3>
 <p>Subject to the same fee-on-transfer gate as the safe overloads; reverts with</p>
 <p><strong>Note:</strong>
-reverts: TransferFeeRequired when the recipient owes a non-zero delta and the
-caller has not forwarded it as <code>msg.value</code>.</p>
+reverts: TransferFeeRequired when the recipient owes a non-zero reach floor and
+the caller has not forwarded it as <code>msg.value</code>.</p>
 <pre><code class="language-solidity">function transferFrom(
     address from,
     address to,
@@ -329,8 +350,8 @@ caller has not forwarded it as <code>msg.value</code>.</p>
 <h3 id="safetransferfrom"><a class="header" href="#safetransferfrom">safeTransferFrom</a></h3>
 <p>Subject to the same fee-on-transfer gate as the four-argument overload; reverts with</p>
 <p><strong>Note:</strong>
-reverts: TransferFeeRequired when the recipient owes a non-zero delta and the
-caller has not forwarded it as <code>msg.value</code>.</p>
+reverts: TransferFeeRequired when the recipient owes a non-zero reach floor and
+the caller has not forwarded it as <code>msg.value</code>.</p>
 <pre><code class="language-solidity">function safeTransferFrom(
     address from,
     address to,
@@ -341,12 +362,11 @@ caller has not forwarded it as <code>msg.value</code>.</p>
     override(ERC721Upgradeable, IDotnsRegistrar);
 </code></pre>
 <h3 id="safetransferfrom-1"><a class="header" href="#safetransferfrom-1">safeTransferFrom</a></h3>
-<p>The registrar's <code>_update</code> hook compares the recipient's running-max paid history and
-tier price against the configured escrow's quote; if the caller does not forward the
-required delta as <code>msg.value</code>, the transfer reverts with</p>
-<p><strong>Note:</strong>
-reverts: TransferFeeRequired. The <code>payable</code> modifier on every transfer overload
-exists so the fee can be forwarded in the same call.</p>
+<p>The registrar's <code>_update</code> hook consults @custom:function PopRules.transferFloor
+to compute the required reach floor; if the caller does not forward at least that
+amount as <code>msg.value</code>, the transfer reverts with @custom:reverts TransferFeeRequired.
+The <code>payable</code> modifier on every transfer overload exists so the fee can be forwarded
+in the same call.</p>
 <pre><code class="language-solidity">function safeTransferFrom(
     address from,
     address to,
@@ -394,15 +414,32 @@ NOTE: If overriding this function in a way that tracks balances, see also {_incr
     override
     returns (address from);
 </code></pre>
-<h3 id="_clearformerprimaryname"><a class="header" href="#_clearformerprimaryname">_clearFormerPrimaryName</a></h3>
-<pre><code class="language-solidity">function _clearFormerPrimaryName(address from, uint256 tokenId) internal;
-</code></pre>
 <h3 id="_syncrecipientstore"><a class="header" href="#_syncrecipientstore">_syncRecipientStore</a></h3>
 <p>Mirrors the sender's label entry into the recipient's <code>LabelStore</code>.</p>
-<pre><code class="language-solidity">function _syncRecipientStore(address to, address from, uint256 tokenId) internal;
+<pre><code class="language-solidity">function _syncRecipientStore(
+    IStoreFactory factory,
+    address to,
+    address from,
+    uint256 tokenId
+)
+    internal;
+</code></pre>
+<h3 id="_readlabelfor"><a class="header" href="#_readlabelfor">_readLabelFor</a></h3>
+<p>Reads the full name (<code>label.tld</code>) for <code>tokenId</code> from <code>holder</code>'s <code>LabelStore</code> using
+a caller-supplied factory.</p>
+<pre><code class="language-solidity">function _readLabelFor(
+    IStoreFactory factory,
+    uint256 tokenId,
+    address holder
+)
+    private
+    view
+    returns (string memory fullName);
 </code></pre>
 <h3 id="_readlabel"><a class="header" href="#_readlabel">_readLabel</a></h3>
-<p>Reads the full name (<code>label.tld</code>) for <code>tokenId</code> from <code>holder</code>'s <code>LabelStore</code>.</p>
+<p>Reads the full name for <code>tokenId</code> from <code>holder</code>'s <code>LabelStore</code> via fresh lookups.</p>
+<p>Used by external view functions where caching the factory is not yet established;
+the hot transfer path uses @custom:function _readLabelFor with a cached factory.</p>
 <pre><code class="language-solidity">function _readLabel(
     uint256 tokenId,
     address holder
@@ -426,16 +463,18 @@ NOTE: If overriding this function in a way that tracks balances, see also {_incr
 <h3 id="_writeownerlabel"><a class="header" href="#_writeownerlabel">_writeOwnerLabel</a></h3>
 <p>Writes the canonical full name into <code>owner</code>'s <code>LabelStore</code> keyed by
 <code>bytes32(tokenId)</code>.</p>
+<p>Caller (@custom:function register) is responsible for short-circuiting on empty label;
+the factory is a protocol-critical dependency and is assumed non-zero (a zero return from
+the registry would have already broken every other call site).</p>
 <pre><code class="language-solidity">function _writeOwnerLabel(address owner, uint256 tokenId, string calldata label) private;
 </code></pre>
 <h3 id="_quotetransferfee"><a class="header" href="#_quotetransferfee">_quoteTransferFee</a></h3>
 <p>Quotes the friction fee required for a transfer.</p>
-<p>Required fee is <code>reachFloor</code> (the value returned by @custom:function
-PopRules.transferFloor). It is paid by the sender on every downward or cross-reach transfer
-and settles to the
-insurance fund. The recipient never locks a fresh deposit at transfer; any prior deposit
-is refunded to its original depositor by the escrow when the NFT leaves that depositor.
-Self-transfers and escrow-touching transfers return zero.</p>
+<p>Required fee is the reach floor returned by @custom:function PopRules.transferFloor.
+It is paid by the sender on every downward or cross-reach transfer and settles to the
+insurance fund. Any prior deposit travels with the NFT: the escrow rebinds the position to
+the new holder rather than refunding the sender, so transferring a funded name forfeits the
+locked deposit to the recipient. Self-transfers and escrow-touching transfers return zero.</p>
 <pre><code class="language-solidity">function _quoteTransferFee(
     address from,
     address to,
@@ -444,6 +483,23 @@ Self-transfers and escrow-touching transfers return zero.</p>
     private
     view
     returns (address escrow, uint256 reachFloor, uint256 requiredFee);
+</code></pre>
+<h3 id="_quotetransferfeefor"><a class="header" href="#_quotetransferfeefor">_quoteTransferFeeFor</a></h3>
+<p>Quotes the transfer floor reusing a caller-cached registry and store factory.</p>
+<p>Hot-path variant used by @custom:function _update. Returns <code>(0, 0)</code> for any
+escrow-touching move or when the sender holds no label entry; otherwise reads the canonical
+label and delegates to @custom:function PopRules.transferFloor.</p>
+<pre><code class="language-solidity">function _quoteTransferFeeFor(
+    IDotnsProtocolRegistry registry,
+    IStoreFactory factory,
+    bool isEscrowTouching,
+    address from,
+    address to,
+    uint256 tokenId
+)
+    private
+    view
+    returns (uint256 reachFloor, uint256 requiredFee);
 </code></pre>
 <h3 id="_authorizeupgrade"><a class="header" href="#_authorizeupgrade">_authorizeUpgrade</a></h3>
 <p>Function that should revert when <code>msg.sender</code> is not authorized to upgrade the contract. Called by

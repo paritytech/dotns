@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6dd6f7d6671f120abf1f15d80af0ba32e37de62a/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -239,6 +239,13 @@ lite-to-full link persistence via</p>
 <p>Prevents owner misconfiguration from instantly expiring every live queue and
 pending-claim entry. The actual production duration is governance-tuned higher.</p>
 <pre><code class="language-solidity">uint64 public constant MIN_RESERVATION_DURATION = 1 hours;
+</code></pre>
+<h3 id="chat_key_length"><a class="header" href="#chat_key_length">CHAT_KEY_LENGTH</a></h3>
+<p>Required byte length for a non-empty chat key.</p>
+<p>Mirrors @custom:contract IDotnsPopResolver <code>InvalidChatKeyLength</code> so the controller
+can fail closed before the mint instead of bubbling the resolver's revert after partial
+state has been committed.</p>
+<pre><code class="language-solidity">uint256 private constant CHAT_KEY_LENGTH = 65;
 </code></pre>
 <h3 id="selector_reserve_lite"><a class="header" href="#selector_reserve_lite">SELECTOR_RESERVE_LITE</a></h3>
 <p>Selector for the typed @custom:function reserveLiteName overload.</p>
@@ -353,10 +360,21 @@ user without touching the base-name reservation queue.</p>
 <p>Callable only via the registered PoP gateway (otherwise @custom:reverts NotGateway);
 the gateway is responsible for asserting substrate Root authority before forwarding
 here. The supplied label must satisfy the dotted <code>stem.NN</code> shape and the flattened label
-must classify as PopLite (otherwise @custom:reverts InvalidLiteLabel) before mint and
-resolver writes run. Emits @custom:emits LiteNameReserved and @custom:emits NameRegistered
-on success. Cross-chain callers pass the ABI-encoded lite-registration tuple as the call's
+must classify as PopLite (otherwise @custom:reverts InvalidLiteLabel); a supplied chat
+key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code> reverts</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: InvalidChatKey before mint and resolver writes run. On a warm-path mint
+emits @custom:emits LiteNameReserved and @custom:emits NameRegistered. On a cold-path
+mint emits @custom:emits LiteNameReserved and @custom:emits PendingClaimStashed, with</p>
+</li>
+<li>
+<p>emits: NameRegistered deferred to @custom:function claimLabelStore when the user
+settles. Cross-chain callers pass the ABI-encoded lite-registration tuple as the call's
 payload, which Solidity decodes directly.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function reserveLiteName(LiteRegistration calldata params) external override onlyGateway;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -387,20 +405,26 @@ claim as a full person later.</p>
 <p>Callable only via the registered PoP gateway (otherwise @custom:reverts NotGateway);
 the gateway is responsible for asserting substrate Root authority before forwarding
 here. The lite leg validates the dotted <code>stem.NN</code> shape and requires the flattened label
-to classify as PopLite (otherwise @custom:reverts InvalidLiteLabel), emitting</p>
-<p><strong>Note:</strong>
-emits: LiteNameReserved and @custom:emits NameRegistered on success. The base-name
-leg only runs when <code>reservedBaseLabel</code> is non-empty: it validates the DNS-label shape and
-requires a true base label with no trailing digits (otherwise @custom:reverts
-InvalidBaseLabel) before any queue mutation so a bad reservation never touches the queue,
-advances the head
-past expired entries (emitting @custom:emits ReservationExpired for each one), removes the
-user from any prior queue position so a single user holds at most one live reservation
-across all labels, and enqueues a fresh entry (emitting @custom:emits ReservationQueued).
-The enqueue rejects with @custom:reverts AlreadyReserved when the user already holds a
-reservation that was not cleared by the prior removal and with @custom:reverts QueueFull
-when the per-label queue has reached <code>MAX_RESERVATION_QUEUE</code>. Cross-chain callers pass
-the ABI-encoded reservation tuple as the call's payload, which Solidity decodes directly.</p>
+to classify as PopLite (otherwise @custom:reverts InvalidLiteLabel), and rejects a
+supplied chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code>
+(otherwise @custom:reverts InvalidChatKey). On a warm-path mint (user already has a
+<code>LabelStore</code>) it emits @custom:emits LiteNameReserved and @custom:emits NameRegistered;
+on a cold-path mint it emits @custom:emits LiteNameReserved and</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>emits: PendingClaimStashed, with @custom:emits NameRegistered deferred to</p>
+</li>
+<li>
+<p>function: claimLabelStore when the user settles. The base-name leg only runs
+when <code>reservedBaseLabel</code> is non-empty: it validates the DNS-label shape and requires a
+true base label with no trailing digits (otherwise @custom:reverts InvalidBaseLabel)
+before any queue mutation so a bad reservation never touches the queue, advances the
+head past expired entries (emitting @custom:emits ReservationExpired for each one),
+removes the user from any prior queue position so a single user holds at most one live
+reservation across all labels, and enqueues a fresh entry (emitting</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function reserveBaseName(BaseReservation calldata params) external override onlyGateway;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -434,7 +458,7 @@ PopRules classification must identify the flattened label as <code>PopLite</code
 Takes the @custom:struct LiteRegistration struct directly so both call sites pass the
 same payload shape: the typed entrypoint forwards its own <code>params</code>, the <code>reserveBaseName</code>
 entrypoint forwards <code>params.lite</code>.</p>
-<pre><code class="language-solidity">function _reserveLite(LiteRegistration calldata params) internal;
+<pre><code class="language-solidity">function _reserveLite(IPopRules rules, LiteRegistration calldata params) internal;
 </code></pre>
 <h3 id="registerbasename"><a class="header" href="#registerbasename">registerBaseName</a></h3>
 <p>Raw-payload variant of @custom:function registerBaseName for cross-chain dispatch.</p>
@@ -464,20 +488,34 @@ encoders MUST NOT assume strict length validation.</p>
 <p>Registers a full-person username on behalf of the supplied user.</p>
 <p>Callable only via the registered PoP gateway (otherwise @custom:reverts NotGateway);
 the gateway is responsible for asserting substrate Root authority before forwarding
-here. The base label must satisfy the DNS-label shape (otherwise</p>
+here. The base label must satisfy the DNS-label shape and be a true base label with no
+trailing digits (otherwise @custom:reverts InvalidBaseLabel), and the label must not
+classify as governance-reserved (otherwise @custom:reverts InvalidBaseLabel). The
+gateway also defers to PopRules as the single cross-flow authority: when PopRules
+carries a live base-name slot held by another user (stamped by the public commit-reveal
+flow or this controller's prior queue head), the call reverts @custom:reverts NotHolder
+before any queue mutation. Two orthogonal axes drive the state machine. The reservation
+axis treats the user as claiming if and only if they hold the live head-of-queue
+reservation on the base label: a claim wipes the entire queue, releases the PopRules
+slot, and emits @custom:emits BaseNameClaimed; a non-claim silently relinquishes any
+pending entry the user holds and emits @custom:emits StandaloneNameRegistered. Advancing
+the queue head past expired entries emits @custom:emits ReservationExpired for each
+one. The chat-key axis selects whether a fresh key is persisted on the resolver or the
+new entry inherits its key from a prior lite-person username. The fresh-key branch
+rejects a chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code> (otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>reverts: InvalidBaseLabel) and PopRules price-with-check runs first so a
-mis-tiered request never touches the queue. Two orthogonal axes drive the state
-machine. The reservation axis treats the user as claiming if and only if they hold the
-live head-of-queue reservation on the base label: a claim wipes the entire queue,
-releases the PopRules slot, and emits @custom:emits BaseNameClaimed, while a non-claim
-silently relinquishes any pending entry the user holds and emits</p>
+<p>reverts: InvalidChatKey). The <code>LiteUsername</code> branch validates the lite label's
+<code>NAMEXX</code> shape (otherwise @custom:reverts InvalidLiteLabel), requires the registrant to
+own the lite token (otherwise @custom:reverts LiteLabelNotOwnedByUser), reads the lite
+node's chat key from the resolver and copies it across; if the lite node carries no chat
+key the inherited value is empty and the full node's chat-key write is silently skipped
+(the <code>LiteToFullLinked</code> event still fires). Emits @custom:emits LiteToFullLinked
+alongside the registration event. On a warm-path mint the event order is</p>
 </li>
 <li>
-<p>emits: StandaloneNameRegistered, reverting with @custom:reverts NotHolder when
-another live head blocks the mint. Advancing the queue head past expired entries emits</p>
+<p>emits: NameRegistered first (from the inner mint), then</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function registerBaseName(FullRegistration calldata params) external override onlyGateway;
@@ -492,7 +530,10 @@ another live head blocks the mint. Advancing the queue head past expired entries
 <p>Permissionless on purpose: anyone (typically a UI or a bot) can poke a stale queue
 so the next live head takes over without waiting for the next gateway call. Validates
 the DNS-label shape of <code>reservedBaseLabel</code> (otherwise @custom:reverts InvalidBaseLabel)
-and emits @custom:emits ReservationExpired for every expired entry reaped from the head.</p>
+and emits @custom:emits ReservationExpired for every expired entry reaped from the
+head. Only base-shaped labels (no trailing digits) ever key a reservation queue, so a
+lite-shaped label still passes the shape check but resolves to an empty queue and the
+call is a no-op.</p>
 <pre><code class="language-solidity">function expireReservation(string calldata reservedBaseLabel) external override;
 </code></pre>
 <h3 id="relinquishreservation"><a class="header" href="#relinquishreservation">relinquishReservation</a></h3>
@@ -506,23 +547,26 @@ stale entries reaped behind it.</p>
 <pre><code class="language-solidity">function relinquishReservation() external override;
 </code></pre>
 <h3 id="claimlabelstore"><a class="header" href="#claimlabelstore">claimLabelStore</a></h3>
-<p>Settles the caller's deferred binding by deploying their <code>LabelStore</code> and
-writing the stashed label.</p>
-<p>User-signed entrypoint: <code>pallet-revive</code> charges the <code>LabelStore</code> storage
+<p>Settles the caller's deferred binding by writing the stashed label into
+the caller's <code>LabelStore</code>, deploying the store first if the caller doesn't yet
+have one.</p>
+<p>User-signed entrypoint: <code>pallet-revive</code> charges any <code>LabelStore</code> storage
 deposit against <code>msg.sender</code>'s balance through the runtime's configured deposit
 backend. Reverts with @custom:reverts NoPendingClaim when the caller has no
-stashed entry or the entry has lapsed past <code>reservationDuration</code>. On success
-deploys the store via the protocol-registered factory, writes the label keyed by
-its labelhash, deletes the pending-claim entry, and emits</p>
+stashed entry or the entry has lapsed past <code>reservationDuration</code>. Reuses any
+existing <code>LabelStore</code> returned by the factory (settling via this controller after a
+concurrent public-flow mint, or settling twice through this controller, both find
+a live store and skip deployment), otherwise deploys a fresh store via the
+protocol-registered factory. Writes the label keyed by its <code>node</code> (namehash),
+deletes the pending-claim entry, and emits @custom:emits PendingClaimSettled and</p>
 <p><strong>Note:</strong>
-emits: PendingClaimSettled and @custom:emits NameRegistered. Chat-key and
-lite-link records are not touched here; they are persisted on the PoP resolver at
-mint time, not at settlement.</p>
+emits: NameRegistered. Chat-key and lite-link records are not touched here;
+they are persisted on the PoP resolver at mint time, not at settlement.</p>
 <pre><code class="language-solidity">function claimLabelStore() external override;
 </code></pre>
 <h3 id="expirependingclaim"><a class="header" href="#expirependingclaim">expirePendingClaim</a></h3>
 <p>Permissionlessly reaps a deferred binding that sat unsettled past
-<code>pendingClaimDuration</code>.</p>
+<code>reservationDuration</code>.</p>
 <p>Permissionless on purpose: anyone (typically a UI or a bot) can poke a
 stale entry so the slot frees up for the next gateway-path mint. Reverts with</p>
 <p><strong>Notes:</strong></p>
@@ -702,23 +746,28 @@ across the slice. Returns an empty array when <code>offset</code> is past the li
 </tbody></table>
 </div>
 <h3 id="_completegatewayregistration"><a class="header" href="#_completegatewayregistration">_completeGatewayRegistration</a></h3>
-<p>Mints a name, wires forward registry, and persists PoP-flow records (chat
-key, lite link) on the PoP resolver. The owner's Store write is handled by
-<code>_persistLabel</code>, which writes directly when the owner already has a <code>LabelStore</code>
-and stashes a pending claim otherwise.</p>
+<p>Mints a name, wires forward registry, persists PoP-flow records (chat key,
+lite link) on the PoP resolver, and either writes the label into the owner's
+existing <code>LabelStore</code> or stashes a pending claim when the owner has none yet.</p>
 <p>The mint + forward-registry pair is delegated to</p>
-<p><strong>Note:</strong>
-function: RegistrationUtils.registerAndStore so this flow and the public
-commit-reveal flow share exactly one implementation of that sequence. The label is passed
-empty so
-the registrar does not deploy a <code>LabelStore</code>; substrate Root cannot run the
-<code>LabelStore</code> constructor under <code>pallet-revive</code>. PoP-flow per-name records (chat key,
-lite link) are persisted eagerly on @custom:contract IDotnsPopResolver here, before
-the label is written, so the resolver carries the full identity record from mint time
-regardless of whether the owner already has a <code>LabelStore</code>. The Store stays
-labels-only. Emits @custom:emits NameRegistered on the warm path; the cold path
-emits @custom:emits PendingClaimStashed and graduates to NameRegistered when the
-user settles.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: RegistrationUtils.registerAndStore so this flow and the public
+commit-reveal flow share exactly one implementation of that sequence. The label is
+passed empty so the registrar does not deploy a <code>LabelStore</code>; substrate Root cannot
+run the <code>LabelStore</code> constructor under <code>pallet-revive</code>. PoP-flow per-name records
+(chat key, lite link) are persisted eagerly on @custom:contract IDotnsPopResolver
+here, before the label is written, so the resolver carries the full identity record
+from mint time regardless of whether the owner already has a <code>LabelStore</code>. The Store
+stays labels-only. Warm path emits @custom:emits NameRegistered immediately; the
+cold path emits @custom:emits PendingClaimStashed at mint and defers</p>
+</li>
+<li>
+<p>emits: NameRegistered to @custom:function claimLabelStore when the user
+settles.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function _completeGatewayRegistration(
     address user,
     string memory label,
@@ -729,43 +778,13 @@ user settles.</p>
 )
     internal;
 </code></pre>
-<h3 id="_persistlabel"><a class="header" href="#_persistlabel">_persistLabel</a></h3>
-<p>Writes a freshly minted name's label, deferring to a pending claim when
-the user has no <code>LabelStore</code> yet.</p>
-<p>Warm path: when <code>factory.getLabelStore(user)</code> is non-zero the label is written
-directly into the existing store under <code>node</code> (matching the registrar's
-<code>_writeOwnerLabel</code> key convention). Cold path: the label is stashed and the call
-returns <code>address(0)</code>. Chat-key persistence on the PoP resolver happens eagerly in</p>
-<p><strong>Note:</strong>
-function: _completeGatewayRegistration before this function runs, so the
-resolver record is independent of whether the owner already has a <code>LabelStore</code>.</p>
-<pre><code class="language-solidity">function _persistLabel(
-    address user,
-    string memory label,
-    bytes32 labelhash,
-    bytes32 node
-)
-    internal
-    returns (address store);
-</code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>user</code></td><td><code>address</code></td><td>Owner of the new name.</td></tr>
-<tr><td><code>label</code></td><td><code>string</code></td><td>Bare DNS label (no TLD) being recorded.</td></tr>
-<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td><code>keccak256(bytes(label))</code>.</td></tr>
-<tr><td><code>node</code></td><td><code>bytes32</code></td><td><code>namehash(labelhash)</code>; the canonical <code>LabelStore</code> key for the entry.</td></tr>
-</tbody></table>
-</div>
-<p><strong>Returns</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>store</code></td><td><code>address</code></td><td>The user's <code>LabelStore</code> address on the warm path, zero on the cold path.</td></tr>
-</tbody></table>
-</div>
 <h3 id="_writerecord"><a class="header" href="#_writerecord">_writeRecord</a></h3>
 <p>Writes a name's label into <code>store</code>.</p>
 <p>Single canonical persistence step shared by the warm gateway path and the
 user-signed @custom:function claimLabelStore. The store key is <code>node</code>, matching
-the registrar's <code>_writeOwnerLabel</code> convention.</p>
+the registrar's <code>_writeOwnerLabel</code> convention. Idempotent on already-locked slots so a
+user whose store was pre-populated under the same <code>node</code> (e.g. by a sibling protocol
+flow) can still settle their pending claim without bricking on <code>LabelAlreadyExists</code>.</p>
 <pre><code class="language-solidity">function _writeRecord(address store, bytes32 node, string memory label) internal;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -798,6 +817,7 @@ base name on PopRules so the public commit-reveal flow sees the reservation thro
 its existing <code>priceWithCheck</code> guard. Subsequent waiters only live in the local queue
 until they are promoted.</p>
 <pre><code class="language-solidity">function _enqueueReservation(
+    IPopRules rules,
     bytes32 labelhash,
     string memory baseLabel,
     address user
@@ -839,15 +859,6 @@ queue shape intact, so no advance or resync is needed.</p>
     pure
     returns (bytes32 labelhash, bytes32 node);
 </code></pre>
-<h3 id="_validatelitelabelhash"><a class="header" href="#_validatelitelabelhash">_validateLiteLabelHash</a></h3>
-<p>Validates a lite-person <code>NAMEXX</code> label and returns its labelhash.</p>
-<p>Node is not needed for every call site; this overload avoids the extra keccak
-when only the labelhash is used.</p>
-<pre><code class="language-solidity">function _validateLiteLabelHash(string memory liteLabel)
-    internal
-    pure
-    returns (bytes32 labelhash);
-</code></pre>
 <h3 id="_validatebaselabel"><a class="header" href="#_validatebaselabel">_validateBaseLabel</a></h3>
 <p>Validates a base (full-person) DNS label and derives <code>(labelhash, node)</code>.</p>
 <pre><code class="language-solidity">function _validateBaseLabel(string calldata baseLabel)
@@ -855,12 +866,11 @@ when only the labelhash is used.</p>
     pure
     returns (bytes32 labelhash, bytes32 node);
 </code></pre>
-<h3 id="_validatebaselabelhash"><a class="header" href="#_validatebaselabelhash">_validateBaseLabelHash</a></h3>
-<p>Validates a base (full-person) DNS label and returns its labelhash.</p>
-<pre><code class="language-solidity">function _validateBaseLabelHash(string calldata baseLabel)
-    internal
-    pure
-    returns (bytes32 labelhash);
+<h3 id="_requirevalidchatkey"><a class="header" href="#_requirevalidchatkey">_requireValidChatKey</a></h3>
+<p>Reverts when a non-empty chat key is not exactly <code>CHAT_KEY_LENGTH</code> bytes.</p>
+<p>Mirrors the resolver's own length gate so the gateway sees a controller-local
+<code>InvalidChatKey</code> revert before any mint state is written.</p>
+<pre><code class="language-solidity">function _requireValidChatKey(bytes memory chatKey) internal pure;
 </code></pre>
 <h3 id="_popresolver"><a class="header" href="#_popresolver">_popResolver</a></h3>
 <p>Resolves the PoP resolver via the protocol registry.</p>
@@ -881,6 +891,10 @@ when only the labelhash is used.</p>
 <h3 id="_syncpoprulestohead"><a class="header" href="#_syncpoprulestohead">_syncPopRulesToHead</a></h3>
 <p>Writes the new head of the queue into PopRules so the public commit-reveal flow
 rejects registrations of this base name for anyone other than <code>newHead</code>.</p>
+<p>Callers guarantee <code>newHead</code> is non-zero (the queue holds a live entry) and that
+<code>_reservedBaseLabel[labelhash]</code> is non-empty (any non-empty queue had its first head
+write the slot). The release-then-reserve pair satisfies PopRules' ownership gate on
+<code>reserveBaseNameForPop</code>.</p>
 <pre><code class="language-solidity">function _syncPopRulesToHead(bytes32 labelhash, address newHead) internal;
 </code></pre>
 <h3 id="_releasepoprulesslot"><a class="header" href="#_releasepoprulesslot">_releasePopRulesSlot</a></h3>
