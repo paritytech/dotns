@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/7179315c54d0daa510f3a9d52a77ffaaa6ef5b6e/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/5c62af67bc364dc91556ab34d2d336a3ac34d104/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -260,6 +260,11 @@ in sync with the @custom:struct LiteRegistration field layout.</p>
 <code>(string,address,bytes)</code>, hence the nested tuple in the canonical signature.</p>
 <pre><code class="language-solidity">bytes4 private constant SELECTOR_RESERVE_BASE =
     bytes4(keccak256("reserveBaseName(((string,address,bytes),string))"));
+</code></pre>
+<h3 id="selector_reserve_base_only"><a class="header" href="#selector_reserve_base_only">SELECTOR_RESERVE_BASE_ONLY</a></h3>
+<p>Selector for the typed reservation-only gateway primitive.</p>
+<pre><code class="language-solidity">bytes4 private constant SELECTOR_RESERVE_BASE_ONLY =
+    bytes4(keccak256("reserveBaseNameOnly((address,string))"));
 </code></pre>
 <h3 id="selector_register_base"><a class="header" href="#selector_register_base">SELECTOR_REGISTER_BASE</a></h3>
 <p>Selector for the typed @custom:function registerBaseName overload.</p>
@@ -449,6 +454,30 @@ reverts: InvalidLiteLabel), base-label shape (otherwise</p>
 <tr><td><code>payload</code></td><td><code>bytes</code></td><td><code>abi.encode(BaseReservation)</code> produced by the cross-chain caller.</td></tr>
 </tbody></table>
 </div>
+<h3 id="reservebasenameonly"><a class="header" href="#reservebasenameonly">reserveBaseNameOnly</a></h3>
+<p>Enqueues only the full/base-name reservation for a user.</p>
+<p>Callable only via the registered PoP gateway. This is the second step of the split
+gateway flow: @custom:function reserveLiteName mints the lite username first, then this
+function reserves the full/base label in a separate transaction so proof-size stays below
+per-call limits. Reverts with @custom:reverts InvalidBaseLabel when the label is empty,
+non-canonical, digit-suffixed, or governance-reserved. The caller remains agnostic about
+backend batching; it simply exposes a small retryable primitive.</p>
+<pre><code class="language-solidity">function reserveBaseNameOnly(BaseNameReservation calldata params)
+    external
+    override
+    onlyGateway;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>params</code></td><td><code>BaseNameReservation</code></td><td>Reservation request; see @custom:struct BaseNameReservation.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservebasenameonly-1"><a class="header" href="#reservebasenameonly-1">reserveBaseNameOnly</a></h3>
+<p>Raw-payload variant of @custom:function reserveBaseNameOnly for cross-chain
+dispatch. @param payload <code>abi.encode(BaseNameReservation)</code> produced by the cross-chain
+caller.</p>
+<pre><code class="language-solidity">function reserveBaseNameOnly(bytes calldata payload) external override onlyGateway;
+</code></pre>
 <h3 id="_reservelite"><a class="header" href="#_reservelite">_reserveLite</a></h3>
 <p>Lite-only mint shared by @custom:function reserveLiteName and the lite leg
 of @custom:function reserveBaseName.</p>
@@ -563,6 +592,23 @@ deletes the pending-claim entry, and emits @custom:emits PendingClaimSettled and
 emits: NameRegistered. Chat-key and lite-link records are not touched here;
 they are persisted on the PoP resolver at mint time, not at settlement.</p>
 <pre><code class="language-solidity">function claimLabelStore() external override;
+</code></pre>
+<h3 id="claimlabelstorefor"><a class="header" href="#claimlabelstorefor">claimLabelStoreFor</a></h3>
+<p>Gateway-driven variant of @custom:function claimLabelStore for split workflows.</p>
+<p>Callable only via the registered PoP gateway. It settles the pending LabelStore claim
+for <code>user</code> without requiring a user transaction. The user-signed</p>
+<p><strong>Note:</strong>
+function: claimLabelStore remains as a permissioned-by-origin fallback if gateway
+dispatch fails.</p>
+<pre><code class="language-solidity">function claimLabelStoreFor(address user) external override onlyGateway;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Account whose pending claim should be settled.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_claimlabelstorefor"><a class="header" href="#_claimlabelstorefor">_claimLabelStoreFor</a></h3>
+<pre><code class="language-solidity">function _claimLabelStoreFor(address user) internal;
 </code></pre>
 <h3 id="expirependingclaim"><a class="header" href="#expirependingclaim">expirePendingClaim</a></h3>
 <p>Permissionlessly reaps a deferred binding that sat unsettled past
