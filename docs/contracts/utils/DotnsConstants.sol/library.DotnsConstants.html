@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/5bdfbd8e54887349c7081e98c436f32e3d0bc258/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f28006025d6b2d346d70abc011f4c148335c5d5a/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Constants</p>
 <p>Protocol-level invariants shared across DotNS contracts.</p>
@@ -328,6 +328,16 @@ clients and tooling. Target contracts still enforce their own
 permissions and observe Multicall3 as <code>msg.sender</code>.
 forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant MULTICALL3 = bytes32("multicall3");
+</code></pre>
+<h3 id="create3_factory"><a class="header" href="#create3_factory">CREATE3_FACTORY</a></h3>
+<p>Well-known key for the CREATE3 factory backing the deterministic
+deploy pipeline.</p>
+<p>Role: permissionless CREATE3 deployer. The first deploy stage
+bootstraps the factory, records it under this key, and every later
+stage resolves it from here, so deterministic addresses never depend
+on an environment variable.
+forge-lint: disable-next-line(unsafe-typecast)</p>
+<pre><code class="language-solidity">bytes32 internal constant CREATE3_FACTORY = bytes32("create3Factory");
 </code></pre>
 <h3 id="pop_gateway"><a class="header" href="#pop_gateway">POP_GATEWAY</a></h3>
 <p>Well-known key for the address authorised to invoke the PoP
