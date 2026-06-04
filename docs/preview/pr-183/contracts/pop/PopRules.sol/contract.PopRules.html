@@ -1,0 +1,754 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>PopRules</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../../favicon.svg">
+        <link rel="shortcut icon" href="../../../favicon.png">
+        <link rel="stylesheet" href="../../../css/variables.css">
+        <link rel="stylesheet" href="../../../css/general.css">
+        <link rel="stylesheet" href="../../../css/chrome.css">
+        <link rel="stylesheet" href="../../../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../../../highlight.css">
+        <link rel="stylesheet" href="../../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../../../book.css">
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../../../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item "><a href="../../../index.html">Home</a></li><li class="chapter-item affix "><li class="part-title">contracts</li><li class="chapter-item "><a href="../../../contracts/access/index.html">❱ access</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/access/DotnsRoleManager.sol/abstract.DotnsRoleManager.html">DotnsRoleManager</a></li><li class="chapter-item "><a href="../../../contracts/access/IDotnsRoleManager.sol/interface.IDotnsRoleManager.html">IDotnsRoleManager</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/deploy/index.html">❱ deploy</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/deploy/Create3Factory.sol/contract.Create3Factory.html">Create3Factory</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/escrow/index.html">❱ escrow</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/escrow/DotnsNameEscrow.sol/contract.DotnsNameEscrow.html">DotnsNameEscrow</a></li><li class="chapter-item "><a href="../../../contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/external/index.html">❱ external</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/external/personhood/index.html">❱ personhood</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/external/personhood/IPersonhood.sol/interface.IPersonhood.html">IPersonhood</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/external/revive/index.html">❱ revive</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/external/revive/ISystem.sol/interface.ISystem.html">ISystem</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../../../contracts/pop/index.html">❱ pop</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></li><li class="chapter-item expanded "><a href="../../../contracts/pop/PopRules.sol/contract.PopRules.html" class="active">PopRules</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/registrars/index.html">❱ registrars</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/registrars/DotnsPopController.sol/contract.DotnsPopController.html">DotnsPopController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/DotnsRegistrar.sol/contract.DotnsRegistrar.html">DotnsRegistrar</a></li><li class="chapter-item "><a href="../../../contracts/registrars/DotnsRegistrarController.sol/contract.DotnsRegistrarController.html">DotnsRegistrarController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/RootGatewayDispatcher.sol/contract.RootGatewayDispatcher.html">RootGatewayDispatcher</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/registry/index.html">❱ registry</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/registry/DotnsProtocolRegistry.sol/contract.DotnsProtocolRegistry.html">DotnsProtocolRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/DotnsRegistry.sol/contract.DotnsRegistry.html">DotnsRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/resolvers/index.html">❱ resolvers</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsContentResolver.sol/contract.DotnsContentResolver.html">DotnsContentResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsPopResolver.sol/contract.DotnsPopResolver.html">DotnsPopResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsResolver.sol/contract.DotnsResolver.html">DotnsResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsReverseResolver.sol/contract.DotnsReverseResolver.html">DotnsReverseResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html">IDotnsPopResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/store/index.html">❱ store</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></li><li class="chapter-item "><a href="../../../contracts/store/ILabelStore.sol/interface.ILabelStore.html">ILabelStore</a></li><li class="chapter-item "><a href="../../../contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></li><li class="chapter-item "><a href="../../../contracts/store/IUserStore.sol/interface.IUserStore.html">IUserStore</a></li><li class="chapter-item "><a href="../../../contracts/store/LabelStore.sol/contract.LabelStore.html">LabelStore</a></li><li class="chapter-item "><a href="../../../contracts/store/StoreFactory.sol/contract.StoreFactory.html">StoreFactory</a></li><li class="chapter-item "><a href="../../../contracts/store/UserStore.sol/contract.UserStore.html">UserStore</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/utils/index.html">❱ utils</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/utils/DotnsConstants.sol/library.DotnsConstants.html">DotnsConstants</a></li><li class="chapter-item "><a href="../../../contracts/utils/LabelUtils.sol/library.LabelUtils.html">LabelUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/Multicall3.sol/contract.Multicall3.html">Multicall3</a></li><li class="chapter-item "><a href="../../../contracts/utils/RegistrationUtils.sol/library.RegistrationUtils.html">RegistrationUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/StoreUtils.sol/library.StoreUtils.html">StoreUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/StringUtils.sol/library.StringUtils.html">StringUtils</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title"></h1>
+
+                    <div class="right-buttons">
+                        <a href="../../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/paritytech/dotns" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="poprules"><a class="header" href="#poprules">PopRules</a></h1>
+<p><a href="https://github.com/paritytech/dotns/blob/dc2aee255cdf53246bc3ebe9d3b0697c00dbb1c1/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><strong>Inherits:</strong>
+Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
+<p><strong>Title:</strong>
+PopRules</p>
+<p>Implements DotNS classification, flat NoStatus pricing, and base-name reservations.</p>
+<p>Tier shape: base lengths &lt;= 5 are governance-reserved, base lengths 6-8 require PopFull
+(or PopLite when carrying exactly two trailing digits, for gateway-issued lite names),
+base lengths &gt;= 9 are open to any caller as NoStatus when they carry zero or exactly two
+trailing digits. A one-digit suffix and more than two trailing digits are invalid.
+NoStatus users pay a single flat deposit (<code>startingPrice</code>) per name; verified users pay
+zero on registration.</p>
+<p><strong>Note:</strong>
+security-contact: admin@parity.io</p>
+<h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
+<h3 id="max_reservation_time"><a class="header" href="#max_reservation_time">MAX_RESERVATION_TIME</a></h3>
+<p>Maximum time a base name can be reserved.</p>
+<pre><code class="language-solidity">uint256 public constant MAX_RESERVATION_TIME = 12 weeks;
+</code></pre>
+<h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
+<h3 id="startingprice"><a class="header" href="#startingprice">startingPrice</a></h3>
+<p>Wei price for names with 9 characters and up.</p>
+<pre><code class="language-solidity">uint256 public startingPrice;
+</code></pre>
+<h3 id="reservations"><a class="header" href="#reservations">reservations</a></h3>
+<p>Active reservations keyed by digit-stripped base name.</p>
+<pre><code class="language-solidity">mapping(string baseName =&gt; Reservation reservation) public reservations;
+</code></pre>
+<h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
+<p>Protocol-level address registry for all DotNS contracts.</p>
+<pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry;
+</code></pre>
+<h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
+<pre><code class="language-solidity">uint256[50] private __gap;
+</code></pre>
+<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
+<h3 id="onlyregistry"><a class="header" href="#onlyregistry">onlyRegistry</a></h3>
+<p>Restricts function to any registry-authorised controller.</p>
+<pre><code class="language-solidity">modifier onlyRegistry();
+</code></pre>
+<h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
+<p><strong>Note:</strong>
+oz-upgrades-unsafe-allow: constructor</p>
+<pre><code class="language-solidity">constructor();
+</code></pre>
+<h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
+<p>Initialises the oracle (public entry point).</p>
+<p>Runs once behind the proxy; subsequent calls trigger @custom:reverts
+InvalidInitialization via the <code>initializer</code> modifier. Seeds <code>startingPrice</code> through</p>
+<p><strong>Note:</strong>
+function: updateStartingPrice.</p>
+<pre><code class="language-solidity">function initialize(
+    uint256 _startingPrice,
+    IDotnsProtocolRegistry registry
+)
+    public
+    initializer;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>_startingPrice</code></td><td><code>uint256</code></td><td>Base price in wei for NoStatus users.</td></tr>
+<tr><td><code>registry</code></td><td><code>IDotnsProtocolRegistry</code></td><td>Protocol-level address registry used to resolve sibling contracts.</td></tr>
+</tbody></table>
+</div>
+<h3 id="updatestartingprice"><a class="header" href="#updatestartingprice">updateStartingPrice</a></h3>
+<p>Updates the spam-deterrent starting price for NoStatus pricing.</p>
+<p>Owner-only; unauthorised callers trigger @custom:reverts
+OwnableUnauthorizedAccount. <code>newStartingPrice</code> must be strictly positive, otherwise</p>
+<p><strong>Note:</strong>
+reverts: PopError. The new value flows into <code>_priceValidatedName</code> on the next
+pricing read; no redeploy. Emits @custom:emits StartingPriceUpdated with the prior
+and new values.</p>
+<pre><code class="language-solidity">function updateStartingPrice(uint256 newStartingPrice) public override onlyOwner;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>newStartingPrice</code></td><td><code>uint256</code></td><td>New base price in wei.</td></tr>
+</tbody></table>
+</div>
+<h3 id="classifyname"><a class="header" href="#classifyname">classifyName</a></h3>
+<p>Classifies a name into a required PoP tier per DotNS naming rules.</p>
+<p>Pure; inputs are the label bytes only. Callers use the returned tier to decide which
+pricing and verification branch applies. Non-canonical labels (anything other than a
+single lowercase ASCII DNS label) and labels with exactly one or more than two
+trailing digits both trigger @custom:reverts PopError.</p>
+<pre><code class="language-solidity">function classifyName(string calldata name)
+    external
+    pure
+    override
+    returns (PopStatus requirement, string memory message);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>The name label being evaluated.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>requirement</code></td><td><code>PopStatus</code></td><td>Required tier for registration.</td></tr>
+<tr><td><code>message</code></td><td><code>string</code></td><td>Explanation of the classification result.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservebasename"><a class="header" href="#reservebasename">reserveBaseName</a></h3>
+<p>Creates or refreshes a reservation entry for a PopLite-eligible stem.</p>
+<p>Commit-reveal reservation path. Only an authorised controller on the registrar may
+call this, otherwise @custom:reverts NotRegistry. The caller passes the
+already-stripped stem; the contract enforces stem shape (no trailing digits) and
+PopLite-eligibility
+(length in <code>[6, 8]</code>), and a non-canonical label or a label outside that shape triggers</p>
+<p><strong>Note:</strong>
+reverts: PopError. Cross-user collision on a live slot triggers @custom:reverts
+PopError so the caller cannot silently overwrite another user's reservation; same-user
+refresh and writes into an empty or expired slot emit @custom:emits BaseNameReserved.</p>
+<pre><code class="language-solidity">function reserveBaseName(
+    string calldata stem,
+    address userAddress
+)
+    external
+    override
+    onlyRegistry;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>stem</code></td><td><code>string</code></td><td>The base label with no trailing digits.</td></tr>
+<tr><td><code>userAddress</code></td><td><code>address</code></td><td></td></tr>
+</tbody></table>
+</div>
+<h3 id="isbasename"><a class="header" href="#isbasename">isBaseName</a></h3>
+<p>Returns whether <code>name</code> is a base name under PoP rules.</p>
+<p>A base name has no trailing digits; lite-person labels always have exactly two
+trailing digits, so the two spaces are disjoint. Non-canonical labels trigger</p>
+<p><strong>Note:</strong>
+reverts: PopError.</p>
+<pre><code class="language-solidity">function isBaseName(string calldata baseName) external pure override returns (bool isBase);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>baseName</code></td><td><code>string</code></td><td></td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>isBase</code></td><td><code>bool</code></td><td>True when the label has no trailing digits.</td></tr>
+</tbody></table>
+</div>
+<h3 id="getbasenamereservation"><a class="header" href="#getbasenamereservation">getBaseNameReservation</a></h3>
+<p>Retrieves reservation information for a base name.</p>
+<p>Raw accessor: returns the stored slot regardless of expiry. Use</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: isBaseNameReserved
+when live-window semantics are needed. Non-canonical labels trigger</p>
+</li>
+<li>
+<p>reverts: PopError.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function getBaseNameReservation(string calldata baseName)
+    external
+    view
+    override
+    returns (address reservationOwner, uint64 expiryTimestamp);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label without trailing digits.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>reservationOwner</code></td><td><code>address</code></td><td>owner The address assigned to the reservation.</td></tr>
+<tr><td><code>expiryTimestamp</code></td><td><code>uint64</code></td><td>expires UNIX timestamp when the reservation expires.</td></tr>
+</tbody></table>
+</div>
+<h3 id="isbasenamereserved"><a class="header" href="#isbasenamereserved">isBaseNameReserved</a></h3>
+<p>Indicates whether a base name is currently reserved.</p>
+<p>Applies the live-window predicate to the stored slot so an expired reservation reads
+as free. Non-canonical labels trigger @custom:reverts PopError.</p>
+<pre><code class="language-solidity">function isBaseNameReserved(string calldata baseName)
+    external
+    view
+    override
+    returns (bool isReserved, address reservationOwner, uint64 expiryTimestamp);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>baseName</code></td><td><code>string</code></td><td>The base label without trailing digits.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>isReserved</code></td><td><code>bool</code></td><td>reservedStatus True if a live reservation is active.</td></tr>
+<tr><td><code>reservationOwner</code></td><td><code>address</code></td><td>owner The reservation holder (zero when not reserved).</td></tr>
+<tr><td><code>expiryTimestamp</code></td><td><code>uint64</code></td><td>expires UNIX timestamp when the reservation expires.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pricewithcheck"><a class="header" href="#pricewithcheck">priceWithCheck</a></h3>
+<p>Calculates price with PoP classification and reservation enforcement.</p>
+<p>Reverting pricing path used by the commit-reveal controller. Price is a spam
+deterrent and is significant only for NoStatus users; verified users pay zero.
+Non-canonical labels, a base stem held live by another user, a governance-reserved
+label, or a <code>userAddress</code> whose personhood tier does not meet the label's required
+tier each trigger @custom:reverts PopError.</p>
+<pre><code class="language-solidity">function priceWithCheck(
+    string calldata name,
+    address userAddress
+)
+    external
+    view
+    override
+    returns (PriceWithMeta memory metadata);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label.</td></tr>
+<tr><td><code>userAddress</code></td><td><code>address</code></td><td>Registering user for the given label.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>metadata</code></td><td><code>PriceWithMeta</code></td><td>Price with PoP requirements and classification.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pricewithoutcheck"><a class="header" href="#pricewithoutcheck">priceWithoutCheck</a></h3>
+<p>Calculates price with PoP classification and reservation metadata, without
+reverting on conflicts.</p>
+<p>Non-reverting counterpart to <code>priceWithCheck</code>: surfaces the same fields, but reports
+a <code>Reserved</code> status through <code>metadata</code> instead of reverting when the base stem is
+held by another user. Used by front-ends that need to present a price and eligibility
+preview without forcing a transaction attempt. Governance-reserved names are not
+rejected here either; the caller decides what to do. Non-canonical labels still
+trigger @custom:reverts PopError because the input is malformed rather than just
+contested.</p>
+<pre><code class="language-solidity">function priceWithoutCheck(
+    string calldata name,
+    address userAddress
+)
+    external
+    view
+    override
+    returns (PriceWithMeta memory metadata);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label.</td></tr>
+<tr><td><code>userAddress</code></td><td><code>address</code></td><td>Registering user for the given label.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>metadata</code></td><td><code>PriceWithMeta</code></td><td>Price with PoP requirements and classification.</td></tr>
+</tbody></table>
+</div>
+<h3 id="price"><a class="header" href="#price">price</a></h3>
+<p>Calculates registration cost for a label.</p>
+<p>Returns zero for any label shorter than 9 characters; lengths &gt;= 9 pay the flat
+<code>startingPrice</code> deposit. Ignores the caller's personhood status and reservation
+state. Non-canonical labels trigger @custom:reverts PopError.</p>
+<pre><code class="language-solidity">function price(string calldata name) external view override returns (uint256);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label to price.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>&lt;none&gt;</code></td><td><code>uint256</code></td><td>cost Registration cost in wei.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reachfee"><a class="header" href="#reachfee">reachFee</a></h3>
+<p>Friction fee owed when <code>account</code> reaches into a label tier above its verification
+level.</p>
+<p>Non-zero only when <code>account</code> cannot meet the label's required PoP tier; the value is
+the flat NoStatus deposit. Acts as cross-payer friction at registration time. Use</p>
+<p><strong>Note:</strong>
+function: transferFloor for transfer-time friction, which folds in the
+sender-tier-downgrade component as well. Non-canonical labels and labels with exactly
+one or more than two trailing digits trigger @custom:reverts PopError.</p>
+<pre><code class="language-solidity">function reachFee(
+    string calldata name,
+    address account
+)
+    external
+    view
+    override
+    returns (uint256 fee);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label being acted on.</td></tr>
+<tr><td><code>account</code></td><td><code>address</code></td><td>Account whose verification reach is being measured.</td></tr>
+</tbody></table>
+</div>
+<h3 id="transferfloor"><a class="header" href="#transferfloor">transferFloor</a></h3>
+<p>Transfer-time friction floor: the greater of the recipient-reach component and
+the sender-tier-downgrade component.</p>
+<p>Returns the flat NoStatus deposit when either (i) the recipient does not meet the
+label's required tier, or (ii) the recipient's personhood tier is strictly below the
+sender's. Returns zero when neither condition holds. The two components overlap on
+pure tier mismatches, so the function takes their maximum rather than their sum to
+avoid double-charging. Consumed by @custom:function DotnsRegistrar.quoteTransferFee.
+Non-canonical labels and labels with exactly one or more than two trailing digits
+trigger @custom:reverts PopError.</p>
+<pre><code class="language-solidity">function transferFloor(
+    string calldata name,
+    address from,
+    address to
+)
+    external
+    view
+    override
+    returns (uint256 floor);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label being transferred.</td></tr>
+<tr><td><code>from</code></td><td><code>address</code></td><td>Current holder of the name.</td></tr>
+<tr><td><code>to</code></td><td><code>address</code></td><td>Incoming holder of the name.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_personhoodtier"><a class="header" href="#_personhoodtier">_personhoodTier</a></h3>
+<p>Reads <code>account</code>'s dotns-scoped personhood tier from the alias-accounts
+precompile and translates it into a <code>PopStatus</code>.</p>
+<p>Single source of truth so callers cannot read the precompile directly and
+drift on the status mapping. Tiers are defined incrementally on the
+precompile side: 0=None, 1=Lite, 2=Full. Anything outside that range
+collapses to <code>NoStatus</code> so a future tier addition fails closed instead of
+silently being treated as a higher level than it actually is.</p>
+<pre><code class="language-solidity">function _personhoodTier(address account) private view returns (PopStatus);
+</code></pre>
+<h3 id="_meetsreach"><a class="header" href="#_meetsreach">_meetsReach</a></h3>
+<p>Single canonical "is <code>userStatus</code> at reach for <code>required</code>?" predicate.</p>
+<p>Both <code>reachFee</code> and <code>priceWithCheck</code> build on this so the tier-eligibility rule lives
+in exactly one place and the two callers cannot disagree about who clears a given label.
+<code>_personhoodTier</code> never returns <code>Reserved</code>, so <code>userStatus</code> is in <code>{NoStatus, PopLite, PopFull}</code> and the enum comparison reflects tier ordering directly. A <code>Reserved</code> <code>required</code>
+(governance label) is unreachable by any verified user, so the comparison returns false and
+the caller charges the friction fee, providing defence-in-depth if a Reserved label ever
+enters circulation.</p>
+<pre><code class="language-solidity">function _meetsReach(PopStatus required, PopStatus userStatus) private pure returns (bool);
+</code></pre>
+<h3 id="_pricevalidatedname"><a class="header" href="#_pricevalidatedname">_priceValidatedName</a></h3>
+<pre><code class="language-solidity">function _priceValidatedName(uint256 namelength) internal view returns (uint256 priceValue);
+</code></pre>
+<h3 id="_enforcereservationrules"><a class="header" href="#_enforcereservationrules">_enforceReservationRules</a></h3>
+<p>Enforces base-name reservation rules.</p>
+<pre><code class="language-solidity">function _enforceReservationRules(string calldata name, address userAddress) internal view;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label.</td></tr>
+<tr><td><code>userAddress</code></td><td><code>address</code></td><td>Registering user.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_islive"><a class="header" href="#_islive">_isLive</a></h3>
+<p>Returns whether <code>reservation</code> is live at <code>block.timestamp</code>.</p>
+<pre><code class="language-solidity">function _isLive(Reservation memory reservation) internal view returns (bool);
+</code></pre>
+<h3 id="_counttrailingdigits"><a class="header" href="#_counttrailingdigits">_countTrailingDigits</a></h3>
+<p>Counts trailing digits in a string.</p>
+<pre><code class="language-solidity">function _countTrailingDigits(string calldata label)
+    internal
+    pure
+    returns (uint256 digitCount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>String to analyse.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>digitCount</code></td><td><code>uint256</code></td><td>Number of trailing digits.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_stripdigits"><a class="header" href="#_stripdigits">_stripDigits</a></h3>
+<p>Strips trailing digits from a name.</p>
+<pre><code class="language-solidity">function _stripDigits(string calldata name) internal pure returns (string memory baseName);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Domain label.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_classifyvalidatedname"><a class="header" href="#_classifyvalidatedname">_classifyValidatedName</a></h3>
+<pre><code class="language-solidity">function _classifyValidatedName(string calldata name)
+    internal
+    pure
+    returns (PopStatus requirement, string memory message);
+</code></pre>
+<h3 id="_requirecanonicallabel"><a class="header" href="#_requirecanonicallabel">_requireCanonicalLabel</a></h3>
+<pre><code class="language-solidity">function _requireCanonicalLabel(string calldata name) internal pure;
+</code></pre>
+<h3 id="supportsinterface"><a class="header" href="#supportsinterface">supportsInterface</a></h3>
+<pre><code class="language-solidity">function supportsInterface(bytes4 interfaceId)
+    public
+    view
+    virtual
+    override
+    returns (bool supported);
+</code></pre>
+<h3 id="_authorizeupgrade"><a class="header" href="#_authorizeupgrade">_authorizeUpgrade</a></h3>
+<p>Function that should revert when <code>msg.sender</code> is not authorized to upgrade the contract. Called by
+{upgradeToAndCall}.
+Normally, this function will use an xref:access.adoc[access control] modifier such as {Ownable-onlyOwner}.</p>
+<pre><code class="language-solidity">function _authorizeUpgrade(address) internal onlyOwner {}
+</code></pre>
+<pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
+</code></pre>
+<h3 id="version"><a class="header" href="#version">version</a></h3>
+<p>Returns implementation version.</p>
+<pre><code class="language-solidity">function version() external pure virtual returns (string memory versionString);
+</code></pre>
+<h3 id="_onlyregistry"><a class="header" href="#_onlyregistry">_onlyRegistry</a></h3>
+<p>Ensures the caller is any controller authorised on the registrar.</p>
+<pre><code class="language-solidity">function _onlyRegistry() internal view;
+</code></pre>
+<h3 id="reservebasenameforpop"><a class="header" href="#reservebasenameforpop">reserveBaseNameForPop</a></h3>
+<p>Writes or refreshes a reservation for a bare base-name stem.</p>
+<p>Gateway-driven reservation path used by the PoP controller. Only a controller in the
+registrar's <code>controllers</code> set may call this, otherwise @custom:reverts NotRegistry.
+Does not apply the lite-format length window that @custom:function reserveBaseName
+enforces, but does require the input to be canonical and stem-shaped (no trailing
+digits); a non-canonical or non-stem label triggers @custom:reverts PopError. If the
+slot is already live and held by a different user, @custom:reverts PopError so the
+caller's local bookkeeping and PopRules state stay in lockstep; if it is live for the
+same user, expiry is refreshed to <code>block.timestamp + MAX_RESERVATION_TIME</code>. Emits</p>
+<p><strong>Note:</strong>
+emits: BaseNameReserved on every successful write.</p>
+<pre><code class="language-solidity">function reserveBaseNameForPop(
+    string calldata stem,
+    address userAddress
+)
+    external
+    override
+    onlyRegistry;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>stem</code></td><td><code>string</code></td><td>The base label with no trailing digits.</td></tr>
+<tr><td><code>userAddress</code></td><td><code>address</code></td><td></td></tr>
+</tbody></table>
+</div>
+<h3 id="stripdigits"><a class="header" href="#stripdigits">stripDigits</a></h3>
+<p>Returns the bare stem of a label, i.e. the label with any trailing ASCII digits
+removed.</p>
+<p>Mirrors the normalisation that @custom:function reserveBaseName applies before writing
+a reservation, so callers can look up or release a reservation by passing the full
+label without re-implementing the digit-stripping rule. Non-canonical labels
+trigger @custom:reverts PopError.</p>
+<pre><code class="language-solidity">function stripDigits(string calldata name) external pure override returns (string memory stem);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Full label (with or without trailing digits).</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>stem</code></td><td><code>string</code></td><td>The label with trailing digits removed.</td></tr>
+</tbody></table>
+</div>
+<h3 id="releasebasename"><a class="header" href="#releasebasename">releaseBaseName</a></h3>
+<p>Clears a reservation for a base-name stem.</p>
+<p>Only a controller in the registrar's <code>controllers</code> set may call this, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotRegistry. Non-canonical or non-stem labels trigger</p>
+</li>
+<li>
+<p>emits: BaseNameReleased once the slot is cleared.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function releaseBaseName(string calldata stem) external override onlyRegistry;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>stem</code></td><td><code>string</code></td><td>The base label whose reservation should be cleared (no trailing digits).</td></tr>
+</tbody></table>
+</div>
+<h3 id="releasereservationforreclaim"><a class="header" href="#releasereservationforreclaim">releaseReservationForReclaim</a></h3>
+<p>Clears a reservation when the slot owner matches <code>expectedOwner</code>, allowing any
+registrar-authorised controller (not only the stamping one) to release the slot.</p>
+<p>Narrower than @custom:function releaseBaseName: callers must prove they know the
+slot owner, so cross-controller release is gated on a positive match rather than on
+caller identity. Intended for the public registrar controller's reclaim path, where
+a prior occupant has handed the name back to escrow and the new registrant needs
+the cross-flow guard cleared regardless of which controller originally stamped it.
+Only a registrar-authorised controller may call this (@custom:reverts NotRegistry).
+Non-canonical or non-stem labels trigger @custom:reverts PopError. A live reservation
+whose owner does not match <code>expectedOwner</code> triggers @custom:reverts PopError; expired
+reservations are cleared regardless. Emits @custom:emits BaseNameReleased.</p>
+<pre><code class="language-solidity">function releaseReservationForReclaim(
+    string calldata stem,
+    address expectedOwner
+)
+    external
+    override
+    onlyRegistry;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>stem</code></td><td><code>string</code></td><td>The base label whose reservation should be cleared (no trailing digits).</td></tr>
+<tr><td><code>expectedOwner</code></td><td><code>address</code></td><td>The address the caller expects to be the current reservation owner.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_writereservation"><a class="header" href="#_writereservation">_writeReservation</a></h3>
+<p>Internal single-source-of-truth writer for stem reservations.</p>
+<p>Routes both @custom:function reserveBaseName and @custom:function reserveBaseNameForPop
+through one path so the cross-user collision semantics stay identical: a live slot held
+by a different user @custom:reverts PopError, and any other case writes a fresh expiry
+and emits @custom:emits BaseNameReserved. Same-owner re-reservations refresh the expiry
+to <code>block.timestamp + MAX_RESERVATION_TIME</code>. Callers are responsible for validating
+<code>stem</code> is canonical and stem-shaped (no trailing digits); this helper does no input
+validation of its own so each public entry can layer additional eligibility checks.</p>
+<pre><code class="language-solidity">function _writeReservation(string calldata stem, address userAddress) internal;
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../../contracts/pop/IPopRules.sol/interface.IPopRules.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../../../contracts/registrars/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../../contracts/pop/IPopRules.sol/interface.IPopRules.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../../../contracts/registrars/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../../elasticlunr.min.js"></script>
+        <script src="../../../mark.min.js"></script>
+        <script src="../../../searcher.js"></script>
+
+        <script src="../../../clipboard.min.js"></script>
+        <script src="../../../highlight.js"></script>
+        <script src="../../../book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../../../solidity.min.js"></script>
+
+
+    </div>
+    </body>
+</html>
