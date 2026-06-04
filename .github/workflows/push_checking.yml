@@ -84,7 +84,11 @@ jobs:
 
       - run: bun install
 
+      # Only the unit-fuzz job needs the fork adapter, and only when fork tests
+      # actually exist in the tree. Fork tests are PR-scoped, so `test/fork/` is
+      # empty on master and `hashFiles` returns '' (step skipped, no docker build).
       - name: Start revive-eth-rpc (paseo_local fork target)
+        if: matrix.kind.id == 'unit-fuzz' && hashFiles('test/fork/**') != ''
         run: |
           docker compose up -d --build
           bash scripts/shell/wait-for-eth-rpc.sh
@@ -124,8 +128,18 @@ jobs:
             exit 1
           fi
 
+      # Fork tests run against the revive-eth-rpc adapter started above, only
+      # when present. The preceding `forge build` already produced full build-info
+      # for the OZ upgrade validator, so this reuses it.
+      - name: Run fork tests
+        if: matrix.kind.id == 'unit-fuzz' && hashFiles('test/fork/**') != ''
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+          FOUNDRY_PROFILE: "ci"
+        run: forge test -vv --match-path 'test/fork/**'
+
       - name: Tear down revive-eth-rpc
-        if: always()
+        if: always() && matrix.kind.id == 'unit-fuzz' && hashFiles('test/fork/**') != ''
         run: docker compose down --volumes --remove-orphans
 
       - name: Stage matrix-kind output for the aggregator

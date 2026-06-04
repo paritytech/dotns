@@ -8,7 +8,10 @@ import {ILabelStore} from "../../../contracts/store/ILabelStore.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 import {IDotnsRoleManager} from "../../../contracts/access/IDotnsRoleManager.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
+import {DotnsRegistrarController} from "../../../contracts/registrars/DotnsRegistrarController.sol";
+import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocolRegistry.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -18,6 +21,37 @@ import {
 ///         availability and commitment book-keeping, PoP-aware registration,
 ///         whitelisting, role management, and transfer-side store wiring.
 contract DotnsRegistrarControllerTest is BaseDotns {
+    function test_initialize_reverts_when_min_commitment_age_is_zero() public {
+        DotnsRegistrarController impl = new DotnsRegistrarController();
+        bytes memory initData = abi.encodeCall(
+            DotnsRegistrarController.initialize,
+            (IDotnsProtocolRegistry(address(protocolRegistry)), 0, 1 days)
+        );
+        vm.expectRevert(IDotnsRegistrarController.MinCommitmentAgeZero.selector);
+        new ERC1967Proxy(address(impl), initData);
+    }
+
+    function test_initialize_reverts_when_max_not_greater_than_min() public {
+        DotnsRegistrarController impl = new DotnsRegistrarController();
+        bytes memory initData = abi.encodeCall(
+            DotnsRegistrarController.initialize,
+            (IDotnsProtocolRegistry(address(protocolRegistry)), 10 seconds, 10 seconds)
+        );
+        vm.expectRevert(IDotnsRegistrarController.MaxCommitmentAgeTooLow.selector);
+        new ERC1967Proxy(address(impl), initData);
+    }
+
+    function test_initialize_reverts_when_max_above_ceiling() public {
+        uint256 ceiling = dotnsRegistrarController.MAX_ALLOWED_COMMITMENT_AGE();
+        DotnsRegistrarController impl = new DotnsRegistrarController();
+        bytes memory initData = abi.encodeCall(
+            DotnsRegistrarController.initialize,
+            (IDotnsProtocolRegistry(address(protocolRegistry)), 6 seconds, ceiling + 1)
+        );
+        vm.expectRevert(IDotnsRegistrarController.MaxCommitmentAgeTooHigh.selector);
+        new ERC1967Proxy(address(impl), initData);
+    }
+
     function test_available_state_transitions() public {
         assertTrue(dotnsRegistrarController.available("longnamehere01"));
 
@@ -69,6 +103,60 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         vm.stopPrank();
 
         assertEq(dotnsRegistrarController.commitments(commitment), block.timestamp);
+    }
+
+    function test_commit_allows_recommit_at_exact_expiry_boundary() public {
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: "alicebob", owner: ed, secret: keccak256("secret"), reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+
+        vm.startPrank(ed);
+        dotnsRegistrarController.commit(commitment);
+
+        uint256 firstCommitTimestamp = dotnsRegistrarController.commitments(commitment);
+        // Land exactly on the expiry boundary. `_consumeCommitment` treats this as expired
+        // (`committedAt + maxCommitmentAge > block.timestamp` is false), so `commit` must
+        // also treat it as overwritable; otherwise the slot is permanently dead-zoned for
+        // that one timestamp.
+        vm.warp(firstCommitTimestamp + dotnsRegistrarController.maxCommitmentAge());
+
+        dotnsRegistrarController.commit(commitment);
+        vm.stopPrank();
+
+        assertEq(dotnsRegistrarController.commitments(commitment), block.timestamp);
+    }
+
+    function test_register_reverts_at_exact_expiry_boundary() public {
+        string memory nameLabel = "alicebobx";
+        address nameOwner = ed;
+        _grantPopFull(nameOwner);
+
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: keccak256("boundary"), reserved: true
+            });
+
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+
+        vm.startPrank(nameOwner);
+        dotnsRegistrarController.commit(commitment);
+        uint256 committedAt = dotnsRegistrarController.commitments(commitment);
+        uint256 maxAge = dotnsRegistrarController.maxCommitmentAge();
+        vm.warp(committedAt + maxAge);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsRegistrarController.CommitmentTooOld.selector,
+                commitment,
+                committedAt + maxAge,
+                block.timestamp
+            )
+        );
+        dotnsRegistrarController.register{value: 0}(registration);
+        vm.stopPrank();
     }
 
     function test_register_popfull_wires_all_records() public {
@@ -474,7 +562,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         assertTrue(leonardoStore.isLocked(bytes32(tokenId)));
     }
 
-    function test_cross_payer_sponsoring_unverified_owner_pays_tier_friction() public {
+    function test_revert_cross_payer_sponsoring_unverified_owner() public {
         string memory popfullLabel = "alicedef";
         address payer = ed;
         address ownerAddr = leonardo;
@@ -493,17 +581,21 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
+        uint256 priced = popRules.priceWithoutCheck(popfullLabel, ownerAddr).price;
         uint256 friction = popRules.transferFloor(popfullLabel, payer, ownerAddr);
-        assertGt(friction, 0);
+        uint256 charge = priced > friction ? priced : friction;
 
-        uint256 priorInsurance = dotnsNameEscrow.insuranceFund();
-
-        vm.deal(payer, friction);
+        vm.deal(payer, charge);
         vm.prank(payer);
-        dotnsRegistrarController.register{value: friction}(registration);
-
-        assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(popfullLabel)), ownerAddr);
-        assertEq(dotnsNameEscrow.insuranceFund() - priorInsurance, friction);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsRegistrarController.OwnerStatusInsufficient.selector,
+                popfullLabel,
+                IPopRules.PopStatus.NoStatus,
+                IPopRules.PopStatus.PopFull
+            )
+        );
+        dotnsRegistrarController.register{value: charge}(registration);
     }
 
     function test_transfer_via_approved_operator_writes_to_store() public {
@@ -530,7 +622,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         assertTrue(leonardoStore.isLocked(bytes32(tokenId)));
     }
 
-    function test_transfer_deploys_store_without_label() public {
+    function test_transfer_skips_store_deploy_when_label_empty() public {
         string memory nameLabel = "nolabel01";
         bytes32 labelhash = keccak256(bytes(nameLabel));
         bytes32 node = _namehash(dotNode, labelhash);
@@ -546,10 +638,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         dotnsRegistrar.transferFrom{value: _xferFee}(ed, leonardo, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
-        assertTrue(storeFactory.getLabelStore(leonardo) != address(0));
-
-        ILabelStore leonardoStore = ILabelStore(storeFactory.getLabelStore(leonardo));
-        assertEq(leonardoStore.getLabel(bytes32(tokenId)), "");
+        // Label-less mints (gateway-cold PoP path) carry no label to mirror, so the registrar
+        // skips the eager `LabelStore` deploy on transfer; demand-deploy still kicks in if the
+        // recipient later receives a labelled write.
+        assertEq(storeFactory.getLabelStore(leonardo), address(0));
     }
 
     /// @notice A zero-fee NoStatus to NoStatus transfer must still rebind the escrow

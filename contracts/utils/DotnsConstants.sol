@@ -128,6 +128,15 @@ library DotnsConstants {
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant MULTICALL3 = bytes32("multicall3");
 
+    /// @notice Well-known key for the CREATE3 factory backing the deterministic
+    ///         deploy pipeline.
+    /// @dev Role: permissionless CREATE3 deployer. The first deploy stage
+    ///      bootstraps the factory, records it under this key, and every later
+    ///      stage resolves it from here, so deterministic addresses never depend
+    ///      on an environment variable.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant CREATE3_FACTORY = bytes32("create3Factory");
+
     /// @notice Well-known key for the address authorised to invoke the PoP
     ///         controller's gated entrypoints.
     /// @dev Role: substrate Root-origin shim. Resolves to the Root gateway

@@ -9,7 +9,6 @@ import {
 import {IDotnsRegistry} from "./IDotnsRegistry.sol";
 import {IDotnsController} from "../registrars/IDotnsController.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
-import {DotnsRegistrar} from "../registrars/DotnsRegistrar.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
@@ -55,16 +54,13 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice Initialises the registry.
     /// @dev Callable exactly once via `Initializable`, otherwise
     ///      @custom:reverts InvalidInitialization. `registry` must be non-zero, otherwise
-    ///      @custom:reverts NotAllowed. Seeds the root node (`bytes32(0)`) with the deployer
-    ///      as owner so sub-TLD bootstrap writes can pass the `authorised(parentNode)` check.
+    ///      @custom:reverts NotAllowed.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
     function initialize(IDotnsProtocolRegistry registry) external initializer {
         __Ownable_init(msg.sender);
 
         require(address(registry) != address(0), NotAllowed());
         protocolRegistry = registry;
-
-        records[bytes32(0)] = Record({owner: msg.sender, resolver: address(0), exists: true});
     }
 
     /// @inheritdoc IDotnsRegistry
@@ -87,18 +83,30 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         bytes32 labelhash = LabelUtils.labelhash(subLabel);
         subnode = LabelUtils.namehashUnder(parentNode, labelhash);
 
-        string memory fullName = string.concat(subLabel, ".", parentLabel, DotnsConstants.TLD);
-
-        if (records[subnode].exists) {
-            address previousOwner = records[subnode].owner;
-            records[subnode].owner = newOwner;
+        Record storage existing = records[subnode];
+        address reverseResolver = protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER);
+        if (existing.exists) {
+            address previousOwner = existing.owner;
+            // Reset the resolver pointer on reassignment so the prior subnode owner's resolver
+            // (and any malicious wiring they staged before losing the subnode) cannot be inherited
+            // by the new holder. Records keyed by `subnode` on other resolver contracts are not
+            // wiped here; consumers should gate reads on current ownership. Skip the resolver
+            // write when it already matches the default to avoid a redundant SSTORE on no-op
+            // refresh paths.
+            existing.owner = newOwner;
+            if (existing.resolver != reverseResolver) {
+                existing.resolver = reverseResolver;
+                emit NewResolver(subnode, reverseResolver);
+            }
 
             if (newOwner != previousOwner) {
+                string memory fullName =
+                    string.concat(subLabel, ".", parentLabel, DotnsConstants.TLD);
                 _writeSubnodeToStore(newOwner, subnode, fullName);
             }
         } else {
-            address _reverseResolver = protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER);
-            records[subnode] = Record({owner: newOwner, resolver: _reverseResolver, exists: true});
+            records[subnode] = Record({owner: newOwner, resolver: reverseResolver, exists: true});
+            string memory fullName = string.concat(subLabel, ".", parentLabel, DotnsConstants.TLD);
             _writeSubnodeToStore(newOwner, subnode, fullName);
         }
 
@@ -106,24 +114,20 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     }
 
     /// @inheritdoc IDotnsRegistry
-    function setOwner(
-        bytes32 node,
-        address newOwner,
-        address resolverAddr
-    )
-        external
-        override
-        onlyRegistrarController
-    {
+    function setOwner(bytes32 node, address newOwner) external override onlyRegistrarController {
         require(newOwner != address(0), NotAllowed());
-        require(!records[node].exists, NodeAlreadyOwned(node));
         IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
-        address tokenOwner = registrar.ownerOf(uint256(node));
-        require(tokenOwner == newOwner, NotAuthorised());
+        require(registrar.ownerOf(uint256(node)) == newOwner, NotAuthorised());
 
-        records[node].owner = address(0);
-        records[node].resolver = resolverAddr;
-        records[node].exists = true;
+        // The resolver pointer is unconditionally reset to the default reverse resolver on every
+        // call so a prior owner's resolver cannot follow the name into the new holder's hands on
+        // reclaim from escrow. Owner remains the zero sentinel so reads delegate to the
+        // registrar's ERC-721 holder.
+        records[node] = Record({
+            owner: address(0),
+            resolver: protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER),
+            exists: true
+        });
 
         emit NodeTransferred(node, newOwner);
     }
@@ -148,17 +152,22 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
 
         bytes32 subnode =
             LabelUtils.namehashUnder(record.parentNode, LabelUtils.labelhash(subLabel));
-        require(records[subnode].exists, NotAuthorised());
+        Record storage existing = records[subnode];
+        require(existing.exists, NotAuthorised());
 
-        records[subnode].resolver = record.resolver;
+        existing.resolver = record.resolver;
         emit NewResolver(subnode, record.resolver);
     }
 
     /// @inheritdoc IDotnsRegistry
     function owner(bytes32 node) external view override returns (address) {
         Record storage record = records[node];
+        // Read `owner` first: a non-zero stored owner proves the record exists and is a subnode,
+        // collapsing the lookup to a single SLOAD. The slower `exists` SLOAD only runs on the
+        // tokenised-or-missing branch.
+        address storedOwner = record.owner;
+        if (storedOwner != address(0)) return storedOwner;
         if (!record.exists) return address(0);
-        if (record.owner != address(0)) return record.owner;
         IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         return registrar.ownerOf(uint256(node));
     }
@@ -228,25 +237,26 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     ///      to the registrar's ERC-721 owner / approved / operator-for-all chain.
     function _authorised(bytes32 node) internal view {
         Record storage record = records[node];
-        require(record.exists, NotAuthorised());
 
+        // Read `owner` first: a non-zero stored owner means this is a subnode with an explicit
+        // owner and the existence flag is implied. Skipping the `exists` SLOAD on the common
+        // subnode path saves one slot read.
         address storedOwner = record.owner;
         if (storedOwner != address(0)) {
             require(storedOwner == msg.sender, NotAuthorised());
             return;
         }
 
+        require(record.exists, NotAuthorised());
+
         IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         uint256 tokenId = uint256(node);
         address tokenOwner = registrar.ownerOf(tokenId);
-
         if (msg.sender == tokenOwner) return;
-
-        address approved = registrar.getApproved(tokenId);
-        if (approved == msg.sender) return;
-
-        bool approvedForAll = registrar.isApprovedForAll(tokenOwner, msg.sender);
-        require(approvedForAll, NotAuthorised());
+        // Operator-for-all is the common marketplace / escrow delegation path; check it before
+        // the single-token approval so the common case terminates on one STATICCALL.
+        if (registrar.isApprovedForAll(tokenOwner, msg.sender)) return;
+        require(registrar.getApproved(tokenId) == msg.sender, NotAuthorised());
     }
 
     /// @notice Internal check for registrar-authorised controller privileges.
@@ -255,7 +265,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     ///      in one place and lets commit-reveal and PoP controllers coexist without registry
     ///      reconfiguration on each addition.
     function _onlyRegistrarController() internal view {
-        DotnsRegistrar registrar = DotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         require(registrar.controllers(IDotnsController(msg.sender)), NotAuthorised());
     }
 

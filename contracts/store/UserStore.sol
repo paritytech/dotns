@@ -68,8 +68,9 @@ contract UserStore is Initializable, IUserStore {
         _current[key] = value;
 
         if (_keyIndex[key] == 0) {
+            uint256 newIndex = _keyList.length + 1;
             _keyList.push(key);
-            _keyIndex[key] = _keyList.length;
+            _keyIndex[key] = newIndex;
         }
 
         emit ValueSet(_owner, key, value);

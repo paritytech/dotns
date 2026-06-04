@@ -193,14 +193,12 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(position.recipient, ed, "position is bound to the registrant");
     }
 
-    function test_revert_release_not_owner_or_approved() public {
+    function test_revert_release_not_holder() public {
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
         vm.prank(tiago);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.NotTokenOwnerOrApproved.selector, tiago, tokenId
-            )
+            abi.encodeWithSelector(IDotnsNameEscrow.NotRefundRecipient.selector, tiago, tokenId)
         );
         dotnsNameEscrow.release(tokenId);
     }

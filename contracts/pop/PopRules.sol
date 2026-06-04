@@ -19,12 +19,13 @@ import {IPersonhood} from "../external/personhood/IPersonhood.sol";
 
 /// @title PopRules
 /// @notice Implements DotNS classification, flat NoStatus pricing, and base-name reservations.
-/// @dev Tier shape: lengths <= 5 are governance-reserved, lengths 6-8 require PopFull (or
-///      PopLite when carrying exactly two trailing digits, for gateway-issued lite names),
-///      lengths >= 9 are open to any caller as NoStatus when they carry zero or exactly two
+/// @dev Tier shape: base lengths <= 5 are governance-reserved, base lengths 6-8 require PopFull
+///      (or PopLite when carrying exactly two trailing digits, for gateway-issued lite names),
+///      base lengths >= 9 are open to any caller as NoStatus when they carry zero or exactly two
 ///      trailing digits. A one-digit suffix and more than two trailing digits are invalid.
 ///      NoStatus users pay a single flat deposit (`startingPrice`) per name; verified users pay
-/// zero. @custom:security-contact admin@parity.io
+///      zero on registration.
+/// @custom:security-contact admin@parity.io
 contract PopRules is
     Initializable,
     UUPSUpgradeable,
@@ -60,26 +61,9 @@ contract PopRules is
         _disableInitializers();
     }
 
-    /// @notice Initialises the oracle with pricing parameters.
-    /// @param _startingPrice Base price in wei for NoStatus users.
-    /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function _popRulesInit(
-        uint256 _startingPrice,
-        IDotnsProtocolRegistry registry
-    )
-        internal
-        onlyInitializing
-    {
-        __Ownable_init(msg.sender);
-        __ERC165_init();
-        updateStartingPrice(_startingPrice);
-        protocolRegistry = registry;
-    }
-
     /// @notice Initialises the oracle (public entry point).
     /// @dev Runs once behind the proxy; subsequent calls trigger @custom:reverts
-    ///      InvalidInitialization via the `initializer` modifier. Forwards to
-    ///      @custom:function _popRulesInit, which seeds `startingPrice` through
+    ///      InvalidInitialization via the `initializer` modifier. Seeds `startingPrice` through
     ///      @custom:function updateStartingPrice.
     /// @param _startingPrice Base price in wei for NoStatus users.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
@@ -90,7 +74,10 @@ contract PopRules is
         public
         initializer
     {
-        _popRulesInit(_startingPrice, registry);
+        __Ownable_init(msg.sender);
+        __ERC165_init();
+        updateStartingPrice(_startingPrice);
+        protocolRegistry = registry;
     }
 
     /// @inheritdoc IPopRules
@@ -102,7 +89,7 @@ contract PopRules is
 
     /// @inheritdoc IPopRules
     function classifyName(string calldata name)
-        public
+        external
         pure
         override
         returns (PopStatus requirement, string memory message)
@@ -130,7 +117,7 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function isBaseName(string calldata baseName) public pure override returns (bool isBase) {
+    function isBaseName(string calldata baseName) external pure override returns (bool isBase) {
         _requireCanonicalLabel(baseName);
         uint256 digits = _countTrailingDigits(baseName);
         return digits == 0;
@@ -232,7 +219,7 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function price(string calldata name) public view override returns (uint256) {
+    function price(string calldata name) external view override returns (uint256) {
         _requireCanonicalLabel(name);
         return _priceValidatedName(bytes(name).length);
     }
@@ -267,15 +254,16 @@ contract PopRules is
         returns (uint256 floor)
     {
         _requireCanonicalLabel(name);
+        if (from == to) return 0;
         (PopStatus required,) = _classifyValidatedName(name);
 
         PopStatus toTier = _personhoodTier(to);
         uint256 reachComponent = _meetsReach(required, toTier) ? 0 : startingPrice;
 
         PopStatus fromTier = _personhoodTier(from);
-        // `_personhoodTier` never returns Reserved, so users are NoStatus(0)/PopLite(1)/PopFull(2)
-        // and uint8 ordering matches tier ordering.
-        uint256 downgradeComponent = uint8(toTier) < uint8(fromTier) ? startingPrice : 0;
+        // `_personhoodTier` never returns Reserved, so users are in {NoStatus, PopLite, PopFull}
+        // and enum comparison reflects tier ordering directly.
+        uint256 downgradeComponent = toTier < fromTier ? startingPrice : 0;
 
         return reachComponent > downgradeComponent ? reachComponent : downgradeComponent;
     }
@@ -298,14 +286,13 @@ contract PopRules is
     /// @notice Single canonical "is `userStatus` at reach for `required`?" predicate.
     /// @dev Both `reachFee` and `priceWithCheck` build on this so the tier-eligibility rule lives
     /// in exactly one place and the two callers cannot disagree about who clears a given label.
+    /// `_personhoodTier` never returns `Reserved`, so `userStatus` is in `{NoStatus, PopLite,
+    /// PopFull}` and the enum comparison reflects tier ordering directly. A `Reserved` `required`
+    /// (governance label) is unreachable by any verified user, so the comparison returns false and
+    /// the caller charges the friction fee, providing defence-in-depth if a Reserved label ever
+    /// enters circulation.
     function _meetsReach(PopStatus required, PopStatus userStatus) private pure returns (bool) {
-        if (required == PopStatus.PopFull) {
-            return userStatus == PopStatus.PopFull;
-        }
-        if (required == PopStatus.PopLite) {
-            return userStatus == PopStatus.PopLite || userStatus == PopStatus.PopFull;
-        }
-        return true;
+        return userStatus >= required;
     }
 
     function _priceValidatedName(uint256 namelength) internal view returns (uint256 priceValue) {
@@ -344,9 +331,7 @@ contract PopRules is
         returns (uint256 digitCount)
     {
         bytes calldata bytesLabel = bytes(label);
-        uint256 stringlength = bytesLabel.length;
-
-        for (uint256 i = stringlength; i > 0; i--) {
+        for (uint256 i = bytesLabel.length; i > 0; i--) {
             if (bytesLabel[i - 1] >= 0x30 && bytesLabel[i - 1] <= 0x39) {
                 digitCount++;
             } else {
@@ -367,6 +352,9 @@ contract PopRules is
         ) {
             endPosition--;
         }
+
+        // No trailing digits to strip: return the input verbatim and skip the manual copy.
+        if (endPosition == bytesName.length) return name;
 
         bytes memory output = new bytes(endPosition);
         for (uint256 i = 0; i < endPosition; i++) {
@@ -397,7 +385,7 @@ contract PopRules is
 
         if (baselength >= 6 && baselength <= 8) {
             if (trailingDigits == 2) {
-                return (PopStatus.PopLite, "Requires Light personhood verification");
+                return (PopStatus.PopLite, "Requires Lite personhood verification");
             }
             return (PopStatus.PopFull, "Requires Full personhood verification");
         }
@@ -513,19 +501,25 @@ contract PopRules is
     ///      to `block.timestamp + MAX_RESERVATION_TIME`. Callers are responsible for validating
     ///      `stem` is canonical and stem-shaped (no trailing digits); this helper does no input
     ///      validation of its own so each public entry can layer additional eligibility checks.
-    function _writeReservation(string memory stem, address userAddress) internal {
+    function _writeReservation(string calldata stem, address userAddress) internal {
         Reservation memory existing = reservations[stem];
-        if (_isLive(existing)) {
+        bool liveSlot = _isLive(existing);
+        if (liveSlot) {
             require(existing.owner == userAddress, PopError("Base name held by another user"));
         }
 
         // `block.timestamp + MAX_RESERVATION_TIME` cannot overflow `uint64`: `MAX_RESERVATION_TIME`
-        // is bounded (one year, ~3.15e7) and `uint64` saturates at ~5.84e11, a horizon that does
+        // is bounded (12 weeks, ~7.26e6) and `uint64` saturates at ~5.84e11, a horizon that does
         // not arrive until year 2554.
         // forge-lint: disable-next-line(unsafe-typecast)
         uint64 expiryTime = uint64(block.timestamp + MAX_RESERVATION_TIME);
+        // Preserve the original stamping `controller` on same-owner refresh so a sibling controller
+        // tracking the same stem (e.g. the PoP queue head) retains the right to release. Without
+        // this, a same-user re-reservation through a different controller silently steals the slot
+        // and bricks the original controller's release/advance/claim paths.
+        address stampingController = liveSlot ? existing.controller : msg.sender;
         reservations[stem] =
-            Reservation({owner: userAddress, expires: expiryTime, controller: msg.sender});
+            Reservation({owner: userAddress, expires: expiryTime, controller: stampingController});
         emit BaseNameReserved(stem, userAddress, expiryTime);
     }
 }

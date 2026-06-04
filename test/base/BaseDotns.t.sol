@@ -108,6 +108,14 @@ abstract contract BaseDotns is Test {
     bytes4 internal constant SELECTOR_RESERVE_BASE_BYTES =
         bytes4(keccak256("reserveBaseName(bytes)"));
 
+    /// @notice Selector for the typed reserveBaseNameOnly entrypoint.
+    bytes4 internal constant SELECTOR_RESERVE_BASE_ONLY_TYPED =
+        bytes4(keccak256("reserveBaseNameOnly((address,string))"));
+
+    /// @notice Selector for the bytes-encoded reserveBaseNameOnly entrypoint.
+    bytes4 internal constant SELECTOR_RESERVE_BASE_ONLY_BYTES =
+        bytes4(keccak256("reserveBaseNameOnly(bytes)"));
+
     /// @notice Selector for the typed registerBaseName entrypoint.
     bytes4 internal constant SELECTOR_REGISTER_BASE_TYPED =
         bytes4(keccak256("registerBaseName((string,address,(uint8,string,bytes)))"));
@@ -207,7 +215,7 @@ abstract contract BaseDotns is Test {
         vm.label(protocolRegistryAddress, "DotnsProtocolRegistry");
         IDotnsProtocolRegistry registry = IDotnsProtocolRegistry(protocolRegistryAddress);
 
-        storeFactory = new StoreFactory(protocolRegistryAddress);
+        storeFactory = new StoreFactory(protocolRegistryAddress, owner);
         vm.label(address(storeFactory), "StoreFactory");
 
         address dotnsRegistrarAddress = Upgrades.deployUUPSProxy(
@@ -443,10 +451,10 @@ abstract contract BaseDotns is Test {
                 reservedBaseLabel: reservedBaseLabel
             })
         );
-        IDotnsPopController.PendingClaim memory pending = dotnsPopController.pendingClaim(user);
+        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController.pendingClaims(user);
         if (
-            pending.mintedAt != 0
-                && pending.mintedAt + dotnsPopController.reservationDuration() > block.timestamp
+            pending.length != 0
+                && pending[0].mintedAt + dotnsPopController.reservationDuration() > block.timestamp
         ) {
             vm.prank(user);
             dotnsPopController.claimLabelStore();
@@ -473,6 +481,18 @@ abstract contract BaseDotns is Test {
     /// @notice Dispatches a pre-encoded `reserveBaseName` payload through the gateway.
     function _gatewayReserveBaseName(bytes memory payload) internal {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_BYTES, payload));
+    }
+
+    /// @notice Dispatches the typed `reserveBaseNameOnly` call through the gateway stand-in.
+    function _gatewayReserveBaseNameOnly(IDotnsPopController.BaseNameReservation memory params)
+        internal
+    {
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_ONLY_TYPED, params));
+    }
+
+    /// @notice Dispatches a pre-encoded `reserveBaseNameOnly` payload through the gateway.
+    function _gatewayReserveBaseNameOnly(bytes memory payload) internal {
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_ONLY_BYTES, payload));
     }
 
     /// @notice Dispatches the typed `registerBaseName` call through the gateway stand-in.

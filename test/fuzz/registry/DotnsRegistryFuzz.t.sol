@@ -31,7 +31,7 @@ contract DotnsRegistryFuzzTest is BaseDotns {
         assertEq(dotnsRegistry.owner(subnode), newOwner);
     }
 
-    function testFuzz_reassignment_preserves_resolver(address resolver) public {
+    function testFuzz_reassignment_resets_resolver_to_default(address resolver) public {
         string memory parentLabel = "fuzzparent02";
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
@@ -49,7 +49,7 @@ contract DotnsRegistryFuzzTest is BaseDotns {
         vm.prank(ed);
         dotnsRegistry.setSubnodeOwner(subnodeRecord);
 
-        assertEq(dotnsRegistry.resolver(subnode), resolver);
+        assertEq(dotnsRegistry.resolver(subnode), address(dotnsReverseResolver));
     }
 
     function testFuzz_non_parent_non_owner_cannot_reassign(address caller) public {

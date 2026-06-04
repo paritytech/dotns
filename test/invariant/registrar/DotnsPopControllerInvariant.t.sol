@@ -181,16 +181,17 @@ contract DotnsPopControllerInvariant is BaseDotns {
         assertEq(enumerated.length, enumCount, "pendingClaimUsers length mismatch");
 
         for (uint256 i = 0; i < enumerated.length; i++) {
-            IDotnsPopController.PendingClaim memory pending =
-                dotnsPopController.pendingClaim(enumerated[i]);
-            assertGt(pending.mintedAt, 0, "enumerated user has no pending claim");
+            assertGt(
+                dotnsPopController.pendingClaims(enumerated[i]).length,
+                0,
+                "enumerated user has no pending claim"
+            );
         }
 
         uint256 seen = handler.pendingClaimActorsSeenCount();
         for (uint256 i = 0; i < seen; i++) {
             address actor = handler.pendingClaimActorsSeen(i);
-            IDotnsPopController.PendingClaim memory pending = dotnsPopController.pendingClaim(actor);
-            if (pending.mintedAt == 0) continue;
+            if (dotnsPopController.pendingClaims(actor).length == 0) continue;
             bool found;
             for (uint256 j = 0; j < enumerated.length; j++) {
                 if (enumerated[j] == actor) {
@@ -211,8 +212,11 @@ contract DotnsPopControllerInvariant is BaseDotns {
         for (uint256 i = 0; i < seen; i++) {
             address actor = handler.pendingClaimActorsSeen(i);
             if (factory.getLabelStore(actor) == address(0)) continue;
-            IDotnsPopController.PendingClaim memory pending = dotnsPopController.pendingClaim(actor);
-            assertEq(pending.mintedAt, 0, "actor has both store and pending claim");
+            assertEq(
+                dotnsPopController.pendingClaims(actor).length,
+                0,
+                "actor has both store and pending claim"
+            );
         }
     }
 
@@ -241,10 +245,14 @@ contract DotnsPopControllerInvariant is BaseDotns {
         uint256 seen = handler.pendingClaimActorsSeenCount();
         for (uint256 i = 0; i < seen; i++) {
             address actor = handler.pendingClaimActorsSeen(i);
-            IDotnsPopController.PendingClaim memory pending = dotnsPopController.pendingClaim(actor);
-            if (pending.mintedAt == 0) continue;
-            uint256 deadline = uint256(pending.mintedAt) + uint256(duration);
-            assertLe(block.timestamp, deadline + uint256(duration), "lapsed entry stuck past grace");
+            IDotnsPopController.PendingClaim[] memory pending =
+                dotnsPopController.pendingClaims(actor);
+            for (uint256 j = 0; j < pending.length; j++) {
+                uint256 deadline = uint256(pending[j].mintedAt) + uint256(duration);
+                assertLe(
+                    block.timestamp, deadline + uint256(duration), "lapsed entry stuck past grace"
+                );
+            }
         }
     }
 }

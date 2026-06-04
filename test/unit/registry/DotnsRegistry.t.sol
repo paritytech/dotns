@@ -11,12 +11,11 @@ import {ILabelStore} from "../../../contracts/store/ILabelStore.sol";
 ///         node ownership, resolver wiring, and authoritative subnode creation
 ///         and reassignment behaviour.
 contract DotnsRegistryTests is BaseDotns {
-    function test_root_record_is_initialized_and_owned_by_owner() public view {
+    function test_root_record_is_not_initialized() public view {
         bytes32 rootNode = bytes32(0);
 
-        assertEq(dotnsRegistry.owner(rootNode), owner);
-        assertTrue(dotnsRegistry.recordExists(rootNode));
-        assertEq(dotnsRegistry.resolver(rootNode), address(0));
+        assertEq(dotnsRegistry.owner(rootNode), address(0));
+        assertFalse(dotnsRegistry.recordExists(rootNode));
     }
 
     function test_protocol_registry_bound_at_init() public view {
@@ -28,12 +27,12 @@ contract DotnsRegistryTests is BaseDotns {
         address resolverAddress = address(dotnsReverseResolver);
 
         vm.startPrank(address(dotnsRegistrarController));
-        dotnsRegistrar.register(uint256(node), ed, "node_b_label");
+        dotnsRegistrar.register(uint256(node), ed, "nodeblabel");
 
         vm.expectEmit(true, false, false, true, address(dotnsRegistry));
         emit IDotnsRegistry.NodeTransferred(node, ed);
 
-        dotnsRegistry.setOwner(node, ed, resolverAddress);
+        dotnsRegistry.setOwner(node, ed);
         vm.stopPrank();
 
         assertEq(dotnsRegistry.owner(node), ed);
@@ -278,7 +277,7 @@ contract DotnsRegistryTests is BaseDotns {
         assertEq(dotnsRegistry.resolver(subnode), newResolver);
     }
 
-    function test_reassignment_preserves_resolver() public {
+    function test_reassignment_resets_resolver_to_default() public {
         string memory parentLabel = "parentnode13";
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
@@ -289,19 +288,17 @@ contract DotnsRegistryTests is BaseDotns {
         vm.prank(ed);
         bytes32 subnode = dotnsRegistry.setSubnodeOwner(subnodeRecord);
 
-        // Subnode owner sets a custom resolver
         address customResolver = makeAddr("customResolver");
         vm.prank(leonardo);
         dotnsRegistry.setResolver(subnode, customResolver);
         assertEq(dotnsRegistry.resolver(subnode), customResolver);
 
-        // Parent reassigns owner -- resolver should be preserved
         subnodeRecord.owner = tiago;
         vm.prank(ed);
         dotnsRegistry.setSubnodeOwner(subnodeRecord);
 
         assertEq(dotnsRegistry.owner(subnode), tiago);
-        assertEq(dotnsRegistry.resolver(subnode), customResolver);
+        assertEq(dotnsRegistry.resolver(subnode), address(dotnsReverseResolver));
     }
 
     function test_revert_non_parent_cannot_reassign_subnode() public {

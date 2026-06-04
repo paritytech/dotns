@@ -22,7 +22,7 @@ contract PopRulesTests is BaseDotns {
             popRules.classifyName("lights01");
 
         assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.PopLite));
-        assertEq(classificationMessage, "Requires Light personhood verification");
+        assertEq(classificationMessage, "Requires Lite personhood verification");
     }
 
     function test_classify_popfull() public view {
@@ -235,6 +235,30 @@ contract PopRulesTests is BaseDotns {
         vm.prank(otherController);
         popRules.releaseBaseName("longnamebob");
 
+        (address holder,) = popRules.getBaseNameReservation("longnamebob");
+        assertEq(holder, address(0));
+    }
+
+    function test_writeReservation_preserves_original_controller_on_same_owner_refresh() public {
+        _authoriseTestAsController();
+        popRules.reserveBaseNameForPop("longnamebob", leonardo);
+
+        address otherController = makeAddr("otherController");
+        vm.prank(owner);
+        dotnsRegistrar.addController(IDotnsController(otherController));
+
+        vm.prank(otherController);
+        popRules.reserveBaseNameForPop("longnamebob", leonardo);
+
+        vm.prank(otherController);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPopRules.PopError.selector, "Only reserving controller can release"
+            )
+        );
+        popRules.releaseBaseName("longnamebob");
+
+        popRules.releaseBaseName("longnamebob");
         (address holder,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, address(0));
     }

@@ -64,19 +64,19 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
     }
 
     function test_register_cross_payer_charges_max_not_sum_of_price_and_reach() public {
-        string memory label = "alicebo42";
+        string memory label = NOSTATUS_LABEL_A;
         address payer = leonardo;
         address nameOwner = ed;
 
-        _grantNoStatus(payer);
+        _grantPopFull(payer);
         _grantNoStatus(nameOwner);
 
         uint256 ownerPrice = popRules.priceWithoutCheck(label, nameOwner).price;
-        uint256 reachFloor = popRules.reachFee(label, payer);
+        uint256 friction = popRules.transferFloor(label, payer, nameOwner);
         assertGt(ownerPrice, 0, "scenario requires non-zero owner price");
-        assertGt(reachFloor, 0, "scenario requires non-zero reach floor");
+        assertGt(friction, 0, "scenario requires non-zero payer-to-owner friction");
 
-        uint256 expectedCharge = ownerPrice > reachFloor ? ownerPrice : reachFloor;
+        uint256 expectedCharge = ownerPrice > friction ? ownerPrice : friction;
 
         IDotnsRegistrarController.Registration memory registration =
             IDotnsRegistrarController.Registration({
@@ -107,19 +107,19 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
     }
 
     function test_revert_register_cross_payer_when_msg_value_below_max_of_price_and_reach() public {
-        string memory label = "alicebo42";
+        string memory label = NOSTATUS_LABEL_A;
         address payer = leonardo;
         address nameOwner = ed;
 
-        _grantNoStatus(payer);
+        _grantPopFull(payer);
         _grantNoStatus(nameOwner);
 
         uint256 ownerPrice = popRules.priceWithoutCheck(label, nameOwner).price;
-        uint256 reachFloor = popRules.reachFee(label, payer);
+        uint256 friction = popRules.transferFloor(label, payer, nameOwner);
         assertGt(ownerPrice, 0);
-        assertGt(reachFloor, 0);
+        assertGt(friction, 0);
 
-        uint256 expectedCharge = ownerPrice > reachFloor ? ownerPrice : reachFloor;
+        uint256 expectedCharge = ownerPrice > friction ? ownerPrice : friction;
 
         IDotnsRegistrarController.Registration memory registration =
             IDotnsRegistrarController.Registration({
@@ -431,8 +431,8 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         uint256 ownerPrice = popRules.priceWithCheck(label, address(receiver)).price;
         uint256 overpayment = 1 ether;
 
-        vm.expectEmit(true, false, false, true, address(dotnsRegistrarController));
-        emit IDotnsRegistrarController.OverpaymentRefunded(address(receiver), overpayment);
+        vm.expectEmit(true, false, false, true, address(dotnsNameEscrow));
+        emit IDotnsNameEscrow.OverpaymentRefunded(address(receiver), overpayment);
 
         vm.prank(address(receiver));
         dotnsRegistrarController.register{value: ownerPrice + overpayment}(registration);
@@ -482,8 +482,8 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         uint256 ownerPrice = popRules.priceWithCheck(label, address(attacker)).price;
         uint256 overpayment = 1 ether;
 
-        vm.expectEmit(true, false, false, true, address(dotnsRegistrarController));
-        emit IDotnsRegistrarController.OverpaymentRefunded(address(attacker), overpayment);
+        vm.expectEmit(true, false, false, true, address(dotnsNameEscrow));
+        emit IDotnsNameEscrow.OverpaymentRefunded(address(attacker), overpayment);
 
         vm.prank(address(attacker));
         dotnsRegistrarController.register{value: ownerPrice + overpayment}(registration);

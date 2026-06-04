@@ -82,8 +82,6 @@ contract LabelStoreTests is BaseDotns {
         vm.prank(address(dotnsRegistrarController));
         vm.expectEmit(true, true, false, true, address(store));
         emit ILabelStore.LabelStored(ed, LABELHASH_A, LABEL_A);
-        vm.expectEmit(true, true, true, false, address(store));
-        emit ILabelStore.LabelLockedPermanently(ed, LABELHASH_A, address(dotnsRegistrarController));
         store.storeLabel(LABELHASH_A, LABEL_A);
 
         assertTrue(store.hasLabel(LABELHASH_A));
@@ -98,7 +96,9 @@ contract LabelStoreTests is BaseDotns {
         ILabelStore store = _freshLabelStore(ed);
         vm.startPrank(address(dotnsRegistrarController));
         store.storeLabel(LABELHASH_A, LABEL_A);
-        vm.expectRevert(abi.encodeWithSelector(ILabelStore.LabelLocked.selector, LABELHASH_A));
+        vm.expectRevert(
+            abi.encodeWithSelector(ILabelStore.LabelAlreadyExists.selector, LABELHASH_A)
+        );
         store.storeLabel(LABELHASH_A, LABEL_B);
         vm.stopPrank();
     }

@@ -3,7 +3,6 @@ pragma solidity ^0.8.34;
 
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
-import {IDotnsReverseResolver} from "../resolvers/IDotnsReverseResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {StoreUtils} from "./StoreUtils.sol";
@@ -47,12 +46,11 @@ library RegistrationUtils {
 
     /// @notice Resolved sibling contracts for a registration call.
     /// @dev Held as a struct internally so the helper can pass a single value to the
-    ///      downstream steps rather than four separate locals. Never returned to
+    ///      downstream steps rather than three separate locals. Never returned to
     ///      callers; kept in memory for the lifetime of one `registerAndStore`.
     struct Siblings {
         IDotnsRegistrar registrar;
         IDotnsRegistry registry;
-        IDotnsReverseResolver reverseResolver;
         IStoreFactory storeFactory;
     }
 
@@ -76,7 +74,7 @@ library RegistrationUtils {
         Siblings memory siblings = _resolveSiblings(context.protocolRegistry);
 
         siblings.registrar.register(uint256(context.node), context.user, context.label);
-        siblings.registry.setOwner(context.node, context.user, address(siblings.reverseResolver));
+        siblings.registry.setOwner(context.node, context.user);
 
         labelStore = siblings.storeFactory.getLabelStore(context.user);
     }
@@ -93,9 +91,6 @@ library RegistrationUtils {
         siblings = Siblings({
             registrar: IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR)),
             registry: IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY)),
-            reverseResolver: IDotnsReverseResolver(
-                protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER)
-            ),
             storeFactory: IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY))
         });
     }

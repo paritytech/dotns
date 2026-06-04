@@ -59,7 +59,7 @@ contract StoreFactory is Ownable, IStoreFactory {
     }
 
     /// @notice Deploys the factory together with both store implementations and beacons.
-    /// @dev A single `new StoreFactory(protocolRegistry)` call wires everything:
+    /// @dev A single `new StoreFactory(protocolRegistry, owner)` call wires everything:
     ///      - Deploys a fresh `LabelStore` implementation.
     ///      - Deploys a fresh `UserStore` implementation.
     ///      - Constructs both `UpgradeableBeacon` instances, owned by `address(this)`
@@ -72,7 +72,8 @@ contract StoreFactory is Ownable, IStoreFactory {
     ///      describes the store topology, removing a class of operator error around mismatched
     ///      beacons.
     /// @param protocolRegistry_ The protocol registry for writer auth on label stores.
-    constructor(address protocolRegistry_) Ownable(msg.sender) {
+    /// @param owner_ Account that owns this factory and can upgrade store implementations.
+    constructor(address protocolRegistry_, address owner_) Ownable(owner_) {
         require(protocolRegistry_ != address(0), InvalidProtocolRegistry(protocolRegistry_));
         IDotnsProtocolRegistry(protocolRegistry_).isRegisteredAddress(address(0));
 

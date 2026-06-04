@@ -29,14 +29,15 @@ contract StoreFactoryTests is BaseDotns {
         vm.expectRevert(
             abi.encodeWithSelector(IStoreFactory.InvalidProtocolRegistry.selector, address(0))
         );
-        new StoreFactory(address(0));
+        new StoreFactory(address(0), owner);
     }
 
     function test_constructor_deploys_both_beacons_and_implementations() public {
-        StoreFactory fresh = new StoreFactory(address(protocolRegistry));
+        StoreFactory fresh = new StoreFactory(address(protocolRegistry), owner);
         assertTrue(fresh.labelStoreBeacon() != address(0));
         assertTrue(fresh.userStoreBeacon() != address(0));
         assertTrue(fresh.labelStoreBeacon() != fresh.userStoreBeacon());
+        assertEq(fresh.owner(), owner);
     }
 
     function test_beacon_owner_is_factory_for_both_beacons() public view {

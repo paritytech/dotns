@@ -31,13 +31,19 @@ contract LabelStore is Initializable, ILabelStore {
     /// @dev labelhash => stored label string.
     mapping(bytes32 labelhash => string label) private _labels;
 
-    /// @dev labelhash => permanent lock flag (monotonic false to true).
-    mapping(bytes32 labelhash => bool locked) private _locked;
+    /// @dev Deprecated. Previously held the `_locked` lock flag per labelhash; the lock state is
+    /// now derived from `_labelIndex != 0`. The mapping type and slot are retained verbatim so
+    /// the OZ Upgrades validator accepts the storage layout against deployed proxies.
+    /// @custom:oz-renamed-from _locked
+    // forge-lint: disable-next-line(mixed-case-variable)
+    mapping(bytes32 labelhash => bool locked) private __deprecated_locked;
 
     /// @dev Insertion-order list of all stored labelhashes. Append-only.
     bytes32[] private _labelList;
 
     /// @dev labelhash => 1-indexed position in `_labelList` (zero means "not present").
+    /// Doubles as the permanent-lock sentinel: a non-zero index proves the label was written and
+    /// the contract has no deletion path, so the index is also the locked flag.
     mapping(bytes32 labelhash => uint256 indexPlusOne) private _labelIndex;
 
     /// @dev Reserved storage space to allow for layout changes in future beacon upgrades.
@@ -73,16 +79,16 @@ contract LabelStore is Initializable, ILabelStore {
         onlyAuthorisedProtocol
     {
         require(labelhash != bytes32(0), InvalidLabel(labelhash));
-        require(!_locked[labelhash], LabelLocked(labelhash));
         require(_labelIndex[labelhash] == 0, LabelAlreadyExists(labelhash));
 
+        // Cache `length + 1` before `push` so the post-push length SLOAD is avoided; the value is
+        // also the 1-indexed position we are about to write.
+        uint256 newIndex = _labelList.length + 1;
         _labels[labelhash] = label;
         _labelList.push(labelhash);
-        _labelIndex[labelhash] = _labelList.length;
-        _locked[labelhash] = true;
+        _labelIndex[labelhash] = newIndex;
 
         emit LabelStored(_owner, labelhash, label);
-        emit LabelLockedPermanently(_owner, labelhash, msg.sender);
     }
 
     /// @inheritdoc IDotnsStore
@@ -102,7 +108,7 @@ contract LabelStore is Initializable, ILabelStore {
 
     /// @inheritdoc ILabelStore
     function isLocked(bytes32 labelhash) external view override returns (bool locked) {
-        return _locked[labelhash];
+        return _labelIndex[labelhash] != 0;
     }
 
     /// @inheritdoc ILabelStore

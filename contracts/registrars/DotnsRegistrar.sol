@@ -18,7 +18,7 @@ import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {ILabelStore} from "../store/ILabelStore.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
-import {IDotnsReverseResolver} from "../resolvers/IDotnsReverseResolver.sol";
+import {StringUtils} from "../utils/StringUtils.sol";
 import {IDotnsNameEscrow} from "../escrow/IDotnsNameEscrow.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
@@ -38,6 +38,7 @@ contract DotnsRegistrar is
     IDotnsRegistrar
 {
     using StoreUtils for IStoreFactory;
+    using StringUtils for *;
 
     /// @notice Mapping of authorised controllers.
     /// @dev Controllers may call `register`. Keyed by the shared baseline @custom:contract
@@ -79,6 +80,7 @@ contract DotnsRegistrar is
         external
         initializer
     {
+        require(address(registry) != address(0), ProtocolRegistryRequired());
         __Ownable_init(msg.sender);
         __ERC721_init(name, symbol);
         protocolRegistry = registry;
@@ -98,11 +100,9 @@ contract DotnsRegistrar is
 
     /// @inheritdoc IDotnsRegistrar
     function available(uint256 id) public view override returns (bool isAvailable) {
-        if (!_exists(id)) return true;
-        address escrow = address(protocolRegistry) == address(0)
-            ? address(0)
-            : protocolRegistry.get(DotnsConstants.NAME_ESCROW);
-        return escrow != address(0) && _ownerOf(id) == escrow;
+        address holder = _ownerOf(id);
+        if (holder == address(0)) return true;
+        return holder == protocolRegistry.get(DotnsConstants.NAME_ESCROW);
     }
 
     /// @inheritdoc IDotnsRegistrar
@@ -115,9 +115,20 @@ contract DotnsRegistrar is
         override
         onlyController
     {
-        require(available(id), NameNotAvailable(id));
+        // `available` returns true both for unminted ids and for ids currently held by escrow
+        // (so the controller can route through `escrow.reclaim`). `register` only handles the
+        // fresh-mint branch; the escrow-held branch must use the reclaim path and is rejected
+        // here with the typed error so callers do not see OZ's `ERC721InvalidSender(0)`.
+        require(!_exists(id), NameNotAvailable(id));
+        require(owner != protocolRegistry.get(DotnsConstants.NAME_ESCROW), InvalidOwner());
+        // Empty labels are an intentional gateway-cold path (substrate Root cannot deploy a
+        // `LabelStore` under `pallet-revive`, so the controller stashes a pending claim and the
+        // user settles via @custom:function IDotnsPopController.claimLabelStore later). Non-empty
+        // labels must still be canonical so the transfer-floor lookup in `_quoteTransferFee`
+        // cannot brick the token by reverting on a malformed stem.
+        require(bytes(label).length == 0 || label.isSingleLabel(), InvalidLabel());
         _mint(owner, id);
-        _writeOwnerLabel(owner, id, label);
+        if (bytes(label).length != 0) _writeOwnerLabel(owner, id, label);
         emit NameRegistered(id, owner);
     }
 
@@ -167,7 +178,7 @@ contract DotnsRegistrar is
         payable
         override(ERC721Upgradeable, IDotnsRegistrar)
     {
-        safeTransferFrom(from, to, tokenId, "");
+        super.safeTransferFrom(from, to, tokenId, "");
     }
 
     /// @inheritdoc IDotnsRegistrar
@@ -217,31 +228,41 @@ contract DotnsRegistrar is
     {
         from = super._update(to, tokenId, auth);
 
-        if (from != address(0) && from != to && address(protocolRegistry) != address(0)) {
-            _clearFormerPrimaryName(from, tokenId);
+        // Mints and self-transfers carry no economic event. Reject any attached value on those
+        // paths because nothing forwards it onward, which would otherwise trap the funds in this
+        // contract permanently (no `receive`, no rescue path).
+        if (from == address(0) || from == to) {
+            require(msg.value == 0, UnexpectedValue());
+            return from;
         }
 
-        if (from != address(0) && to != address(0) && address(protocolRegistry) != address(0)) {
-            _syncRecipientStore(to, from, tokenId);
+        // Resolve every registry-sourced dependency once and thread it into the helpers so a
+        // single transfer pays one external lookup per key rather than three.
+        IDotnsProtocolRegistry registry = protocolRegistry;
+        address escrow = registry.get(DotnsConstants.NAME_ESCROW);
+        require(escrow != address(0), EscrowNotConfigured());
+        IStoreFactory factory = IStoreFactory(registry.get(DotnsConstants.STORE_FACTORY));
+
+        bool isEscrowTouching = to == escrow || from == escrow;
+        // Skip mirroring on escrow-touching paths: release deposits the NFT into custody where
+        // a `LabelStore` would be wasted and reclaim hands it back to a fresh-mint controller
+        // that writes the label through its own flow.
+        if (!isEscrowTouching) {
+            _syncRecipientStore(factory, to, from, tokenId);
         }
 
-        // Fee-on-transfer path. Skip mints (controller already priced), burns (defensive),
-        // and self-transfers (no economic event).
-        if (from == address(0)) return from;
-        if (to == address(0)) return from;
-        if (from == to) return from;
-
-        (address escrow, uint256 reachFloor, uint256 requiredFee) =
-            _quoteTransferFee(from, to, tokenId);
-        require(requiredFee == 0 || msg.value != 0, TransferFeeRequired(tokenId, to, requiredFee));
+        (uint256 reachFloor, uint256 requiredFee) =
+            _quoteTransferFeeFor(registry, factory, isEscrowTouching, from, to, tokenId);
+        if (requiredFee != 0) {
+            require(msg.value >= requiredFee, TransferFeeRequired(tokenId, to, requiredFee));
+        }
 
         // Deposits follow the NFT, not the depositor: every transfer that moves a name off the
-        // prior position recipient rebinds the escrow position to the new holder, so the locked
+        // prior position recipient rebinds the escrow position to the new holder so the locked
         // deposit (when funded) and the lifecycle marker (when zero-amount) both travel with the
-        // name. Escrow-touching transfers (release into escrow, reclaim out of it) are excluded
-        // because the escrow is mid-call and its non-reentrancy guard would reject a re-entry;
-        // the release/reclaim paths manage the position directly.
-        bool isEscrowTouching = to == escrow || from == escrow;
+        // name. Escrow-touching transfers are excluded because the escrow is mid-call and its
+        // non-reentrancy guard would reject a re-entry; release/reclaim manage the position
+        // directly.
         bool positionSyncNeeded;
         if (!isEscrowTouching) {
             IDotnsNameEscrow.ReleasePosition memory position =
@@ -260,34 +281,44 @@ contract DotnsRegistrar is
         return from;
     }
 
-    function _clearFormerPrimaryName(address from, uint256 tokenId) internal {
-        string memory fullName = _readLabel(tokenId, from);
-        if (bytes(fullName).length == 0) return;
-
-        IDotnsReverseResolver reverse =
-            IDotnsReverseResolver(protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER));
-        string memory currentReverse = reverse.nameOf(from);
-
-        if (LabelUtils.labelhashMemory(currentReverse) == LabelUtils.labelhashMemory(fullName)) {
-            reverse.setReverseName(from, "");
-        }
-    }
-
     /// @notice Mirrors the sender's label entry into the recipient's `LabelStore`.
-    function _syncRecipientStore(address to, address from, uint256 tokenId) internal {
-        IStoreFactory factory = _storeFactory();
-        if (address(factory) == address(0)) return;
-
-        string memory fullName = _readLabel(tokenId, from);
+    function _syncRecipientStore(
+        IStoreFactory factory,
+        address to,
+        address from,
+        uint256 tokenId
+    )
+        internal
+    {
+        string memory fullName = _readLabelFor(factory, tokenId, from);
         if (bytes(fullName).length == 0) {
-            factory.ensureLabelStore(to);
+            // Sender has no label entry for the token (typical of gateway-cold PoP mints).
+            // Nothing to mirror, so do not deploy a recipient store; downstream writes are
+            // demand-deploy through `StoreUtils.ensureLabelStore`.
             return;
         }
-
         factory.writeLabel(to, bytes32(tokenId), fullName);
     }
 
-    /// @notice Reads the full name (`label.tld`) for `tokenId` from `holder`'s `LabelStore`.
+    /// @notice Reads the full name (`label.tld`) for `tokenId` from `holder`'s `LabelStore` using
+    /// a caller-supplied factory.
+    function _readLabelFor(
+        IStoreFactory factory,
+        uint256 tokenId,
+        address holder
+    )
+        private
+        view
+        returns (string memory fullName)
+    {
+        address store = factory.getLabelStore(holder);
+        if (store == address(0)) return "";
+        return ILabelStore(store).getLabel(bytes32(tokenId));
+    }
+
+    /// @notice Reads the full name for `tokenId` from `holder`'s `LabelStore` via fresh lookups.
+    /// @dev Used by external view functions where caching the factory is not yet established;
+    /// the hot transfer path uses @custom:function _readLabelFor with a cached factory.
     function _readLabel(
         uint256 tokenId,
         address holder
@@ -296,11 +327,7 @@ contract DotnsRegistrar is
         view
         returns (string memory fullName)
     {
-        IStoreFactory factory = _storeFactory();
-        if (address(factory) == address(0)) return "";
-        address store = factory.getLabelStore(holder);
-        if (store == address(0)) return "";
-        return ILabelStore(store).getLabel(bytes32(tokenId));
+        return _readLabelFor(_storeFactory(), tokenId, holder);
     }
 
     /// @notice Resolves the configured name escrow address from the protocol registry.
@@ -320,11 +347,12 @@ contract DotnsRegistrar is
 
     /// @notice Writes the canonical full name into `owner`'s `LabelStore` keyed by
     /// `bytes32(tokenId)`.
+    /// @dev Caller (@custom:function register) is responsible for short-circuiting on empty label;
+    /// the factory is a protocol-critical dependency and is assumed non-zero (a zero return from
+    /// the registry would have already broken every other call site).
     function _writeOwnerLabel(address owner, uint256 tokenId, string calldata label) private {
-        if (bytes(label).length == 0) return;
-        IStoreFactory factory = _storeFactory();
-        if (address(factory) == address(0)) return;
-        factory.writeLabel(owner, bytes32(tokenId), string.concat(label, DotnsConstants.TLD));
+        _storeFactory()
+            .writeLabel(owner, bytes32(tokenId), string.concat(label, DotnsConstants.TLD));
     }
 
     /// @notice Quotes the friction fee required for a transfer.
@@ -342,20 +370,45 @@ contract DotnsRegistrar is
         view
         returns (address escrow, uint256 reachFloor, uint256 requiredFee)
     {
-        escrow = _escrow();
+        if (from == to) return (address(0), 0, 0);
+
+        IDotnsProtocolRegistry registry = protocolRegistry;
+        escrow = registry.get(DotnsConstants.NAME_ESCROW);
         require(escrow != address(0), EscrowNotConfigured());
 
-        if (from == to) return (escrow, 0, 0);
-        if (to == escrow || from == escrow) return (escrow, 0, 0);
+        bool isEscrowTouching = to == escrow || from == escrow;
+        IStoreFactory factory = IStoreFactory(registry.get(DotnsConstants.STORE_FACTORY));
+        (reachFloor, requiredFee) =
+            _quoteTransferFeeFor(registry, factory, isEscrowTouching, from, to, tokenId);
+    }
 
-        string memory fullName = _readLabel(tokenId, from);
-        // No label means there is no label-derived price to charge against; treat as
-        // a zero-fee move.
-        if (bytes(fullName).length == 0) return (escrow, 0, 0);
+    /// @notice Quotes the transfer floor reusing a caller-cached registry and store factory.
+    /// @dev Hot-path variant used by @custom:function _update. Returns `(0, 0)` for any
+    /// escrow-touching move or when the sender holds no label entry; otherwise reads the canonical
+    /// label and delegates to @custom:function PopRules.transferFloor.
+    function _quoteTransferFeeFor(
+        IDotnsProtocolRegistry registry,
+        IStoreFactory factory,
+        bool isEscrowTouching,
+        address from,
+        address to,
+        uint256 tokenId
+    )
+        private
+        view
+        returns (uint256 reachFloor, uint256 requiredFee)
+    {
+        if (isEscrowTouching) return (0, 0);
+
+        string memory fullName = _readLabelFor(factory, tokenId, from);
+        // No label means there is no label-derived price to charge against; treat as a zero-fee
+        // move (typical of gateway-cold PoP mints that have not yet claimed a `LabelStore`).
+        if (bytes(fullName).length == 0) return (0, 0);
         string memory label = LabelUtils.stripDotTld(fullName);
-        if (bytes(label).length == 0) return (escrow, 0, 0);
+        if (bytes(label).length == 0) return (0, 0);
 
-        reachFloor = _popRules().transferFloor(label, from, to);
+        reachFloor =
+            IPopRules(registry.get(DotnsConstants.POP_RULES)).transferFloor(label, from, to);
         requiredFee = reachFloor;
     }
 

@@ -19,16 +19,6 @@ interface ILabelStore is IDotnsStore {
     /// @param label The stored label string (typically the full name, e.g. "alice.dot").
     event LabelStored(address indexed owner, bytes32 indexed labelhash, string label);
 
-    /// @notice Emitted when a labelhash slot becomes permanently locked.
-    /// @dev Emitted in the same transaction as `LabelStored`; the two together mark the
-    ///      single immutable write that can ever happen for a given labelhash on this store.
-    /// @param owner The user this store is bound to.
-    /// @param labelhash The labelhash key that was locked.
-    /// @param locker The protocol-registered address that performed the write.
-    event LabelLockedPermanently(
-        address indexed owner, bytes32 indexed labelhash, address indexed locker
-    );
-
     /// @notice Thrown when a caller that is not currently protocol-registered attempts a write.
     /// @param caller The msg.sender that failed the `isRegisteredAddress` check.
     error NotAuthorised(address caller);
@@ -45,13 +35,9 @@ interface ILabelStore is IDotnsStore {
     /// @param labelhash The invalid labelhash argument.
     error InvalidLabel(bytes32 labelhash);
 
-    /// @notice Thrown when `storeLabel` is called on a labelhash that is already locked.
-    /// @param labelhash The locked labelhash.
-    error LabelLocked(bytes32 labelhash);
-
     /// @notice Thrown when `storeLabel` is called for a labelhash already present in the index.
-    /// @dev Distinct from `LabelLocked` so stack traces can disambiguate same-session double-writes
-    ///      from cross-session double-writes.
+    /// @dev Labels are write-once and permanently locked on first store, so any second write
+    ///      for the same labelhash fails with this error regardless of caller or session.
     /// @param labelhash The conflicting labelhash.
     error LabelAlreadyExists(bytes32 labelhash);
 
@@ -66,12 +52,9 @@ interface ILabelStore is IDotnsStore {
     /// @notice Records a label under `labelhash` and locks the slot permanently.
     /// @dev Gated to addresses currently registered in the protocol registry, otherwise
     ///      @custom:reverts NotAuthorised. `labelhash` must be non-zero, otherwise
-    ///      @custom:reverts InvalidLabel. The slot must not already be locked (otherwise
-    ///      @custom:reverts LabelLocked) and must not already hold an entry (otherwise
-    ///      @custom:reverts LabelAlreadyExists); the two are kept distinct so stack traces can
-    ///      disambiguate cross-session from same-session double-writes. Emits
-    ///      @custom:emits LabelStored and @custom:emits LabelLockedPermanently together on the
-    ///      single write that ever happens for `labelhash`.
+    ///      @custom:reverts InvalidLabel. The slot must not already hold an entry, otherwise
+    ///      @custom:reverts LabelAlreadyExists; the write is permanent so any second call
+    ///      reverts. Emits @custom:emits LabelStored on the single successful write.
     /// @param labelhash The labelhash key.
     /// @param label The label string to store.
     function storeLabel(bytes32 labelhash, string calldata label) external;

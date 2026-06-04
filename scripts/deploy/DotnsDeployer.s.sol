@@ -151,14 +151,18 @@ contract DotnsDeployer is BaseDeployer {
         internal
         returns (address proxy)
     {
-        vm.startBroadcast(owner);
-        storeFactory = new StoreFactory(protocolRegistryProxy);
-        vm.stopBroadcast();
+        storeFactory = StoreFactory(
+            _broadcastDeployCreate3(
+                owner,
+                "StoreFactory.sol:StoreFactory",
+                abi.encode(protocolRegistryProxy, owner),
+                "StoreFactory"
+            )
+        );
         proxy = address(storeFactory);
         vm.label(proxy, "StoreFactory");
         vm.label(storeFactory.labelStoreBeacon(), "LabelStoreBeacon");
         vm.label(storeFactory.userStoreBeacon(), "UserStoreBeacon");
-        logDeployment("StoreFactory", proxy);
         logDeployment("LabelStoreBeacon", storeFactory.labelStoreBeacon());
         logDeployment("UserStoreBeacon", storeFactory.userStoreBeacon());
     }

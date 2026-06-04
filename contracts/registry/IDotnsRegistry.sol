@@ -75,15 +75,26 @@ interface IDotnsRegistry {
     ///      @custom:reverts NotAllowed. `record.subLabel` must be a single canonical DNS label
     ///      (otherwise @custom:reverts InvalidLabel) and `record.parentLabel` must be a name
     ///      path whose namehash matches `record.parentNode` (otherwise
-    ///      @custom:reverts ParentLabelMismatch). Indexes the subnode under the new owner's
-    ///      `LabelStore` keyed by the namehashed `subnode` so off-chain consumers can enumerate
-    ///      names per address. Emits @custom:emits NewOwner on each successful assignment.
+    ///      @custom:reverts ParentLabelMismatch). Subnodes are parent-sovereign: the current
+    ///      `record.parentNode` owner may reassign or rotate a subnode's resolver at any time
+    ///      without the prior subnode owner's consent. On reassignment the resolver pointer is
+    ///      reset to the protocol-registered default reverse resolver so a prior subnode
+    ///      owner's resolver cannot be inherited by the next holder (records on other resolver
+    ///      contracts are keyed by node and are not cleared by this function; downstream
+    ///      consumers should gate resolver reads on current ownership). Indexes the subnode
+    ///      under the new owner's `LabelStore` keyed by the namehashed `subnode` so off-chain
+    ///      consumers can enumerate names per address. Emits @custom:emits NewOwner on each
+    ///      successful assignment.
     function setSubnodeOwner(SubnodeRecord calldata record) external returns (bytes32 subnode);
 
     /// @notice Sets the resolver for an existing subnode.
     /// @dev Callable only by the current owner of `record.parentNode`, otherwise
     ///      @custom:reverts NotAuthorised. The subnode owner can still update the resolver
-    ///      directly via `setResolver`. `record.subLabel` must be a single canonical DNS label
+    ///      directly via `setResolver`. Both entry points emit the same `NewResolver(subnode,
+    ///      ...)` event, so the parent can silently override a subnode owner's chosen resolver:
+    ///      this is the parent-sovereign hierarchy applied to resolution. Off-chain consumers
+    ///      that surface trust signals to subnode owners should treat any resolver rotation as
+    ///      a re-attestation prompt. `record.subLabel` must be a single canonical DNS label
     ///      (otherwise @custom:reverts InvalidLabel) and `record.parentLabel` must be a name
     ///      path whose namehash matches `record.parentNode` (otherwise
     ///      @custom:reverts ParentLabelMismatch). The resulting subnode must already exist,
@@ -91,20 +102,26 @@ interface IDotnsRegistry {
     ///      success.
     function setSubnodeResolver(SubnodeResolverRecord calldata record) external;
 
-    /// @notice Creates a node record for a tokenised base registration.
+    /// @notice Creates or resets a node record for a tokenised base registration.
     /// @dev Restricted to the registrar's controllers, otherwise @custom:reverts NotAuthorised.
     ///      `newOwner` must be non-zero (otherwise @custom:reverts NotAllowed) and must match
     ///      the ERC-721 owner reported by the registrar (otherwise
-    ///      @custom:reverts NotAuthorised). The node must not already have a record, otherwise
-    ///      @custom:reverts NodeAlreadyOwned. Stores `owner = address(0)` as a sentinel so
-    ///      reads delegate to `IDotnsRegistrar.ownerOf` and ERC-721 transfers remain
-    ///      authoritative. Emits @custom:emits NodeTransferred on success.
-    function setOwner(bytes32 node, address newOwner, address resolverAddr) external;
+    ///      @custom:reverts NotAuthorised). The function is callable both on a fresh
+    ///      registration and on every reclaim from escrow: each call rewrites
+    ///      `records[node].resolver` to the protocol-registered default reverse resolver so a
+    ///      prior owner's resolver pointer (and the records keyed under it) cannot be inherited
+    ///      by the next holder. Stores `owner = address(0)` as a sentinel so reads delegate to
+    ///      `IDotnsRegistrar.ownerOf` and ERC-721 transfers remain authoritative. Emits
+    ///      @custom:emits NodeTransferred on success.
+    function setOwner(bytes32 node, address newOwner) external;
 
     /// @notice Sets or clears the resolver for a node.
     /// @dev Callable only by the current node owner, otherwise @custom:reverts NotAuthorised.
     ///      For tokenised nodes, authorisation falls back to ERC-721 owner / approved /
-    ///      operator-for-all via the registrar. Emits @custom:emits NewResolver on success.
+    ///      operator-for-all via the registrar. The registry does not validate
+    ///      `resolverAddr` against any interface or code presence; off-chain consumers must
+    ///      verify resolver shape before trusting reads. Emits @custom:emits NewResolver on
+    ///      success.
     /// @param resolverAddr Resolver contract address (zero clears).
     function setResolver(bytes32 node, address resolverAddr) external;
 

@@ -81,7 +81,7 @@ Two controllers sit on top of a single registrar and a single protocol registry.
 
 ### DotnsRegistrarController
 
-Commit-reveal controller for the public registration path. A caller first submits a commitment hash, waits out the minimum commitment age, then reveals the registration parameters alongside the payment. The controller validates the commitment, routes price and eligibility through PopRules, and orchestrates every side effect of a successful registration: the mint on the registrar, the forward wire-up on the registry, the reverse record on the reverse resolver, the immutable Store write, and any refund owed on overpayment. Acceptable input is a single DNS label; governance-reserved labels are rejected at the pricing layer.
+Commit-reveal controller for the public registration path. A caller first submits a commitment hash, waits out the minimum commitment age, then reveals the registration parameters alongside the payment. The controller validates the commitment, routes price and eligibility through PopRules, and orchestrates every side effect of a successful registration: the mint on the registrar, the forward wire-up on the registry, the reverse record on the reverse resolver, the immutable Store write, and any refund owed on overpayment. Acceptable input is a single DNS label of at least the minimum-length policy; shorter labels revert with `LabelTooShort`. Labels classified as governance-reserved revert with `GovernanceReserved`; a base stem held by another user reverts with `NameReserved`. On the cross-payer path the owner's recorded PoP tier must meet the label's required tier — verified-payer-for-unverified-owner sponsorship is rejected with `OwnerStatusInsufficient`, so the direct-path personhood guarantee carries over to sponsored registrations.
 
 ### DotnsPopController
 
@@ -93,7 +93,7 @@ The first, reserveBaseName, mints a lite-person username to a user. The gateway-
 
 The second, registerBaseName, mints a full-person username. Whether the call is a claim against a prior lite reservation or a fresh standalone registration is derived from on-chain reservation state; the caller does not choose. The link argument selects the chat-key source: inherit from a prior lite label, or accept a fresh one in the payload. When inheriting, the call also writes the liteLink (full => lite) and fullClaim (lite => full) records on the PoP resolver in the same transaction so downstream consumers can resolve either direction without scanning events.
 
-Each base label carries a head/tail-indexed reservation queue with a capacity of MAX_RESERVATION_QUEUE and a governance-configurable reservationDuration. The queue head is mirrored into PopRules on every head transition (enqueue-from-empty, expiry-driven promotion, non-expiry head removal, claim-wipes-queue), so the public commit-reveal flow sees the same cross-flow lock through its existing PopRules price check. Expiry advancement is permissionless: anyone can call expireReservation to garbage-collect a stale head, which is what the pallet does on its own cadence.
+Each base label carries a head/tail-indexed reservation queue with a capacity of MAX_RESERVATION_QUEUE and a governance-configurable reservationDuration. The queue head is mirrored into PopRules on every head transition (enqueue-from-empty, expiry-driven promotion, non-expiry head removal, claim-wipes-queue), so the public commit-reveal flow sees the same cross-flow lock through its existing PopRules price check. The gateway path is symmetric: registerBaseName consults the live PopRules slot before mint and rejects with `NotHolder` when another user holds the stem, so PopRules is the single cross-flow authority in both directions. registerBaseName additionally rejects lite-classified labels (those belong on reserveBaseName) and governance-reserved labels with `InvalidBaseLabel`. Expiry advancement is permissionless: anyone can call expireReservation to garbage-collect a stale head, which is what the pallet does on its own cadence.
 
 #### Early testnet quirk: LabelStore deployment
 
@@ -199,3 +199,7 @@ Current network addresses are listed in [DEPLOYMENTS.md](./DEPLOYMENTS.md).
 ### Build and test
 
 Builds and tests are run with Foundry. Fork tests use the local Paseo Asset Hub adapter described in [DEPLOYMENTS.md](./DEPLOYMENTS.md); ordinary unit, fuzz, and invariant tests run against Foundry's in-process EVM.
+
+## License
+
+Licensed under the MIT License. See [LICENSE](./LICENSE). External interface definitions under `contracts/external/` retain their upstream licences (the SPDX header in each file is authoritative). Security policy and disclosure: see [SECURITY.md](./SECURITY.md).

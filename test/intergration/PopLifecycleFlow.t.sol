@@ -117,9 +117,9 @@ contract PopLifecycleFlow is BaseDotns {
         // LabelStore write is deferred for cold-path users.
         assertEq(dotnsPopResolver.chatKey(liteNode), CHAT_KEY);
 
-        IDotnsPopController.PendingClaim memory pending = dotnsPopController.pendingClaim(ed);
-        assertEq(pending.label, LITE_LABEL);
-        assertGt(pending.mintedAt, 0);
+        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController.pendingClaims(ed);
+        assertEq(pending[0].label, LITE_LABEL);
+        assertGt(pending[0].mintedAt, 0);
 
         vm.prank(ed);
         dotnsPopController.claimLabelStore();
@@ -130,7 +130,7 @@ contract PopLifecycleFlow is BaseDotns {
             ILabelStore(store).getLabel(liteNode), string.concat(LITE_LABEL, DotnsConstants.TLD)
         );
         assertEq(dotnsPopResolver.chatKey(liteNode), CHAT_KEY);
-        assertEq(dotnsPopController.pendingClaim(ed).mintedAt, 0);
+        assertEq(dotnsPopController.pendingClaims(ed).length, 0);
         assertEq(dotnsPopController.pendingClaimUserCount(), 0);
     }
 
@@ -141,11 +141,11 @@ contract PopLifecycleFlow is BaseDotns {
                 liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
         );
-        uint64 firstMintedAt = dotnsPopController.pendingClaim(ed).mintedAt;
+        uint64 firstMintedAt = dotnsPopController.pendingClaims(ed)[0].mintedAt;
 
         vm.warp(block.timestamp + DEFAULT_RESERVATION_DURATION + 1);
         dotnsPopController.expirePendingClaim(ed);
-        assertEq(dotnsPopController.pendingClaim(ed).mintedAt, 0);
+        assertEq(dotnsPopController.pendingClaims(ed).length, 0);
         assertEq(dotnsPopController.pendingClaimUserCount(), 0);
 
         string memory secondLabel = "aliceli02";
@@ -157,10 +157,10 @@ contract PopLifecycleFlow is BaseDotns {
             })
         );
 
-        IDotnsPopController.PendingClaim memory second = dotnsPopController.pendingClaim(ed);
-        assertEq(second.label, secondLabel);
+        IDotnsPopController.PendingClaim[] memory second = dotnsPopController.pendingClaims(ed);
+        assertEq(second[0].label, secondLabel);
         assertEq(dotnsPopResolver.chatKey(_nodeOf(secondLabel)), secondKey);
-        assertGt(second.mintedAt, firstMintedAt);
+        assertGt(second[0].mintedAt, firstMintedAt);
         assertEq(dotnsPopController.pendingClaimUserCount(), 1);
     }
 
@@ -182,10 +182,10 @@ contract PopLifecycleFlow is BaseDotns {
         // the registrar's transfer-sync path because `ed` has no store yet to
         // copy the label from; this is current `DotnsRegistrar._update`
         // behaviour and is independent of the pending-claim mapping.
-        IDotnsPopController.PendingClaim memory pending = dotnsPopController.pendingClaim(ed);
-        assertEq(pending.label, LITE_LABEL);
-        assertGt(pending.mintedAt, 0);
-        assertEq(dotnsPopController.pendingClaim(tiago).mintedAt, 0);
+        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController.pendingClaims(ed);
+        assertEq(pending[0].label, LITE_LABEL);
+        assertGt(pending[0].mintedAt, 0);
+        assertEq(dotnsPopController.pendingClaims(tiago).length, 0);
 
         vm.prank(ed);
         dotnsPopController.claimLabelStore();
@@ -209,7 +209,7 @@ contract PopLifecycleFlow is BaseDotns {
         vm.prank(makeAddr("sweeper"));
         dotnsPopController.expirePendingClaim(ed);
 
-        assertEq(dotnsPopController.pendingClaim(ed).mintedAt, 0);
+        assertEq(dotnsPopController.pendingClaims(ed).length, 0);
         assertEq(storeFactory.getLabelStore(ed), address(0));
         assertEq(dotnsPopController.pendingClaimUserCount(), 0);
     }

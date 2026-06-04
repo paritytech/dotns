@@ -220,13 +220,7 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function creditOverpayment(address recipient)
-        external
-        payable
-        override
-        onlyController
-        nonReentrant
-    {
+    function creditOverpayment(address recipient) external payable override onlyController {
         require(recipient != address(0), InvalidRecipient());
         require(msg.value != 0, InvalidAmount());
         _pendingWithdrawals[recipient] += msg.value;
@@ -239,7 +233,6 @@ contract DotnsNameEscrow is
         payable
         override
         onlyController
-        nonReentrant
     {
         require(msg.value > 0, InvalidAmount());
 
@@ -261,10 +254,15 @@ contract DotnsNameEscrow is
         payable
         override
         onlyRegistrar
-        nonReentrant
         returns (uint256 charged)
     {
         ReleasePosition storage position = _positions[params.tokenId];
+        // Released positions are mid-lifecycle in escrow custody and must not be rebound; the
+        // recipient is the original releaser who will claim the refund. The canonical transfer
+        // path never reaches here for released tokens (`_update` short-circuits on escrow-touching
+        // transfers) but the guard hardens the contract against a divergent registrar.
+        require(!position.released, AlreadyReleased(params.tokenId));
+
         address priorRecipient = position.recipient;
 
         uint256 fee = params.reachFloor;
@@ -295,10 +293,7 @@ contract DotnsNameEscrow is
 
         uint256 overpayment = msg.value - fee;
         if (overpayment > 0) {
-            // `cooldown` is capped at @custom:constant MAX_COOLDOWN (one hour), so the cast to
-            // `uint64` cannot truncate for any plausible block timestamp.
-            // forge-lint: disable-next-line(unsafe-typecast)
-            _creditRefund(params.payer, overpayment, params.tokenId, uint64(cooldown));
+            _creditRefund(params.payer, overpayment, params.tokenId);
         }
     }
 
@@ -307,47 +302,44 @@ contract DotnsNameEscrow is
         IDotnsRegistrar registrar = _registrar();
 
         address currentOwner = registrar.ownerOf(tokenId);
-        bool callerAuthorised = msg.sender == currentOwner
-            || registrar.getApproved(tokenId) == msg.sender
-            || registrar.isApprovedForAll(currentOwner, msg.sender);
-
-        require(callerAuthorised, NotTokenOwnerOrApproved(msg.sender, tokenId));
 
         ReleasePosition storage position = _positions[tokenId];
-        // Recipient is the canonical "is this position present?" sentinel; zero-
-        // amount positions seeded for free PopFull / PopLite registrations are
-        // still releasable so every minted name has a reachable lifecycle.
+        // Recipient is the canonical "is this position present?" sentinel; zero-amount positions
+        // seeded for free PopFull / PopLite registrations are still releasable so every minted
+        // name has a reachable lifecycle.
         require(position.recipient != address(0), DepositNotConfigured(tokenId));
         require(!position.released, AlreadyReleased(tokenId));
 
-        // Position recipient mirrors the current NFT holder (rebound on every transfer), so this
-        // gate is the holder-only check. Belt-and-braces with the approval check below: the
-        // holder must both initiate the release and approve escrow to move the NFT.
-        require(msg.sender == position.recipient, NotRefundRecipient(msg.sender, tokenId));
+        // Position recipient mirrors the current NFT holder (rebound on every transfer), so the
+        // holder gate collapses to a single equality check. Approved operators cannot release on
+        // behalf of the holder because the recipient field is keyed to the holder, not to any
+        // approval set; this keeps the deposit refund flow tied to the on-chain owner.
+        require(
+            msg.sender == currentOwner && msg.sender == position.recipient,
+            NotRefundRecipient(msg.sender, tokenId)
+        );
 
         bool approvedForEscrow = registrar.getApproved(tokenId) == address(this)
             || registrar.isApprovedForAll(currentOwner, address(this));
 
         require(approvedForEscrow, EscrowNotApproved(tokenId));
 
-        // Position recipient already mirrors the caller (the current holder) thanks to the
-        // transfer rebind, so release does not need to touch it. The cast to `uint64` is safe
-        // because `cooldown` is bounded by @custom:constant MAX_COOLDOWN.
+        // Snapshot the position fields once into stack locals so the trailing event emit reuses
+        // them without three extra warm SLOADs after the state mutation. The cast to `uint64` is
+        // safe because `cooldown` is bounded by @custom:constant MAX_COOLDOWN.
+        address asset = position.asset;
+        uint256 amount = position.amount;
         // forge-lint: disable-next-line(unsafe-typecast)
-        position.withdrawAvailableAt = uint64(block.timestamp + cooldown);
+        uint64 availableAt = uint64(block.timestamp + cooldown);
+
+        position.withdrawAvailableAt = availableAt;
         position.released = true;
 
         registrar.safeTransferFrom(currentOwner, address(this), tokenId);
 
         _addReleasedToken(tokenId);
 
-        emit NameReleased(
-            tokenId,
-            position.recipient,
-            position.asset,
-            position.amount,
-            position.withdrawAvailableAt
-        );
+        emit NameReleased(tokenId, msg.sender, asset, amount, availableAt);
     }
 
     /// @inheritdoc IDotnsNameEscrow
@@ -364,7 +356,9 @@ contract DotnsNameEscrow is
 
         uint256 owed = position.amount;
         address asset = position.asset;
-        address recipient = position.recipient;
+        // `position.recipient == msg.sender` was just enforced above, so reuse the local in place
+        // of an extra warm SLOAD.
+        address recipient = msg.sender;
         uint256 reserved = tokenReserved[asset];
 
         uint256 fromRefundable;
@@ -418,16 +412,21 @@ contract DotnsNameEscrow is
 
     /// @inheritdoc IDotnsNameEscrow
     function claimRefund(uint256 entryId) external override nonReentrant returns (uint256 amount) {
-        RefundEntry memory entry = _refundEntries[entryId];
-        require(entry.recipient == msg.sender, NotRefundRecipient(msg.sender, entry.tokenId));
-        require(entry.amount > 0, NoSuchRefundEntry(entryId));
+        // Storage pointer over memory copy: only the fields we actually need are SLOAD-ed.
+        RefundEntry storage entry = _refundEntries[entryId];
+        amount = entry.amount;
+        // Check existence first so a deleted (already-claimed or unknown) entry surfaces a clear
+        // `NoSuchRefundEntry` rather than the recipient-mismatch revert that would otherwise fire
+        // against the zero-address sentinel.
+        require(amount > 0, NoSuchRefundEntry(entryId));
+        uint256 entryTokenId = entry.tokenId;
+        require(entry.recipient == msg.sender, NotRefundRecipient(msg.sender, entryTokenId));
         require(block.timestamp >= entry.availableAt, RefundLocked(entryId, entry.availableAt));
 
-        amount = entry.amount;
         _removeRefundEntry(entryId, msg.sender);
 
         (bool ok,) = payable(msg.sender).call{value: amount}("");
-        require(ok, RefundFailed(entry.tokenId));
+        require(ok, RefundFailed(entryTokenId));
 
         emit RefundClaimed(msg.sender, entryId, amount);
     }
@@ -444,15 +443,16 @@ contract DotnsNameEscrow is
 
         for (uint256 i; i < length; ++i) {
             uint256 entryId = entryIds[i];
-            RefundEntry memory entry = _refundEntries[entryId];
+            RefundEntry storage entry = _refundEntries[entryId];
+            uint256 amount = entry.amount;
+            require(amount > 0, NoSuchRefundEntry(entryId));
             require(entry.recipient == msg.sender, NotRefundRecipient(msg.sender, entry.tokenId));
-            require(entry.amount > 0, NoSuchRefundEntry(entryId));
             require(block.timestamp >= entry.availableAt, RefundLocked(entryId, entry.availableAt));
 
-            totalAmount += entry.amount;
+            totalAmount += amount;
             _removeRefundEntry(entryId, msg.sender);
 
-            emit RefundClaimed(msg.sender, entryId, entry.amount);
+            emit RefundClaimed(msg.sender, entryId, amount);
         }
 
         (bool ok,) = payable(msg.sender).call{value: totalAmount}("");
@@ -534,14 +534,13 @@ contract DotnsNameEscrow is
 
     /// @notice Internal helper: allocate a new entryId and credit a refund to `recipient`.
     /// @dev Assigns the next monotonic entryId, stores the entry, appends to the recipient's
-    ///      enumeration array, and emits @custom:emits RefundCredited. `cooldownSeconds` may be
-    ///      zero when the cooldown has already been served by another mechanism (for example, the
-    ///      release-and-withdraw path enforces the cooldown on the position before crediting).
+    /// enumeration array, and emits @custom:emits RefundCredited. The cooldown is read from the
+    /// configured `cooldown` storage value; @custom:constant MAX_COOLDOWN bounds it so the cast to
+    /// `uint64` cannot truncate for any plausible block timestamp.
     function _creditRefund(
         address recipient,
         uint256 amount,
-        uint256 tokenId,
-        uint64 cooldownSeconds
+        uint256 tokenId
     )
         internal
         returns (uint256 entryId)
@@ -551,7 +550,7 @@ contract DotnsNameEscrow is
 
         entryId = ++_nextEntryId;
         // forge-lint: disable-next-line(unsafe-typecast)
-        uint64 availableAt = uint64(block.timestamp + cooldownSeconds);
+        uint64 availableAt = uint64(block.timestamp + cooldown);
 
         _refundEntries[entryId] = RefundEntry({
             recipient: recipient, amount: amount, availableAt: availableAt, tokenId: tokenId
@@ -614,7 +613,7 @@ contract DotnsNameEscrow is
     function onERC721Received(
         address,
         address,
-        uint256,
+        uint256 tokenId,
         bytes calldata
     )
         external
@@ -623,6 +622,11 @@ contract DotnsNameEscrow is
         returns (bytes4 selector)
     {
         require(msg.sender == address(_registrar()), NotAcceptedTransfer(msg.sender));
+        // Only accept transfers that this contract itself initiated via `release`. A holder calling
+        // `registrar.safeTransferFrom(holder, escrow, tokenId)` directly would otherwise land the
+        // NFT in custody with no `released` position, leaving the token (and any prior deposit)
+        // permanently unreachable through `withdraw` / `reclaim`.
+        require(_positions[tokenId].released, UnsolicitedDeposit(tokenId));
         selector = IERC721Receiver.onERC721Received.selector;
     }
 

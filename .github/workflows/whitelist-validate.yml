@@ -115,7 +115,7 @@ jobs:
           ADDRESS_TYPE: ${{ steps.extract.outputs.address_type }}
           DOTNS_ENV: ${{ steps.network.outputs.env }}
         run: |
-          RESULT=$(dotns account is-mapped "$ADDRESS" --env "$DOTNS_ENV" --json -k //Alice 2>&1) || true
+          RESULT=$(dotns account is-mapped "$ADDRESS" --env "$DOTNS_ENV" --json 2>&1) || true
 
           if echo "$RESULT" | jq -e . > /dev/null 2>&1; then
             IS_MAPPED=$(echo "$RESULT" | jq -r '.isMapped')

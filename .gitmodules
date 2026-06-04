@@ -16,3 +16,6 @@
 [submodule "halmos-cheatcodes"]
 	path = halmos-cheatcodes
 	url = https://github.com/a16z/halmos-cheatcodes
+[submodule "lib/solady"]
+	path = lib/solady
+	url = https://github.com/Vectorized/solady

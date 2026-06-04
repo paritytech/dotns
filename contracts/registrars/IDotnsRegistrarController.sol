@@ -2,6 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {IDotnsController} from "./IDotnsController.sol";
+import {IPopRules} from "../pop/IPopRules.sol";
 
 /// @title Dotns Registrar Controller
 /// @notice Interface for registering .dot labels using a commit reveal scheme.
@@ -15,6 +16,11 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @notice Parameters used to generate and reveal a commitment.
     /// @dev All fields must match exactly between commitment and reveal.
     /// @param label Label being registered (e.g. "alice").
+    /// @param owner Beneficiary the registered name is minted to.
+    /// @param secret Caller-chosen entropy that hides the registration intent in the commit
+    /// hash; revealed verbatim at registration time.
+    /// @param reserved True when the registration flows through the whitelisted reserved
+    /// pipeline (`registerReserved`); false for the standard public flow (`register`).
     struct Registration {
         string label;
         address owner;
@@ -60,9 +66,33 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @notice Thrown when attempting to register an unavailable name.
     error NameNotAvailable(string label);
 
-    /// @notice Thrown when attempting to register a name whose base stem is reserved by another
-    /// user.
+    /// @notice Thrown when a label is below the minimum-length policy.
+    /// @dev Distinct from @custom:reverts NameNotAvailable so off-chain consumers can tell a
+    /// too-short label apart from a name that is already minted.
+    /// @param label Caller-supplied label that failed the minimum-length policy.
+    error LabelTooShort(string label);
+
+    /// @notice Thrown when attempting to register a name whose base stem is held as a live
+    /// reservation by another user.
     error NameReserved(string label);
+
+    /// @notice Thrown when attempting to register a label that classifies as
+    /// governance-reserved at the protocol level.
+    /// @dev Distinct from @custom:reverts NameReserved so off-chain consumers can tell
+    /// "wait for the holder to relinquish" apart from "this label is permanently held by
+    /// governance".
+    /// @param label Caller-supplied label that the rules engine classifies as governance-reserved.
+    error GovernanceReserved(string label);
+
+    /// @notice Thrown on the cross-payer path when the owner's recorded PoP tier does not
+    /// meet the label's required tier. The direct path's @custom:contract IPopRules
+    /// `priceWithCheck` covers this same condition via its own revert.
+    /// @param label Label whose tier requirement was unmet.
+    /// @param userStatus Owner's recorded tier.
+    /// @param required Required tier for the label.
+    error OwnerStatusInsufficient(
+        string label, IPopRules.PopStatus userStatus, IPopRules.PopStatus required
+    );
 
     /// @notice Thrown when a label is not a canonical lowercase ASCII DNS label.
     error InvalidLabel();
@@ -70,11 +100,12 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @notice Thrown when supplied payment is insufficient.
     error InsufficientValue();
 
-    /// @notice Thrown when refund fails.
-    error RefundFailed();
-
     /// @notice Thrown when escrow is not configured in the protocol registry.
     error EscrowNotConfigured();
+
+    /// @notice Thrown when min commitment age is zero, which would allow same-block
+    /// commit-reveal and defeat the front-running guard.
+    error MinCommitmentAgeZero();
 
     /// @notice Thrown when max commitment age is invalid (must be > minCommitmentAge).
     error MaxCommitmentAgeTooLow();
@@ -82,19 +113,16 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @notice Thrown when max commitment age is invalid (exceeds implementation limit).
     error MaxCommitmentAgeTooHigh();
 
-    /// @notice Thrown when an invalid Store instance is encountered.
-    error InvalidStore();
-
-    /// @notice Thrown when the caller is not the registry.
-    error NotRegistry();
-
     /// @notice Returns whether a label is available for registration.
     /// @dev Validates the canonical DNS-label shape (otherwise @custom:reverts InvalidLabel)
-    /// and rejects labels shorter than the minimum length with
-    /// @custom:reverts NameNotAvailable before checking ERC721 availability on the registrar.
+    /// and rejects labels below the minimum-length policy with
+    /// @custom:reverts LabelTooShort before checking ERC721 availability on the registrar.
     function available(string calldata label) external view returns (bool isAvailable);
 
     /// @notice Computes the commitment hash for a registration.
+    /// @dev Uses `abi.encode` so the variable-width `label` is length-prefixed and the boundary
+    /// between `label` and the fixed-width `owner`, `secret`, and `reserved` fields is
+    /// unambiguous, binding the commitment to the exact tuple.
     function makeCommitment(Registration calldata registration)
         external
         pure
@@ -102,30 +130,41 @@ interface IDotnsRegistrarController is IDotnsController {
 
     /// @notice Submits a commitment for a future registration.
     /// @dev Idempotent over expiry: re-committing an unexpired hash reverts with
-    /// @custom:reverts UnexpiredCommitmentExists (front-running guard); re-committing a hash
-    /// whose stored timestamp has passed `maxCommitmentAge` overwrites the slot so storage
-    /// cannot be permanently griefed. Emits @custom:emits NameCommitted on success.
+    /// @custom:reverts UnexpiredCommitmentExists (front-running guard); a hash whose stored
+    /// timestamp has passed `maxCommitmentAge` overwrites the slot so storage cannot be
+    /// permanently griefed. The expiry boundary is inclusive on the commit side
+    /// (`committedAt + maxCommitmentAge <= block.timestamp` overwrites) and exclusive on the
+    /// reveal side (`register` rejects at the same instant with @custom:reverts
+    /// CommitmentTooOld), so the slot is overwritable from exactly the timestamp at which
+    /// reveal begins rejecting it. Emits @custom:emits NameCommitted on success.
     function commit(bytes32 commitment) external;
 
     /// @notice Registers a name after the commitment delay.
-    /// @dev Validates the label shape (otherwise @custom:reverts InvalidLabel) and ERC721
-    /// availability (otherwise @custom:reverts NameNotAvailable), then resolves the configured
-    /// escrow address from the protocol registry (otherwise @custom:reverts EscrowNotConfigured)
-    /// and consumes the prior commitment, which fails with @custom:reverts CommitmentNotFound
-    /// when no commitment exists for the supplied registration, @custom:reverts CommitmentTooNew
-    /// before `minCommitmentAge`, and @custom:reverts CommitmentTooOld past `maxCommitmentAge`.
-    /// Splits on direct vs cross-payer at `msg.sender == registration.owner`. The direct path
-    /// runs `priceWithCheck` (personhood + reservation gate) and routes the fee to a refundable
-    /// escrow deposit owned by `registration.owner`. The cross-payer path skips personhood
-    /// (a third party may sponsor a verified owner), still enforces base-name reservations
-    /// (otherwise @custom:reverts NameReserved), applies the flat NoStatus `reachFee` friction
-    /// when the sender's own tier is below the label's required tier, and routes funds to the
-    /// insurance branch when the payer's tier price differs from the owner's (genuine
-    /// cross-tier sponsorship) versus the refundable branch when the tier prices match
-    /// (same-tier-different-address). The caller must supply at least the priced amount plus
-    /// any friction (otherwise @custom:reverts InsufficientValue), and any overpayment is
-    /// returned to `msg.sender` with @custom:emits OverpaymentRefunded; a failed refund call
-    /// reverts with @custom:reverts RefundFailed. Emits @custom:emits NameRegistered on success.
+    /// @dev Validates the label shape (otherwise @custom:reverts InvalidLabel), rejects labels
+    /// below the minimum length policy (@custom:reverts LabelTooShort), and ERC721 availability
+    /// (otherwise @custom:reverts NameNotAvailable), then consumes the prior commitment, which
+    /// fails with @custom:reverts CommitmentNotFound when no commitment exists for the supplied
+    /// registration, @custom:reverts CommitmentTooNew before `minCommitmentAge`, and
+    /// @custom:reverts CommitmentTooOld past `maxCommitmentAge`, and finally resolves the
+    /// configured escrow address from the protocol registry (otherwise
+    /// @custom:reverts EscrowNotConfigured). Splits on direct vs cross-payer at
+    /// `msg.sender == registration.owner`. The direct path runs `priceWithCheck` (personhood
+    /// + reservation gate) and routes the charge to a refundable escrow deposit owned by
+    /// `registration.owner`. The cross-payer path skips the personhood revert in
+    /// `priceWithCheck` but applies it directly via @custom:reverts OwnerStatusInsufficient
+    /// when the owner's recorded tier does not meet the label's required tier, and still
+    /// rejects governance-reserved labels with @custom:reverts GovernanceReserved and live
+    /// cross-user stem reservations with @custom:reverts NameReserved. The total
+    /// charge on the cross-payer path is the greater of the owner-side registration price and
+    /// the owner-tier `transferFloor` friction (never their sum); friction is computed against
+    /// the owner's tier so a verified payer cannot pay around an unverified owner. The entire
+    /// charge routes to the escrow insurance fund while seeding a zero-amount deposit slot so
+    /// the release lifecycle stays reachable. The caller must supply at least the charge
+    /// (otherwise @custom:reverts InsufficientValue); any overpayment is pushed back to
+    /// `msg.sender` inline and, on failure, credited to the escrow's pull-payment ledger so
+    /// contract receivers cannot block registration. Emits @custom:emits OverpaymentRefunded
+    /// on the inline branch, the escrow's own @custom:emits OverpaymentRefunded on the pull
+    /// fallback, and @custom:emits NameRegistered on success.
     function register(Registration calldata registration) external payable;
 
     /// @notice Registers a name after the commitment delay.

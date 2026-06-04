@@ -61,6 +61,16 @@ library StringUtils {
         return _isDnsLabel(label, 0, label.length);
     }
 
+    /// @notice Memory-location helper for @custom:function isSingleLabel, used where the
+    /// candidate label is produced by an upstream string transformation (e.g. the output of
+    /// @custom:function stripDigits) so callers do not need a calldata round-trip.
+    /// @param value Candidate label held in memory.
+    /// @return isValid True if `value` is a canonical DNS label.
+    function isSingleLabelMemory(string memory value) internal pure returns (bool isValid) {
+        bytes memory label = bytes(value);
+        return _isDnsLabel(label, 0, label.length);
+    }
+
     /// @notice Removes dot separators from a dotted label.
     /// @dev Used by the PoP gateway boundary to normalise user-facing
     ///      `name.path` input into the flat label expected by pricing and minting.
@@ -145,9 +155,9 @@ library StringUtils {
         return _isLitePersonLabel(bytes(value));
     }
 
-    /// @notice Validates the lite-person PoP label format: `<stem><digits>`.
-    /// @dev Memory helper used by controller-side normalisation paths.
-    /// @param value Candidate label.
+    /// @notice Memory-location helper for @custom:function isLitePersonLabel, used by
+    /// controller-side normalisation paths.
+    /// @param value Candidate label held in memory.
     /// @return isValid True if the label is a DNS label with at least
     ///         @custom:constant MIN_LITE_SUFFIX_DIGITS trailing digits.
     function isLitePersonLabelMemory(string memory value) internal pure returns (bool isValid) {

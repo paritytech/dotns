@@ -15,6 +15,7 @@ import {IDotnsRegistrarController} from "./IDotnsRegistrarController.sol";
 import {IDotnsNameEscrow} from "../escrow/IDotnsNameEscrow.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
@@ -61,12 +62,6 @@ contract DotnsRegistrarController is
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
 
-    /// @notice Restricts calls to the forward registry contract.
-    modifier onlyRegistry() {
-        _onlyRegistry();
-        _;
-    }
-
     /// @notice Restricts calls to whitelisted addresses or the owner.
     /// @dev Used to gate `registerReserved`, which allows registering reserved names without
     /// PoP checks or payment. Necessary so the owner (or a whitelisted operator) can seed
@@ -91,7 +86,9 @@ contract DotnsRegistrarController is
     /// @dev Callable once through the UUPS proxy; direct calls on the implementation revert
     /// with @custom:reverts InvalidInitialization, and any nested call outside an active
     /// initialiser scope reverts with @custom:reverts NotInitializing. Validates the
-    /// commitment window bounds: `maxAge` must exceed `minAge` (otherwise
+    /// commitment window bounds: `minAge` must be strictly positive (otherwise
+    /// @custom:reverts MinCommitmentAgeZero) so a reveal cannot land in the same block as
+    /// its commit; `maxAge` must exceed `minAge` (otherwise
     /// @custom:reverts MaxCommitmentAgeTooLow) and must stay within
     /// `MAX_ALLOWED_COMMITMENT_AGE` (otherwise @custom:reverts MaxCommitmentAgeTooHigh) before
     /// wiring the protocol registry.
@@ -106,6 +103,7 @@ contract DotnsRegistrarController is
         __Ownable_init(msg.sender);
         _dotnsRoleManagerInit();
 
+        require(minAge > 0, MinCommitmentAgeZero());
         require(maxAge > minAge, MaxCommitmentAgeTooLow());
         require(maxAge <= MAX_ALLOWED_COMMITMENT_AGE, MaxCommitmentAgeTooHigh());
 
@@ -130,9 +128,6 @@ contract DotnsRegistrarController is
         override
         returns (bytes32 commitment)
     {
-        // `abi.encode` length-prefixes the variable-width `label` so the boundary between the
-        // label bytes and the fixed-width `owner`, `secret`, and `reserved` fields is unambiguous,
-        // and the commitment uniquely identifies the (label, owner, secret, reserved) tuple.
         commitment = keccak256(
             abi.encode(
                 registration.label, registration.owner, registration.secret, registration.reserved
@@ -142,9 +137,9 @@ contract DotnsRegistrarController is
 
     /// @inheritdoc IDotnsRegistrarController
     function commit(bytes32 commitment) external override {
+        uint256 prior = commitments[commitment];
         require(
-            commitments[commitment] == 0
-                || commitments[commitment] + maxCommitmentAge < block.timestamp,
+            prior == 0 || prior + maxCommitmentAge <= block.timestamp,
             UnexpiredCommitmentExists(commitment)
         );
 
@@ -154,100 +149,104 @@ contract DotnsRegistrarController is
 
     /// @inheritdoc IDotnsRegistrarController
     function register(Registration calldata registration) external payable override nonReentrant {
-        address escrow = _escrow();
-
         (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
             _requireAvailableLabel(registration.label);
         _consumeCommitment(registration);
 
+        address escrow = _escrow();
         IPopRules rules = IPopRules(protocolRegistry.get(DotnsConstants.POP_RULES));
 
         uint256 tokenId = uint256(node);
         bool isReclaim = registrar.exists(tokenId);
 
-        // On reclaim, clear a stale stem reservation only if it belongs to the
-        // prior occupant. `releaseReservationForReclaim` gates on owner match
-        // rather than caller identity so a slot stamped by the PoP controller
-        // can be cleared from the public-flow side when ownership matches.
-        if (isReclaim) {
-            string memory stem = rules.stripDigits(registration.label);
+        string memory stem = rules.stripDigits(registration.label);
+        bool stemCanonical = stem.isSingleLabelMemory();
+        // Reclaim hands the name back from a prior occupant who may hold a sibling-controller's
+        // stem reservation; clear it so the new registrant's stem reserve at line 218 starts fresh.
+        // Non-reclaim paths intentionally leave an existing same-owner reservation in place so a
+        // sibling controller (e.g. the PoP queue head stamp) retains the slot's `controller` field
+        // through the refresh in `_writeReservation`. Replacing the slot from this controller
+        // would brick the sibling's release/advance paths.
+        if (stemCanonical && isReclaim) {
             (address reservationOwner,) = rules.getBaseNameReservation(stem);
-            address previousOccupant =
+            address expectedOwner =
                 IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId).recipient;
-            if (reservationOwner != address(0) && reservationOwner == previousOccupant) {
-                rules.releaseReservationForReclaim(stem, previousOccupant);
+            if (reservationOwner != address(0) && reservationOwner == expectedOwner) {
+                rules.releaseReservationForReclaim(stem, expectedOwner);
             }
         }
 
         bool isDirect = msg.sender == registration.owner;
         IPopRules.PriceWithMeta memory priced;
         if (isDirect) {
-            // Direct path: enforce personhood + reservation gate.
             priced = rules.priceWithCheck(registration.label, registration.owner);
         } else {
-            // Cross-payer path: the personhood gate is skipped here, but base-name
-            // reservations are still enforced so a third party cannot pay around a
-            // reservation held by another user.
             priced = rules.priceWithoutCheck(registration.label, registration.owner);
-            require(priced.status != IPopRules.PopStatus.Reserved, NameReserved(registration.label));
+            if (priced.status == IPopRules.PopStatus.Reserved) {
+                (IPopRules.PopStatus required,) = rules.classifyName(registration.label);
+                if (required == IPopRules.PopStatus.Reserved) {
+                    revert GovernanceReserved(registration.label);
+                }
+                revert NameReserved(registration.label);
+            }
+            require(
+                priced.userStatus >= priced.status,
+                OwnerStatusInsufficient(registration.label, priced.userStatus, priced.status)
+            );
         }
 
-        // Cross-payer charge is the greater of the owner-side registration price and the
-        // payer-to-owner downward friction, never their sum: both quantities describe the
-        // same privilege gap and the rule forecloses double-charging. On a direct
-        // registration friction is zero, so the max collapses to `priced.price`.
         uint256 friction =
             !isDirect ? rules.transferFloor(registration.label, msg.sender, registration.owner) : 0;
         uint256 totalCharged = priced.price > friction ? priced.price : friction;
         require(msg.value >= totalCharged, InsufficientValue());
 
-        // Skip the reverse-record auto-set when the owner already has a primary,
-        // otherwise a second reserved registration would silently overwrite it.
-        IDotnsReverseResolver reverse =
-            IDotnsReverseResolver(protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER));
-        bool setReverseRecord = registration.reserved && isDirect
-            && bytes(reverse.nameOf(registration.owner)).length == 0;
+        IDotnsReverseResolver reverse;
+        bool setReverseRecord;
+        if (registration.reserved && isDirect) {
+            reverse = IDotnsReverseResolver(protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER));
+            setReverseRecord = bytes(reverse.nameOf(registration.owner)).length == 0;
+        }
 
-        // State writes before custody moves: on reclaim the forward record
-        // already exists and resolves through the registrar dynamically, so
-        // only the store entry and optional reverse record need updating here.
         _completeRegistration(
-            registration, labelhash, node, priced.price, setReverseRecord, isReclaim
+            registration, labelhash, node, priced.price, setReverseRecord, reverse, isReclaim
         );
 
-        // Custody handoff after state writes so any `onERC721Received` observer
-        // sees a fully wired registration.
         if (isReclaim) {
             IDotnsNameEscrow(payable(escrow)).reclaim(tokenId, registration.owner);
+            // Reclaim hands the NFT to the new holder; rewrite the registry record so the prior
+            // owner's resolver pointer cannot follow the name. Must run after `escrow.reclaim`
+            // so the registry's `ownerOf` check sees the new holder, not the escrow.
+            IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY))
+                .setOwner(node, registration.owner);
         }
 
         _settleEscrow(escrow, tokenId, registration.owner, isDirect, totalCharged);
 
         if (
             priced.status == IPopRules.PopStatus.PopLite
-                && priced.userStatus == IPopRules.PopStatus.PopLite
+                && priced.userStatus == IPopRules.PopStatus.PopLite && stemCanonical
         ) {
-            rules.reserveBaseName(rules.stripDigits(registration.label), registration.owner);
+            rules.reserveBaseName(stem, registration.owner);
         }
 
-        // Overpayment credited to the pull-payment ledger so contract wallets
-        // Push the overage to msg.sender directly. Contract callers that reject incoming value
-        // fall back to the escrow's pull-payment ledger, claimed later via `claimWithdrawal`.
         if (msg.value > totalCharged) {
             uint256 refund = msg.value - totalCharged;
             (bool ok,) = payable(msg.sender).call{value: refund}("");
-            if (!ok) {
+            if (ok) {
+                emit OverpaymentRefunded(msg.sender, refund);
+            } else {
                 IDotnsNameEscrow(payable(escrow)).creditOverpayment{value: refund}(msg.sender);
             }
-            emit OverpaymentRefunded(msg.sender, refund);
         }
     }
 
     /// @notice Settles every escrow side-effect of a successful registration.
     /// @dev Extracted to keep `register` under the stack-depth ceiling. On a direct
-    ///      registration the full `chargeAmount` lands in the refundable deposit position;
-    ///      on a cross-payer registration the same amount routes to the friction reserve
-    ///      and no deposit position is seeded.
+    ///      registration the full `chargeAmount` lands in the refundable deposit position
+    ///      keyed to `nameOwner`. On a cross-payer registration the deposit position is
+    ///      seeded with a zero amount so the release lifecycle stays reachable, and the same
+    ///      `chargeAmount` routes to the insurance fund via `depositInsurance` keyed to
+    ///      `msg.sender` as the payer.
     function _settleEscrow(
         address escrow,
         uint256 tokenId,
@@ -301,7 +300,9 @@ contract DotnsRegistrarController is
         (, bytes32 labelhash, bytes32 node) = _requireAvailableLabel(registration.label);
         _consumeCommitment(registration);
 
-        _completeRegistration(registration, labelhash, node, 0, true, false);
+        IDotnsReverseResolver reverse =
+            IDotnsReverseResolver(protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER));
+        _completeRegistration(registration, labelhash, node, 0, true, reverse, false);
     }
 
     /// @inheritdoc IERC165
@@ -317,16 +318,17 @@ contract DotnsRegistrarController is
 
     /// @notice Validates label shape and derives `(labelhash, node)`.
     /// @dev Delegates hashing to @custom:contract LabelUtils so the assembly sequence lives in
-    /// exactly one place across the codebase. Error ownership stays on this interface: short labels
-    /// revert with `NameNotAvailable(label)` (pre-existing semantics); shape violations
-    /// revert with `InvalidLabel()`.
+    /// exactly one place across the codebase. Error ownership stays on this interface: shape
+    /// violations revert with `InvalidLabel()`; labels below the minimum length revert with
+    /// `LabelTooShort(label)` so off-chain consumers can distinguish "shape-valid but below
+    /// the policy minimum" from "shape-valid but already minted".
     function _validatedLabelNode(string calldata label)
         internal
         pure
         returns (bytes32 labelhash, bytes32 node)
     {
         require(label.isSingleLabel(), InvalidLabel());
-        require(bytes(label).length >= 3, NameNotAvailable(label));
+        require(bytes(label).length >= 3, LabelTooShort(label));
         (labelhash, node) = LabelUtils.deriveNode(label);
     }
 
@@ -372,6 +374,7 @@ contract DotnsRegistrarController is
         bytes32 node,
         uint256 baseCost,
         bool setReverseRecord,
+        IDotnsReverseResolver reverse,
         bool isReclaim
     )
         internal
@@ -388,8 +391,8 @@ contract DotnsRegistrarController is
                 })
             );
         } else {
-            // Reclaim: skip the mint and the forward-registry write (both
-            // already in place) and seed only the new owner's label store entry.
+            // Registry reset on reclaim is deferred until after `escrow.reclaim` runs (see
+            // @custom:function register) so the registry's `ownerOf` check sees the new holder.
             IStoreFactory factory =
                 IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
             string memory fullName = string.concat(registration.label, DotnsConstants.TLD);
@@ -397,8 +400,6 @@ contract DotnsRegistrarController is
         }
 
         if (setReverseRecord) {
-            IDotnsReverseResolver reverse =
-                IDotnsReverseResolver(protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER));
             reverse.setReverseName(
                 registration.owner, string.concat(registration.label, DotnsConstants.TLD)
             );
@@ -422,12 +423,6 @@ contract DotnsRegistrarController is
     /// @notice Internal check enforcing whitelist-or-owner access.
     function _onlyWhiteListedOrOwner() internal view {
         require(whiteList[msg.sender] || msg.sender == owner(), NotWhiteListedOrOwner(msg.sender));
-    }
-
-    /// @notice Internal check enforcing registry-only access.
-    function _onlyRegistry() internal view {
-        address registry = protocolRegistry.get(DotnsConstants.REGISTRY);
-        require(msg.sender == registry, NotRegistry());
     }
 
     function _isSupportedRole(bytes32 role) internal view override returns (bool supported) {

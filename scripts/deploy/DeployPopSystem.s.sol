@@ -7,7 +7,6 @@ import {DeploymentNetwork} from "./DeploymentNetwork.sol";
 
 import {DotnsPopResolver} from "../../contracts/resolvers/DotnsPopResolver.sol";
 import {DotnsPopController} from "../../contracts/registrars/DotnsPopController.sol";
-import {RootGatewayDispatcher} from "../../contracts/registrars/RootGatewayDispatcher.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
 
 /// @title DeployPopSystem
@@ -90,11 +89,11 @@ contract DeployPopSystem is BaseDeployer {
         internal
         returns (address dispatcher)
     {
-        vm.startBroadcast(owner);
-        dispatcher = address(new RootGatewayDispatcher(popController));
-        vm.stopBroadcast();
-
-        vm.label(dispatcher, "RootGatewayDispatcher");
-        logDeployment("RootGatewayDispatcher", dispatcher);
+        dispatcher = _broadcastDeployCreate3(
+            owner,
+            "RootGatewayDispatcher.sol:RootGatewayDispatcher",
+            abi.encode(popController),
+            "RootGatewayDispatcher"
+        );
     }
 }

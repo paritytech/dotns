@@ -203,9 +203,6 @@ interface IDotnsNameEscrow {
     /// @notice Thrown when a token is not in a reclaimable state (released + claimed).
     error NotReclaimable(uint256 tokenId);
 
-    /// @notice Thrown when the caller is neither the token owner nor an approved operator.
-    error NotTokenOwnerOrApproved(address caller, uint256 tokenId);
-
     /// @notice Thrown when escrow is not approved to transfer the token.
     error EscrowNotApproved(uint256 tokenId);
 
@@ -232,6 +229,12 @@ interface IDotnsNameEscrow {
 
     /// @notice Thrown when escrow receives an ERC721 transfer from a non-registrar source.
     error NotAcceptedTransfer(address caller);
+
+    /// @notice Thrown when escrow receives a registrar-sourced ERC721 transfer that does not
+    /// correspond to a live release. Blocks holders who try to push a token into custody by
+    /// calling @custom:function safeTransferFrom directly without going through @custom:function
+    /// release, which would otherwise trap the NFT and any deposit permanently.
+    error UnsolicitedDeposit(uint256 tokenId);
 
     /// @notice Returns total amount of assets liabilities reserved for withdrawals.
     /// @param asset Asset address. `address(0)` denotes native token.
@@ -311,18 +314,18 @@ interface IDotnsNameEscrow {
     function insuranceFund() external view returns (uint256 balance);
 
     /// @notice Releases a token into escrow and starts the withdrawal cooldown.
-    /// @dev First step of the phased lifecycle. The caller must be the current NFT holder or one
-    ///      of its approved operators, otherwise @custom:reverts NotTokenOwnerOrApproved. The slot
-    ///      for `tokenId` must already hold a position (sentinel:
+    /// @dev First step of the phased lifecycle. The caller must be the current NFT holder and the
+    ///      current position recipient (the field is rebound to the holder on every transfer that
+    ///      moves the name off the prior recipient), otherwise @custom:reverts NotRefundRecipient.
+    ///      Approved operators cannot release on behalf of the holder because the recipient field
+    ///      is keyed to the holder, not to any approval set, which keeps the deposit refund tied
+    ///      to the on-chain owner. The slot for `tokenId` must already hold a position (sentinel:
     ///      `position.recipient != address(0)`); an unseeded slot triggers @custom:reverts
     ///      DepositNotConfigured, and a position already in the released phase triggers
     ///      @custom:reverts AlreadyReleased. Zero-amount positions are still releasable so every
-    ///      minted name has a reachable lifecycle. The caller must also be the current position
-    ///      recipient, which is rebound to the NFT holder on every transfer that moves the name
-    ///      off the prior recipient, otherwise @custom:reverts NotRefundRecipient. Combined with
-    ///      the escrow approval check (@custom:reverts EscrowNotApproved when escrow may not move
-    ///      the NFT) this ensures only the live holder can release the name and unlock its locked
-    ///      deposit. Emits @custom:emits NameReleased once the NFT is moved into custody.
+    ///      minted name has a reachable lifecycle. The escrow must additionally be approved to
+    ///      move the NFT, otherwise @custom:reverts EscrowNotApproved. Emits @custom:emits
+    ///      NameReleased once the NFT is moved into custody.
     function release(uint256 tokenId) external;
 
     /// @notice Credits the refundable deposit for a released token to the recipient's pending
