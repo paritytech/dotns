@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="storefactory"><a class="header" href="#storefactory">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/883f70bd119336174dc452ed3081627cbac650ed/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/e165e094ec2fbfba9f9ee09fc5ffce77be21d6ed/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Ownable, <a href="/contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
@@ -202,39 +202,39 @@ security-contact: admin@parity.io</p>
 <h3 id="labelstorebeacon"><a class="header" href="#labelstorebeacon">labelStoreBeacon</a></h3>
 <p>Beacon backing every <code>LabelStore</code> proxy.</p>
 <p>Public getter name is interface-constrained by @custom:contract IStoreFactory.</p>
-<pre><code class="language-solidity">address public immutable override labelStoreBeacon;
+<pre><code class="language-solidity">address public immutable override labelStoreBeacon
 </code></pre>
 <h3 id="userstorebeacon"><a class="header" href="#userstorebeacon">userStoreBeacon</a></h3>
 <p>Beacon backing every <code>UserStore</code> proxy.</p>
 <p>Public getter name is interface-constrained by @custom:contract IStoreFactory.</p>
-<pre><code class="language-solidity">address public immutable override userStoreBeacon;
+<pre><code class="language-solidity">address public immutable override userStoreBeacon
 </code></pre>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
 <p>Protocol registry used to authorise <code>deployLabelStoreFor</code> callers.</p>
 <p>Public getter name is interface-constrained by @custom:contract IStoreFactory.</p>
-<pre><code class="language-solidity">address public immutable override protocolRegistry;
+<pre><code class="language-solidity">address public immutable override protocolRegistry
 </code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="_labelstores"><a class="header" href="#_labelstores">_labelStores</a></h3>
 <p>user =&gt; their permanent <code>LabelStore</code>. Set once per user, forever.</p>
-<pre><code class="language-solidity">mapping(address user =&gt; address store) private _labelStores;
+<pre><code class="language-solidity">mapping(address user =&gt; address store) private _labelStores
 </code></pre>
 <h3 id="_userstores"><a class="header" href="#_userstores">_userStores</a></h3>
 <p>user =&gt; their permanent <code>UserStore</code>. Set once per user, forever.</p>
-<pre><code class="language-solidity">mapping(address user =&gt; address store) private _userStores;
+<pre><code class="language-solidity">mapping(address user =&gt; address store) private _userStores
 </code></pre>
 <h3 id="_labelstorelist"><a class="header" href="#_labelstorelist">_labelStoreList</a></h3>
 <p>Insertion-order list of every <code>LabelStore</code> proxy ever deployed. Append-only.</p>
-<pre><code class="language-solidity">address[] private _labelStoreList;
+<pre><code class="language-solidity">address[] private _labelStoreList
 </code></pre>
 <h3 id="_userstorelist"><a class="header" href="#_userstorelist">_userStoreList</a></h3>
 <p>Insertion-order list of every <code>UserStore</code> proxy ever claimed. Append-only.</p>
-<pre><code class="language-solidity">address[] private _userStoreList;
+<pre><code class="language-solidity">address[] private _userStoreList
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlyownerorprotocol"><a class="header" href="#onlyownerorprotocol">onlyOwnerOrProtocol</a></h3>
 <p>Restricts <code>deployLabelStoreFor</code> to the owner or any protocol-registered caller.</p>
-<pre><code class="language-solidity">modifier onlyOwnerOrProtocol();
+<pre><code class="language-solidity">modifier onlyOwnerOrProtocol() ;
 </code></pre>
 <h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
 <p>Deploys the factory together with both store implementations and beacons.</p>

@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="userstore"><a class="header" href="#userstore">UserStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/883f70bd119336174dc452ed3081627cbac650ed/contracts/store/UserStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/e165e094ec2fbfba9f9ee09fc5ffce77be21d6ed/contracts/store/UserStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, <a href="/contracts/store/IUserStore.sol/interface.IUserStore.html">IUserStore</a></p>
 <p><strong>Title:</strong>
@@ -200,38 +200,38 @@ security-contact: admin@parity.io</p>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="_owner"><a class="header" href="#_owner">_owner</a></h3>
 <p>Permanent user this store belongs to. Set in <code>initialize</code>.</p>
-<pre><code class="language-solidity">address private _owner;
+<pre><code class="language-solidity">address private _owner
 </code></pre>
 <h3 id="_current"><a class="header" href="#_current">_current</a></h3>
 <p>key =&gt; current value bytes.</p>
-<pre><code class="language-solidity">mapping(bytes32 key =&gt; bytes value) private _current;
+<pre><code class="language-solidity">mapping(bytes32 key =&gt; bytes value) private _current
 </code></pre>
 <h3 id="_history"><a class="header" href="#_history">_history</a></h3>
 <p>key =&gt; insertion-order list of prior non-empty values and their supersession
 timestamps.</p>
-<pre><code class="language-solidity">mapping(bytes32 key =&gt; Entry[] entries) private _history;
+<pre><code class="language-solidity">mapping(bytes32 key =&gt; Entry[] entries) private _history
 </code></pre>
 <h3 id="_keylist"><a class="header" href="#_keylist">_keyList</a></h3>
 <p>Insertion-order list of all keys ever written. Append-only (never pruned).</p>
-<pre><code class="language-solidity">bytes32[] private _keyList;
+<pre><code class="language-solidity">bytes32[] private _keyList
 </code></pre>
 <h3 id="_keyindex"><a class="header" href="#_keyindex">_keyIndex</a></h3>
 <p>key =&gt; 1-indexed position in <code>_keyList</code> (zero means "never written").</p>
-<pre><code class="language-solidity">mapping(bytes32 key =&gt; uint256 indexPlusOne) private _keyIndex;
+<pre><code class="language-solidity">mapping(bytes32 key =&gt; uint256 indexPlusOne) private _keyIndex
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in future beacon upgrades.</p>
-<pre><code class="language-solidity">uint256[50] private __gap;
+<pre><code class="language-solidity">uint256[50] private __gap
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlyowner"><a class="header" href="#onlyowner">onlyOwner</a></h3>
 <p>Restricts writes to the bound owner.</p>
-<pre><code class="language-solidity">modifier onlyOwner();
+<pre><code class="language-solidity">modifier onlyOwner() ;
 </code></pre>
 <h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
 <p><strong>Note:</strong>
 oz-upgrades-unsafe-allow: constructor</p>
-<pre><code class="language-solidity">constructor();
+<pre><code class="language-solidity">constructor() ;
 </code></pre>
 <h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
 <p>Initialises the store, binding it permanently to <code>user_</code>.</p>
