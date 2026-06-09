@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/e165e094ec2fbfba9f9ee09fc5ffce77be21d6ed/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9f89c529c0eb075a6f7f9f8963071491515e71a/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -315,6 +315,34 @@ back to <code>IDotnsRegistrar.ownerOf(uint256(node))</code>.</p>
 <p>Returns whether a node exists.</p>
 <pre><code class="language-solidity">function recordExists(bytes32 node) external view override returns (bool);
 </code></pre>
+<h3 id="isauthorised"><a class="header" href="#isauthorised">isAuthorised</a></h3>
+<p>Returns whether <code>account</code> is authorised to manage <code>node</code>.</p>
+<p>For subnodes, authority is the explicit stored owner. For tokenised nodes it is the
+ERC-721 owner, an address approved for the token, or an operator approved for all of
+the owner's tokens via the registrar. This is the canonical authorisation check the
+registry enforces on owner-gated entry points; sibling contracts may consult it so a
+single registrar-level approval delegates management across the protocol. Returns
+false for a node that does not exist.</p>
+<pre><code class="language-solidity">function isAuthorised(
+    bytes32 node,
+    address account
+)
+    external
+    view
+    override
+    returns (bool authorisedFlag);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+<tr><td><code>account</code></td><td><code>address</code></td><td>Address whose authority is being checked.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>authorisedFlag</code></td><td><code>bool</code></td><td>True when <code>account</code> may manage <code>node</code>.</td></tr>
+</tbody></table>
+</div>
 <h3 id="_writesubnodetostore"><a class="header" href="#_writesubnodetostore">_writeSubnodeToStore</a></h3>
 <p>Writes subnode registration to the owner's <code>LabelStore</code>.</p>
 <p>Keys the entry by <code>node</code> (full namehash) rather than labelhash so a single store
@@ -334,9 +362,15 @@ cost of slicing into intermediate <code>bytes</code> and to keep gas linear in t
 </code></pre>
 <h3 id="_authorised"><a class="header" href="#_authorised">_authorised</a></h3>
 <p>Internal authorisation check for node ownership.</p>
-<p>Honours the sentinel-zero pattern: if the registry has no explicit owner, fall back
-to the registrar's ERC-721 owner / approved / operator-for-all chain.</p>
+<p>Reverts with NotAuthorised when <code>msg.sender</code> is not authorised for <code>node</code>.</p>
 <pre><code class="language-solidity">function _authorised(bytes32 node) internal view;
+</code></pre>
+<h3 id="_isauthorised"><a class="header" href="#_isauthorised">_isAuthorised</a></h3>
+<p>Canonical authorisation rule for a node, parameterised by <code>account</code>.</p>
+<p>Honours the sentinel-zero pattern: if the registry has no explicit owner, fall back
+to the registrar's ERC-721 owner / approved / operator-for-all chain. This is the
+single source of truth <code>_authorised</code> and <code>isAuthorised</code> both delegate to.</p>
+<pre><code class="language-solidity">function _isAuthorised(bytes32 node, address account) internal view returns (bool);
 </code></pre>
 <h3 id="_onlyregistrarcontroller"><a class="header" href="#_onlyregistrarcontroller">_onlyRegistrarController</a></h3>
 <p>Internal check for registrar-authorised controller privileges.</p>
