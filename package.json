@@ -10,6 +10,8 @@
     "deploy:testnet": "./scripts/deploy/run.sh '--timeout 1000'",
     "deploy:factory": "./scripts/deploy/factory.sh",
     "deploy:all": "./scripts/deploy/deployall.sh",
+    "cdm:generate": "bun scripts/deploy/cdm/generate.ts",
+    "cdm:register": "bun scripts/deploy/cdm/register.ts",
     "postinstall": "./setup.bash",
     "reset": "forge clean"
   },
@@ -43,6 +45,11 @@
     "node": "24.6.0"
   },
   "dependencies": {
-    "@openzeppelin/upgrades-core": "1.44.2"
+    "@openzeppelin/upgrades-core": "1.44.2",
+    "@parity/cdm-builder": "^5.0.0",
+    "@parity/cdm-env": "^2.3.0",
+    "@parity/product-sdk-cloud-storage": "^0.5.4",
+    "@parity/product-sdk-contracts": "^0.9.0",
+    "@parity/product-sdk-tx": "^0.2.8"
   }
 }
