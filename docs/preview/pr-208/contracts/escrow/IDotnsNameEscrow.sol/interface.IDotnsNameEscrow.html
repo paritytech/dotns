@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/7b6b8f145a990159890fdb9835e7516655bc0e97/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/056e4bb63b0235df6e252889b1714ee8577d64c7/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Name Escrow Interface</p>
 <p>Escrows refundable deposits for .dot registrations and manages the release lifecycle.</p>
@@ -753,15 +753,15 @@ the only address that can later release into escrow and unlock the locked value.
 There is no transfer-time refund path.</p>
 <pre><code class="language-solidity">struct ChargeTransferFeeParams {
     uint256 tokenId;
-    uint256 reachFloor;
+    uint256 transferFee;
     address payer;
     address to;
 }
 </code></pre>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td></td></tr>
-<tr><td><code>reachFloor</code></td><td><code>uint256</code></td><td>Required fee paid by the sender on a downward or cross-reach transfer.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token whose escrow position is charged and rebound to the recipient.</td></tr>
+<tr><td><code>transferFee</code></td><td><code>uint256</code></td><td>The name's own curve price on a downward or cross-reach transfer.</td></tr>
 <tr><td><code>payer</code></td><td><code>address</code></td><td>Original sender of the registrar transfer entrypoint.</td></tr>
 <tr><td><code>to</code></td><td><code>address</code></td><td>NFT recipient. Becomes the new position recipient whenever a position exists.</td></tr>
 </tbody></table>
