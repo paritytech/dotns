@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3081d889f7664832e8b24f598c2d67a7af6bd679/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cd26e37661c14d41f53aa687eb2909469d2bce77/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -924,14 +924,14 @@ queue shape intact, so no advance or resync is needed.</p>
 <p>Validates a lite-person <code>NAMEXX</code> label and derives <code>(labelhash, node)</code>.</p>
 <pre><code class="language-solidity">function _validateLiteLabel(string memory liteLabel)
     internal
-    pure
+    view
     returns (bytes32 labelhash, bytes32 node);
 </code></pre>
 <h3 id="_validatebaselabel"><a class="header" href="#_validatebaselabel">_validateBaseLabel</a></h3>
 <p>Validates a base (full-person) DNS label and derives <code>(labelhash, node)</code>.</p>
 <pre><code class="language-solidity">function _validateBaseLabel(string calldata baseLabel)
     internal
-    pure
+    view
     returns (bytes32 labelhash, bytes32 node);
 </code></pre>
 <h3 id="_requirevalidchatkey"><a class="header" href="#_requirevalidchatkey">_requireValidChatKey</a></h3>

@@ -180,15 +180,16 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="labelutils"><a class="header" href="#labelutils">LabelUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3081d889f7664832e8b24f598c2d67a7af6bd679/contracts/utils/LabelUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cd26e37661c14d41f53aa687eb2909469d2bce77/contracts/utils/LabelUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Label Utilities Library</p>
-<p>Canonical keccak labelhash and <code>.dot</code>-TLD namehash helpers shared by every
-DotNS contract that derives node identifiers from user-supplied labels.</p>
+<p>Canonical keccak labelhash and namehash helpers shared by every DotNS contract that
+derives node identifiers from user-supplied labels.</p>
 <p>Exists so that the identical inline-assembly keccak sequences don't need to
 live in every controller, registrar, or resolver. Every caller that maps a
 label to an on-chain node goes through this library, which is the single
-source of truth for how a label hashes.</p>
+source of truth for how a label hashes. The TLD is supplied by the caller (read from the
+protocol registry), so this library holds no network-specific constant.</p>
 <p>Deliberate non-goals:</p>
 <ul>
 <li>Validation (single-label checks, min-length rules, availability): each caller
@@ -235,11 +236,8 @@ semantics as @custom:function labelhash, different calldata shape.</p>
 </div>
 <h3 id="namehashunder"><a class="header" href="#namehashunder">namehashUnder</a></h3>
 <p>Computes <code>namehash(parent, labelhash)</code> against an arbitrary parent.</p>
-<p>General form of @custom:function namehash; use when the parent is not the <code>.dot</code> TLD
-(e.g. subnode derivation under a non-TLD parent in the forward registry,
-or a PoP namespace root). For top-level <code>.dot</code> registrations prefer</p>
-<p><strong>Note:</strong>
-function: namehash which hard-codes <code>DOT_NODE</code>.</p>
+<p>Pass the TLD node (from the protocol registry) as <code>parent</code> for a top-level
+registration, or a subnode/PoP-namespace node for a nested name.</p>
 <pre><code class="language-solidity">function namehashUnder(bytes32 parent, bytes32 labelhash_)
     internal
     pure
@@ -256,47 +254,49 @@ function: namehash which hard-codes <code>DOT_NODE</code>.</p>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td><code>namehash(parent, labelhash)</code>.</td></tr>
 </tbody></table>
 </div>
-<h3 id="namehash"><a class="header" href="#namehash">namehash</a></h3>
-<p>Computes <code>namehash(DOT_NODE, labelhash)</code> via memory-safe scratch space.</p>
-<p>Specialised to the <code>.dot</code> TLD; cheaper than @custom:function namehashUnder because
-the parent constant is folded in at compile time.</p>
-<pre><code class="language-solidity">function namehash(bytes32 labelhash_) internal pure returns (bytes32 node);
-</code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>labelhash_</code></td><td><code>bytes32</code></td><td><code>keccak256(bytes(label))</code>.</td></tr>
-</tbody></table>
-</div>
-<p><strong>Returns</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node identifier under the <code>.dot</code> TLD.</td></tr>
-</tbody></table>
-</div>
 <h3 id="derivenode"><a class="header" href="#derivenode">deriveNode</a></h3>
-<p>Derives <code>(labelhash, node)</code> from a label in one call.</p>
+<p>Derives <code>(labelhash, node)</code> for a label under a given TLD node in one call.</p>
 <p>Convenience combinator for registration flows: hashes the label
 exactly once and returns both identifiers callers need without
 recomputing.</p>
-<pre><code class="language-solidity">function deriveNode(string calldata label) internal pure returns (bytes32 hash, bytes32 node);
+<pre><code class="language-solidity">function deriveNode(
+    bytes32 tldNode,
+    string calldata label
+)
+    internal
+    pure
+    returns (bytes32 hash, bytes32 node);
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>tldNode</code></td><td><code>bytes32</code></td><td>TLD node to root the name under, read from the protocol registry.</td></tr>
 <tr><td><code>label</code></td><td><code>string</code></td><td>Label string.</td></tr>
 </tbody></table>
 </div>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>hash</code></td><td><code>bytes32</code></td><td><code>keccak256(bytes(label))</code>.</td></tr>
-<tr><td><code>node</code></td><td><code>bytes32</code></td><td><code>namehash(DOT_NODE, hash)</code>.</td></tr>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td><code>namehash(tldNode, hash)</code>.</td></tr>
 </tbody></table>
 </div>
-<h3 id="stripdottld"><a class="header" href="#stripdottld">stripDotTld</a></h3>
-<p>Strips the configured <code>.dot</code> TLD suffix from a stored full name.</p>
-<p>Returns the empty string when the input does not end in the TLD; callers treat
+<h3 id="striptld"><a class="header" href="#striptld">stripTld</a></h3>
+<p>Strips the network's TLD suffix from a stored full name.</p>
+<p>Returns the empty string when the input does not end in <code>tld</code>; callers treat
 an empty return as a "do not trust this record" signal.</p>
-<pre><code class="language-solidity">function stripDotTld(string memory fullName) internal pure returns (string memory label);
+<pre><code class="language-solidity">function stripTld(
+    string memory tldSuffix,
+    string memory fullName
+)
+    internal
+    pure
+    returns (string memory label);
 </code></pre>
-
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>tldSuffix</code></td><td><code>string</code></td><td>TLD suffix including the leading dot, read from the protocol registry.</td></tr>
+<tr><td><code>fullName</code></td><td><code>string</code></td><td>Stored full name to strip.</td></tr>
+</tbody></table>
+</div>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">

@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3081d889f7664832e8b24f598c2d67a7af6bd679/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cd26e37661c14d41f53aa687eb2909469d2bce77/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -355,10 +355,11 @@ lookup yields the canonical full name without re-walking the parent chain.</p>
     internal;
 </code></pre>
 <h3 id="_parentnamehash"><a class="header" href="#_parentnamehash">_parentNamehash</a></h3>
-<p>Computes the namehash of <code>parentLabel</code> rooted at the configured TLD.</p>
+<p>Computes the namehash of <code>parentLabel</code> rooted at the network's TLD node.</p>
 <p>Walks the label right-to-left in calldata using memory-safe assembly to avoid the
-cost of slicing into intermediate <code>bytes</code> and to keep gas linear in the label depth.</p>
-<pre><code class="language-solidity">function _parentNamehash(string calldata parentLabel) internal pure returns (bytes32 node);
+cost of slicing into intermediate <code>bytes</code> and to keep gas linear in the label depth.
+Reads the TLD node from the protocol registry, so it is a view rather than pure.</p>
+<pre><code class="language-solidity">function _parentNamehash(string calldata parentLabel) internal view returns (bytes32 node);
 </code></pre>
 <h3 id="_authorised"><a class="header" href="#_authorised">_authorised</a></h3>
 <p>Internal authorisation check for node ownership.</p>

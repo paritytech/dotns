@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3081d889f7664832e8b24f598c2d67a7af6bd679/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/cd26e37661c14d41f53aa687eb2909469d2bce77/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p><strong>Author:</strong>
@@ -188,7 +188,8 @@ Parity</p>
 <p>Interface for the DotNS protocol-level address registry.</p>
 <p>Single source of truth for sibling lookups. Contracts resolve each other via well-known
 <code>bytes32</code> constants in <code>DotnsConstants</code> so an upgrade or rewire only mutates the
-registry, never the consumers.</p>
+registry, never the consumers. The registry also holds the network's top-level domain,
+so every consumer reads one TLD rather than compiling its own.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
@@ -217,6 +218,17 @@ registered return true. Treats <code>address(0)</code> as never registered regar
 refcount.</p>
 <pre><code class="language-solidity">function isRegisteredAddress(address addr) external view returns (bool registered);
 </code></pre>
+<h3 id="tldnode"><a class="header" href="#tldnode">tldNode</a></h3>
+<p>Returns the namehash of the network's TLD node.</p>
+<p><code>namehash(0, keccak256(bytes(tldLabel)))</code>, fixed at initialisation. Consumers use it
+as the root parent when deriving a name's node.</p>
+<pre><code class="language-solidity">function tldNode() external view returns (bytes32 node);
+</code></pre>
+<h3 id="tld"><a class="header" href="#tld">tld</a></h3>
+<p>Returns the network's TLD suffix, including the leading dot (e.g. <code>.dot</code>).</p>
+<p>Fixed at initialisation. Consumers append it when rendering a label as a full name.</p>
+<pre><code class="language-solidity">function tld() external view returns (string memory suffix);
+</code></pre>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
 <h3 id="addressupdated"><a class="header" href="#addressupdated">AddressUpdated</a></h3>
 <p>Emitted when a protocol address is set or updated.</p>
@@ -226,6 +238,10 @@ refcount.</p>
 <h3 id="zeroaddress"><a class="header" href="#zeroaddress">ZeroAddress</a></h3>
 <p>Thrown when a zero address is provided where one is not allowed.</p>
 <pre><code class="language-solidity">error ZeroAddress();
+</code></pre>
+<h3 id="invalidtld"><a class="header" href="#invalidtld">InvalidTld</a></h3>
+<p>Thrown when the TLD label supplied at initialisation is not a single DNS label.</p>
+<pre><code class="language-solidity">error InvalidTld();
 </code></pre>
 
                     </main>
