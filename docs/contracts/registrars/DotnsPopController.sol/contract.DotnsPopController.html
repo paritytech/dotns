@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/cd26e37661c14d41f53aa687eb2909469d2bce77/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/6397f8e22c82fc894ca2edd7b3a0b76935e70605/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -432,8 +432,13 @@ on a cold-path mint it emits @custom:emits LiteNameReserved and</p>
 <li>
 <p>function: claimLabelStore when the user settles. The base-name leg only runs
 when <code>reservedBaseLabel</code> is non-empty: it validates the DNS-label shape and requires a
-true base label with no trailing digits (otherwise @custom:reverts InvalidBaseLabel)
-before any queue mutation so a bad reservation never touches the queue, advances the
+true base label with no trailing digits (otherwise @custom:reverts InvalidBaseLabel) and
+with no owner on the registrar (otherwise @custom:reverts BaseNameAlreadyRegistered),
+since a name that already has an owner could never be claimed. This validation runs
+before both the lite mint and any queue mutation, so an already-registered
+<code>reservedBaseLabel</code> aborts the whole call and the candidate receives no lite username
+either; callers should validate the reserved label before attesting rather than relying
+on this revert. It then advances the
 head past expired entries (emitting @custom:emits ReservationExpired for each one),
 removes the user from any prior queue position so a single user holds at most one live
 reservation across all labels, and enqueues a fresh entry (emitting</p>
@@ -469,7 +474,10 @@ reverts: InvalidLiteLabel), base-label shape (otherwise</p>
 gateway flow: @custom:function reserveLiteName mints the lite username first, then this
 function reserves the full/base label in a separate transaction so proof-size stays below
 per-call limits. Reverts with @custom:reverts InvalidBaseLabel when the label is empty,
-non-canonical, digit-suffixed, or governance-reserved. The caller remains agnostic about
+non-canonical, digit-suffixed, or governance-reserved, and with</p>
+<p><strong>Note:</strong>
+reverts: BaseNameAlreadyRegistered when the label already has an owner on the
+registrar and so could never be claimed. The caller remains agnostic about
 backend batching; it simply exposes a small retryable primitive.</p>
 <pre><code class="language-solidity">function reserveBaseNameOnly(BaseNameReservation calldata params)
     external
@@ -930,6 +938,24 @@ queue shape intact, so no advance or resync is needed.</p>
 <h3 id="_validatebaselabel"><a class="header" href="#_validatebaselabel">_validateBaseLabel</a></h3>
 <p>Validates a base (full-person) DNS label and derives <code>(labelhash, node)</code>.</p>
 <pre><code class="language-solidity">function _validateBaseLabel(string calldata baseLabel)
+    internal
+    view
+    returns (bytes32 labelhash, bytes32 node);
+</code></pre>
+<h3 id="_validatereservablebaselabel"><a class="header" href="#_validatereservablebaselabel">_validateReservableBaseLabel</a></h3>
+<p>Validates a base label as reservable and returns its hashes.</p>
+<p>Shared by both reservation entrypoints so the guard cannot drift between them. Runs
+three checks and reverts on the first failure, before any reservation state is mutated: the
+label must classify outside the governance-reserved tier and be a base name, be a canonical
+single label, and have no owner on the registrar. The last check is the fix for a
+reservation queued over an already-registered name: the queue keys by stem, so such a
+reservation could never be redeemed yet would lock every two-digit variant of the stem for
+the full reservation window. <code>exists</code> (owner set) mirrors exactly what makes the eventual
+claim's mint revert, so a label that passes here is one a claim can still register.</p>
+<pre><code class="language-solidity">function _validateReservableBaseLabel(
+    IPopRules rules,
+    string calldata baseLabel
+)
     internal
     view
     returns (bytes32 labelhash, bytes32 node);
