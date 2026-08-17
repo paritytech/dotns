@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/6572c1c607b9abe9017f662bbfe2298d15c1cd89/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/7388066abc6c4e3fcb8de5369a4177e215c65e39/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -432,8 +432,13 @@ on a cold-path mint it emits @custom:emits LiteNameReserved and</p>
 <li>
 <p>function: claimLabelStore when the user settles. The base-name leg only runs
 when <code>reservedBaseLabel</code> is non-empty: it validates the DNS-label shape and requires a
-true base label with no trailing digits (otherwise @custom:reverts InvalidBaseLabel)
-before any queue mutation so a bad reservation never touches the queue, advances the
+true base label with no trailing digits (otherwise @custom:reverts InvalidBaseLabel) and
+with no owner on the registrar (otherwise @custom:reverts BaseNameAlreadyRegistered),
+since a name that already has an owner could never be claimed. This validation runs
+before both the lite mint and any queue mutation, so an already-registered
+<code>reservedBaseLabel</code> aborts the whole call and the candidate receives no lite username
+either; callers should validate the reserved label before attesting rather than relying
+on this revert. It then advances the
 head past expired entries (emitting @custom:emits ReservationExpired for each one),
 removes the user from any prior queue position so a single user holds at most one live
 reservation across all labels, and enqueues a fresh entry (emitting</p>
@@ -469,7 +474,10 @@ reverts: InvalidLiteLabel), base-label shape (otherwise</p>
 gateway flow: @custom:function reserveLiteName mints the lite username first, then this
 function reserves the full/base label in a separate transaction so proof-size stays below
 per-call limits. Reverts with @custom:reverts InvalidBaseLabel when the label is empty,
-non-canonical, digit-suffixed, or governance-reserved. The caller remains agnostic about
+non-canonical, digit-suffixed, or governance-reserved, and with</p>
+<p><strong>Note:</strong>
+reverts: BaseNameAlreadyRegistered when the label already has an owner on the
+registrar and so could never be claimed. The caller remains agnostic about
 backend batching; it simply exposes a small retryable primitive.</p>
 <pre><code class="language-solidity">function reserveBaseNameOnly(BaseNameReservation calldata params)
     external
