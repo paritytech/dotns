@@ -27,7 +27,12 @@ contract DotnsPopResolverTests is BaseDotns {
         // Auth runs before the length check, so even a valid 65-byte payload
         // from an unauthorised caller must revert with `NotPopController`.
         vm.prank(ed);
-        vm.expectRevert(abi.encodeWithSelector(IDotnsPopResolver.NotPopController.selector, ed));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopResolver.NotPopController.selector,
+                ed
+            )
+        );
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), _validChatKey(0x04));
     }
 
@@ -49,8 +54,16 @@ contract DotnsPopResolverTests is BaseDotns {
 
     function test_setLiteLink_reverts_for_unauthorised_caller() public {
         vm.prank(ed);
-        vm.expectRevert(abi.encodeWithSelector(IDotnsPopResolver.NotPopController.selector, ed));
-        dotnsPopResolver.setLiteLink(_nodeOf("alice"), keccak256(bytes("alice42")));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopResolver.NotPopController.selector,
+                ed
+            )
+        );
+        dotnsPopResolver.setLiteLink(
+            _nodeOf("alice"),
+            keccak256(bytes("alice42"))
+        );
     }
 
     function test_setChatKey_accepts_zero_node_as_passthrough() public {
@@ -87,7 +100,8 @@ contract DotnsPopResolverTests is BaseDotns {
         vm.prank(address(dotnsPopController));
         vm.expectRevert(
             abi.encodeWithSelector(
-                IDotnsPopResolver.NotPopController.selector, address(dotnsPopController)
+                IDotnsPopResolver.NotPopController.selector,
+                address(dotnsPopController)
             )
         );
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), first);
@@ -113,7 +127,12 @@ contract DotnsPopResolverTests is BaseDotns {
         bytes memory key = new bytes(0);
 
         vm.prank(address(dotnsPopController));
-        vm.expectRevert(abi.encodeWithSelector(IDotnsPopResolver.InvalidChatKeyLength.selector, 0));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopResolver.InvalidChatKeyLength.selector,
+                0
+            )
+        );
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), key);
     }
 
@@ -121,7 +140,12 @@ contract DotnsPopResolverTests is BaseDotns {
         bytes memory key = new bytes(1);
 
         vm.prank(address(dotnsPopController));
-        vm.expectRevert(abi.encodeWithSelector(IDotnsPopResolver.InvalidChatKeyLength.selector, 1));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopResolver.InvalidChatKeyLength.selector,
+                1
+            )
+        );
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), key);
     }
 
@@ -130,7 +154,12 @@ contract DotnsPopResolverTests is BaseDotns {
         bytes memory key = new bytes(64);
 
         vm.prank(address(dotnsPopController));
-        vm.expectRevert(abi.encodeWithSelector(IDotnsPopResolver.InvalidChatKeyLength.selector, 64));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopResolver.InvalidChatKeyLength.selector,
+                64
+            )
+        );
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), key);
     }
 
@@ -139,7 +168,12 @@ contract DotnsPopResolverTests is BaseDotns {
         bytes memory key = new bytes(66);
 
         vm.prank(address(dotnsPopController));
-        vm.expectRevert(abi.encodeWithSelector(IDotnsPopResolver.InvalidChatKeyLength.selector, 66));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopResolver.InvalidChatKeyLength.selector,
+                66
+            )
+        );
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), key);
     }
 
@@ -150,7 +184,10 @@ contract DotnsPopResolverTests is BaseDotns {
 
         vm.prank(address(dotnsPopController));
         vm.expectRevert(
-            abi.encodeWithSelector(IDotnsPopResolver.InvalidChatKeyLength.selector, 1024)
+            abi.encodeWithSelector(
+                IDotnsPopResolver.InvalidChatKeyLength.selector,
+                1024
+            )
         );
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), key);
     }
@@ -161,20 +198,34 @@ contract DotnsPopResolverTests is BaseDotns {
         bytes memory key = _validChatKey(0x04);
 
         vm.prank(ed);
-        vm.expectRevert(abi.encodeWithSelector(IDotnsPopResolver.NotPopController.selector, ed));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopResolver.NotPopController.selector,
+                ed
+            )
+        );
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), key);
     }
 
-    function test_setChatKey_auth_check_precedes_length_check_on_bad_payload() public {
+    function test_setChatKey_auth_check_precedes_length_check_on_bad_payload()
+        public
+    {
         // And the same with a clearly invalid payload: auth wins over length.
         bytes memory key = new bytes(0);
 
         vm.prank(ed);
-        vm.expectRevert(abi.encodeWithSelector(IDotnsPopResolver.NotPopController.selector, ed));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopResolver.NotPopController.selector,
+                ed
+            )
+        );
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), key);
     }
 
-    function test_setLiteLink_same_full_node_relink_clears_old_reverse() public {
+    function test_setLiteLink_same_full_node_relink_clears_old_reverse()
+        public
+    {
         bytes32 fullA = _nodeOf("alice");
         bytes32 liteX = keccak256(bytes("alice42"));
         bytes32 liteY = keccak256(bytes("alice99"));
@@ -285,7 +336,9 @@ contract DotnsPopResolverTests is BaseDotns {
         assertEq(dotnsPopResolver.fullClaim(bytes32(0)), fullA);
     }
 
-    function test_setLiteLink_long_chain_invariant_holds_at_every_step() public {
+    function test_setLiteLink_long_chain_invariant_holds_at_every_step()
+        public
+    {
         // Ten sequential re-links of the same `fullNode` to fresh lite
         // labelhashes. At each step the forward and reverse indices must
         // round-trip for the current pair, and the previous lite's reverse

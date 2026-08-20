@@ -35,9 +35,7 @@ contract DeterministicDeploymentHarness is BaseDeployer {
         address owner,
         address protocolRegistry,
         address factory
-    )
-        external
-    {
+    ) external {
         _registerCreate3Factory(owner, protocolRegistry, factory);
     }
 
@@ -50,11 +48,9 @@ contract DeterministicDeploymentHarness is BaseDeployer {
         string memory artefact,
         bytes memory initialiserCalldata,
         string memory label
-    )
-        external
-        returns (address)
-    {
-        return _broadcastDeployUups(owner, artefact, initialiserCalldata, label);
+    ) external returns (address) {
+        return
+            _broadcastDeployUups(owner, artefact, initialiserCalldata, label);
     }
 
     function deployCreate3(
@@ -62,21 +58,14 @@ contract DeterministicDeploymentHarness is BaseDeployer {
         string memory artefact,
         bytes memory constructorData,
         string memory label
-    )
-        external
-        returns (address)
-    {
+    ) external returns (address) {
         return _broadcastDeployCreate3(owner, artefact, constructorData, label);
     }
 
     function predictCreate3(
         string memory label,
         string memory kind
-    )
-        external
-        view
-        returns (address)
-    {
+    ) external view returns (address) {
         return _predictCreate3(label, kind);
     }
 }

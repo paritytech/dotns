@@ -36,7 +36,10 @@ contract RootGatewayDispatcherTests is BaseDotns {
         _mockCallerIsRoot(false);
     }
 
-    function test_dispatcher_target_is_immutable_and_points_to_controller() public view {
+    function test_dispatcher_target_is_immutable_and_points_to_controller()
+        public
+        view
+    {
         assertEq(dispatcher.TARGET(), address(dotnsPopController));
     }
 
@@ -45,7 +48,9 @@ contract RootGatewayDispatcherTests is BaseDotns {
         bytes memory payload = abi.encodeWithSelector(
             _RESERVE_LITE_TYPED_SELECTOR,
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
+                liteLabel: LITE_LABEL_A,
+                user: ed,
+                chatKey: _validChatKey(0x01)
             })
         );
 
@@ -53,7 +58,7 @@ contract RootGatewayDispatcherTests is BaseDotns {
         // `expectRevert` asserts the failure shape; the return tuple is
         // intentionally discarded.
         // solhint-disable-next-line no-unused-vars
-        (bool ok,) = address(dispatcher).call(payload);
+        (bool ok, ) = address(dispatcher).call(payload);
         ok;
     }
 
@@ -64,7 +69,7 @@ contract RootGatewayDispatcherTests is BaseDotns {
         // Non-payable fallback rejects any non-zero value transfer before the
         // precompile check runs; the revert carries Solidity's default empty
         // payload, not NotRoot, so we just assert the call fails.
-        (bool ok,) = address(dispatcher).call{value: 1 wei}("");
+        (bool ok, ) = address(dispatcher).call{value: 1 wei}("");
         assertFalse(ok);
     }
 
@@ -75,11 +80,13 @@ contract RootGatewayDispatcherTests is BaseDotns {
         bytes memory payload = abi.encodeWithSelector(
             _RESERVE_LITE_TYPED_SELECTOR,
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A_DOTTED, user: ed, chatKey: _validChatKey(0x01)
+                liteLabel: LITE_LABEL_A_DOTTED,
+                user: ed,
+                chatKey: _validChatKey(0x01)
             })
         );
 
-        (bool ok,) = address(dispatcher).call(payload);
+        (bool ok, ) = address(dispatcher).call(payload);
         assertTrue(ok);
 
         bytes32 node = _nodeOf(LITE_LABEL_A);
@@ -95,7 +102,9 @@ contract RootGatewayDispatcherTests is BaseDotns {
         bytes memory payload = abi.encodeWithSelector(
             _RESERVE_LITE_TYPED_SELECTOR,
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
+                liteLabel: LITE_LABEL_A,
+                user: ed,
+                chatKey: _validChatKey(0x01)
             })
         );
 
@@ -120,7 +129,9 @@ contract RootGatewayDispatcherTests is BaseDotns {
         vm.prank(address(dispatcher));
         dotnsPopController.reserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A_DOTTED, user: ed, chatKey: _validChatKey(0x01)
+                liteLabel: LITE_LABEL_A_DOTTED,
+                user: ed,
+                chatKey: _validChatKey(0x01)
             })
         );
 
@@ -132,11 +143,16 @@ contract RootGatewayDispatcherTests is BaseDotns {
         // Caller is neither the registered gateway nor a Root-origin
         // dispatch, so the gateway check rejects it.
         vm.expectRevert(
-            abi.encodeWithSelector(IDotnsPopController.NotGateway.selector, address(this))
+            abi.encodeWithSelector(
+                IDotnsPopController.NotGateway.selector,
+                address(this)
+            )
         );
         dotnsPopController.reserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
+                liteLabel: LITE_LABEL_A,
+                user: ed,
+                chatKey: _validChatKey(0x01)
             })
         );
     }
@@ -153,11 +169,16 @@ contract RootGatewayDispatcherTests is BaseDotns {
         _grantPopFull(ed);
         vm.prank(address(dispatcher));
         vm.expectRevert(
-            abi.encodeWithSelector(IDotnsPopController.NotGateway.selector, address(dispatcher))
+            abi.encodeWithSelector(
+                IDotnsPopController.NotGateway.selector,
+                address(dispatcher)
+            )
         );
         dotnsPopController.reserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
+                liteLabel: LITE_LABEL_A,
+                user: ed,
+                chatKey: _validChatKey(0x01)
             })
         );
     }

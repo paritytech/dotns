@@ -35,8 +35,8 @@ Two facts about your target chain:
 Edit `docker-compose.yaml`, under `command:` → `--node-rpc-url`:
 
 ```yaml
-      - "--node-rpc-url"
-      - "wss://YOUR-CHAIN-WSS-URL-HERE"
+- "--node-rpc-url"
+- "wss://YOUR-CHAIN-WSS-URL-HERE"
 ```
 
 ## Step 2 — Start the adapter
@@ -81,10 +81,10 @@ cp .env.example .env
 Set these in `.env`:
 
 - [ ] `PRIVATE_KEY=0x...` — funded deployer key (first run only; imported into
-  the Foundry keystore, then `.env` is auto-deleted on success).
+      the Foundry keystore, then `.env` is auto-deleted on success).
 - [ ] `ACCOUNT_PASSWORD=...` — any password; encrypts the keystore account.
 - [ ] `WHITELIST_OPERATOR=0x...` — the whitelist manager. **Do not leave the
-  default** unless you intend to use the Parity team operator address.
+      default** unless you intend to use the Parity team operator address.
 - [ ] `RPC_URL=paseo_local` — leave as-is; this is the local adapter on :8545.
 
 ## Step 6 — (Sanity) Build and run the non-fork tests
@@ -112,7 +112,7 @@ After each stage the runner verifies every manifest address actually has
 bytecode. On any failure it restores the previous manifest and stops.
 
 - [ ] Ends with `=== Pipeline complete ===` and
-  `Deleted one-off env file: .env`.
+      `Deleted one-off env file: .env`.
 
 ## Step 8 — Verify
 

@@ -25,27 +25,39 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
         _grantPopLite(registrant);
         vm.startPrank(registrant);
 
-        bytes32 secret = keccak256(abi.encodePacked(nameLabel, registrant, block.timestamp));
-        IDotnsRegistrarController.Registration memory registration =
-            IDotnsRegistrarController.Registration({
-                label: nameLabel, owner: registrant, secret: secret, reserved: true
+        bytes32 secret = keccak256(
+            abi.encodePacked(nameLabel, registrant, block.timestamp)
+        );
+        IDotnsRegistrarController.Registration
+            memory registration = IDotnsRegistrarController.Registration({
+                label: nameLabel,
+                owner: registrant,
+                secret: secret,
+                reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(
+            registration
+        );
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+        vm.warp(
+            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPopRules.PopError.selector, "Requires Full Personhood verification"
+                IPopRules.PopError.selector,
+                "Requires Full Personhood verification"
             )
         );
         dotnsRegistrarController.register(registration);
         vm.stopPrank();
     }
 
-    function test_revert_non_owner_cannot_create_subdomain_under_someone_elses_name() public {
+    function test_revert_non_owner_cannot_create_subdomain_under_someone_elses_name()
+        public
+    {
         address parentOwner = ed;
         address attacker = tiago;
 
@@ -54,9 +66,13 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
 
         bytes32 parentNode = _namehash(dotNode, keccak256(bytes(NAME_POPFULL)));
 
-        IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "blog", parentLabel: NAME_POPFULL, owner: attacker
-        });
+        IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry
+            .SubnodeRecord({
+                parentNode: parentNode,
+                subLabel: "blog",
+                parentLabel: NAME_POPFULL,
+                owner: attacker
+            });
 
         vm.startPrank(attacker);
         vm.expectRevert(IDotnsRegistry.NotAuthorised.selector);
@@ -71,9 +87,13 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
         _commitAndRegister(NAME_POPFULL, parentOwner, true);
         bytes32 parentNode = _namehash(dotNode, keccak256(bytes(NAME_POPFULL)));
 
-        IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "blog", parentLabel: NAME_POPFULL, owner: parentOwner
-        });
+        IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry
+            .SubnodeRecord({
+                parentNode: parentNode,
+                subLabel: "blog",
+                parentLabel: NAME_POPFULL,
+                owner: parentOwner
+            });
 
         vm.startPrank(parentOwner);
         dotnsRegistry.setSubnodeOwner(subnodeRecord);
@@ -98,7 +118,11 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
 
         vm.startPrank(attacker);
         vm.expectRevert(
-            abi.encodeWithSelector(IDotnsContentResolver.NotAuthorised.selector, node, attacker)
+            abi.encodeWithSelector(
+                IDotnsContentResolver.NotAuthorised.selector,
+                node,
+                attacker
+            )
         );
         dotnsContentResolver.setContenthash(node, CID_A);
         vm.stopPrank();

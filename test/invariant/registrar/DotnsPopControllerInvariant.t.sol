@@ -23,11 +23,16 @@ contract DotnsPopControllerInvariant is BaseDotns {
         uint256 actorCount = 72;
         address[] memory handlerActors = new address[](actorCount);
         for (uint256 i = 0; i < actorCount; i++) {
-            handlerActors[i] = makeAddr(string.concat("popActor", vm.toString(i)));
+            handlerActors[i] = makeAddr(
+                string.concat("popActor", vm.toString(i))
+            );
         }
 
-        handler =
-            new PopControllerHandler(dotnsPopController, handlerActors, protocolRegistry.tldNode());
+        handler = new PopControllerHandler(
+            dotnsPopController,
+            handlerActors,
+            protocolRegistry.tldNode()
+        );
         targetContract(address(handler));
 
         bytes4[] memory selectors = new bytes4[](8);
@@ -39,7 +44,9 @@ contract DotnsPopControllerInvariant is BaseDotns {
         selectors[5] = handler.reLink.selector;
         selectors[6] = handler.settlePendingClaim.selector;
         selectors[7] = handler.sweepPendingClaim.selector;
-        targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
+        targetSelector(
+            FuzzSelector({addr: address(handler), selectors: selectors})
+        );
     }
 
     /// @notice Every tracked reservation queue stays bounded by MAX_RESERVATION_QUEUE.
@@ -47,7 +54,9 @@ contract DotnsPopControllerInvariant is BaseDotns {
         uint256 n = handler.reservedLabelsSeenCount();
         for (uint256 i = 0; i < n; i++) {
             bytes32 labelhash = handler.reservedLabelsSeen(i);
-            (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(labelhash);
+            (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(
+                labelhash
+            );
             assertLe(uint256(tail - head), uint256(handler.MAX_QUEUE()));
         }
     }
@@ -62,21 +71,24 @@ contract DotnsPopControllerInvariant is BaseDotns {
             string memory baseLabel = handler.baseLabelAt(i);
             bytes32 labelhash = keccak256(bytes(baseLabel));
 
-            (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(labelhash);
+            (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(
+                labelhash
+            );
             address expected;
             if (head < tail) {
-                (address headOwner, uint64 joinedAt) =
-                    dotnsPopController.reservationEntry(labelhash, head);
+                (address headOwner, uint64 joinedAt) = dotnsPopController
+                    .reservationEntry(labelhash, head);
                 if (
-                    headOwner != address(0)
-                        && uint256(joinedAt) + uint256(dotnsPopController.reservationDuration())
-                            > block.timestamp
+                    headOwner != address(0) &&
+                    uint256(joinedAt) +
+                        uint256(dotnsPopController.reservationDuration()) >
+                    block.timestamp
                 ) {
                     expected = headOwner;
                 }
             }
 
-            (address popHolder,) = popRules.getBaseNameReservation(baseLabel);
+            (address popHolder, ) = popRules.getBaseNameReservation(baseLabel);
             if (expected != address(0)) {
                 assertEq(popHolder, expected, "PopRules head != queue head");
             }
@@ -91,18 +103,22 @@ contract DotnsPopControllerInvariant is BaseDotns {
         uint256 count = handler.actorsCount();
         for (uint256 i = 0; i < count; i++) {
             address actor = handler.actors(i);
-            IDotnsPopController.UserReservation memory reservation =
-                dotnsPopController.userReservation(actor);
+            IDotnsPopController.UserReservation
+                memory reservation = dotnsPopController.userReservation(actor);
             if (reservation.labelhash == bytes32(0)) continue;
 
-            (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(reservation.labelhash);
+            (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(
+                reservation.labelhash
+            );
             assertTrue(
                 reservation.index >= head && reservation.index < tail,
                 "reservation index out of live range"
             );
 
-            (address entryOwner,) =
-                dotnsPopController.reservationEntry(reservation.labelhash, reservation.index);
+            (address entryOwner, ) = dotnsPopController.reservationEntry(
+                reservation.labelhash,
+                reservation.index
+            );
             assertEq(entryOwner, actor, "reservation entry owner mismatch");
         }
     }
@@ -114,7 +130,11 @@ contract DotnsPopControllerInvariant is BaseDotns {
         uint256 n = handler.mintedLiteTokenCount();
         for (uint256 i = 0; i < n; i++) {
             uint256 tokenId = handler.mintedLiteTokenIds(i);
-            assertGt(bytes(dotnsRegistrar.labelOf(tokenId)).length, 0, "empty labelOf");
+            assertGt(
+                bytes(dotnsRegistrar.labelOf(tokenId)).length,
+                0,
+                "empty labelOf"
+            );
         }
     }
 
@@ -129,15 +149,25 @@ contract DotnsPopControllerInvariant is BaseDotns {
             bytes32 liteLabelhash = handler.claimedLiteLabelhashes(i);
             bytes32 fullNode = handler.claimedFullNodes(i);
 
-            bytes32 currentFullForLite = dotnsPopResolver.fullClaim(liteLabelhash);
+            bytes32 currentFullForLite = dotnsPopResolver.fullClaim(
+                liteLabelhash
+            );
             bytes32 currentLiteForFull = dotnsPopResolver.liteLink(fullNode);
 
             // Either the pair is still live on both sides, or both sides
             // have been cleared. Anything else is a partial overwrite.
             if (currentFullForLite == fullNode) {
-                assertEq(currentLiteForFull, liteLabelhash, "live fullClaim but liteLink drifted");
+                assertEq(
+                    currentLiteForFull,
+                    liteLabelhash,
+                    "live fullClaim but liteLink drifted"
+                );
             } else if (currentLiteForFull == liteLabelhash) {
-                assertEq(currentFullForLite, fullNode, "live liteLink but fullClaim drifted");
+                assertEq(
+                    currentFullForLite,
+                    fullNode,
+                    "live liteLink but fullClaim drifted"
+                );
             }
             // Else: both sides were overwritten. Covered by the stale
             // invariants below.
@@ -154,7 +184,11 @@ contract DotnsPopControllerInvariant is BaseDotns {
             bytes32 fullNode = handler.claimedFullNodes(i);
             bytes32 currentLite = dotnsPopResolver.liteLink(fullNode);
             if (currentLite == bytes32(0)) continue;
-            assertEq(dotnsPopResolver.fullClaim(currentLite), fullNode, "stale liteLink");
+            assertEq(
+                dotnsPopResolver.fullClaim(currentLite),
+                fullNode,
+                "stale liteLink"
+            );
         }
     }
 
@@ -167,7 +201,11 @@ contract DotnsPopControllerInvariant is BaseDotns {
             bytes32 liteLabelhash = handler.claimedLiteLabelhashes(i);
             bytes32 currentFull = dotnsPopResolver.fullClaim(liteLabelhash);
             if (currentFull == bytes32(0)) continue;
-            assertEq(dotnsPopResolver.liteLink(currentFull), liteLabelhash, "stale fullClaim");
+            assertEq(
+                dotnsPopResolver.liteLink(currentFull),
+                liteLabelhash,
+                "stale fullClaim"
+            );
         }
     }
 
@@ -176,10 +214,20 @@ contract DotnsPopControllerInvariant is BaseDotns {
     ///         entry appears in the enumeration, and every entry in the
     ///         enumeration has a non-empty queue and is one of the actors the
     ///         handler has stashed for.
-    function invariant_pendingClaimUsers_mirrors_pendingClaims_mapping() public view {
+    function invariant_pendingClaimUsers_mirrors_pendingClaims_mapping()
+        public
+        view
+    {
         uint256 enumCount = dotnsPopController.pendingClaimUserCount();
-        address[] memory enumerated = dotnsPopController.pendingClaimUsers(0, enumCount);
-        assertEq(enumerated.length, enumCount, "pendingClaimUsers length mismatch");
+        address[] memory enumerated = dotnsPopController.pendingClaimUsers(
+            0,
+            enumCount
+        );
+        assertEq(
+            enumerated.length,
+            enumCount,
+            "pendingClaimUsers length mismatch"
+        );
 
         for (uint256 i = 0; i < enumerated.length; i++) {
             assertGt(
@@ -200,14 +248,20 @@ contract DotnsPopControllerInvariant is BaseDotns {
                     break;
                 }
             }
-            assertTrue(found, "actor with mintedAt missing from pendingClaimUsers");
+            assertTrue(
+                found,
+                "actor with mintedAt missing from pendingClaimUsers"
+            );
         }
     }
 
     /// @notice A user with a deployed `LabelStore` cannot simultaneously hold a
     ///         pending claim: settlement deploys the store and clears the
     ///         entry in the same call, expiry clears without deploying.
-    function invariant_pending_claim_and_label_store_are_mutually_exclusive() public view {
+    function invariant_pending_claim_and_label_store_are_mutually_exclusive()
+        public
+        view
+    {
         IStoreFactory factory = IStoreFactory(address(storeFactory));
         uint256 seen = handler.pendingClaimActorsSeenCount();
         for (uint256 i = 0; i < seen; i++) {
@@ -224,9 +278,15 @@ contract DotnsPopControllerInvariant is BaseDotns {
     /// @notice `pendingClaimUserCount()` equals the length of the enumeration
     ///         slice taken with offset zero and a generous limit. Catches
     ///         pagination accounting drift.
-    function invariant_pendingClaimUserCount_matches_enumeration_length() public view {
+    function invariant_pendingClaimUserCount_matches_enumeration_length()
+        public
+        view
+    {
         uint256 count = dotnsPopController.pendingClaimUserCount();
-        address[] memory page = dotnsPopController.pendingClaimUsers(0, count == 0 ? 1 : count);
+        address[] memory page = dotnsPopController.pendingClaimUsers(
+            0,
+            count == 0 ? 1 : count
+        );
         assertEq(page.length, count, "count != enumeration length");
     }
 
@@ -246,12 +306,15 @@ contract DotnsPopControllerInvariant is BaseDotns {
         uint256 seen = handler.pendingClaimActorsSeenCount();
         for (uint256 i = 0; i < seen; i++) {
             address actor = handler.pendingClaimActorsSeen(i);
-            IDotnsPopController.PendingClaim[] memory pending =
-                dotnsPopController.pendingClaims(actor);
+            IDotnsPopController.PendingClaim[]
+                memory pending = dotnsPopController.pendingClaims(actor);
             for (uint256 j = 0; j < pending.length; j++) {
-                uint256 deadline = uint256(pending[j].mintedAt) + uint256(duration);
+                uint256 deadline = uint256(pending[j].mintedAt) +
+                    uint256(duration);
                 assertLe(
-                    block.timestamp, deadline + uint256(duration), "lapsed entry stuck past grace"
+                    block.timestamp,
+                    deadline + uint256(duration),
+                    "lapsed entry stuck past grace"
                 );
             }
         }

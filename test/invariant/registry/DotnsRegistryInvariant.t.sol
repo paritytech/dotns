@@ -76,12 +76,13 @@ contract DotnsRegistryInvariantTest is BaseDotns {
             if (bytes(parentLabel).length == 0) continue;
 
             // Parent should be able to reassign
-            IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry.SubnodeRecord({
-                parentNode: parentNode,
-                subLabel: "sub",
-                parentLabel: parentLabel,
-                owner: parentOwner
-            });
+            IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry
+                .SubnodeRecord({
+                    parentNode: parentNode,
+                    subLabel: "sub",
+                    parentLabel: parentLabel,
+                    owner: parentOwner
+                });
 
             vm.prank(parentOwner);
             dotnsRegistry.setSubnodeOwner(record);
@@ -102,7 +103,11 @@ contract DotnsRegistryInvariantTest is BaseDotns {
 
         for (uint256 i; i < subnodes.length; ++i) {
             address currentOwner = dotnsRegistry.owner(subnodes[i]);
-            assertEq(currentOwner, owners[i], "Registry owner must match tracked owner");
+            assertEq(
+                currentOwner,
+                owners[i],
+                "Registry owner must match tracked owner"
+            );
         }
     }
 
@@ -111,7 +116,10 @@ contract DotnsRegistryInvariantTest is BaseDotns {
         bytes32[] memory subnodes = handler.getSubnodeHashes();
 
         for (uint256 i; i < subnodes.length; ++i) {
-            assertTrue(dotnsRegistry.recordExists(subnodes[i]), "Subnode must exist after creation");
+            assertTrue(
+                dotnsRegistry.recordExists(subnodes[i]),
+                "Subnode must exist after creation"
+            );
         }
     }
 }

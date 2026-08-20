@@ -22,7 +22,11 @@ contract DotnsRegistrarControllerRoleInvariantTest is BaseDotns {
         actors[1] = leonardo;
         actors[2] = tiago;
 
-        handler = new RegistrarControllerRoleHandler(dotnsRegistrarController, owner, actors);
+        handler = new RegistrarControllerRoleHandler(
+            dotnsRegistrarController,
+            owner,
+            actors
+        );
 
         targetContract(address(handler));
 
@@ -30,7 +34,9 @@ contract DotnsRegistrarControllerRoleInvariantTest is BaseDotns {
         selectors[0] = handler.setWhitelistOperator.selector;
         selectors[1] = handler.grantWhitelistOperator.selector;
         selectors[2] = handler.revokeWhitelistOperator.selector;
-        targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
+        targetSelector(
+            FuzzSelector({addr: address(handler), selectors: selectors})
+        );
 
         excludeContract(address(dotnsRegistrarController));
     }
@@ -38,14 +44,20 @@ contract DotnsRegistrarControllerRoleInvariantTest is BaseDotns {
     /// @notice The on-chain `WHITELIST_OPERATOR_ROLE` membership for every
     ///         actor matches the handler's ghost record after any sequence of
     ///         grants, revokes, and setRole calls.
-    function invariant_whitelist_operator_role_matches_ghost_state() public view {
+    function invariant_whitelist_operator_role_matches_ghost_state()
+        public
+        view
+    {
         address[] memory actors = handler.actors();
 
         for (uint256 i; i < actors.length; ++i) {
             address actor = actors[i];
 
             assertEq(
-                dotnsRegistrarController.hasRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, actor),
+                dotnsRegistrarController.hasRole(
+                    DotnsConstants.WHITELIST_OPERATOR_ROLE,
+                    actor
+                ),
                 handler.ghostWhitelistOperator(actor),
                 "Whitelist operator role must match handler state"
             );

@@ -17,7 +17,11 @@ interface ILabelStore is IDotnsStore {
     /// labelhash. @param owner The user this store is bound to.
     /// @param labelhash The labelhash key.
     /// @param label The stored label string (typically the full name, e.g. "alice.dot").
-    event LabelStored(address indexed owner, bytes32 indexed labelhash, string label);
+    event LabelStored(
+        address indexed owner,
+        bytes32 indexed labelhash,
+        string label
+    );
 
     /// @notice Thrown when a caller that is not currently protocol-registered attempts a write.
     /// @param caller The msg.sender that failed the `isRegisteredAddress` check.
@@ -61,7 +65,10 @@ interface ILabelStore is IDotnsStore {
 
     /// @notice Returns the protocol registry this store queries for write authorisation.
     /// @return protocolRegistry_ The registry address.
-    function protocolRegistry() external view returns (address protocolRegistry_);
+    function protocolRegistry()
+        external
+        view
+        returns (address protocolRegistry_);
 
     /// @notice Returns true iff a label has been stored under `labelhash`.
     /// @param labelhash The labelhash to check.
@@ -78,7 +85,9 @@ interface ILabelStore is IDotnsStore {
     /// @notice Returns the stored label for `labelhash`, or the empty string if none.
     /// @param labelhash The labelhash to look up.
     /// @return label The stored label string.
-    function getLabel(bytes32 labelhash) external view returns (string memory label);
+    function getLabel(
+        bytes32 labelhash
+    ) external view returns (string memory label);
 
     /// @notice Returns the total number of labels ever stored.
     /// @return count Current length of the insertion-order list.
@@ -89,12 +98,16 @@ interface ILabelStore is IDotnsStore {
     ///      labelhash. For the underlying labelhash key see @custom:function getLabelhashAt.
     /// @param index Zero-based index into the insertion-order list.
     /// @return label The stored label string at `index`.
-    function getLabelAt(uint256 index) external view returns (string memory label);
+    function getLabelAt(
+        uint256 index
+    ) external view returns (string memory label);
 
     /// @notice Returns the labelhash at the given insertion-order index.
     /// @param index Zero-based index into the insertion-order list.
     /// @return labelhash The labelhash at `index`.
-    function getLabelhashAt(uint256 index) external view returns (bytes32 labelhash);
+    function getLabelhashAt(
+        uint256 index
+    ) external view returns (bytes32 labelhash);
 
     /// @notice Paginated read returning just the stored labels, in insertion order.
     /// @dev Primary bulk read for "give me all my names". Callers never need to touch
@@ -103,7 +116,10 @@ interface ILabelStore is IDotnsStore {
     /// @param offset Start index.
     /// @param limit Maximum entries to return.
     /// @return labels Slice of label strings.
-    function getLabels(uint256 offset, uint256 limit) external view returns (string[] memory labels);
+    function getLabels(
+        uint256 offset,
+        uint256 limit
+    ) external view returns (string[] memory labels);
 
     /// @notice Paginated read over the labelhash keys, in insertion order.
     /// @dev Advanced read for callers that need the raw labelhash keys. Symmetric with
@@ -114,8 +130,5 @@ interface ILabelStore is IDotnsStore {
     function getLabelhashes(
         uint256 offset,
         uint256 limit
-    )
-        external
-        view
-        returns (bytes32[] memory labelhashes);
+    ) external view returns (bytes32[] memory labelhashes);
 }

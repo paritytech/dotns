@@ -16,23 +16,28 @@ contract DotnsNameEscrowRefundHarness is DotnsNameEscrow {
         address recipient,
         uint256 amount,
         uint256 tokenId
-    )
-        external
-        payable
-        returns (uint256 entryId)
-    {
+    ) external payable returns (uint256 entryId) {
         entryId = _creditRefund(recipient, amount, tokenId);
     }
 
-    function exposeRemoveRefundEntry(uint256 entryId, address recipient) external {
+    function exposeRemoveRefundEntry(
+        uint256 entryId,
+        address recipient
+    ) external {
         _removeRefundEntry(entryId, recipient);
     }
 
-    function exposeEntryIndexPlusOne(uint256 entryId) external view returns (uint256) {
+    function exposeEntryIndexPlusOne(
+        uint256 entryId
+    ) external view returns (uint256) {
         // Cannot access private storage directly across contracts, so derive from the public view.
         IDotnsNameEscrow.RefundEntry memory entry = this.refundEntry(entryId);
         if (entry.amount == 0) return 0;
-        uint256[] memory ids = this.pendingRefundIds(entry.recipient, 0, MAX_REFUND_PAGE_SIZE);
+        uint256[] memory ids = this.pendingRefundIds(
+            entry.recipient,
+            0,
+            MAX_REFUND_PAGE_SIZE
+        );
         for (uint256 i = 0; i < ids.length; ++i) {
             if (ids[i] == entryId) return i + 1;
         }
@@ -66,7 +71,8 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         // constructor disables initialisers.
         DotnsNameEscrowRefundHarness impl = new DotnsNameEscrowRefundHarness();
         bytes memory initData = abi.encodeCall(
-            DotnsNameEscrow.initialize, (IDotnsProtocolRegistry(address(protocolRegistry)), 1 hours)
+            DotnsNameEscrow.initialize,
+            (IDotnsProtocolRegistry(address(protocolRegistry)), 1 hours)
         );
         address proxy = address(new ERC1967Proxy(address(impl), initData));
         harness = DotnsNameEscrowRefundHarness(payable(proxy));
@@ -80,10 +86,7 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         address to,
         uint256 amount,
         uint256 tokenId
-    )
-        internal
-        returns (uint256 entryId)
-    {
+    ) internal returns (uint256 entryId) {
         entryId = harness.exposeCreditRefund(to, amount, tokenId);
     }
 
@@ -92,8 +95,14 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     }
 
     function _assertEntryDeleted(uint256 entryId) internal view {
-        IDotnsNameEscrow.RefundEntry memory entry = harness.refundEntry(entryId);
-        assertEq(entry.recipient, address(0), "entry recipient should be zeroed");
+        IDotnsNameEscrow.RefundEntry memory entry = harness.refundEntry(
+            entryId
+        );
+        assertEq(
+            entry.recipient,
+            address(0),
+            "entry recipient should be zeroed"
+        );
         assertEq(entry.amount, 0, "entry amount should be zero");
         assertEq(entry.availableAt, 0, "entry availableAt should be zero");
         assertEq(entry.tokenId, 0, "entry tokenId should be zero");
@@ -123,7 +132,9 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
             "first entry cooldown must not move when second is credited"
         );
         assertGt(
-            secondAvailableAt, firstAvailableAt, "later entry's clock starts at its credit time"
+            secondAvailableAt,
+            firstAvailableAt,
+            "later entry's clock starts at its credit time"
         );
     }
 
@@ -140,7 +151,13 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     function test_creditRefund_emitsRefundCredited() public {
         uint64 expectedAvailableAt = uint64(block.timestamp + DEFAULT_COOLDOWN);
         vm.expectEmit(true, true, true, true, address(harness));
-        emit IDotnsNameEscrow.RefundCredited(recipient, 1, 1 ether, expectedAvailableAt, TOKEN_ID);
+        emit IDotnsNameEscrow.RefundCredited(
+            recipient,
+            1,
+            1 ether,
+            expectedAvailableAt,
+            TOKEN_ID
+        );
         _credit(recipient, 1 ether, TOKEN_ID);
     }
 
@@ -153,8 +170,16 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         uint256 amount = harness.claimRefund(entryId);
 
         assertEq(amount, 1 ether, "claim returns the credited amount");
-        assertEq(recipient.balance - before, 1 ether, "recipient receives the credited amount");
-        assertEq(harness.pendingRefundCount(recipient), 0, "entry is removed from enumeration");
+        assertEq(
+            recipient.balance - before,
+            1 ether,
+            "recipient receives the credited amount"
+        );
+        assertEq(
+            harness.pendingRefundCount(recipient),
+            0,
+            "entry is removed from enumeration"
+        );
         _assertEntryDeleted(entryId);
     }
 
@@ -165,7 +190,9 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         vm.prank(otherRecipient);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IDotnsNameEscrow.NotRefundRecipient.selector, otherRecipient, TOKEN_ID
+                IDotnsNameEscrow.NotRefundRecipient.selector,
+                otherRecipient,
+                TOKEN_ID
             )
         );
         harness.claimRefund(entryId);
@@ -177,7 +204,11 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
 
         vm.prank(recipient);
         vm.expectRevert(
-            abi.encodeWithSelector(IDotnsNameEscrow.RefundLocked.selector, entryId, availableAt)
+            abi.encodeWithSelector(
+                IDotnsNameEscrow.RefundLocked.selector,
+                entryId,
+                availableAt
+            )
         );
         harness.claimRefund(entryId);
     }
@@ -198,7 +229,12 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         _warpPast(harness.refundEntry(entryId).availableAt);
 
         vm.prank(address(rejecter));
-        vm.expectRevert(abi.encodeWithSelector(IDotnsNameEscrow.RefundFailed.selector, TOKEN_ID));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsNameEscrow.RefundFailed.selector,
+                TOKEN_ID
+            )
+        );
         harness.claimRefund(entryId);
     }
 
@@ -218,8 +254,16 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         uint256 total = harness.claimRefundsBatch(ids);
 
         assertEq(total, 6 ether, "batch returns the aggregate amount");
-        assertEq(recipient.balance - before, 6 ether, "recipient receives the aggregate");
-        assertEq(harness.pendingRefundCount(recipient), 0, "all entries removed");
+        assertEq(
+            recipient.balance - before,
+            6 ether,
+            "recipient receives the aggregate"
+        );
+        assertEq(
+            harness.pendingRefundCount(recipient),
+            0,
+            "all entries removed"
+        );
     }
 
     function test_claimRefundsBatch_atomicOnLockedEntry() public {
@@ -241,12 +285,20 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         uint256 before = recipient.balance;
         vm.prank(recipient);
         vm.expectRevert(
-            abi.encodeWithSelector(IDotnsNameEscrow.RefundLocked.selector, b, bAvailableAt)
+            abi.encodeWithSelector(
+                IDotnsNameEscrow.RefundLocked.selector,
+                b,
+                bAvailableAt
+            )
         );
         harness.claimRefundsBatch(ids);
 
         assertEq(recipient.balance, before, "no partial transfer occurred");
-        assertEq(harness.pendingRefundCount(recipient), 3, "no entry was removed");
+        assertEq(
+            harness.pendingRefundCount(recipient),
+            3,
+            "no entry was removed"
+        );
         assertEq(harness.refundEntry(a).amount, 1 ether, "A still credited");
         assertEq(harness.refundEntry(b).amount, 2 ether, "B still credited");
         assertEq(harness.refundEntry(c).amount, 3 ether, "C still credited");
@@ -255,7 +307,9 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     function test_claimRefundsBatch_revertsOnEmpty() public {
         uint256[] memory empty = new uint256[](0);
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSelector(IDotnsNameEscrow.InvalidPageSize.selector, 0));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsNameEscrow.InvalidPageSize.selector, 0)
+        );
         harness.claimRefundsBatch(empty);
     }
 

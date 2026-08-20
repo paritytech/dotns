@@ -9,7 +9,11 @@ import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 /// @notice Unit tests for the address record on @custom:contract DotnsResolver.
 contract DotnsResolverTests is BaseDotns {
     function test_setaddress_emits_event_and_persists() public {
-        bytes32 node = _register("longnamehere01", ed, IPopRules.PopStatus.NoStatus);
+        bytes32 node = _register(
+            "longnamehere01",
+            ed,
+            IPopRules.PopStatus.NoStatus
+        );
 
         vm.expectEmit(true, true, true, true);
         emit IDotnsResolver.AddressSet(node, leonardo);
@@ -21,7 +25,11 @@ contract DotnsResolverTests is BaseDotns {
     }
 
     function test_setaddress_overwrites_previous_value() public {
-        bytes32 node = _register("overwriteaddr01", ed, IPopRules.PopStatus.NoStatus);
+        bytes32 node = _register(
+            "overwriteaddr01",
+            ed,
+            IPopRules.PopStatus.NoStatus
+        );
 
         vm.startPrank(ed);
         dotnsResolver.setAddress(node, leonardo);

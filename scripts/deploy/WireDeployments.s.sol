@@ -88,7 +88,10 @@ contract WireDeployments is BaseDeployer {
         addr.rootGatewayDispatcher = _readAddress("RootGatewayDispatcher");
     }
 
-    function _authoriseControllers(address owner, Addresses memory addr) internal {
+    function _authoriseControllers(
+        address owner,
+        Addresses memory addr
+    ) internal {
         DotnsRegistrar registrar = DotnsRegistrar(addr.registrar);
         vm.startBroadcast(owner);
         registrar.addController(IDotnsController(addr.registrarController));
@@ -96,8 +99,13 @@ contract WireDeployments is BaseDeployer {
         vm.stopBroadcast();
     }
 
-    function _wireProtocolRegistryKeys(address owner, Addresses memory addr) internal {
-        DotnsProtocolRegistry registry = DotnsProtocolRegistry(addr.protocolRegistry);
+    function _wireProtocolRegistryKeys(
+        address owner,
+        Addresses memory addr
+    ) internal {
+        DotnsProtocolRegistry registry = DotnsProtocolRegistry(
+            addr.protocolRegistry
+        );
 
         vm.startBroadcast(owner);
         registry.set(DotnsConstants.REGISTRAR, addr.registrar);
@@ -121,12 +129,13 @@ contract WireDeployments is BaseDeployer {
         address owner,
         Addresses memory addr,
         address whitelistOperator
-    )
-        internal
-    {
+    ) internal {
         vm.startBroadcast(owner);
-        DotnsRegistrarController(addr.registrarController)
-            .setRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, whitelistOperator, true);
+        DotnsRegistrarController(addr.registrarController).setRole(
+            DotnsConstants.WHITELIST_OPERATOR_ROLE,
+            whitelistOperator,
+            true
+        );
         vm.stopBroadcast();
         console.log("Whitelist operator role granted to", whitelistOperator);
     }
@@ -135,26 +144,36 @@ contract WireDeployments is BaseDeployer {
         Addresses memory addr,
         address expectedOwner,
         address whitelistOperator
-    )
-        internal
-        view
-    {
-        require(DotnsRegistrar(addr.registrar).owner() == expectedOwner, "Registrar: wrong owner");
+    ) internal view {
         require(
-            DotnsRegistrarController(addr.registrarController).owner() == expectedOwner,
+            DotnsRegistrar(addr.registrar).owner() == expectedOwner,
+            "Registrar: wrong owner"
+        );
+        require(
+            DotnsRegistrarController(addr.registrarController).owner() ==
+                expectedOwner,
             "Controller: wrong owner"
         );
-        require(DotnsRegistry(addr.registry).owner() == expectedOwner, "Registry: wrong owner");
+        require(
+            DotnsRegistry(addr.registry).owner() == expectedOwner,
+            "Registry: wrong owner"
+        );
         require(
             DotnsReverseResolver(addr.reverseResolver).owner() == expectedOwner,
             "ReverseResolver: wrong owner"
         );
-        require(DotnsResolver(addr.resolver).owner() == expectedOwner, "Resolver: wrong owner");
+        require(
+            DotnsResolver(addr.resolver).owner() == expectedOwner,
+            "Resolver: wrong owner"
+        );
         require(
             DotnsContentResolver(addr.contentResolver).owner() == expectedOwner,
             "ContentResolver: wrong owner"
         );
-        require(PopRules(addr.popRules).owner() == expectedOwner, "PopRules: wrong owner");
+        require(
+            PopRules(addr.popRules).owner() == expectedOwner,
+            "PopRules: wrong owner"
+        );
         require(
             DotnsNameEscrow(payable(addr.nameEscrow)).owner() == expectedOwner,
             "NameEscrow: wrong owner"
@@ -164,54 +183,91 @@ contract WireDeployments is BaseDeployer {
             "PopController: wrong owner"
         );
         require(
-            DotnsPopResolver(addr.popResolver).owner() == expectedOwner, "PopResolver: wrong owner"
+            DotnsPopResolver(addr.popResolver).owner() == expectedOwner,
+            "PopResolver: wrong owner"
         );
         require(
-            DotnsProtocolRegistry(addr.protocolRegistry).owner() == expectedOwner,
+            DotnsProtocolRegistry(addr.protocolRegistry).owner() ==
+                expectedOwner,
             "ProtocolRegistry: wrong owner"
         );
 
-        DotnsProtocolRegistry registry = DotnsProtocolRegistry(addr.protocolRegistry);
-        require(registry.get(DotnsConstants.REGISTRAR) == addr.registrar, "Key: registrar");
-        require(
-            registry.get(DotnsConstants.CONTROLLER) == addr.registrarController, "Key: controller"
+        DotnsProtocolRegistry registry = DotnsProtocolRegistry(
+            addr.protocolRegistry
         );
-        require(registry.get(DotnsConstants.REGISTRY) == addr.registry, "Key: registry");
         require(
-            registry.get(DotnsConstants.REVERSE_RESOLVER) == addr.reverseResolver,
+            registry.get(DotnsConstants.REGISTRAR) == addr.registrar,
+            "Key: registrar"
+        );
+        require(
+            registry.get(DotnsConstants.CONTROLLER) == addr.registrarController,
+            "Key: controller"
+        );
+        require(
+            registry.get(DotnsConstants.REGISTRY) == addr.registry,
+            "Key: registry"
+        );
+        require(
+            registry.get(DotnsConstants.REVERSE_RESOLVER) ==
+                addr.reverseResolver,
             "Key: reverseResolver"
         );
-        require(registry.get(DotnsConstants.RESOLVER) == addr.resolver, "Key: resolver");
         require(
-            registry.get(DotnsConstants.CONTENT_RESOLVER) == addr.contentResolver,
+            registry.get(DotnsConstants.RESOLVER) == addr.resolver,
+            "Key: resolver"
+        );
+        require(
+            registry.get(DotnsConstants.CONTENT_RESOLVER) ==
+                addr.contentResolver,
             "Key: contentResolver"
         );
-        require(registry.get(DotnsConstants.POP_RULES) == addr.popRules, "Key: popRules");
         require(
-            registry.get(DotnsConstants.STORE_FACTORY) == addr.storeFactory, "Key: storeFactory"
+            registry.get(DotnsConstants.POP_RULES) == addr.popRules,
+            "Key: popRules"
         );
-        require(registry.get(DotnsConstants.NAME_ESCROW) == addr.nameEscrow, "Key: nameEscrow");
-        require(registry.get(DotnsConstants.MULTICALL3) == addr.multicall3, "Key: multicall3");
         require(
-            registry.get(DotnsConstants.POP_CONTROLLER) == addr.popController, "Key: popController"
+            registry.get(DotnsConstants.STORE_FACTORY) == addr.storeFactory,
+            "Key: storeFactory"
         );
-        require(registry.get(DotnsConstants.POP_RESOLVER) == addr.popResolver, "Key: popResolver");
         require(
-            registry.get(DotnsConstants.POP_GATEWAY) == addr.rootGatewayDispatcher,
+            registry.get(DotnsConstants.NAME_ESCROW) == addr.nameEscrow,
+            "Key: nameEscrow"
+        );
+        require(
+            registry.get(DotnsConstants.MULTICALL3) == addr.multicall3,
+            "Key: multicall3"
+        );
+        require(
+            registry.get(DotnsConstants.POP_CONTROLLER) == addr.popController,
+            "Key: popController"
+        );
+        require(
+            registry.get(DotnsConstants.POP_RESOLVER) == addr.popResolver,
+            "Key: popResolver"
+        );
+        require(
+            registry.get(DotnsConstants.POP_GATEWAY) ==
+                addr.rootGatewayDispatcher,
             "Key: popGateway"
         );
 
         require(
-            DotnsRegistrar(addr.registrar).controllers(IDotnsController(addr.registrarController)),
+            DotnsRegistrar(addr.registrar).controllers(
+                IDotnsController(addr.registrarController)
+            ),
             "Controller: not authorised"
         );
         require(
-            DotnsRegistrar(addr.registrar).controllers(IDotnsController(addr.popController)),
+            DotnsRegistrar(addr.registrar).controllers(
+                IDotnsController(addr.popController)
+            ),
             "PopController: not authorised"
         );
         require(
-            DotnsRegistrarController(addr.registrarController)
-                .hasRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, whitelistOperator),
+            DotnsRegistrarController(addr.registrarController).hasRole(
+                DotnsConstants.WHITELIST_OPERATOR_ROLE,
+                whitelistOperator
+            ),
             "WhitelistOperator: role not granted"
         );
 

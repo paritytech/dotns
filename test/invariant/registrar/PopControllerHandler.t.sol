@@ -2,10 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {Test} from "forge-std/Test.sol";
-import {
-    DotnsPopController,
-    IDotnsPopController
-} from "../../../contracts/registrars/DotnsPopController.sol";
+import {DotnsPopController, IDotnsPopController} from "../../../contracts/registrars/DotnsPopController.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 import {LabelUtils} from "../../../contracts/utils/LabelUtils.sol";
 import {ISystem} from "../../../contracts/external/revive/ISystem.sol";
@@ -75,7 +72,11 @@ contract PopControllerHandler is Test {
     /// @param controller_ The PoP controller under test.
     /// @param actors_ Pool of accounts the handler cycles through.
     /// @param tldNode_ Node hash of the suite's TLD, from the deployed protocol registry.
-    constructor(DotnsPopController controller_, address[] memory actors_, bytes32 tldNode_) {
+    constructor(
+        DotnsPopController controller_,
+        address[] memory actors_,
+        bytes32 tldNode_
+    ) {
         CONTROLLER = controller_;
         TLD_NODE = tldNode_;
         actors = actors_;
@@ -101,14 +102,22 @@ contract PopControllerHandler is Test {
     /// @dev Status byte mirrors the precompile's wire format: 0 = NoStatus,
     ///      1 = PopLite, 2 = PopFull. A zero status clears the context alias.
     function _mockPersonhoodTier(address account, uint8 statusByte) internal {
-        bytes32 contextAlias =
-            statusByte == 0 ? bytes32(0) : keccak256(abi.encode(account, statusByte));
+        bytes32 contextAlias = statusByte == 0
+            ? bytes32(0)
+            : keccak256(abi.encode(account, statusByte));
         vm.mockCall(
             DotnsConstants.PERSONHOOD,
             abi.encodeWithSelector(
-                IPersonhood.personhoodStatus.selector, account, DotnsConstants.PERSONHOOD_CONTEXT
+                IPersonhood.personhoodStatus.selector,
+                account,
+                DotnsConstants.PERSONHOOD_CONTEXT
             ),
-            abi.encode(IPersonhood.PersonhoodInfo({status: statusByte, contextAlias: contextAlias}))
+            abi.encode(
+                IPersonhood.PersonhoodInfo({
+                    status: statusByte,
+                    contextAlias: contextAlias
+                })
+            )
         );
     }
 
@@ -165,24 +174,34 @@ contract PopControllerHandler is Test {
         uint256 baseIndex,
         bool attachReservation,
         bool useBytes
-    )
-        external
-    {
+    ) external {
         address actor = _actor(actorIndex);
         _liteSuffix[actor]++;
-        string memory liteLabel = _buildLiteLabel("rsv", actor, _liteSuffix[actor]);
-        string memory reservedBase = attachReservation ? _baseLabel(baseIndex) : "";
+        string memory liteLabel = _buildLiteLabel(
+            "rsv",
+            actor,
+            _liteSuffix[actor]
+        );
+        string memory reservedBase = attachReservation
+            ? _baseLabel(baseIndex)
+            : "";
 
-        IDotnsPopController.BaseReservation memory params = IDotnsPopController.BaseReservation({
-            lite: IDotnsPopController.LiteRegistration({
-                liteLabel: liteLabel, user: actor, chatKey: ""
-            }),
-            reservedBaseLabel: reservedBase
-        });
+        IDotnsPopController.BaseReservation memory params = IDotnsPopController
+            .BaseReservation({
+                lite: IDotnsPopController.LiteRegistration({
+                    liteLabel: liteLabel,
+                    user: actor,
+                    chatKey: ""
+                }),
+                reservedBaseLabel: reservedBase
+            });
 
         if (_callReserveBaseName(params, useBytes)) {
             if (attachReservation) _track(keccak256(bytes(reservedBase)));
-            bytes32 node = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(liteLabel));
+            bytes32 node = LabelUtils.namehashUnder(
+                TLD_NODE,
+                LabelUtils.labelhashMemory(liteLabel)
+            );
             mintedLiteTokenIds.push(uint256(node));
             priorLiteLabels.push(liteLabel);
             _trackPendingActor(actor);
@@ -195,23 +214,35 @@ contract PopControllerHandler is Test {
     ///      surface as a revert and are swallowed so the runner keeps
     ///      exploring. `useBytes` selects the dispatch path for both the lite
     ///      leg and the full register leg.
-    function claim(uint256 actorIndex, uint256 baseIndex, bool useBytes) external {
+    function claim(
+        uint256 actorIndex,
+        uint256 baseIndex,
+        bool useBytes
+    ) external {
         address actor = _actor(actorIndex);
         string memory baseLabel = _baseLabel(baseIndex);
 
-        IDotnsPopController.UserReservation memory reservation = CONTROLLER.userReservation(actor);
+        IDotnsPopController.UserReservation memory reservation = CONTROLLER
+            .userReservation(actor);
         if (reservation.labelhash == bytes32(0)) return;
         if (reservation.labelhash != keccak256(bytes(baseLabel))) return;
 
         _liteSuffix[actor]++;
-        string memory liteLabel = _buildLiteLabel("clm", actor, _liteSuffix[actor]);
+        string memory liteLabel = _buildLiteLabel(
+            "clm",
+            actor,
+            _liteSuffix[actor]
+        );
 
-        IDotnsPopController.BaseReservation memory liteParams = IDotnsPopController.BaseReservation({
-            lite: IDotnsPopController.LiteRegistration({
-                liteLabel: liteLabel, user: actor, chatKey: ""
-            }),
-            reservedBaseLabel: ""
-        });
+        IDotnsPopController.BaseReservation
+            memory liteParams = IDotnsPopController.BaseReservation({
+                lite: IDotnsPopController.LiteRegistration({
+                    liteLabel: liteLabel,
+                    user: actor,
+                    chatKey: ""
+                }),
+                reservedBaseLabel: ""
+            });
         if (!_callReserveBaseName(liteParams, useBytes)) return;
         _trackPendingActor(actor);
 
@@ -222,17 +253,28 @@ contract PopControllerHandler is Test {
         try CONTROLLER.claimLabelStore() {} catch {}
 
         IDotnsPopController.Link memory link = IDotnsPopController.Link({
-            kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
+            kind: IDotnsPopController.LinkKind.LiteUsername,
+            liteLabel: liteLabel,
+            chatKey: ""
         });
-        IDotnsPopController.FullRegistration memory fullParams =
-            IDotnsPopController.FullRegistration({label: baseLabel, user: actor, link: link});
+        IDotnsPopController.FullRegistration
+            memory fullParams = IDotnsPopController.FullRegistration({
+                label: baseLabel,
+                user: actor,
+                link: link
+            });
         if (!_callRegisterBaseName(fullParams, useBytes)) return;
 
         bytes32 liteLabelhash = LabelUtils.labelhashMemory(liteLabel);
-        bytes32 fullNode = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(baseLabel));
+        bytes32 fullNode = LabelUtils.namehashUnder(
+            TLD_NODE,
+            LabelUtils.labelhashMemory(baseLabel)
+        );
         claimedLiteLabelhashes.push(liteLabelhash);
         claimedFullNodes.push(fullNode);
-        mintedLiteTokenIds.push(uint256(LabelUtils.namehashUnder(TLD_NODE, liteLabelhash)));
+        mintedLiteTokenIds.push(
+            uint256(LabelUtils.namehashUnder(TLD_NODE, liteLabelhash))
+        );
         mintedLiteTokenIds.push(uint256(fullNode));
         priorLiteLabels.push(liteLabel);
     }
@@ -248,9 +290,7 @@ contract PopControllerHandler is Test {
         uint256 baseIndex,
         uint256 liteIndex,
         bool useBytes
-    )
-        external
-    {
+    ) external {
         uint256 liteCount = priorLiteLabels.length;
         if (liteCount == 0) return;
 
@@ -258,19 +298,25 @@ contract PopControllerHandler is Test {
         string memory baseLabel = _baseLabel(baseIndex);
         string memory liteLabel = priorLiteLabels[liteIndex % liteCount];
 
-        IDotnsPopController.UserReservation memory reservation = CONTROLLER.userReservation(actor);
+        IDotnsPopController.UserReservation memory reservation = CONTROLLER
+            .userReservation(actor);
         if (reservation.labelhash == bytes32(0)) return;
         if (reservation.labelhash != keccak256(bytes(baseLabel))) return;
 
         IDotnsPopController.Link memory link = IDotnsPopController.Link({
-            kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
+            kind: IDotnsPopController.LinkKind.LiteUsername,
+            liteLabel: liteLabel,
+            chatKey: ""
         });
-        IDotnsPopController.FullRegistration memory params =
-            IDotnsPopController.FullRegistration({label: baseLabel, user: actor, link: link});
+        IDotnsPopController.FullRegistration memory params = IDotnsPopController
+            .FullRegistration({label: baseLabel, user: actor, link: link});
         if (!_callRegisterBaseName(params, useBytes)) return;
 
         bytes32 liteLabelhash = LabelUtils.labelhashMemory(liteLabel);
-        bytes32 fullNode = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(baseLabel));
+        bytes32 fullNode = LabelUtils.namehashUnder(
+            TLD_NODE,
+            LabelUtils.labelhashMemory(baseLabel)
+        );
         claimedLiteLabelhashes.push(liteLabelhash);
         claimedFullNodes.push(fullNode);
         mintedLiteTokenIds.push(uint256(fullNode));
@@ -321,10 +367,7 @@ contract PopControllerHandler is Test {
     function _callReserveBaseName(
         IDotnsPopController.BaseReservation memory params,
         bool useBytes
-    )
-        internal
-        returns (bool ok)
-    {
+    ) internal returns (bool ok) {
         _mockCallerIsRoot(true);
         if (useBytes) {
             try CONTROLLER.reserveBaseName(abi.encode(params)) {
@@ -346,10 +389,7 @@ contract PopControllerHandler is Test {
     function _callRegisterBaseName(
         IDotnsPopController.FullRegistration memory params,
         bool useBytes
-    )
-        internal
-        returns (bool ok)
-    {
+    ) internal returns (bool ok) {
         _mockCallerIsRoot(true);
         if (useBytes) {
             try CONTROLLER.registerBaseName(abi.encode(params)) {
@@ -387,20 +427,17 @@ contract PopControllerHandler is Test {
         string memory tag,
         address actor,
         uint64 suffix
-    )
-        internal
-        pure
-        returns (string memory label)
-    {
+    ) internal pure returns (string memory label) {
         bytes32 seed = keccak256(abi.encode(actor));
         bytes memory letters = new bytes(4);
         for (uint256 i = 0; i < 4; i++) {
             // Map each byte to lowercase a-z.
-            letters[i] = bytes1(uint8(seed[i]) % 26 + 0x61);
+            letters[i] = bytes1((uint8(seed[i]) % 26) + 0x61);
         }
         uint256 twoDigit = uint256(suffix) % 100;
-        string memory digits =
-            twoDigit < 10 ? string.concat("0", vm.toString(twoDigit)) : vm.toString(twoDigit);
+        string memory digits = twoDigit < 10
+            ? string.concat("0", vm.toString(twoDigit))
+            : vm.toString(twoDigit);
         label = string.concat(tag, string(letters), digits);
     }
 

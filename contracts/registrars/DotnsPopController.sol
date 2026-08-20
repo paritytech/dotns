@@ -3,12 +3,8 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {
-    ERC165Upgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -110,22 +106,26 @@ contract DotnsPopController is
     /// @notice Selector for the typed @custom:function registerBaseName overload.
     /// @dev `Link` is `(uint8,string,bytes)` because `LinkKind` is an enum.
     bytes4 private constant SELECTOR_REGISTER_BASE =
-        bytes4(keccak256("registerBaseName((string,address,(uint8,string,bytes)))"));
+        bytes4(
+            keccak256("registerBaseName((string,address,(uint8,string,bytes)))")
+        );
 
     /// @notice Protocol-level address registry for all DotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @notice Per-label queue metadata (head/tail pointers).
-    mapping(bytes32 labelhash => ReservationQueueMeta meta) internal _reservationMeta;
+    mapping(bytes32 labelhash => ReservationQueueMeta meta)
+        internal _reservationMeta;
 
     /// @notice Per-label sparse entries keyed by monotonically-increasing index.
-    mapping(bytes32 labelhash => mapping(uint64 index => ReservationEntry entry)) internal
-        _reservationEntries;
+    mapping(bytes32 labelhash => mapping(uint64 index => ReservationEntry entry))
+        internal _reservationEntries;
 
     /// @notice Single per-user pointer into the reservation queues.
     /// @dev Keeps per-user reservation data behind one key and one struct value so callers
     /// read both fields in one call instead of two.
-    mapping(address user => UserReservation reservation) internal _userReservations;
+    mapping(address user => UserReservation reservation)
+        internal _userReservations;
 
     /// @notice Remembers the base-label string for each reserved labelhash so the PopRules
     /// sync path can address the reservation by its original string form (PopRules keys its
@@ -184,10 +184,7 @@ contract DotnsPopController is
     function initialize(
         IDotnsProtocolRegistry registry,
         uint64 reservationDuration_
-    )
-        external
-        initializer
-    {
+    ) external initializer {
         require(
             reservationDuration_ >= MIN_RESERVATION_DURATION,
             ReservationDurationTooLow(reservationDuration_)
@@ -200,22 +197,31 @@ contract DotnsPopController is
     }
 
     /// @inheritdoc IDotnsPopController
-    function reserveLiteName(LiteRegistration calldata params) external override onlyGateway {
+    function reserveLiteName(
+        LiteRegistration calldata params
+    ) external override onlyGateway {
         _reserveLite(_popRules(), params);
     }
 
     /// @inheritdoc IDotnsPopController
-    function reserveLiteName(bytes calldata payload) external override onlyGateway {
+    function reserveLiteName(
+        bytes calldata payload
+    ) external override onlyGateway {
         _dispatchTyped(SELECTOR_RESERVE_LITE, payload);
     }
 
     /// @inheritdoc IDotnsPopController
-    function reserveBaseName(BaseReservation calldata params) external override onlyGateway {
+    function reserveBaseName(
+        BaseReservation calldata params
+    ) external override onlyGateway {
         IPopRules rules = _popRules();
         bytes32 reservedHash;
         bool hasReservation = bytes(params.reservedBaseLabel).length != 0;
         if (hasReservation) {
-            (reservedHash,) = _validateReservableBaseLabel(rules, params.reservedBaseLabel);
+            (reservedHash, ) = _validateReservableBaseLabel(
+                rules,
+                params.reservedBaseLabel
+            );
         }
 
         _reserveLite(rules, params.lite);
@@ -223,30 +229,45 @@ contract DotnsPopController is
         if (hasReservation) {
             _advanceExpiredHead(reservedHash);
             _removeUserFromQueue(params.lite.user);
-            _enqueueReservation(rules, reservedHash, params.reservedBaseLabel, params.lite.user);
+            _enqueueReservation(
+                rules,
+                reservedHash,
+                params.reservedBaseLabel,
+                params.lite.user
+            );
         }
     }
 
     /// @inheritdoc IDotnsPopController
-    function reserveBaseName(bytes calldata payload) external override onlyGateway {
+    function reserveBaseName(
+        bytes calldata payload
+    ) external override onlyGateway {
         _dispatchTyped(SELECTOR_RESERVE_BASE, payload);
     }
 
     /// @inheritdoc IDotnsPopController
-    function reserveBaseNameOnly(BaseNameReservation calldata params)
-        external
-        override
-        onlyGateway
-    {
+    function reserveBaseNameOnly(
+        BaseNameReservation calldata params
+    ) external override onlyGateway {
         IPopRules rules = _popRules();
-        (bytes32 reservedHash,) = _validateReservableBaseLabel(rules, params.reservedBaseLabel);
+        (bytes32 reservedHash, ) = _validateReservableBaseLabel(
+            rules,
+            params.reservedBaseLabel
+        );
         _advanceExpiredHead(reservedHash);
         _removeUserFromQueue(params.user);
-        _enqueueReservation(rules, reservedHash, params.reservedBaseLabel, params.user);
+        _enqueueReservation(
+            rules,
+            reservedHash,
+            params.reservedBaseLabel,
+            params.user
+        );
     }
 
     /// @inheritdoc IDotnsPopController
-    function reserveBaseNameOnly(bytes calldata payload) external override onlyGateway {
+    function reserveBaseNameOnly(
+        bytes calldata payload
+    ) external override onlyGateway {
         _dispatchTyped(SELECTOR_RESERVE_BASE_ONLY, payload);
     }
 
@@ -259,12 +280,15 @@ contract DotnsPopController is
     /// length. Takes the @custom:struct LiteRegistration struct directly so both call sites pass
     /// the same payload shape: the typed entrypoint forwards its own `params`, the
     /// `reserveBaseName` entrypoint forwards `params.lite`.
-    function _reserveLite(IPopRules rules, LiteRegistration calldata params) internal {
+    function _reserveLite(
+        IPopRules rules,
+        LiteRegistration calldata params
+    ) internal {
         require(params.liteLabel.isSingleDotLiteLabel(), InvalidLiteLabel());
         _requireValidChatKey(params.chatKey);
 
         string memory liteLabel = params.liteLabel.stripDots();
-        (IPopRules.PopStatus required,) = rules.classifyName(liteLabel);
+        (IPopRules.PopStatus required, ) = rules.classifyName(liteLabel);
         // `isSingleDotLiteLabel` guarantees exactly two trailing digits, so the flattened label
         // classifies as PopLite (base 6-8), NoStatus (base >= 9), or Reserved (base <= 5). Accept
         // the first two; governance-reserved short stems are still rejected.
@@ -272,27 +296,37 @@ contract DotnsPopController is
         (bytes32 labelhash, bytes32 node) = _validateLiteLabel(liteLabel);
 
         _completeGatewayRegistration(
-            params.user, liteLabel, labelhash, node, params.chatKey, bytes32(0)
+            params.user,
+            liteLabel,
+            labelhash,
+            node,
+            params.chatKey,
+            bytes32(0)
         );
 
         emit LiteNameReserved(labelhash, params.user, liteLabel);
     }
 
     /// @inheritdoc IDotnsPopController
-    function registerBaseName(bytes calldata payload) external override onlyGateway {
+    function registerBaseName(
+        bytes calldata payload
+    ) external override onlyGateway {
         _dispatchTyped(SELECTOR_REGISTER_BASE, payload);
     }
 
     /// @inheritdoc IDotnsPopController
-    function registerBaseName(FullRegistration calldata params) external override onlyGateway {
+    function registerBaseName(
+        FullRegistration calldata params
+    ) external override onlyGateway {
         Link calldata link = params.link;
         address user = params.user;
         string calldata label = params.label;
 
         IPopRules rules = _popRules();
-        (IPopRules.PopStatus required,) = rules.classifyName(label);
+        (IPopRules.PopStatus required, ) = rules.classifyName(label);
         require(
-            required != IPopRules.PopStatus.Reserved && required != IPopRules.PopStatus.PopLite,
+            required != IPopRules.PopStatus.Reserved &&
+                required != IPopRules.PopStatus.PopLite,
             InvalidBaseLabel()
         );
 
@@ -306,20 +340,22 @@ contract DotnsPopController is
         // when held by another user so PopRules is the single cross-flow authority in
         // both directions; the public flow already gates on this slot through
         // `priceWithCheck`.
-        (bool slotLive, address slotOwner,) = rules.isBaseNameReserved(label);
+        (bool slotLive, address slotOwner, ) = rules.isBaseNameReserved(label);
         require(!slotLive || slotOwner == user, NotHolder(user, labelhash));
 
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         ReservationEntry memory headEntry = meta.head < meta.tail
             ? _reservationEntries[labelhash][meta.head]
             : ReservationEntry({owner: address(0), joinedAt: 0});
-        bool isClaim = _userReservations[user].labelhash == labelhash && meta.head < meta.tail
-            && headEntry.owner == user;
+        bool isClaim = _userReservations[user].labelhash == labelhash &&
+            meta.head < meta.tail &&
+            headEntry.owner == user;
 
         if (!isClaim && meta.head < meta.tail) {
             if (
-                headEntry.owner != address(0) && headEntry.owner != user
-                    && !_isExpired(headEntry.joinedAt)
+                headEntry.owner != address(0) &&
+                headEntry.owner != user &&
+                !_isExpired(headEntry.joinedAt)
             ) {
                 revert NotHolder(user, labelhash);
             }
@@ -340,7 +376,8 @@ contract DotnsPopController is
             (liteLabelhash, liteNode) = _validateLiteLabel(liteLabel);
             IDotnsRegistrar registrar = _registrar();
             require(
-                registrar.exists(uint256(liteNode)) && registrar.ownerOf(uint256(liteNode)) == user,
+                registrar.exists(uint256(liteNode)) &&
+                    registrar.ownerOf(uint256(liteNode)) == user,
                 LiteLabelNotOwnedByUser(user, liteLabelhash)
             );
             chatKeyToPersist = _popResolver().chatKey(liteNode);
@@ -349,7 +386,14 @@ contract DotnsPopController is
             chatKeyToPersist = link.chatKey;
         }
 
-        _completeGatewayRegistration(user, label, labelhash, node, chatKeyToPersist, liteLabelhash);
+        _completeGatewayRegistration(
+            user,
+            label,
+            labelhash,
+            node,
+            chatKeyToPersist,
+            liteLabelhash
+        );
 
         if (isClaim) {
             emit BaseNameClaimed(labelhash, user, label);
@@ -362,15 +406,20 @@ contract DotnsPopController is
     }
 
     /// @inheritdoc IDotnsPopController
-    function expireReservation(string calldata reservedBaseLabel) external override {
-        (bytes32 labelhash,) = _validateBaseLabel(reservedBaseLabel);
+    function expireReservation(
+        string calldata reservedBaseLabel
+    ) external override {
+        (bytes32 labelhash, ) = _validateBaseLabel(reservedBaseLabel);
         _advanceExpiredHead(labelhash);
     }
 
     /// @inheritdoc IDotnsPopController
     function relinquishReservation() external override {
         UserReservation memory userRes = _userReservations[msg.sender];
-        require(userRes.labelhash != bytes32(0), NoActiveReservation(msg.sender));
+        require(
+            userRes.labelhash != bytes32(0),
+            NoActiveReservation(msg.sender)
+        );
         _removeUserFromQueue(msg.sender);
         emit ReservationRelinquished(userRes.labelhash, msg.sender);
     }
@@ -413,12 +462,12 @@ contract DotnsPopController is
         address store,
         address user,
         string memory label
-    )
-        internal
-        returns (address)
-    {
+    ) internal returns (address) {
         bytes32 labelhash = LabelUtils.labelhashMemory(label);
-        bytes32 node = LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash);
+        bytes32 node = LabelUtils.namehashUnder(
+            protocolRegistry.tldNode(),
+            labelhash
+        );
         if (store == address(0)) {
             store = factory.deployLabelStoreFor(user);
         }
@@ -461,17 +510,16 @@ contract DotnsPopController is
     }
 
     /// @inheritdoc IDotnsPopController
-    function isReservedForClaim(string calldata reservedBaseLabel)
-        external
-        view
-        override
-        returns (bool reserved, address holder)
-    {
-        (bytes32 labelhash,) = _validateBaseLabel(reservedBaseLabel);
+    function isReservedForClaim(
+        string calldata reservedBaseLabel
+    ) external view override returns (bool reserved, address holder) {
+        (bytes32 labelhash, ) = _validateBaseLabel(reservedBaseLabel);
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         if (meta.head >= meta.tail) return (false, address(0));
 
-        ReservationEntry memory head = _reservationEntries[labelhash][meta.head];
+        ReservationEntry memory head = _reservationEntries[labelhash][
+            meta.head
+        ];
         if (head.owner == address(0)) return (false, address(0));
         if (_isExpired(head.joinedAt)) return (false, address(0));
 
@@ -479,19 +527,21 @@ contract DotnsPopController is
     }
 
     /// @inheritdoc IDotnsPopController
-    function setReservationDuration(uint64 duration) external override onlyOwner {
-        require(duration >= MIN_RESERVATION_DURATION, ReservationDurationTooLow(duration));
+    function setReservationDuration(
+        uint64 duration
+    ) external override onlyOwner {
+        require(
+            duration >= MIN_RESERVATION_DURATION,
+            ReservationDurationTooLow(duration)
+        );
         reservationDuration = duration;
         emit ReservationDurationSet(duration);
     }
 
     /// @inheritdoc IDotnsPopController
-    function reservationMeta(bytes32 labelhash)
-        external
-        view
-        override
-        returns (uint64 head, uint64 tail)
-    {
+    function reservationMeta(
+        bytes32 labelhash
+    ) external view override returns (uint64 head, uint64 tail) {
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         return (meta.head, meta.tail);
     }
@@ -500,38 +550,32 @@ contract DotnsPopController is
     function reservationEntry(
         bytes32 labelhash,
         uint64 index
-    )
-        external
-        view
-        override
-        returns (address entryOwner, uint64 joinedAt)
-    {
+    ) external view override returns (address entryOwner, uint64 joinedAt) {
         ReservationEntry memory entry = _reservationEntries[labelhash][index];
         return (entry.owner, entry.joinedAt);
     }
 
     /// @inheritdoc IDotnsPopController
-    function userReservation(address user)
-        external
-        view
-        override
-        returns (UserReservation memory reservation)
-    {
+    function userReservation(
+        address user
+    ) external view override returns (UserReservation memory reservation) {
         return _userReservations[user];
     }
 
     /// @inheritdoc IDotnsPopController
-    function pendingClaims(address user)
-        external
-        view
-        override
-        returns (PendingClaim[] memory claims_)
-    {
+    function pendingClaims(
+        address user
+    ) external view override returns (PendingClaim[] memory claims_) {
         return _pendingClaimQueue[user];
     }
 
     /// @inheritdoc IDotnsPopController
-    function pendingClaimUserCount() external view override returns (uint256 count) {
+    function pendingClaimUserCount()
+        external
+        view
+        override
+        returns (uint256 count)
+    {
         return _pendingClaimUsers.length();
     }
 
@@ -539,12 +583,7 @@ contract DotnsPopController is
     function pendingClaimUsers(
         uint256 offset,
         uint256 limit
-    )
-        external
-        view
-        override
-        returns (address[] memory users)
-    {
+    ) external view override returns (address[] memory users) {
         uint256 total = _pendingClaimUsers.length();
         if (offset >= total) return new address[](0);
 
@@ -558,19 +597,22 @@ contract DotnsPopController is
     }
 
     /// @inheritdoc ERC165Upgradeable
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC165Upgradeable, IERC165)
-        returns (bool)
-    {
-        return interfaceId == type(IDotnsPopController).interfaceId
-            || super.supportsInterface(interfaceId);
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(ERC165Upgradeable, IERC165) returns (bool) {
+        return
+            interfaceId == type(IDotnsPopController).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
+    function version()
+        external
+        pure
+        virtual
+        returns (string memory versionString)
+    {
         versionString = "1.0.0";
     }
 
@@ -596,9 +638,7 @@ contract DotnsPopController is
         bytes32 node,
         bytes memory chatKeyBytes,
         bytes32 liteLabelhash
-    )
-        internal
-    {
+    ) internal {
         RegistrationUtils.registerAndStore(
             RegistrationUtils.RegistrationContext({
                 protocolRegistry: protocolRegistry,
@@ -637,9 +677,16 @@ contract DotnsPopController is
     /// @param store Owner's `LabelStore` proxy.
     /// @param node `namehash(labelhash)` for the entry.
     /// @param label Bare DNS label (no TLD); the TLD is appended on write.
-    function _writeRecord(address store, bytes32 node, string memory label) internal {
+    function _writeRecord(
+        address store,
+        bytes32 node,
+        string memory label
+    ) internal {
         if (ILabelStore(store).isLocked(node)) return;
-        ILabelStore(store).storeLabel(node, string.concat(label, protocolRegistry.tld()));
+        ILabelStore(store).storeLabel(
+            node,
+            string.concat(label, protocolRegistry.tld())
+        );
     }
 
     /// @notice Appends a deferred binding for `user` and adds them to the enumeration set.
@@ -647,7 +694,11 @@ contract DotnsPopController is
     /// up in `_pendingClaimQueue` until a signed-origin @custom:function claimLabelStore settles
     /// them. Adding the user to the set is idempotent, so repeat stashes keep a single enumeration
     /// entry. Emits @custom:emits PendingClaimStashed.
-    function _stashPendingClaim(address user, string memory label, bytes32 labelhash) internal {
+    function _stashPendingClaim(
+        address user,
+        string memory label,
+        bytes32 labelhash
+    ) internal {
         _pendingClaimQueue[user].push(
             PendingClaim({label: label, mintedAt: uint64(block.timestamp)})
         );
@@ -678,22 +729,34 @@ contract DotnsPopController is
         bytes32 labelhash,
         string memory baseLabel,
         address user
-    )
-        internal
-    {
-        require(_userReservations[user].labelhash == bytes32(0), AlreadyReserved(user, labelhash));
+    ) internal {
+        require(
+            _userReservations[user].labelhash == bytes32(0),
+            AlreadyReserved(user, labelhash)
+        );
 
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
-        require(meta.tail - meta.head < MAX_RESERVATION_QUEUE, QueueFull(labelhash));
+        require(
+            meta.tail - meta.head < MAX_RESERVATION_QUEUE,
+            QueueFull(labelhash)
+        );
 
         uint64 index = meta.tail;
         bool becomesHead = index == meta.head;
 
-        _reservationEntries[labelhash][index] =
-            ReservationEntry({owner: user, joinedAt: uint64(block.timestamp)});
-        _reservationMeta[labelhash] = ReservationQueueMeta({head: meta.head, tail: index + 1});
+        _reservationEntries[labelhash][index] = ReservationEntry({
+            owner: user,
+            joinedAt: uint64(block.timestamp)
+        });
+        _reservationMeta[labelhash] = ReservationQueueMeta({
+            head: meta.head,
+            tail: index + 1
+        });
 
-        _userReservations[user] = UserReservation({labelhash: labelhash, index: index});
+        _userReservations[user] = UserReservation({
+            labelhash: labelhash,
+            index: index
+        });
 
         if (becomesHead) {
             _reservedBaseLabel[labelhash] = baseLabel;
@@ -734,7 +797,9 @@ contract DotnsPopController is
         uint64 tail = meta.tail;
 
         while (head < tail) {
-            ReservationEntry memory entry = _reservationEntries[labelhash][head];
+            ReservationEntry memory entry = _reservationEntries[labelhash][
+                head
+            ];
             if (entry.owner == address(0)) {
                 // `owner == 0` implies the slot is fully zero (it can only have arrived here
                 // via a prior full-slot `delete`), so skip the no-op SSTORE.
@@ -753,7 +818,10 @@ contract DotnsPopController is
             delete _reservationMeta[labelhash];
             _releasePopRulesSlot(labelhash);
         } else if (head != meta.head) {
-            _reservationMeta[labelhash] = ReservationQueueMeta({head: head, tail: tail});
+            _reservationMeta[labelhash] = ReservationQueueMeta({
+                head: head,
+                tail: tail
+            });
             address newHead = _reservationEntries[labelhash][head].owner;
             _syncPopRulesToHead(labelhash, newHead);
         }
@@ -782,24 +850,23 @@ contract DotnsPopController is
     }
 
     /// @notice Validates a lite-person `NAMEXX` label and derives `(labelhash, node)`.
-    function _validateLiteLabel(string memory liteLabel)
-        internal
-        view
-        returns (bytes32 labelhash, bytes32 node)
-    {
+    function _validateLiteLabel(
+        string memory liteLabel
+    ) internal view returns (bytes32 labelhash, bytes32 node) {
         require(liteLabel.isLitePersonLabelMemory(), InvalidLiteLabel());
         labelhash = LabelUtils.labelhashMemory(liteLabel);
         node = LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash);
     }
 
     /// @notice Validates a base (full-person) DNS label and derives `(labelhash, node)`.
-    function _validateBaseLabel(string calldata baseLabel)
-        internal
-        view
-        returns (bytes32 labelhash, bytes32 node)
-    {
+    function _validateBaseLabel(
+        string calldata baseLabel
+    ) internal view returns (bytes32 labelhash, bytes32 node) {
         require(baseLabel.isSingleLabel(), InvalidBaseLabel());
-        (labelhash, node) = LabelUtils.deriveNode(protocolRegistry.tldNode(), baseLabel);
+        (labelhash, node) = LabelUtils.deriveNode(
+            protocolRegistry.tldNode(),
+            baseLabel
+        );
     }
 
     /// @notice Validates a base label as reservable and returns its hashes.
@@ -814,18 +881,18 @@ contract DotnsPopController is
     function _validateReservableBaseLabel(
         IPopRules rules,
         string calldata baseLabel
-    )
-        internal
-        view
-        returns (bytes32 labelhash, bytes32 node)
-    {
-        (IPopRules.PopStatus required,) = rules.classifyName(baseLabel);
+    ) internal view returns (bytes32 labelhash, bytes32 node) {
+        (IPopRules.PopStatus required, ) = rules.classifyName(baseLabel);
         require(
-            required != IPopRules.PopStatus.Reserved && rules.isBaseName(baseLabel),
+            required != IPopRules.PopStatus.Reserved &&
+                rules.isBaseName(baseLabel),
             InvalidBaseLabel()
         );
         (labelhash, node) = _validateBaseLabel(baseLabel);
-        require(!_registrar().exists(uint256(node)), BaseNameAlreadyRegistered());
+        require(
+            !_registrar().exists(uint256(node)),
+            BaseNameAlreadyRegistered()
+        );
     }
 
     /// @notice Reverts when a non-empty chat key is not exactly `CHAT_KEY_LENGTH` bytes.
@@ -833,13 +900,17 @@ contract DotnsPopController is
     /// `InvalidChatKey` revert before any mint state is written.
     function _requireValidChatKey(bytes memory chatKey) internal pure {
         require(
-            chatKey.length == 0 || chatKey.length == CHAT_KEY_LENGTH, InvalidChatKey(chatKey.length)
+            chatKey.length == 0 || chatKey.length == CHAT_KEY_LENGTH,
+            InvalidChatKey(chatKey.length)
         );
     }
 
     /// @notice Resolves the PoP resolver via the protocol registry.
     function _popResolver() internal view returns (IDotnsPopResolver) {
-        return IDotnsPopResolver(protocolRegistry.get(DotnsConstants.POP_RESOLVER));
+        return
+            IDotnsPopResolver(
+                protocolRegistry.get(DotnsConstants.POP_RESOLVER)
+            );
     }
 
     /// @notice Resolves the PopRules contract via the protocol registry.
@@ -849,7 +920,8 @@ contract DotnsPopController is
 
     /// @notice Resolves the Store factory via the protocol registry.
     function _storeFactory() internal view returns (IStoreFactory) {
-        return IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
+        return
+            IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
     }
 
     /// @notice Resolves the registrar via the protocol registry.
@@ -906,7 +978,9 @@ contract DotnsPopController is
     /// same registry slot.
     /// @custom:oz-upgrades-unsafe-allow delegatecall
     function _dispatchTyped(bytes4 selector, bytes calldata payload) private {
-        (bool ok, bytes memory ret) = address(this).delegatecall(bytes.concat(selector, payload));
+        (bool ok, bytes memory ret) = address(this).delegatecall(
+            bytes.concat(selector, payload)
+        );
         if (!ok) {
             assembly {
                 revert(add(ret, 32), mload(ret))
@@ -915,5 +989,7 @@ contract DotnsPopController is
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }

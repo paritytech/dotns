@@ -19,10 +19,10 @@ library StoreUtils {
     /// @param factory The store factory.
     /// @param user The user whose label store is being resolved.
     /// @return store The resolved or newly deployed store address.
-    function ensureLabelStore(IStoreFactory factory, address user)
-        internal
-        returns (address store)
-    {
+    function ensureLabelStore(
+        IStoreFactory factory,
+        address user
+    ) internal returns (address store) {
         store = factory.getLabelStore(user);
         if (store == address(0)) {
             store = factory.deployLabelStoreFor(user);
@@ -45,10 +45,7 @@ library StoreUtils {
         address user,
         bytes32 labelhash,
         string memory label
-    )
-        internal
-        returns (address store)
-    {
+    ) internal returns (address store) {
         store = ensureLabelStore(factory, user);
         if (!ILabelStore(store).isLocked(labelhash)) {
             ILabelStore(store).storeLabel(labelhash, label);

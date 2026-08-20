@@ -62,7 +62,10 @@ contract RootGatewayDispatcher {
     ///      which the controller authorises against the gateway address
     ///      registered on the protocol registry.
     fallback() external {
-        require(ISystem(DotnsConstants.REVIVE_SYSTEM).callerIsRoot(), NotRoot());
+        require(
+            ISystem(DotnsConstants.REVIVE_SYSTEM).callerIsRoot(),
+            NotRoot()
+        );
 
         (bool ok, bytes memory ret) = TARGET.call(msg.data);
         if (!ok) {

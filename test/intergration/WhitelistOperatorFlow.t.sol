@@ -14,7 +14,9 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 ///      the reserved registration flow rather than any single unit of behaviour.
 /// @custom:security-contact admin@parity.io
 contract WhitelistOperatorFlow is BaseDotns {
-    function test_operator_can_seed_whitelist_for_reserved_registration() public {
+    function test_operator_can_seed_whitelist_for_reserved_registration()
+        public
+    {
         address operator = leonardo;
         address user = ed;
         string memory nameLabel = "operatorseed01";
@@ -25,26 +27,40 @@ contract WhitelistOperatorFlow is BaseDotns {
         dotnsRegistrarController.whiteListAddress(user, true);
         assertTrue(dotnsRegistrarController.isWhiteListed(user));
 
-        bytes32 secret = keccak256(abi.encodePacked(nameLabel, user, "operator"));
-        IDotnsRegistrarController.Registration memory registration =
-            IDotnsRegistrarController.Registration({
-                label: nameLabel, owner: user, secret: secret, reserved: true
+        bytes32 secret = keccak256(
+            abi.encodePacked(nameLabel, user, "operator")
+        );
+        IDotnsRegistrarController.Registration
+            memory registration = IDotnsRegistrarController.Registration({
+                label: nameLabel,
+                owner: user,
+                secret: secret,
+                reserved: true
             });
 
         vm.startPrank(user);
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(
+            registration
+        );
         dotnsRegistrarController.commit(commitment);
-        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+        vm.warp(
+            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
+        );
         dotnsRegistrarController.registerReserved(registration);
         vm.stopPrank();
 
         bytes32 node = _nodeOf(nameLabel);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), user);
         assertEq(dotnsRegistry.owner(node), user);
-        assertEq(dotnsReverseResolver.nameOf(user), string.concat(nameLabel, ".dot"));
+        assertEq(
+            dotnsReverseResolver.nameOf(user),
+            string.concat(nameLabel, ".dot")
+        );
     }
 
-    function test_operator_role_revocation_blocks_further_whitelist_writes() public {
+    function test_operator_role_revocation_blocks_further_whitelist_writes()
+        public
+    {
         address operator = leonardo;
 
         _grantWhitelistOperator(operator);

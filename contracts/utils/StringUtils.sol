@@ -56,7 +56,9 @@ library StringUtils {
     ///      registrar.
     /// @param value Candidate label.
     /// @return isValid True if `value` is a canonical DNS label.
-    function isSingleLabel(string calldata value) internal pure returns (bool isValid) {
+    function isSingleLabel(
+        string calldata value
+    ) internal pure returns (bool isValid) {
         bytes memory label = bytes(value);
         return _isDnsLabel(label, 0, label.length);
     }
@@ -66,7 +68,9 @@ library StringUtils {
     /// @custom:function stripDigits) so callers do not need a calldata round-trip.
     /// @param value Candidate label held in memory.
     /// @return isValid True if `value` is a canonical DNS label.
-    function isSingleLabelMemory(string memory value) internal pure returns (bool isValid) {
+    function isSingleLabelMemory(
+        string memory value
+    ) internal pure returns (bool isValid) {
         bytes memory label = bytes(value);
         return _isDnsLabel(label, 0, label.length);
     }
@@ -76,7 +80,9 @@ library StringUtils {
     ///      `name.path` input into the flat label expected by pricing and minting.
     /// @param value Candidate dotted label.
     /// @return stripped Label with all dots removed.
-    function stripDots(string calldata value) internal pure returns (string memory stripped) {
+    function stripDots(
+        string calldata value
+    ) internal pure returns (string memory stripped) {
         bytes calldata raw = bytes(value);
         uint256 length = raw.length;
         uint256 outputLength;
@@ -105,7 +111,9 @@ library StringUtils {
     ///      @custom:constant MIN_LITE_SUFFIX_DIGITS characters.
     /// @param value Candidate dotted lite label.
     /// @return isValid True when `value` matches the gateway lite input shape.
-    function isSingleDotLiteLabel(string calldata value) internal pure returns (bool isValid) {
+    function isSingleDotLiteLabel(
+        string calldata value
+    ) internal pure returns (bool isValid) {
         bytes calldata raw = bytes(value);
         uint256 length = raw.length;
         if (length == 0) return false;
@@ -151,7 +159,9 @@ library StringUtils {
     /// @param value Candidate label.
     /// @return isValid True if the label is a DNS label with at least
     ///         @custom:constant MIN_LITE_SUFFIX_DIGITS  trailing digits.
-    function isLitePersonLabel(string calldata value) internal pure returns (bool isValid) {
+    function isLitePersonLabel(
+        string calldata value
+    ) internal pure returns (bool isValid) {
         return _isLitePersonLabel(bytes(value));
     }
 
@@ -160,11 +170,15 @@ library StringUtils {
     /// @param value Candidate label held in memory.
     /// @return isValid True if the label is a DNS label with at least
     ///         @custom:constant MIN_LITE_SUFFIX_DIGITS trailing digits.
-    function isLitePersonLabelMemory(string memory value) internal pure returns (bool isValid) {
+    function isLitePersonLabelMemory(
+        string memory value
+    ) internal pure returns (bool isValid) {
         return _isLitePersonLabel(bytes(value));
     }
 
-    function _isLitePersonLabel(bytes memory raw) private pure returns (bool isValid) {
+    function _isLitePersonLabel(
+        bytes memory raw
+    ) private pure returns (bool isValid) {
         uint256 length = raw.length;
         if (length < MIN_LITE_SUFFIX_DIGITS + 1) return false;
 
@@ -189,7 +203,9 @@ library StringUtils {
     ///      bare labels.
     /// @param value Candidate name path.
     /// @return isValid True if every dot-separated segment is a canonical DNS label.
-    function isNamePath(string calldata value) internal pure returns (bool isValid) {
+    function isNamePath(
+        string calldata value
+    ) internal pure returns (bool isValid) {
         bytes memory path = bytes(value);
         uint256 length = path.length;
         if (length == 0) return false;
@@ -208,14 +224,11 @@ library StringUtils {
         bytes memory label,
         uint256 start,
         uint256 end
-    )
-        private
-        pure
-        returns (bool isValid)
-    {
+    ) private pure returns (bool isValid) {
         if (end <= start) return false;
         if (end - start > MAX_DNS_LABEL_OCTETS) return false;
-        if (label[start] == bytes1(0x2d) || label[end - 1] == bytes1(0x2d)) return false;
+        if (label[start] == bytes1(0x2d) || label[end - 1] == bytes1(0x2d))
+            return false;
 
         for (uint256 i = start; i < end; ++i) {
             bytes1 char = label[i];
@@ -239,7 +252,9 @@ library StringUtils {
     /// @dev Wraps OpenZeppelin's Strings.toHexString(). Returns lowercase hex with "0x" prefix.
     /// @param account The address to convert.
     /// @return The hexadecimal string representation (42 characters including "0x").
-    function addressToHex(address account) internal pure returns (string memory) {
+    function addressToHex(
+        address account
+    ) internal pure returns (string memory) {
         return account.toHexString();
     }
 
@@ -248,7 +263,9 @@ library StringUtils {
     ///      Useful for converting short strings stored in bytes32 back to string type.
     /// @param _bytes32 The bytes32 value containing a null-terminated ASCII string.
     /// @return The extracted string (up to 32 characters).
-    function bytes32ToString(bytes32 _bytes32) internal pure returns (string memory) {
+    function bytes32ToString(
+        bytes32 _bytes32
+    ) internal pure returns (string memory) {
         uint8 i = 0;
         while (i < 32 && _bytes32[i] != 0) {
             i++;

@@ -20,7 +20,6 @@ jobs:
       (github.event_name == 'issues' && github.event.label.name == 'whitelist-approved' && contains(github.event.issue.labels.*.name, 'whitelist-request')) ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/retry') && contains(github.event.issue.labels.*.name, 'whitelist-approved') && contains(github.event.issue.labels.*.name, 'whitelist-request') && (github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'COLLABORATOR' || github.event.comment.user.login == github.event.issue.user.login))
     runs-on: ubuntu-latest
-
     steps:
       - name: Acknowledge retry
         if: github.event_name == 'issue_comment'

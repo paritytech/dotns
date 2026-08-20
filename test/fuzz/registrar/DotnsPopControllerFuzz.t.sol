@@ -2,9 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
-import {
-    IDotnsRegistrarController
-} from "../../../contracts/registrars/IDotnsRegistrarController.sol";
+import {IDotnsRegistrarController} from "../../../contracts/registrars/IDotnsRegistrarController.sol";
 import {IDotnsPopController} from "../../../contracts/registrars/IDotnsPopController.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {ILabelStore} from "../../../contracts/store/ILabelStore.sol";
@@ -20,14 +18,22 @@ contract DotnsPopControllerFuzz is BaseDotns {
     // Render `value` as a decimal string padded to at least two digits. Callers bound
     // `value` to `[0, 99]` so the resulting suffix matches the `NAMEXX` contract used
     // throughout the PoP controller tests.
-    function _twoDigitDecimal(uint256 value) internal pure returns (string memory s) {
-        if (value < 10) return string.concat("0", StringUtils.uintToString(value));
+    function _twoDigitDecimal(
+        uint256 value
+    ) internal pure returns (string memory s) {
+        if (value < 10)
+            return string.concat("0", StringUtils.uintToString(value));
         return StringUtils.uintToString(value);
     }
 
-    function testFuzz_reserveBaseName_accepts_any_two_digit_suffix(uint8 suffix) public {
+    function testFuzz_reserveBaseName_accepts_any_two_digit_suffix(
+        uint8 suffix
+    ) public {
         suffix = uint8(bound(uint256(suffix), 0, 99));
-        string memory label = string.concat("alicex", _twoDigitDecimal(uint256(suffix)));
+        string memory label = string.concat(
+            "alicex",
+            _twoDigitDecimal(uint256(suffix))
+        );
 
         // Lite-tier label requires ed to hold PopLite (or PopFull) status so the
         // `priceWithCheck` guard inside the controller accepts the reservation.
@@ -35,18 +41,22 @@ contract DotnsPopControllerFuzz is BaseDotns {
 
         _reservePop(ed, label, "", "");
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(label))), ed);
+        assertEq(
+            IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(label))),
+            ed
+        );
     }
 
     function testFuzz_reserveBaseName_persists_chat_key_exact_bytes(
         uint8 suffix,
         bytes1 keySeed,
         bool useKey
-    )
-        public
-    {
+    ) public {
         suffix = uint8(bound(uint256(suffix), 0, 99));
-        string memory label = string.concat("bobxyz", _twoDigitDecimal(uint256(suffix)));
+        string memory label = string.concat(
+            "bobxyz",
+            _twoDigitDecimal(uint256(suffix))
+        );
 
         _grantPopLite(ed);
 
@@ -61,7 +71,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
         }
     }
 
-    function testFuzz_public_register_respects_popRules_reservation(bool reserveFirst) public {
+    function testFuzz_public_register_respects_popRules_reservation(
+        bool reserveFirst
+    ) public {
         string memory stem = "longnamebob";
         string memory fullLabel = "longnamebob01";
 
@@ -74,21 +86,31 @@ contract DotnsPopControllerFuzz is BaseDotns {
             _reservePop(tiago, LITE_LABEL_A, "", stem);
         }
 
-        bytes32 secret = keccak256(abi.encodePacked(fullLabel, ed, block.timestamp));
-        IDotnsRegistrarController.Registration memory registration =
-            IDotnsRegistrarController.Registration({
-                label: fullLabel, owner: ed, secret: secret, reserved: true
+        bytes32 secret = keccak256(
+            abi.encodePacked(fullLabel, ed, block.timestamp)
+        );
+        IDotnsRegistrarController.Registration
+            memory registration = IDotnsRegistrarController.Registration({
+                label: fullLabel,
+                owner: ed,
+                secret: secret,
+                reserved: true
             });
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(
+            registration
+        );
 
         vm.prank(ed);
         dotnsRegistrarController.commit(commitment);
-        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+        vm.warp(
+            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
+        );
 
         if (reserveFirst) {
             vm.expectRevert(
                 abi.encodeWithSelector(
-                    IPopRules.PopError.selector, "Base name reserved for original Lite registrant"
+                    IPopRules.PopError.selector,
+                    "Base name reserved for original Lite registrant"
                 )
             );
             vm.prank(ed);
@@ -97,11 +119,19 @@ contract DotnsPopControllerFuzz is BaseDotns {
             uint256 cost = popRules.priceWithCheck(fullLabel, ed).price;
             vm.prank(ed);
             dotnsRegistrarController.register{value: cost}(registration);
-            assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(fullLabel))), ed);
+            assertEq(
+                IERC721(address(dotnsRegistrar)).ownerOf(
+                    uint256(_nodeOf(fullLabel))
+                ),
+                ed
+            );
         }
     }
 
-    function testFuzz_reserveLiteName_overloads_equivalent(uint8 suffix, bytes1 keySeed) public {
+    function testFuzz_reserveLiteName_overloads_equivalent(
+        uint8 suffix,
+        bytes1 keySeed
+    ) public {
         suffix = uint8(bound(uint256(suffix), 0, 99));
         string memory digits = _twoDigitDecimal(uint256(suffix));
         // The gateway-facing entry point accepts the dotted `stem.digits` shape; the
@@ -112,9 +142,12 @@ contract DotnsPopControllerFuzz is BaseDotns {
 
         _grantPopLite(ed);
 
-        IDotnsPopController.LiteRegistration memory params = IDotnsPopController.LiteRegistration({
-            liteLabel: liteLabelDotted, user: ed, chatKey: chatKey
-        });
+        IDotnsPopController.LiteRegistration memory params = IDotnsPopController
+            .LiteRegistration({
+                liteLabel: liteLabelDotted,
+                user: ed,
+                chatKey: chatKey
+            });
 
         bytes32 node = _nodeOf(liteLabelFlat);
         // Snapshot the world once and run both dispatch paths from the same starting
@@ -126,7 +159,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
         vm.prank(popGateway);
         dotnsPopController.reserveLiteName(params);
         Vm.Log[] memory typedLogs = vm.getRecordedLogs();
-        address typedOwner = IERC721(address(dotnsRegistrar)).ownerOf(uint256(node));
+        address typedOwner = IERC721(address(dotnsRegistrar)).ownerOf(
+            uint256(node)
+        );
         bytes memory typedKey = dotnsPopResolver.chatKey(node);
 
         vm.revertToState(baseline);
@@ -136,7 +171,10 @@ contract DotnsPopControllerFuzz is BaseDotns {
         dotnsPopController.reserveLiteName(abi.encode(params));
         Vm.Log[] memory bytesLogs = vm.getRecordedLogs();
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), typedOwner);
+        assertEq(
+            IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)),
+            typedOwner
+        );
         assertEq(dotnsPopResolver.chatKey(node), typedKey);
         _assertLogsEqual(typedLogs, bytesLogs);
     }
@@ -145,9 +183,7 @@ contract DotnsPopControllerFuzz is BaseDotns {
         uint8 suffix,
         bytes1 keySeed,
         bool useReservation
-    )
-        public
-    {
+    ) public {
         suffix = uint8(bound(uint256(suffix), 0, 99));
         string memory digits = _twoDigitDecimal(uint256(suffix));
         // Gateway-facing dotted shape; flat form drives the on-chain node lookup.
@@ -162,25 +198,32 @@ contract DotnsPopControllerFuzz is BaseDotns {
         // the base label (PopFull-classified) requires PopFull.
         _grantPopFull(ed);
 
-        IDotnsPopController.BaseReservation memory params = IDotnsPopController.BaseReservation({
-            lite: IDotnsPopController.LiteRegistration({
-                liteLabel: liteLabelDotted, user: ed, chatKey: chatKey
-            }),
-            reservedBaseLabel: reservedBase
-        });
+        IDotnsPopController.BaseReservation memory params = IDotnsPopController
+            .BaseReservation({
+                lite: IDotnsPopController.LiteRegistration({
+                    liteLabel: liteLabelDotted,
+                    user: ed,
+                    chatKey: chatKey
+                }),
+                reservedBaseLabel: reservedBase
+            });
 
         bytes32 liteNode = _nodeOf(liteLabelFlat);
-        bytes32 reservedHash = useReservation ? keccak256(bytes(reservedBase)) : bytes32(0);
+        bytes32 reservedHash = useReservation
+            ? keccak256(bytes(reservedBase))
+            : bytes32(0);
         uint256 baseline = vm.snapshotState();
 
         vm.recordLogs();
         vm.prank(popGateway);
         dotnsPopController.reserveBaseName(params);
         Vm.Log[] memory typedLogs = vm.getRecordedLogs();
-        address typedOwner = IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode));
+        address typedOwner = IERC721(address(dotnsRegistrar)).ownerOf(
+            uint256(liteNode)
+        );
         bytes memory typedKey = dotnsPopResolver.chatKey(liteNode);
-        IDotnsPopController.UserReservation memory typedUserRes =
-            dotnsPopController.userReservation(ed);
+        IDotnsPopController.UserReservation
+            memory typedUserRes = dotnsPopController.userReservation(ed);
         (uint64 typedHead, uint64 typedTail) = useReservation
             ? dotnsPopController.reservationMeta(reservedHash)
             : (uint64(0), uint64(0));
@@ -192,14 +235,18 @@ contract DotnsPopControllerFuzz is BaseDotns {
         dotnsPopController.reserveBaseName(abi.encode(params));
         Vm.Log[] memory bytesLogs = vm.getRecordedLogs();
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)), typedOwner);
+        assertEq(
+            IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)),
+            typedOwner
+        );
         assertEq(dotnsPopResolver.chatKey(liteNode), typedKey);
-        IDotnsPopController.UserReservation memory bytesUserRes =
-            dotnsPopController.userReservation(ed);
+        IDotnsPopController.UserReservation
+            memory bytesUserRes = dotnsPopController.userReservation(ed);
         assertEq(bytesUserRes.labelhash, typedUserRes.labelhash);
         assertEq(uint256(bytesUserRes.index), uint256(typedUserRes.index));
         if (useReservation) {
-            (uint64 bytesHead, uint64 bytesTail) = dotnsPopController.reservationMeta(reservedHash);
+            (uint64 bytesHead, uint64 bytesTail) = dotnsPopController
+                .reservationMeta(reservedHash);
             assertEq(bytesHead, typedHead);
             assertEq(bytesTail, typedTail);
         }
@@ -210,15 +257,16 @@ contract DotnsPopControllerFuzz is BaseDotns {
         uint8 suffix,
         bytes1 keySeed,
         bool useLiteLink
-    )
-        public
-    {
+    ) public {
         suffix = uint8(bound(uint256(suffix), 0, 99));
         // Stem `longnamebob` (stem length above the PopLite ceiling) plus a 2-digit suffix
         // classifies as NoStatus, the legitimate inhabitant of the base-name path. The
         // `useLiteLink` toggle picks between the `None` (fresh chat key) and `LiteUsername`
         // (inherit from prior lite) branches.
-        string memory baseLabel = string.concat("longnamebob", _twoDigitDecimal(uint256(suffix)));
+        string memory baseLabel = string.concat(
+            "longnamebob",
+            _twoDigitDecimal(uint256(suffix))
+        );
         bytes memory chatKey = _validChatKey(keySeed);
 
         _grantPopLite(ed);
@@ -231,7 +279,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
             vm.prank(popGateway);
             dotnsPopController.reserveLiteName(
                 IDotnsPopController.LiteRegistration({
-                    liteLabel: LITE_LABEL_A_DOTTED, user: ed, chatKey: chatKey
+                    liteLabel: LITE_LABEL_A_DOTTED,
+                    user: ed,
+                    chatKey: chatKey
                 })
             );
             vm.prank(ed);
@@ -243,12 +293,14 @@ contract DotnsPopControllerFuzz is BaseDotns {
             });
         } else {
             link = IDotnsPopController.Link({
-                kind: IDotnsPopController.LinkKind.None, liteLabel: "", chatKey: chatKey
+                kind: IDotnsPopController.LinkKind.None,
+                liteLabel: "",
+                chatKey: chatKey
             });
         }
 
-        IDotnsPopController.FullRegistration memory params =
-            IDotnsPopController.FullRegistration({label: baseLabel, user: ed, link: link});
+        IDotnsPopController.FullRegistration memory params = IDotnsPopController
+            .FullRegistration({label: baseLabel, user: ed, link: link});
 
         bytes32 baseNode = _nodeOf(baseLabel);
         uint256 baseline = vm.snapshotState();
@@ -257,7 +309,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
         vm.prank(popGateway);
         dotnsPopController.registerBaseName(params);
         Vm.Log[] memory typedLogs = vm.getRecordedLogs();
-        address typedOwner = IERC721(address(dotnsRegistrar)).ownerOf(uint256(baseNode));
+        address typedOwner = IERC721(address(dotnsRegistrar)).ownerOf(
+            uint256(baseNode)
+        );
         bytes memory typedKey = dotnsPopResolver.chatKey(baseNode);
         bytes32 typedLiteLink = dotnsPopResolver.liteLink(baseNode);
 
@@ -268,7 +322,10 @@ contract DotnsPopControllerFuzz is BaseDotns {
         dotnsPopController.registerBaseName(abi.encode(params));
         Vm.Log[] memory bytesLogs = vm.getRecordedLogs();
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(baseNode)), typedOwner);
+        assertEq(
+            IERC721(address(dotnsRegistrar)).ownerOf(uint256(baseNode)),
+            typedOwner
+        );
         assertEq(dotnsPopResolver.chatKey(baseNode), typedKey);
         assertEq(dotnsPopResolver.liteLink(baseNode), typedLiteLink);
         // Event equivalence catches axis-classification drift between the two
@@ -284,23 +341,31 @@ contract DotnsPopControllerFuzz is BaseDotns {
         assertEq(a.length, b.length, "log count mismatch");
         for (uint256 i = 0; i < a.length; ++i) {
             assertEq(a[i].emitter, b[i].emitter, "log emitter mismatch");
-            assertEq(a[i].topics.length, b[i].topics.length, "log topic count mismatch");
+            assertEq(
+                a[i].topics.length,
+                b[i].topics.length,
+                "log topic count mismatch"
+            );
             for (uint256 t = 0; t < a[i].topics.length; ++t) {
                 assertEq(a[i].topics[t], b[i].topics[t], "log topic mismatch");
             }
-            assertEq(keccak256(a[i].data), keccak256(b[i].data), "log data mismatch");
+            assertEq(
+                keccak256(a[i].data),
+                keccak256(b[i].data),
+                "log data mismatch"
+            );
         }
     }
 
     function testFuzz_isReservedForClaim_tracks_duration_boundary(
         uint64 duration,
         uint64 elapsed
-    )
-        public
-    {
+    ) public {
         duration = uint64(
             bound(
-                uint256(duration), uint256(dotnsPopController.MIN_RESERVATION_DURATION()), 365 days
+                uint256(duration),
+                uint256(dotnsPopController.MIN_RESERVATION_DURATION()),
+                365 days
             )
         );
         elapsed = uint64(bound(uint256(elapsed), 0, 365 days));
@@ -316,7 +381,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
 
         vm.warp(block.timestamp + uint256(elapsed));
 
-        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(
+            BASE_LABEL_A
+        );
         if (uint256(elapsed) <= uint256(duration)) {
             assertTrue(reserved);
             assertEq(holder, ed);
@@ -329,19 +396,25 @@ contract DotnsPopControllerFuzz is BaseDotns {
     function testFuzz_gatewayReserve_cold_user_stashes_label_and_chat_key_exactly(
         uint8 suffix,
         bytes1 keySeed
-    )
-        public
-    {
+    ) public {
         suffix = uint8(bound(uint256(suffix), 0, 99));
-        string memory label = string.concat("coldfu", _twoDigitDecimal(uint256(suffix)));
+        string memory label = string.concat(
+            "coldfu",
+            _twoDigitDecimal(uint256(suffix))
+        );
         bytes memory chatKey = _validChatKey(keySeed);
 
         _grantPopLite(ed);
         _gatewayReserveLiteName(
-            IDotnsPopController.LiteRegistration({liteLabel: label, user: ed, chatKey: chatKey})
+            IDotnsPopController.LiteRegistration({
+                liteLabel: label,
+                user: ed,
+                chatKey: chatKey
+            })
         );
 
-        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController.pendingClaims(ed);
+        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController
+            .pendingClaims(ed);
         assertEq(pending[0].label, label);
         assertGt(pending[0].mintedAt, 0);
         assertEq(storeFactory.getLabelStore(ed), address(0));
@@ -354,16 +427,21 @@ contract DotnsPopControllerFuzz is BaseDotns {
     function testFuzz_claimLabelStore_settles_label_and_chat_key_exactly(
         uint8 suffix,
         bytes1 keySeed
-    )
-        public
-    {
+    ) public {
         suffix = uint8(bound(uint256(suffix), 0, 99));
-        string memory label = string.concat("warmfu", _twoDigitDecimal(uint256(suffix)));
+        string memory label = string.concat(
+            "warmfu",
+            _twoDigitDecimal(uint256(suffix))
+        );
         bytes memory chatKey = _validChatKey(keySeed);
 
         _grantPopLite(ed);
         _gatewayReserveLiteName(
-            IDotnsPopController.LiteRegistration({liteLabel: label, user: ed, chatKey: chatKey})
+            IDotnsPopController.LiteRegistration({
+                liteLabel: label,
+                user: ed,
+                chatKey: chatKey
+            })
         );
 
         vm.prank(ed);
@@ -372,7 +450,10 @@ contract DotnsPopControllerFuzz is BaseDotns {
         bytes32 node = _nodeOf(label);
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
-        assertEq(ILabelStore(store).getLabel(node), string.concat(label, protocolRegistry.tld()));
+        assertEq(
+            ILabelStore(store).getLabel(node),
+            string.concat(label, protocolRegistry.tld())
+        );
         assertEq(dotnsPopResolver.chatKey(node), chatKey);
         assertEq(dotnsPopController.pendingClaims(ed).length, 0);
     }
@@ -380,12 +461,12 @@ contract DotnsPopControllerFuzz is BaseDotns {
     function testFuzz_pendingClaim_expiry_boundary_admits_or_lapses(
         uint64 duration,
         uint64 elapsed
-    )
-        public
-    {
+    ) public {
         duration = uint64(
             bound(
-                uint256(duration), uint256(dotnsPopController.MIN_RESERVATION_DURATION()), 365 days
+                uint256(duration),
+                uint256(dotnsPopController.MIN_RESERVATION_DURATION()),
+                365 days
             )
         );
         elapsed = uint64(bound(uint256(elapsed), 0, 365 days));
@@ -396,7 +477,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
         _grantPopLite(ed);
         _gatewayReserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x77)
+                liteLabel: LITE_LABEL_A,
+                user: ed,
+                chatKey: _validChatKey(0x77)
             })
         );
 
@@ -405,14 +488,22 @@ contract DotnsPopControllerFuzz is BaseDotns {
 
         if (elapsed <= duration) {
             vm.expectRevert(
-                abi.encodeWithSelector(IDotnsPopController.PendingClaimNotExpired.selector, ed)
+                abi.encodeWithSelector(
+                    IDotnsPopController.PendingClaimNotExpired.selector,
+                    ed
+                )
             );
             dotnsPopController.expirePendingClaim(ed);
             vm.prank(ed);
             dotnsPopController.claimLabelStore();
             assertTrue(storeFactory.getLabelStore(ed) != address(0));
         } else {
-            vm.expectRevert(abi.encodeWithSelector(IDotnsPopController.NoPendingClaim.selector, ed));
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    IDotnsPopController.NoPendingClaim.selector,
+                    ed
+                )
+            );
             vm.prank(ed);
             dotnsPopController.claimLabelStore();
             dotnsPopController.expirePendingClaim(ed);

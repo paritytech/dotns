@@ -2,12 +2,8 @@
 pragma solidity ^0.8.34;
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {
-    AccessControlUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IDotnsRoleManager} from "./IDotnsRoleManager.sol";
 
 /// @title Dotns Role Manager
@@ -29,7 +25,11 @@ abstract contract DotnsRoleManager is
     }
 
     /// @inheritdoc IDotnsRoleManager
-    function setRole(bytes32 role, address account, bool enabled) external override onlyOwner {
+    function setRole(
+        bytes32 role,
+        address account,
+        bool enabled
+    ) external override onlyOwner {
         _setRole(role, account, enabled);
     }
 
@@ -37,11 +37,7 @@ abstract contract DotnsRoleManager is
     function grantRole(
         bytes32 role,
         address account
-    )
-        public
-        override(AccessControlUpgradeable, IAccessControl)
-        onlyOwner
-    {
+    ) public override(AccessControlUpgradeable, IAccessControl) onlyOwner {
         _setRole(role, account, true);
     }
 
@@ -49,24 +45,23 @@ abstract contract DotnsRoleManager is
     function revokeRole(
         bytes32 role,
         address account
-    )
-        public
-        override(AccessControlUpgradeable, IAccessControl)
-        onlyOwner
-    {
+    ) public override(AccessControlUpgradeable, IAccessControl) onlyOwner {
         _setRole(role, account, false);
     }
 
     /// @inheritdoc AccessControlUpgradeable
-    function supportsInterface(bytes4 interfaceId)
+    function supportsInterface(
+        bytes4 interfaceId
+    )
         public
         view
         virtual
         override(AccessControlUpgradeable)
         returns (bool supported)
     {
-        return interfaceId == type(IDotnsRoleManager).interfaceId
-            || super.supportsInterface(interfaceId);
+        return
+            interfaceId == type(IDotnsRoleManager).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
 
     /// @notice Reverts unless the caller is the owner or holds `role`.
@@ -75,7 +70,10 @@ abstract contract DotnsRoleManager is
     ///      with @custom:reverts NotRoleOrOwner.
     function _checkRoleOrOwner(bytes32 role) internal view {
         address caller = _msgSender();
-        require(caller == owner() || hasRole(role, caller), NotRoleOrOwner(caller, role));
+        require(
+            caller == owner() || hasRole(role, caller),
+            NotRoleOrOwner(caller, role)
+        );
     }
 
     /// @notice Grants or revokes a supported role for `account`.
@@ -97,5 +95,7 @@ abstract contract DotnsRoleManager is
 
     /// @notice Returns whether `role` is recognised by the consuming contract.
     /// @dev Implemented by each consuming contract so unsupported role identifiers fail closed.
-    function _isSupportedRole(bytes32 role) internal view virtual returns (bool supported);
+    function _isSupportedRole(
+        bytes32 role
+    ) internal view virtual returns (bool supported);
 }

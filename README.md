@@ -1,7 +1,6 @@
 > [!WARNING]
 > This open source code is provided for research, experimentation, and developer education only. This code has not been audited, is actively experimental, and may contain bugs, vulnerabilities, or incomplete features. Use at your own risk.
 
-
 # Dotns
 
 Smart contracts for registering .dot names on Polkadot.
@@ -40,12 +39,12 @@ D plays two distinct roles. As a **deposit** it is the refundable lock a NoStatu
 
 The public controller computes the registration charge as the greater of the owner-side price and the payer-to-owner downward friction; it does not add the two together. The single charge becomes a refundable deposit on a direct NoStatus registration and becomes non-refundable reserve funding on a cross-payer registration.
 
-| Owner tier      | Reserved (stem ≤5) | PopFull-tier (stem 6-8, no digits) | PopLite-tier (stem 6-8, two digits) | NoStatus-tier (stem ≥9) |
-|---|---|---|---|---|
-| **NoStatus user**     | rejected | rejected | rejected | direct: pays D into deposit |
-| **PopLite user**      | rejected | rejected | gateway-only; free | free |
-| **PopFull user**      | rejected | free | gateway-only; free | free |
-| **Whitelisted address** | free | free | free | free |
+| Owner tier              | Reserved (stem ≤5) | PopFull-tier (stem 6-8, no digits) | PopLite-tier (stem 6-8, two digits) | NoStatus-tier (stem ≥9)     |
+| ----------------------- | ------------------ | ---------------------------------- | ----------------------------------- | --------------------------- |
+| **NoStatus user**       | rejected           | rejected                           | rejected                            | direct: pays D into deposit |
+| **PopLite user**        | rejected           | rejected                           | gateway-only; free                  | free                        |
+| **PopFull user**        | rejected           | free                               | gateway-only; free                  | free                        |
+| **Whitelisted address** | free               | free                               | free                                | free                        |
 
 Cross-payer registrations pay the greater of the owner-side price and the transfer-floor amount into the reserve. Reserved labels remain forbidden on the cross-payer path because the owner-side gate still rejects them. Whitelist registrations go through the same commit-reveal pipeline as the public path.
 
@@ -55,16 +54,16 @@ The registrar consults PopRules for the transfer floor. A transfer pays D whenev
 
 The deposit, when present, is bound to the name and rides with it on every transfer. The escrow position is rebound to the new holder rather than refunded; only releasing the name back to escrow ever unlocks the locked D. Transferring a funded name is therefore a real forfeiture: the sender hands the locked deposit over to the recipient along with the NFT.
 
-| Sender → Recipient                | Friction (to insurance) | Deposit movement |
-|---|---|---|
-| NoStatus → NoStatus (same tier)   | 0                      | Travels with the name; position rebinds to recipient |
-| NoStatus → PopLite or PopFull     | 0                      | Travels with the name; position rebinds to recipient |
-| PopLite → NoStatus                | D                      | Any inherited deposit travels with the name |
-| PopLite → PopLite (same)          | 0                      | Any inherited deposit stays bound to the name |
-| PopLite → PopFull (upward)        | 0                      | Any inherited deposit stays bound to the name |
-| PopFull → NoStatus                | D                      | Any inherited deposit travels with the name |
-| PopFull → PopLite (downward)      | D                      | Any inherited deposit stays bound to the name |
-| PopFull → PopFull (same)          | 0                      | Any inherited deposit stays bound to the name |
+| Sender → Recipient              | Friction (to insurance) | Deposit movement                                     |
+| ------------------------------- | ----------------------- | ---------------------------------------------------- |
+| NoStatus → NoStatus (same tier) | 0                       | Travels with the name; position rebinds to recipient |
+| NoStatus → PopLite or PopFull   | 0                       | Travels with the name; position rebinds to recipient |
+| PopLite → NoStatus              | D                       | Any inherited deposit travels with the name          |
+| PopLite → PopLite (same)        | 0                       | Any inherited deposit stays bound to the name        |
+| PopLite → PopFull (upward)      | 0                       | Any inherited deposit stays bound to the name        |
+| PopFull → NoStatus              | D                       | Any inherited deposit travels with the name          |
+| PopFull → PopLite (downward)    | D                       | Any inherited deposit stays bound to the name        |
+| PopFull → PopFull (same)        | 0                       | Any inherited deposit stays bound to the name        |
 
 The friction is constant and additive across downward hops. Every step that crosses a tier boundary downward charges D independently, so routing a name through intermediary tiers never costs less than the equivalent direct transfer. Laundering pays at least as much as the route it tries to avoid. Because the deposit follows the NFT, a NoStatus user cannot recover their D by handing the name to a fresh address and registering again; the only path back to D is releasing the current name into escrow. This binds Sybil cost to one D per live NoStatus name in existence, independent of how often names change hands.
 
@@ -133,18 +132,18 @@ PoP-aware name classification and pricing. Classification reads the label's **st
 
 The classifier bands on the stem, not the total label length. The stem is the label after removing any trailing digits. Trailing digit count must be zero or exactly two; a one-digit suffix and suffixes longer than two digits are invalid before tier eligibility is considered.
 
-| Label | Stem | Trailing digits | Classification | Eligible public path | Notes |
-| --- | --- | ---: | --- | --- | --- |
-| alice12 | alice | 2 | Reserved | Whitelist only | The stem is five characters, so the two-digit suffix does not make it PopLite. |
-| andrew01 | andrew | 2 | PopLite | Pop gateway only | Valid lite shape: six-character stem plus system-supplied two-digit suffix. |
-| alicebob42 | alicebob | 2 | PopLite | Pop gateway only | Eight-character stem plus two digits; total length is ten. |
-| andrew | andrew | 0 | PopFull | PopFull user | Canonical full-person base name. |
-| andrew1 | andrew | 1 | Rejected | None | One trailing digit has no protocol meaning. |
-| andrewsays | andrewsays | 0 | NoStatus | Anyone | NoStatus self-registration pays the flat refundable deposit. |
-| andrewsays01 | andrewsays | 2 | NoStatus | Anyone | Long stem remains NoStatus even with a two-digit suffix. |
-| andrew123 | andrew | 3 | Rejected | None | More than two trailing digits is invalid. |
-| andrew.01 | n/a | n/a | Rejected by public label validator | None | Dots are not valid in the public flat label. The Pop gateway accepts stem.suffix and normalises it to stemsuffix. |
-| Andrew01 | n/a | n/a | Rejected by canonical label validator | None | Labels must be lowercase ASCII DNS labels. |
+| Label        | Stem       | Trailing digits | Classification                        | Eligible public path | Notes                                                                                                             |
+| ------------ | ---------- | --------------: | ------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| alice12      | alice      |               2 | Reserved                              | Whitelist only       | The stem is five characters, so the two-digit suffix does not make it PopLite.                                    |
+| andrew01     | andrew     |               2 | PopLite                               | Pop gateway only     | Valid lite shape: six-character stem plus system-supplied two-digit suffix.                                       |
+| alicebob42   | alicebob   |               2 | PopLite                               | Pop gateway only     | Eight-character stem plus two digits; total length is ten.                                                        |
+| andrew       | andrew     |               0 | PopFull                               | PopFull user         | Canonical full-person base name.                                                                                  |
+| andrew1      | andrew     |               1 | Rejected                              | None                 | One trailing digit has no protocol meaning.                                                                       |
+| andrewsays   | andrewsays |               0 | NoStatus                              | Anyone               | NoStatus self-registration pays the flat refundable deposit.                                                      |
+| andrewsays01 | andrewsays |               2 | NoStatus                              | Anyone               | Long stem remains NoStatus even with a two-digit suffix.                                                          |
+| andrew123    | andrew     |               3 | Rejected                              | None                 | More than two trailing digits is invalid.                                                                         |
+| andrew.01    | n/a        |             n/a | Rejected by public label validator    | None                 | Dots are not valid in the public flat label. The Pop gateway accepts stem.suffix and normalises it to stemsuffix. |
+| Andrew01     | n/a        |             n/a | Rejected by canonical label validator | None                 | Labels must be lowercase ASCII DNS labels.                                                                        |
 
 Tier assignment is read on every pricing call, not stored: PopRules queries the alias-accounts personhood precompile at DotnsConstants.PERSONHOOD with the dotns context (bytes32("dotns")), and translates the returned status byte into a PopStatus (0=NoStatus, 1=PopLite, 2=PopFull). Unknown tier bytes collapse to NoStatus, so a future precompile addition fails closed rather than silently being treated as a higher tier. There is no on-chain self-attestation; users obtain personhood off-chain through the People-chain ring proof and the alias-accounts pallet propagates the result via XCM.
 
@@ -172,11 +171,11 @@ Stores contenthash and text records per node. This is where external content lin
 
 Choosing a delegation mechanism:
 
-| Goal | Use | Why |
-| --- | --- | --- |
-| Delegate full control of one name, including the right to transfer it, automatically revoked on sale | registrar `approve(operator, tokenId)` | Single-token approval. ERC-721 clears it on every transfer, so it cannot follow the name to a buyer. |
-| Delegate full control of all your names, current and future, including transferring them | registrar `setApprovalForAll(operator, true)` | The name-admin role. Persists until revoked and spans every name you hold. It grants transfer power, so grant it only to fully trusted managers; this is the approval marketplaces and escrows require. |
-| Delegate record edits only, with no power over ownership or transfer | content resolver `setApprovalForAll(operator, true)` | The narrowest grant. Resolver-local and record-scoped: the operator can set text and contenthash but cannot transfer the name or change its owner. |
+| Goal                                                                                                 | Use                                                  | Why                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Delegate full control of one name, including the right to transfer it, automatically revoked on sale | registrar `approve(operator, tokenId)`               | Single-token approval. ERC-721 clears it on every transfer, so it cannot follow the name to a buyer.                                                                                                    |
+| Delegate full control of all your names, current and future, including transferring them             | registrar `setApprovalForAll(operator, true)`        | The name-admin role. Persists until revoked and spans every name you hold. It grants transfer power, so grant it only to fully trusted managers; this is the approval marketplaces and escrows require. |
+| Delegate record edits only, with no power over ownership or transfer                                 | content resolver `setApprovalForAll(operator, true)` | The narrowest grant. Resolver-local and record-scoped: the operator can set text and contenthash but cannot transfer the name or change its owner.                                                      |
 
 Revoke any grant with the inverse call (`approve(address(0), tokenId)` or `setApprovalForAll(operator, false)`). Because every write re-reads the current owner, a transfer drops all delegates the prior owner had set.
 
@@ -229,7 +228,7 @@ Before deploying it for real use cases, you are responsible for:
 - Securing your own fork or deployment environment (keys, secrets, network configuration)
 - Tracking the latest tagged release/commits for security fixes; older releases are not backported (exceptions might apply)
 
-For Parity's security disclosure process, and Bug Bounty program, feel free to visit:  https://parity.io/bug-bounty
+For Parity's security disclosure process, and Bug Bounty program, feel free to visit: https://parity.io/bug-bounty
 
 ## Known limitations
 

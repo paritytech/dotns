@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "forge test -vvvvv",
+    "format": "prettier --write .",
     "deploy": "./scripts/deploy/run.sh",
     "deploy:anvil": "forge clean && forge build && ./scripts/deploy/run.sh",
     "deploy:testnet": "./scripts/deploy/run.sh '--timeout 1000'",

@@ -92,10 +92,7 @@ interface IStoreFactory {
     function getLabelStores(
         uint256 offset,
         uint256 limit
-    )
-        external
-        view
-        returns (address[] memory stores);
+    ) external view returns (address[] memory stores);
 
     /// @notice Upgrades the `LabelStore` implementation for every existing and future proxy.
     /// @dev Callable by the factory owner only, otherwise
@@ -107,7 +104,9 @@ interface IStoreFactory {
     ///      `UpgradeableBeacon.upgradeTo` and emits
     ///      @custom:emits LabelStoreImplementationUpgraded on success.
     /// @param newImplementation The new implementation address.
-    function upgradeLabelStoreImplementation(address newImplementation) external;
+    function upgradeLabelStoreImplementation(
+        address newImplementation
+    ) external;
 
     /// @notice Caller claims their `UserStore` beacon-proxy.
     /// @dev Self-claim only; `_owner` on the resulting store is always `msg.sender`,
@@ -137,10 +136,7 @@ interface IStoreFactory {
     function getUserStores(
         uint256 offset,
         uint256 limit
-    )
-        external
-        view
-        returns (address[] memory stores);
+    ) external view returns (address[] memory stores);
 
     /// @notice Upgrades the `UserStore` implementation for every existing and future proxy.
     /// @dev Callable by the factory owner only, otherwise

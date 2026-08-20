@@ -36,16 +36,17 @@ contract DeployPolicy is BaseDeployer {
     function _deployRegistrarController(
         address owner,
         address protocolRegistry
-    )
-        internal
-        returns (address proxy)
-    {
+    ) internal returns (address proxy) {
         proxy = _broadcastDeployUups(
             owner,
             "DotnsRegistrarController.sol:DotnsRegistrarController",
             abi.encodeCall(
                 DotnsRegistrarController.initialize,
-                (IDotnsProtocolRegistry(protocolRegistry), MIN_COMMITMENT_AGE, MAX_COMMITMENT_AGE)
+                (
+                    IDotnsProtocolRegistry(protocolRegistry),
+                    MIN_COMMITMENT_AGE,
+                    MAX_COMMITMENT_AGE
+                )
             ),
             "DotnsRegistrarController"
         );
@@ -54,10 +55,7 @@ contract DeployPolicy is BaseDeployer {
     function _deployNameEscrow(
         address owner,
         address protocolRegistry
-    )
-        internal
-        returns (address proxy)
-    {
+    ) internal returns (address proxy) {
         proxy = _broadcastDeployUups(
             owner,
             "DotnsNameEscrow.sol:DotnsNameEscrow",

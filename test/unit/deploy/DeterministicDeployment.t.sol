@@ -35,7 +35,9 @@ contract DeterministicDeploymentTest is Test {
         deployer.initManifest();
         // Mirror DeployCore: bootstrap the factory and prime it as the override
         // so the protocol registry can be deployed through it.
-        factory = Create3Factory(payable(deployer.bootstrapCreate3Factory(owner)));
+        factory = Create3Factory(
+            payable(deployer.bootstrapCreate3Factory(owner))
+        );
     }
 
     function test_coreDeploymentAddressesStayTheSameAcrossChainIds() public {
@@ -50,19 +52,33 @@ contract DeterministicDeploymentTest is Test {
         vm.chainId(420420422);
         CoreAddresses memory passetHub = _deployCore();
 
-        assertEq(passetHub.protocolRegistry, paseo.protocolRegistry, "protocol registry");
+        assertEq(
+            passetHub.protocolRegistry,
+            paseo.protocolRegistry,
+            "protocol registry"
+        );
         assertEq(passetHub.multicall3, paseo.multicall3, "multicall3");
         assertEq(passetHub.storeFactory, paseo.storeFactory, "store factory");
         assertEq(passetHub.registrar, paseo.registrar, "registrar");
-        assertEq(passetHub.reverseResolver, paseo.reverseResolver, "reverse resolver");
+        assertEq(
+            passetHub.reverseResolver,
+            paseo.reverseResolver,
+            "reverse resolver"
+        );
         assertEq(passetHub.registry, paseo.registry, "registry");
 
         vm.revertToState(baseline);
     }
 
     function test_predictionsMatchCreate3Deployments() public {
-        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot"));
-        address predicted = deployer.predictCreate3("DotnsProtocolRegistry", "proxy");
+        bytes memory initData = abi.encodeCall(
+            DotnsProtocolRegistry.initialize,
+            ("dot")
+        );
+        address predicted = deployer.predictCreate3(
+            "DotnsProtocolRegistry",
+            "proxy"
+        );
 
         address deployed = deployer.deployUups(
             owner,
@@ -84,10 +100,16 @@ contract DeterministicDeploymentTest is Test {
             abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot")),
             "DotnsProtocolRegistry"
         );
-        deployer.registerCreate3Factory(owner, protocolRegistry, address(factory));
+        deployer.registerCreate3Factory(
+            owner,
+            protocolRegistry,
+            address(factory)
+        );
 
         assertEq(
-            IDotnsProtocolRegistry(protocolRegistry).get(DotnsConstants.CREATE3_FACTORY),
+            IDotnsProtocolRegistry(protocolRegistry).get(
+                DotnsConstants.CREATE3_FACTORY
+            ),
             address(factory),
             "factory recorded on protocol registry"
         );
@@ -97,21 +119,41 @@ contract DeterministicDeploymentTest is Test {
         deployer.setCreate3Factory(address(0));
 
         address predicted = deployer.predictCreate3("Multicall3", "contract");
-        address deployed =
-            deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", bytes(""), "Multicall3");
-        assertEq(deployed, predicted, "registry-resolved deploy matches prediction");
+        address deployed = deployer.deployCreate3(
+            owner,
+            "Multicall3.sol:Multicall3",
+            bytes(""),
+            "Multicall3"
+        );
+        assertEq(
+            deployed,
+            predicted,
+            "registry-resolved deploy matches prediction"
+        );
     }
 
     function test_predictionsMatchForNonProxyDeploys() public {
         address predictedPaseo = _predictMulticall3On(420420417);
         address deployedPaseo = _deployMulticall3On(420420417);
-        assertEq(deployedPaseo, predictedPaseo, "paseo: prediction matches deploy");
+        assertEq(
+            deployedPaseo,
+            predictedPaseo,
+            "paseo: prediction matches deploy"
+        );
 
         address predictedPassetHub = _predictMulticall3On(420420422);
         address deployedPassetHub = _deployMulticall3On(420420422);
-        assertEq(deployedPassetHub, predictedPassetHub, "passetHub: prediction matches deploy");
+        assertEq(
+            deployedPassetHub,
+            predictedPassetHub,
+            "passetHub: prediction matches deploy"
+        );
 
-        assertEq(deployedPassetHub, deployedPaseo, "deploy stable across chains");
+        assertEq(
+            deployedPassetHub,
+            deployedPaseo,
+            "deploy stable across chains"
+        );
     }
 
     function test_addressesIdenticalAcrossDeployers() public {
@@ -123,8 +165,16 @@ contract DeterministicDeploymentTest is Test {
         address passetHubOwner = _deployRegistryOn(420420422, owner);
         address passetHubBob = _deployRegistryOn(420420422, bob);
 
-        assertEq(paseoBob, paseoOwner, "paseo: different deployer, same address");
-        assertEq(passetHubBob, paseoOwner, "passetHub: different deployer, same address");
+        assertEq(
+            paseoBob,
+            paseoOwner,
+            "paseo: different deployer, same address"
+        );
+        assertEq(
+            passetHubBob,
+            paseoOwner,
+            "passetHub: different deployer, same address"
+        );
         assertEq(passetHubOwner, paseoOwner, "same deployer, different chain");
     }
 
@@ -134,9 +184,21 @@ contract DeterministicDeploymentTest is Test {
         address passetHubFirst = _deployRegistryOn(420420422, owner);
         address passetHubSecond = _deployRegistryOn(420420422, owner);
 
-        assertEq(paseoSecond, paseoFirst, "paseo: sequential run, same address");
-        assertEq(passetHubSecond, passetHubFirst, "passetHub: sequential run, same address");
-        assertEq(passetHubFirst, paseoFirst, "sequential run stable across chains");
+        assertEq(
+            paseoSecond,
+            paseoFirst,
+            "paseo: sequential run, same address"
+        );
+        assertEq(
+            passetHubSecond,
+            passetHubFirst,
+            "passetHub: sequential run, same address"
+        );
+        assertEq(
+            passetHubFirst,
+            paseoFirst,
+            "sequential run stable across chains"
+        );
     }
 
     function test_reusedFactoryMakesAddressesDeployerIndependent() public {
@@ -165,8 +227,8 @@ contract DeterministicDeploymentTest is Test {
         minting.initManifest();
         minting.bootstrapCreate3Factory(owner);
         assertTrue(
-            minting.predictCreate3("DotnsRegistrar", "proxy")
-                != runA.predictCreate3("DotnsRegistrar", "proxy"),
+            minting.predictCreate3("DotnsRegistrar", "proxy") !=
+                runA.predictCreate3("DotnsRegistrar", "proxy"),
             "freshly minted factory yields a different address"
         );
     }
@@ -197,15 +259,26 @@ contract DeterministicDeploymentTest is Test {
     function test_reDeployAdoptsAnExistingContract() public {
         // A resumed run re-deploys a non-upgradeable contract already on-chain:
         // it must adopt the existing address rather than revert.
-        address first =
-            deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", bytes(""), "Multicall3");
-        address second =
-            deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", bytes(""), "Multicall3");
+        address first = deployer.deployCreate3(
+            owner,
+            "Multicall3.sol:Multicall3",
+            bytes(""),
+            "Multicall3"
+        );
+        address second = deployer.deployCreate3(
+            owner,
+            "Multicall3.sol:Multicall3",
+            bytes(""),
+            "Multicall3"
+        );
         assertEq(second, first, "re-run adopts the existing contract");
     }
 
     function test_reDeployAdoptsProxyWithoutReinitialising() public {
-        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot"));
+        bytes memory initData = abi.encodeCall(
+            DotnsProtocolRegistry.initialize,
+            ("dot")
+        );
         address first = deployer.deployUups(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
@@ -221,42 +294,55 @@ contract DeterministicDeploymentTest is Test {
             "DotnsProtocolRegistry"
         );
         assertEq(second, first, "re-run adopts the existing proxy");
-        assertEq(DotnsProtocolRegistry(second).owner(), owner, "proxy stays initialised");
+        assertEq(
+            DotnsProtocolRegistry(second).owner(),
+            owner,
+            "proxy stays initialised"
+        );
     }
 
-    function _deployRegistry(address deployerAccount) private returns (address) {
-        return deployer.deployUups(
-            deployerAccount,
-            "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot")),
-            "DotnsProtocolRegistry"
-        );
+    function _deployRegistry(
+        address deployerAccount
+    ) private returns (address) {
+        return
+            deployer.deployUups(
+                deployerAccount,
+                "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
+                abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot")),
+                "DotnsProtocolRegistry"
+            );
     }
 
     function _deployRegistryOn(
         uint256 chainId,
         address deployerAccount
-    )
-        private
-        returns (address result)
-    {
+    ) private returns (address result) {
         uint256 snap = vm.snapshotState();
         vm.chainId(chainId);
         result = _deployRegistry(deployerAccount);
         vm.revertToState(snap);
     }
 
-    function _predictMulticall3On(uint256 chainId) private returns (address result) {
+    function _predictMulticall3On(
+        uint256 chainId
+    ) private returns (address result) {
         uint256 snap = vm.snapshotState();
         vm.chainId(chainId);
         result = deployer.predictCreate3("Multicall3", "contract");
         vm.revertToState(snap);
     }
 
-    function _deployMulticall3On(uint256 chainId) private returns (address result) {
+    function _deployMulticall3On(
+        uint256 chainId
+    ) private returns (address result) {
         uint256 snap = vm.snapshotState();
         vm.chainId(chainId);
-        result = deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", bytes(""), "Multicall3");
+        result = deployer.deployCreate3(
+            owner,
+            "Multicall3.sol:Multicall3",
+            bytes(""),
+            "Multicall3"
+        );
         vm.revertToState(snap);
     }
 
@@ -268,8 +354,12 @@ contract DeterministicDeploymentTest is Test {
             "DotnsProtocolRegistry"
         );
 
-        addr.multicall3 =
-            deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", bytes(""), "Multicall3");
+        addr.multicall3 = deployer.deployCreate3(
+            owner,
+            "Multicall3.sol:Multicall3",
+            bytes(""),
+            "Multicall3"
+        );
 
         addr.storeFactory = deployer.deployCreate3(
             owner,
@@ -278,12 +368,17 @@ contract DeterministicDeploymentTest is Test {
             "StoreFactory"
         );
 
-        IDotnsProtocolRegistry registry = IDotnsProtocolRegistry(addr.protocolRegistry);
+        IDotnsProtocolRegistry registry = IDotnsProtocolRegistry(
+            addr.protocolRegistry
+        );
 
         addr.registrar = deployer.deployUups(
             owner,
             "DotnsRegistrar.sol:DotnsRegistrar",
-            abi.encodeCall(DotnsRegistrar.initialize, ("Dotns", "Dotns", registry)),
+            abi.encodeCall(
+                DotnsRegistrar.initialize,
+                ("Dotns", "Dotns", registry)
+            ),
             "DotnsRegistrar"
         );
 
@@ -301,8 +396,20 @@ contract DeterministicDeploymentTest is Test {
             "DotnsRegistry"
         );
 
-        assertEq(DotnsProtocolRegistry(addr.protocolRegistry).owner(), owner, "registry owner");
-        assertEq(DotnsRegistrar(addr.registrar).owner(), owner, "registrar owner");
-        assertEq(StoreFactory(addr.storeFactory).owner(), owner, "factory owner");
+        assertEq(
+            DotnsProtocolRegistry(addr.protocolRegistry).owner(),
+            owner,
+            "registry owner"
+        );
+        assertEq(
+            DotnsRegistrar(addr.registrar).owner(),
+            owner,
+            "registrar owner"
+        );
+        assertEq(
+            StoreFactory(addr.storeFactory).owner(),
+            owner,
+            "factory owner"
+        );
     }
 }

@@ -4,12 +4,12 @@ DotNS carries a small set of constraints worth knowing before deploying or build
 
 For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.md).
 
-| # | Issue | Type | Resolves when |
-| :- | :---- | :--- | :------------ |
-| 1 | Deferred LabelStore deployment | Runtime | Runtime allows root-origin contract deployment |
-| 2 | Transfer fee is zero until the store is settled | Runtime (follows from 1) | The holder calls `claimLabelStore`, or 1 is resolved |
-| 3 | Root origin is not propagated through delegatecalls | Runtime | Runtime propagates origin through delegatecalls |
-| 4 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
+| #   | Issue                                               | Type                     | Resolves when                                        |
+| :-- | :-------------------------------------------------- | :----------------------- | :--------------------------------------------------- |
+| 1   | Deferred LabelStore deployment                      | Runtime                  | Runtime allows root-origin contract deployment       |
+| 2   | Transfer fee is zero until the store is settled     | Runtime (follows from 1) | The holder calls `claimLabelStore`, or 1 is resolved |
+| 3   | Root origin is not propagated through delegatecalls | Runtime                  | Runtime propagates origin through delegatecalls      |
+| 4   | No standalone user-status mapping                   | Current implementation   | A dedicated status mapping is added, if ever needed  |
 
 ## 1. Deferred LabelStore deployment
 

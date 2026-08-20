@@ -38,8 +38,5 @@ interface IPersonhood {
     function personhoodStatus(
         address account,
         bytes32 context
-    )
-        external
-        view
-        returns (PersonhoodInfo memory info);
+    ) external view returns (PersonhoodInfo memory info);
 }

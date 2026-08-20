@@ -31,17 +31,15 @@ contract RegistrationProbe is IERC721Receiver {
         address,
         uint256 tokenId,
         bytes calldata
-    )
-        external
-        override
-        returns (bytes4)
-    {
+    ) external override returns (bytes4) {
         callbackFired = true;
-        (bool ok, bytes memory data) =
-            registry.staticcall(abi.encodeWithSignature("owner(bytes32)", bytes32(tokenId)));
+        (bool ok, bytes memory data) = registry.staticcall(
+            abi.encodeWithSignature("owner(bytes32)", bytes32(tokenId))
+        );
         if (ok) observedRegistryOwner = abi.decode(data, (address));
-        (ok, data) =
-            reverseResolver.staticcall(abi.encodeWithSignature("nameOf(address)", address(this)));
+        (ok, data) = reverseResolver.staticcall(
+            abi.encodeWithSignature("nameOf(address)", address(this))
+        );
         if (ok) observedReverseName = abi.decode(data, (string));
         return IERC721Receiver.onERC721Received.selector;
     }

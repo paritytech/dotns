@@ -38,7 +38,9 @@ interface IDotnsProtocolRegistry {
     ///      writes and `StoreFactory` deploys; only addresses governance has actively
     ///      registered return true. Treats `address(0)` as never registered regardless of
     ///      refcount.
-    function isRegisteredAddress(address addr) external view returns (bool registered);
+    function isRegisteredAddress(
+        address addr
+    ) external view returns (bool registered);
 
     /// @notice Returns the namehash of the network's TLD node.
     /// @dev `namehash(0, keccak256(bytes(tldLabel)))`, fixed at initialisation. Consumers use it

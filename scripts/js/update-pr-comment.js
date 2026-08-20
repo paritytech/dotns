@@ -38,8 +38,7 @@ module.exports = async ({ github, context }) => {
   });
 
   const existing = comments.find(
-    (c) =>
-      c.user?.login === "github-actions[bot]" && c.body?.includes(marker)
+    (c) => c.user?.login === "github-actions[bot]" && c.body?.includes(marker)
   );
 
   // Parse existing sections from the comment

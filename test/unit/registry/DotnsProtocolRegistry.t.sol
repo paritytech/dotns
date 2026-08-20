@@ -16,10 +16,9 @@ contract DotnsProtocolRegistryTldTests is BaseDotns {
     ///         proxy, mirroring the fixture's own registry deployment.
     /// @param tldLabel Bare TLD label without the leading dot.
     /// @return registry The initialised registry.
-    function _deployRegistry(string memory tldLabel)
-        private
-        returns (IDotnsProtocolRegistry registry)
-    {
+    function _deployRegistry(
+        string memory tldLabel
+    ) private returns (IDotnsProtocolRegistry registry) {
         address proxy = Upgrades.deployUUPSProxy(
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
             abi.encodeCall(DotnsProtocolRegistry.initialize, (tldLabel))
@@ -31,8 +30,12 @@ contract DotnsProtocolRegistryTldTests is BaseDotns {
     ///         registries whose TLDs differ, and the two TLD authorities never coincide.
     /// @dev The fixture's `protocolRegistry` already runs under @custom:constant TLD_LABEL (`dot`),
     ///      so it stands up a second authority under a different TLD and compares derivations.
-    function test_same_label_derives_distinct_node_and_token_id_per_tld() public {
-        IDotnsProtocolRegistry dotRegistry = IDotnsProtocolRegistry(address(protocolRegistry));
+    function test_same_label_derives_distinct_node_and_token_id_per_tld()
+        public
+    {
+        IDotnsProtocolRegistry dotRegistry = IDotnsProtocolRegistry(
+            address(protocolRegistry)
+        );
         IDotnsProtocolRegistry ethRegistry = _deployRegistry("eth");
 
         // Distinct TLDs must not share a TLD node or suffix.
@@ -41,8 +44,14 @@ contract DotnsProtocolRegistryTldTests is BaseDotns {
         assertEq(ethRegistry.tld(), ".eth");
 
         bytes32 labelHash = LabelUtils.labelhashMemory("alice");
-        bytes32 dotNodeOfLabel = LabelUtils.namehashUnder(dotRegistry.tldNode(), labelHash);
-        bytes32 ethNodeOfLabel = LabelUtils.namehashUnder(ethRegistry.tldNode(), labelHash);
+        bytes32 dotNodeOfLabel = LabelUtils.namehashUnder(
+            dotRegistry.tldNode(),
+            labelHash
+        );
+        bytes32 ethNodeOfLabel = LabelUtils.namehashUnder(
+            ethRegistry.tldNode(),
+            labelHash
+        );
 
         // Same label under a different TLD yields a different node, and therefore a different
         // token id (the token id is the node cast to uint256).

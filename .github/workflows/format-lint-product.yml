@@ -2,7 +2,7 @@ name: Format & Lint
 
 on:
   pull_request:
-    paths: ['src/**', 'script/**', 'test/**', '**.sol']
+    paths: ["src/**", "script/**", "test/**", "**.sol"]
 
 permissions:
   contents: read
@@ -57,7 +57,7 @@ jobs:
         if: always()
         with:
           name: lint-logs
-          path: '*.log'
+          path: "*.log"
           retention-days: 7
 
       - name: Update PR comment
@@ -86,7 +86,7 @@ jobs:
 
             let rows = {};
             let detailsSection = '';
-            
+
             if (existing?.body) {
               const parts = existing.body.split(detailsMarker);
               const tableSection = parts[0] || '';

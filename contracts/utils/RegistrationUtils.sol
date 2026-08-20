@@ -67,13 +67,16 @@ library RegistrationUtils {
     ///      could conflict with the registrar's locked-entry semantics.
     /// @param context Registration inputs. See @custom:struct RegistrationContext.
     /// @return labelStore The resolved or newly deployed `LabelStore` address for `context.user`.
-    function registerAndStore(RegistrationContext memory context)
-        internal
-        returns (address labelStore)
-    {
+    function registerAndStore(
+        RegistrationContext memory context
+    ) internal returns (address labelStore) {
         Siblings memory siblings = _resolveSiblings(context.protocolRegistry);
 
-        siblings.registrar.register(uint256(context.node), context.user, context.label);
+        siblings.registrar.register(
+            uint256(context.node),
+            context.user,
+            context.label
+        );
         siblings.registry.setOwner(context.node, context.user);
 
         labelStore = siblings.storeFactory.getLabelStore(context.user);
@@ -83,15 +86,19 @@ library RegistrationUtils {
     /// @dev Exists so that resolution is one round-trip through a single helper and
     ///      not duplicated inline at every call site. If protocol-registry key
     ///      conventions change, the change lands here.
-    function _resolveSiblings(IDotnsProtocolRegistry protocolRegistry)
-        private
-        view
-        returns (Siblings memory siblings)
-    {
+    function _resolveSiblings(
+        IDotnsProtocolRegistry protocolRegistry
+    ) private view returns (Siblings memory siblings) {
         siblings = Siblings({
-            registrar: IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR)),
-            registry: IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY)),
-            storeFactory: IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY))
+            registrar: IDotnsRegistrar(
+                protocolRegistry.get(DotnsConstants.REGISTRAR)
+            ),
+            registry: IDotnsRegistry(
+                protocolRegistry.get(DotnsConstants.REGISTRY)
+            ),
+            storeFactory: IStoreFactory(
+                protocolRegistry.get(DotnsConstants.STORE_FACTORY)
+            )
         });
     }
 }

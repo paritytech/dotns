@@ -14,7 +14,10 @@ contract UserStoreFuzzTest is BaseDotns {
         store = IUserStore(storeFactory.claimUserStore());
     }
 
-    function testFuzz_setValue_accepts_arbitrary_inputs(bytes32 key, bytes calldata value) public {
+    function testFuzz_setValue_accepts_arbitrary_inputs(
+        bytes32 key,
+        bytes calldata value
+    ) public {
         vm.assume(key != bytes32(0));
 
         IUserStore store = _freshUserStore(ed);
@@ -26,9 +29,11 @@ contract UserStoreFuzzTest is BaseDotns {
         assertEq(store.getKeyAt(0), key);
     }
 
-    function testFuzz_history_length_equals_prior_nonempty_writes(uint8 rawCount) public {
+    function testFuzz_history_length_equals_prior_nonempty_writes(
+        uint8 rawCount
+    ) public {
         // 1..8
-        uint256 count = uint256(rawCount) % 8 + 1;
+        uint256 count = (uint256(rawCount) % 8) + 1;
         bytes32 key = keccak256("k");
 
         IUserStore store = _freshUserStore(ed);
@@ -62,14 +67,12 @@ contract UserStoreFuzzTest is BaseDotns {
         uint8 rawVersions,
         uint256 offset,
         uint256 limit
-    )
-        public
-    {
+    ) public {
         bytes32 key = keccak256("k");
         // rawVersions writes; each call after the first leaves one history entry, so
         // history length == rawVersions - 1 when every value is non-empty.
         // 2..9
-        uint256 versions = uint256(rawVersions) % 8 + 2;
+        uint256 versions = (uint256(rawVersions) % 8) + 2;
 
         IUserStore store = _freshUserStore(ed);
 

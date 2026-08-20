@@ -22,7 +22,8 @@ library DotnsConstants {
     ///         alias-accounts pallet on Asset Hub.
     /// @dev Consumed by `PopRules` to read each account's personhood tier
     ///      (`None` / `Lite` / `Full`) and the dotns-scoped `contextAlias`.
-    address internal constant PERSONHOOD = address(0x000000000000000000000000000000000a010000);
+    address internal constant PERSONHOOD =
+        address(0x000000000000000000000000000000000a010000);
 
     /// @notice Application identifier passed to @custom:function IPersonhood.personhoodStatus.
     /// @dev Fixed per project so the same person receives a stable, dotns-only
@@ -42,7 +43,8 @@ library DotnsConstants {
     /// @notice Operational role allowed to manage the public controller whitelist.
     /// @dev Holders can grant or revoke whitelist entries, but cannot upgrade contracts
     ///      or change protocol configuration.
-    bytes32 internal constant WHITELIST_OPERATOR_ROLE = keccak256("DOTNS_WHITELIST_OPERATOR_ROLE");
+    bytes32 internal constant WHITELIST_OPERATOR_ROLE =
+        keccak256("DOTNS_WHITELIST_OPERATOR_ROLE");
 
     /// @notice Well-known key for the ERC721 registrar backing name ownership.
     /// @dev Role: token-of-record for registered names. Mints, burns, and tracks the

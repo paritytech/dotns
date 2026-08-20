@@ -22,7 +22,9 @@ library LabelUtils {
     /// @notice Computes `keccak256(bytes(label))` via memory-safe scratch space.
     /// @param label Label string.
     /// @return hash `keccak256(bytes(label))`.
-    function labelhash(string calldata label) internal pure returns (bytes32 hash) {
+    function labelhash(
+        string calldata label
+    ) internal pure returns (bytes32 hash) {
         assembly ("memory-safe") {
             let pointer := mload(0x40)
             let len := label.length
@@ -37,7 +39,9 @@ library LabelUtils {
     ///      semantics as @custom:function labelhash, different calldata shape.
     /// @param label Label string held in memory.
     /// @return hash `keccak256(bytes(label))`.
-    function labelhashMemory(string memory label) internal pure returns (bytes32 hash) {
+    function labelhashMemory(
+        string memory label
+    ) internal pure returns (bytes32 hash) {
         assembly ("memory-safe") {
             hash := keccak256(add(label, 0x20), mload(label))
         }
@@ -49,11 +53,10 @@ library LabelUtils {
     /// @param parent Parent node.
     /// @param labelhash_ `keccak256(bytes(label))`.
     /// @return node `namehash(parent, labelhash)`.
-    function namehashUnder(bytes32 parent, bytes32 labelhash_)
-        internal
-        pure
-        returns (bytes32 node)
-    {
+    function namehashUnder(
+        bytes32 parent,
+        bytes32 labelhash_
+    ) internal pure returns (bytes32 node) {
         assembly ("memory-safe") {
             let pointer := mload(0x40)
             mstore(pointer, parent)
@@ -73,11 +76,7 @@ library LabelUtils {
     function deriveNode(
         bytes32 tldNode,
         string calldata label
-    )
-        internal
-        pure
-        returns (bytes32 hash, bytes32 node)
-    {
+    ) internal pure returns (bytes32 hash, bytes32 node) {
         hash = labelhash(label);
         node = namehashUnder(tldNode, hash);
     }
@@ -90,11 +89,7 @@ library LabelUtils {
     function stripTld(
         string memory tldSuffix,
         string memory fullName
-    )
-        internal
-        pure
-        returns (string memory label)
-    {
+    ) internal pure returns (string memory label) {
         bytes memory full = bytes(fullName);
         bytes memory tld = bytes(tldSuffix);
         if (full.length <= tld.length) return "";

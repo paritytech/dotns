@@ -3,12 +3,8 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {
-    ERC165Upgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IDotnsContentResolver} from "./IDotnsContentResolver.sol";
@@ -35,10 +31,12 @@ contract DotnsContentResolver is
     mapping(bytes32 node => bytes contentHash) private contenthashes;
 
     /// @notice Stores all text records
-    mapping(bytes32 node => mapping(string key => string value)) private textRecords;
+    mapping(bytes32 node => mapping(string key => string value))
+        private textRecords;
 
     /// @notice Store all approval mapping
-    mapping(address owner => mapping(address operator => bool approved)) private operators;
+    mapping(address owner => mapping(address operator => bool approved))
+        private operators;
 
     /// @notice Protocol-level address registry for all DotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
@@ -65,19 +63,28 @@ contract DotnsContentResolver is
     }
 
     /// @inheritdoc IDotnsContentResolver
-    function setContenthash(bytes32 node, bytes calldata hash) external override {
+    function setContenthash(
+        bytes32 node,
+        bytes calldata hash
+    ) external override {
         _requireNodeOwnerOrOperator(node);
         contenthashes[node] = hash;
         emit ContentHashUpdated(node, hash);
     }
 
     /// @inheritdoc IDotnsContentResolver
-    function contenthash(bytes32 node) external view override returns (bytes memory hash) {
+    function contenthash(
+        bytes32 node
+    ) external view override returns (bytes memory hash) {
         return contenthashes[node];
     }
 
     /// @inheritdoc IDotnsContentResolver
-    function setText(bytes32 node, string calldata key, string calldata value) external override {
+    function setText(
+        bytes32 node,
+        string calldata key,
+        string calldata value
+    ) external override {
         _requireNodeOwnerOrOperator(node);
         textRecords[node][key] = value;
         emit TextUpdated(node, key, value);
@@ -87,17 +94,15 @@ contract DotnsContentResolver is
     function text(
         bytes32 node,
         string calldata key
-    )
-        external
-        view
-        override
-        returns (string memory value)
-    {
+    ) external view override returns (string memory value) {
         return textRecords[node][key];
     }
 
     /// @inheritdoc IDotnsContentResolver
-    function setApprovalForAll(address operator, bool approved) external override {
+    function setApprovalForAll(
+        address operator,
+        bool approved
+    ) external override {
         operators[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
     }
@@ -106,12 +111,7 @@ contract DotnsContentResolver is
     function isApprovedForAll(
         address owner,
         address operator
-    )
-        external
-        view
-        override
-        returns (bool)
-    {
+    ) external view override returns (bool) {
         return operators[owner][operator];
     }
 
@@ -125,27 +125,40 @@ contract DotnsContentResolver is
     ///      local-operator checks run before the cross-contract registry call.
     /// @param node Node identifier.
     function _requireNodeOwnerOrOperator(bytes32 node) internal view {
-        IDotnsRegistry _registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
+        IDotnsRegistry _registry = IDotnsRegistry(
+            protocolRegistry.get(DotnsConstants.REGISTRY)
+        );
         address nodeOwner = _registry.owner(node);
         require(
-            msg.sender == nodeOwner || operators[nodeOwner][msg.sender]
-                || _registry.isAuthorised(node, msg.sender),
+            msg.sender == nodeOwner ||
+                operators[nodeOwner][msg.sender] ||
+                _registry.isAuthorised(node, msg.sender),
             NotAuthorised(node, msg.sender)
         );
     }
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
+    function version()
+        external
+        pure
+        virtual
+        returns (string memory versionString)
+    {
         versionString = "1.0.0";
     }
 
     /// @inheritdoc ERC165Upgradeable
-    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        return interfaceId == type(IDotnsContentResolver).interfaceId
-            || super.supportsInterface(interfaceId);
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override returns (bool) {
+        return
+            interfaceId == type(IDotnsContentResolver).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }

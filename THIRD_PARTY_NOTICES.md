@@ -37,14 +37,14 @@ Source: https://github.com/ensdomains/ens-contracts
 
 These are vendored under `lib/` (pinned by commit in `setup.bash` or `.gitmodules`).
 
-| Library | Licence | Used by deployed contracts | Source |
-|---------|---------|----------------------------|--------|
-| forge-std | MIT / Apache-2.0 | No (test/scripts only) | https://github.com/foundry-rs/forge-std |
-| OpenZeppelin Contracts | MIT | Yes | https://github.com/OpenZeppelin/openzeppelin-contracts |
-| OpenZeppelin Contracts Upgradeable | MIT | Yes | https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable |
-| OpenZeppelin Foundry Upgrades | MIT | No (deploy tooling) | https://github.com/OpenZeppelin/openzeppelin-foundry-upgrades |
-| Solady | MIT | Yes (`contracts/deploy/Create3Factory.sol`) | https://github.com/Vectorized/solady |
-| halmos-cheatcodes | AGPL-3.0 | No — not imported anywhere | https://github.com/a16z/halmos-cheatcodes |
+| Library                            | Licence          | Used by deployed contracts                  | Source                                                             |
+| ---------------------------------- | ---------------- | ------------------------------------------- | ------------------------------------------------------------------ |
+| forge-std                          | MIT / Apache-2.0 | No (test/scripts only)                      | https://github.com/foundry-rs/forge-std                            |
+| OpenZeppelin Contracts             | MIT              | Yes                                         | https://github.com/OpenZeppelin/openzeppelin-contracts             |
+| OpenZeppelin Contracts Upgradeable | MIT              | Yes                                         | https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable |
+| OpenZeppelin Foundry Upgrades      | MIT              | No (deploy tooling)                         | https://github.com/OpenZeppelin/openzeppelin-foundry-upgrades      |
+| Solady                             | MIT              | Yes (`contracts/deploy/Create3Factory.sol`) | https://github.com/Vectorized/solady                               |
+| halmos-cheatcodes                  | AGPL-3.0         | No — not imported anywhere                  | https://github.com/a16z/halmos-cheatcodes                          |
 
 Note on halmos-cheatcodes: it is AGPL-3.0, but no contract, script, or test in this repository imports
 it, so it does not affect the licensing of this project's code. Consider removing it from `setup.bash`

@@ -58,10 +58,18 @@ interface IDotnsRegistrarController is IDotnsController {
     error CommitmentNotFound(bytes32 commitment);
 
     /// @notice Thrown when a commitment is revealed before the minimum age.
-    error CommitmentTooNew(bytes32 commitment, uint256 minTime, uint256 currentTime);
+    error CommitmentTooNew(
+        bytes32 commitment,
+        uint256 minTime,
+        uint256 currentTime
+    );
 
     /// @notice Thrown when a commitment has expired.
-    error CommitmentTooOld(bytes32 commitment, uint256 maxTime, uint256 currentTime);
+    error CommitmentTooOld(
+        bytes32 commitment,
+        uint256 maxTime,
+        uint256 currentTime
+    );
 
     /// @notice Thrown when attempting to register an unavailable name.
     error NameNotAvailable(string label);
@@ -91,7 +99,9 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @param userStatus Owner's recorded tier.
     /// @param required Required tier for the label.
     error OwnerStatusInsufficient(
-        string label, IPopRules.PopStatus userStatus, IPopRules.PopStatus required
+        string label,
+        IPopRules.PopStatus userStatus,
+        IPopRules.PopStatus required
     );
 
     /// @notice Thrown when a label is not a canonical lowercase ASCII DNS label.
@@ -117,16 +127,17 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @dev Validates the canonical DNS-label shape (otherwise @custom:reverts InvalidLabel)
     /// and rejects labels below the minimum-length policy with
     /// @custom:reverts LabelTooShort before checking ERC721 availability on the registrar.
-    function available(string calldata label) external view returns (bool isAvailable);
+    function available(
+        string calldata label
+    ) external view returns (bool isAvailable);
 
     /// @notice Computes the commitment hash for a registration.
     /// @dev Uses `abi.encode` so the variable-width `label` is length-prefixed and the boundary
     /// between `label` and the fixed-width `owner`, `secret`, and `reserved` fields is
     /// unambiguous, binding the commitment to the exact tuple.
-    function makeCommitment(Registration calldata registration)
-        external
-        pure
-        returns (bytes32 commitment);
+    function makeCommitment(
+        Registration calldata registration
+    ) external pure returns (bytes32 commitment);
 
     /// @notice Submits a commitment for a future registration.
     /// @dev Idempotent over expiry: re-committing an unexpired hash reverts with
@@ -181,7 +192,9 @@ interface IDotnsRegistrarController is IDotnsController {
     function registerReserved(Registration calldata registration) external;
 
     /// @notice Checks if the given address is whitelisted to call `registerReserved`.
-    function isWhiteListed(address who) external view returns (bool isWhiteListed);
+    function isWhiteListed(
+        address who
+    ) external view returns (bool isWhiteListed);
 
     /// @notice Adds or removes an address from the whitelist for `registerReserved`.
     /// @dev Callable by the owner or an account holding `DotnsConstants.WHITELIST_OPERATOR_ROLE`;

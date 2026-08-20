@@ -10,7 +10,9 @@ import {IUserStore} from "../../../contracts/store/IUserStore.sol";
 ///         and large-value round-trips for both LabelStore and UserStore.
 contract StoreStressTest is BaseDotns {
     /// @notice Deploys and returns a fresh LabelStore for `user` via the factory owner.
-    function _freshLabelStore(address user) internal returns (ILabelStore store) {
+    function _freshLabelStore(
+        address user
+    ) internal returns (ILabelStore store) {
         vm.prank(owner);
         store = ILabelStore(storeFactory.deployLabelStoreFor(user));
     }
@@ -76,9 +78,16 @@ contract StoreStressTest is BaseDotns {
         assertEq(middle.length, 10);
         assertEq(middle[0].value, bytes(abi.encodePacked("v", _intString(30))));
 
-        IUserStore.Entry[] memory tail = store.getHistory(key, versions - 2, 100);
+        IUserStore.Entry[] memory tail = store.getHistory(
+            key,
+            versions - 2,
+            100
+        );
         assertEq(tail.length, 1);
-        assertEq(tail[0].value, bytes(abi.encodePacked("v", _intString(versions - 2))));
+        assertEq(
+            tail[0].value,
+            bytes(abi.encodePacked("v", _intString(versions - 2)))
+        );
     }
 
     function test_user_store_many_keys() public {
@@ -119,7 +128,9 @@ contract StoreStressTest is BaseDotns {
     }
 
     /// @notice Builds a deterministic byte blob of `size` bytes for round-trip tests.
-    function _buildBlob(uint256 size) internal pure returns (bytes memory blob) {
+    function _buildBlob(
+        uint256 size
+    ) internal pure returns (bytes memory blob) {
         blob = new bytes(size);
         for (uint256 index; index < size; ++index) {
             blob[index] = bytes1(uint8((index * 31 + 7) & 0xff));
@@ -129,7 +140,9 @@ contract StoreStressTest is BaseDotns {
     /// @notice Converts `value` to its decimal string representation.
     /// @dev Avoids OpenZeppelin's Strings library so the stress suite stays
     ///      self-contained.
-    function _intString(uint256 value) internal pure returns (string memory decimal) {
+    function _intString(
+        uint256 value
+    ) internal pure returns (string memory decimal) {
         if (value == 0) return "0";
         uint256 length;
         for (uint256 remaining = value; remaining != 0; remaining /= 10) {

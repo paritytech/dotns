@@ -58,8 +58,15 @@ abstract contract BaseDeployer is Script {
     ///      The deploy runner exports the same variable so its manifest path
     ///      stays in step with the one resolved here.
     /// @return subdirectory Folder under `deployments/` for the current network.
-    function networkFolder() internal view returns (string memory subdirectory) {
-        subdirectory = vm.envOr("DEPLOYMENT_NETWORK", DeploymentNetwork.folder(block.chainid));
+    function networkFolder()
+        internal
+        view
+        returns (string memory subdirectory)
+    {
+        subdirectory = vm.envOr(
+            "DEPLOYMENT_NETWORK",
+            DeploymentNetwork.folder(block.chainid)
+        );
     }
 
     /// @notice Resolves the bare TLD label to initialise the protocol registry with.
@@ -73,7 +80,8 @@ abstract contract BaseDeployer is Script {
     function tldLabel() internal view returns (string memory label) {
         label = vm.envString("DOTNS_TLD");
         require(
-            bytes(label).length != 0, "DOTNS_TLD must be set to a bare TLD label (for example dot)"
+            bytes(label).length != 0,
+            "DOTNS_TLD must be set to a bare TLD label (for example dot)"
         );
     }
 
@@ -87,7 +95,10 @@ abstract contract BaseDeployer is Script {
     ///      `vm.parseJsonAddress`.
     /// @param subdirectory Network-specific folder under `deployments/`.
     /// @param filename Stem of the manifest file (for example `block.chainid`).
-    function initDeployment(string memory subdirectory, string memory filename) internal {
+    function initDeployment(
+        string memory subdirectory,
+        string memory filename
+    ) internal {
         manifestPath = _deploymentPath(subdirectory, filename);
 
         if (vm.exists(manifestPath)) {
@@ -102,17 +113,32 @@ abstract contract BaseDeployer is Script {
             string[] memory names = vm.parseJsonKeys(priorJson, "$");
 
             for (uint256 i = 0; i < names.length; ++i) {
-                address addr = vm.parseJsonAddress(priorJson, string.concat(".", names[i]));
-                manifestJson = vm.serializeAddress(MANIFEST_OBJECT_KEY, names[i], addr);
+                address addr = vm.parseJsonAddress(
+                    priorJson,
+                    string.concat(".", names[i])
+                );
+                manifestJson = vm.serializeAddress(
+                    MANIFEST_OBJECT_KEY,
+                    names[i],
+                    addr
+                );
             }
             if (names.length == 0) {
-                manifestJson = vm.serializeAddress(MANIFEST_OBJECT_KEY, "_seed", address(0));
+                manifestJson = vm.serializeAddress(
+                    MANIFEST_OBJECT_KEY,
+                    "_seed",
+                    address(0)
+                );
             }
         } else {
             // `vm.serializeAddress` requires at least one write before it will
             // emit a valid object. We seed with a sentinel address(0) under
             // a reserved key so subsequent writes have a base to extend.
-            manifestJson = vm.serializeAddress(MANIFEST_OBJECT_KEY, "_seed", address(0));
+            manifestJson = vm.serializeAddress(
+                MANIFEST_OBJECT_KEY,
+                "_seed",
+                address(0)
+            );
         }
     }
 
@@ -148,7 +174,9 @@ abstract contract BaseDeployer is Script {
     ///      `initDeployment` first so the manifest path is resolved.
     /// @param name The label under which the target address was recorded.
     /// @return addr The recorded address.
-    function _readAddress(string memory name) internal view returns (address addr) {
+    function _readAddress(
+        string memory name
+    ) internal view returns (address addr) {
         string memory key = string.concat(".", name);
         addr = vm.parseJsonAddress(manifestJson, key);
         _requireContract(name, addr);
@@ -178,16 +206,16 @@ abstract contract BaseDeployer is Script {
         string memory artefact,
         bytes memory initialiserCalldata,
         string memory label
-    )
-        internal
-        returns (address proxy)
-    {
+    ) internal returns (address proxy) {
         Options memory opts;
         Upgrades.validateImplementation(artefact, opts);
 
         vm.startBroadcast(owner);
-        (address implementation,) =
-            _deployCreate3(artefact, opts.constructorData, _create3Salt(label, "implementation"));
+        (address implementation, ) = _deployCreate3(
+            artefact,
+            opts.constructorData,
+            _create3Salt(label, "implementation")
+        );
         bool proxyExisted;
         (proxy, proxyExisted) = _deployCreate3(
             "ERC1967Proxy.sol:ERC1967Proxy",
@@ -208,8 +236,13 @@ abstract contract BaseDeployer is Script {
             // initialiser argument computed for this run is discarded. Values
             // without a setter (such as the TLD) cannot be corrected afterwards,
             // so surface it rather than reporting success.
-            console.log("WARNING: adopted existing proxy, initialiser skipped for", label);
-            console.log("         on-chain configuration may differ from this run's inputs");
+            console.log(
+                "WARNING: adopted existing proxy, initialiser skipped for",
+                label
+            );
+            console.log(
+                "         on-chain configuration may differ from this run's inputs"
+            );
         }
         vm.stopBroadcast();
         vm.label(proxy, label);
@@ -228,12 +261,13 @@ abstract contract BaseDeployer is Script {
         string memory artefact,
         bytes memory constructorData,
         string memory label
-    )
-        internal
-        returns (address deployed)
-    {
+    ) internal returns (address deployed) {
         vm.startBroadcast(owner);
-        (deployed,) = _deployCreate3(artefact, constructorData, _create3Salt(label, "contract"));
+        (deployed, ) = _deployCreate3(
+            artefact,
+            constructorData,
+            _create3Salt(label, "contract")
+        );
         vm.stopBroadcast();
         vm.label(deployed, label);
         logDeployment(label, deployed);
@@ -256,7 +290,9 @@ abstract contract BaseDeployer is Script {
     /// @param owner Broadcasting account; deploys the factory only when none is
     ///        configured.
     /// @return factory Address of the reused or freshly deployed CREATE3 factory.
-    function _ensureCreate3Factory(address owner) internal returns (address factory) {
+    function _ensureCreate3Factory(
+        address owner
+    ) internal returns (address factory) {
         factory = _configuredCreate3Factory();
         if (factory != address(0)) {
             _adoptCreate3Factory(factory);
@@ -269,7 +305,11 @@ abstract contract BaseDeployer is Script {
     ///         the `CREATE3_FACTORY` environment variable, or the zero address
     ///         when the pipeline should mint its own.
     /// @return configured Configured factory address, or `address(0)` when unset.
-    function _configuredCreate3Factory() internal view returns (address configured) {
+    function _configuredCreate3Factory()
+        internal
+        view
+        returns (address configured)
+    {
         configured = vm.envOr("CREATE3_FACTORY", address(0));
     }
 
@@ -283,11 +323,16 @@ abstract contract BaseDeployer is Script {
     ///      for stable addresses across resets.
     /// @param owner Broadcasting account; deploys and is recorded as the factory.
     /// @return factory Address of the freshly deployed CREATE3 factory.
-    function _bootstrapCreate3Factory(address owner) internal returns (address factory) {
+    function _bootstrapCreate3Factory(
+        address owner
+    ) internal returns (address factory) {
         vm.startBroadcast(owner);
         factory = address(new Create3Factory());
         vm.stopBroadcast();
-        console.log("WARNING: minted a nonce-derived CREATE3 factory at", factory);
+        console.log(
+            "WARNING: minted a nonce-derived CREATE3 factory at",
+            factory
+        );
         console.log(
             "  Its address depends on the deployer nonce and is NOT reproducible across chain"
         );
@@ -304,7 +349,10 @@ abstract contract BaseDeployer is Script {
     ///      non-existent factory.
     /// @param factory CREATE3 factory address to adopt for this process.
     function _adoptCreate3Factory(address factory) internal {
-        require(factory.code.length != 0, "Create3Factory: no code at factory address");
+        require(
+            factory.code.length != 0,
+            "Create3Factory: no code at factory address"
+        );
         _setCreate3Factory(factory);
         vm.label(factory, "Create3Factory");
         logDeployment("Create3Factory", factory);
@@ -320,11 +368,12 @@ abstract contract BaseDeployer is Script {
         address owner,
         address protocolRegistry,
         address factory
-    )
-        internal
-    {
+    ) internal {
         vm.startBroadcast(owner);
-        IDotnsProtocolRegistry(protocolRegistry).set(DotnsConstants.CREATE3_FACTORY, factory);
+        IDotnsProtocolRegistry(protocolRegistry).set(
+            DotnsConstants.CREATE3_FACTORY,
+            factory
+        );
         vm.stopBroadcast();
     }
 
@@ -342,11 +391,7 @@ abstract contract BaseDeployer is Script {
     function _predictCreate3(
         string memory label,
         string memory kind
-    )
-        internal
-        view
-        returns (address predicted)
-    {
+    ) internal view returns (address predicted) {
         predicted = _create3Factory().predict(_create3Salt(label, kind));
     }
 
@@ -361,27 +406,26 @@ abstract contract BaseDeployer is Script {
         string memory artefact,
         bytes memory constructorData,
         bytes32 salt
-    )
-        internal
-        returns (address deployed, bool existed)
-    {
+    ) internal returns (address deployed, bool existed) {
         address predicted = _create3Factory().predict(salt);
         if (predicted.code.length != 0) {
             return (predicted, true);
         }
 
-        deployed = _create3Factory().deploy(salt, _creationBytecode(artefact, constructorData));
-        require(deployed == predicted, string.concat(artefact, ": CREATE3 deploy failed"));
+        deployed = _create3Factory().deploy(
+            salt,
+            _creationBytecode(artefact, constructorData)
+        );
+        require(
+            deployed == predicted,
+            string.concat(artefact, ": CREATE3 deploy failed")
+        );
     }
 
     function _creationBytecode(
         string memory artefact,
         bytes memory constructorData
-    )
-        internal
-        view
-        returns (bytes memory)
-    {
+    ) internal view returns (bytes memory) {
         return abi.encodePacked(vm.getCode(artefact), constructorData);
     }
 
@@ -396,29 +440,41 @@ abstract contract BaseDeployer is Script {
         address factoryAddress = create3FactoryOverride;
         if (factoryAddress == address(0)) {
             address protocolRegistry = _readAddress("DotnsProtocolRegistry");
-            factoryAddress =
-                IDotnsProtocolRegistry(protocolRegistry).get(DotnsConstants.CREATE3_FACTORY);
+            factoryAddress = IDotnsProtocolRegistry(protocolRegistry).get(
+                DotnsConstants.CREATE3_FACTORY
+            );
         }
         require(factoryAddress.code.length != 0, "Create3Factory: no code");
         factory = Create3Factory(payable(factoryAddress));
     }
 
-    function _create3Salt(string memory label, string memory kind) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(CREATE3_SALT_NAMESPACE, ":", label, ":", kind));
+    function _create3Salt(
+        string memory label,
+        string memory kind
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(CREATE3_SALT_NAMESPACE, ":", label, ":", kind)
+            );
     }
 
     function _deploymentPath(
         string memory subdirectory,
         string memory filename
-    )
-        private
-        pure
-        returns (string memory)
-    {
-        return string.concat("./deployments/", subdirectory, "/", filename, ".json");
+    ) private pure returns (string memory) {
+        return
+            string.concat(
+                "./deployments/",
+                subdirectory,
+                "/",
+                filename,
+                ".json"
+            );
     }
 
-    function _parentDirectory(string memory path) private pure returns (string memory) {
+    function _parentDirectory(
+        string memory path
+    ) private pure returns (string memory) {
         bytes memory bytesPath = bytes(path);
         uint256 lastSlash = bytesPath.length;
         for (uint256 i = bytesPath.length; i > 0; --i) {

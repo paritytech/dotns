@@ -9,7 +9,9 @@ import {ILabelStore} from "../../../contracts/store/ILabelStore.sol";
 /// accounting.
 contract LabelStoreFuzzTest is BaseDotns {
     /// @notice Deploy a fresh @custom:contract LabelStore owned by `user` via the store factory.
-    function _freshLabelStore(address user) internal returns (ILabelStore store) {
+    function _freshLabelStore(
+        address user
+    ) internal returns (ILabelStore store) {
         vm.prank(owner);
         store = ILabelStore(storeFactory.deployLabelStoreFor(user));
     }
@@ -17,9 +19,7 @@ contract LabelStoreFuzzTest is BaseDotns {
     function testFuzz_storeLabel_succeeds_for_arbitrary_inputs(
         bytes32 labelhash,
         string calldata label
-    )
-        public
-    {
+    ) public {
         vm.assume(labelhash != bytes32(0));
 
         ILabelStore store = _freshLabelStore(ed);
@@ -38,16 +38,17 @@ contract LabelStoreFuzzTest is BaseDotns {
         uint8 rawCount,
         uint256 offset,
         uint256 limit
-    )
-        public
-    {
+    ) public {
         // 1..10
-        uint256 count = uint256(rawCount) % 10 + 1;
+        uint256 count = (uint256(rawCount) % 10) + 1;
         ILabelStore store = _freshLabelStore(ed);
 
         vm.startPrank(address(dotnsRegistrarController));
         for (uint256 i; i < count; ++i) {
-            store.storeLabel(keccak256(abi.encodePacked("label", i)), _intString(i));
+            store.storeLabel(
+                keccak256(abi.encodePacked("label", i)),
+                _intString(i)
+            );
         }
         vm.stopPrank();
 
@@ -67,12 +68,17 @@ contract LabelStoreFuzzTest is BaseDotns {
         assertEq(hashes.length, expected);
         for (uint256 i; i < expected; ++i) {
             assertEq(labels[i], _intString(offset + i));
-            assertEq(hashes[i], keccak256(abi.encodePacked("label", offset + i)));
+            assertEq(
+                hashes[i],
+                keccak256(abi.encodePacked("label", offset + i))
+            );
         }
     }
 
     /// @notice Render `value` as its base-10 decimal string.
-    function _intString(uint256 value) internal pure returns (string memory decimal) {
+    function _intString(
+        uint256 value
+    ) internal pure returns (string memory decimal) {
         if (value == 0) return "0";
         uint256 length;
         for (uint256 remaining = value; remaining != 0; remaining /= 10) {

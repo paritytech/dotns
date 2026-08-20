@@ -79,14 +79,14 @@ cp .env.example .env
 
 Set these fields:
 
-| Field | Required | Meaning |
-| --- | --- | --- |
-| ACCOUNT_NAME | optional | Foundry keystore account name. Defaults to dotns-deploy. |
-| ACCOUNT_PASSWORD | yes on first import | Password used to import and unlock the Foundry keystore account. |
-| PRIVATE_KEY | yes on first import | Hex deployer private key. This is imported into the Foundry keystore, then removed from disk when the deploy succeeds. |
-| WHITELIST_OPERATOR | optional | Address granted whitelist-management permission after deployment. Defaults to the team operator in the example file. |
-| RPC_URL | optional | Foundry RPC alias or full RPC URL. Defaults to paseo_local, which means the local adapter. |
-| DEPLOYMENT_NETWORK | optional | Manifest subdirectory under deployments/. Set it to keep networks that share a chain id apart (see [Deployment manifests](#deployment-manifests)). Defaults to the chain-id mapping. |
+| Field              | Required            | Meaning                                                                                                                                                                              |
+| ------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ACCOUNT_NAME       | optional            | Foundry keystore account name. Defaults to dotns-deploy.                                                                                                                             |
+| ACCOUNT_PASSWORD   | yes on first import | Password used to import and unlock the Foundry keystore account.                                                                                                                     |
+| PRIVATE_KEY        | yes on first import | Hex deployer private key. This is imported into the Foundry keystore, then removed from disk when the deploy succeeds.                                                               |
+| WHITELIST_OPERATOR | optional            | Address granted whitelist-management permission after deployment. Defaults to the team operator in the example file.                                                                 |
+| RPC_URL            | optional            | Foundry RPC alias or full RPC URL. Defaults to paseo_local, which means the local adapter.                                                                                           |
+| DEPLOYMENT_NETWORK | optional            | Manifest subdirectory under deployments/. Set it to keep networks that share a chain id apart (see [Deployment manifests](#deployment-manifests)). Defaults to the chain-id mapping. |
 
 The .env file is bootstrap input only. It is git-ignored. On a successful deployment the runner deletes it automatically. On failure the file is left in place so you can correct it and retry.
 
@@ -138,12 +138,12 @@ forge test --match-path 'test/fork/**' -vvvvv
 
 The expected test split is:
 
-| Suite type | Environment | Purpose |
-| --- | --- | --- |
-| Unit tests | Foundry in-process EVM | Check isolated contract behaviour. |
-| Fuzz tests | Foundry in-process EVM | Search input space around registration, transfer, escrow, and resolver invariants. |
-| Invariant tests | Foundry in-process EVM | Exercise stateful flows such as escrow accounting and registrar lifecycle properties. |
-| Fork tests | Local revive ETH-RPC adapter | Validate behaviour against live Paseo Asset Hub state and runtime assumptions. |
+| Suite type      | Environment                  | Purpose                                                                               |
+| --------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
+| Unit tests      | Foundry in-process EVM       | Check isolated contract behaviour.                                                    |
+| Fuzz tests      | Foundry in-process EVM       | Search input space around registration, transfer, escrow, and resolver invariants.    |
+| Invariant tests | Foundry in-process EVM       | Exercise stateful flows such as escrow accounting and registrar lifecycle properties. |
+| Fork tests      | Local revive ETH-RPC adapter | Validate behaviour against live Paseo Asset Hub state and runtime assumptions.        |
 
 Do not use fork-test failures as a substitute for unit failures. If a fork test fails, first confirm the adapter is healthy and that the target network state has not drifted from the test assumptions.
 
@@ -185,13 +185,13 @@ If ACCOUNT_PASSWORD is not set and the process has a TTY, the runner prompts onc
 
 The fresh-deploy pipeline is split across five stages:
 
-| Stage | Script | Purpose |
-| --- | --- | --- |
-| Deploy core | scripts/deploy/DeployCore.s.sol | Foundational name-ownership layer: Multicall3, store factory, registrar, reverse resolver, and forward registry. |
-| Deploy records | scripts/deploy/DeployRecords.s.sol | Per-name record layer: forward resolver, content resolver, and PopRules. |
-| Deploy policy | scripts/deploy/DeployPolicy.s.sol | Commit-reveal controller and protocol registry. |
-| Deploy Pop system | scripts/deploy/DeployPopSystem.s.sol | Proof-of-Personhood resolver and controller. |
-| Wire deployments | scripts/deploy/WireDeployments.s.sol | Authorisation and registry wire-up plus end-to-end verification. This stage does not deploy proxies. |
+| Stage             | Script                               | Purpose                                                                                                          |
+| ----------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Deploy core       | scripts/deploy/DeployCore.s.sol      | Foundational name-ownership layer: Multicall3, store factory, registrar, reverse resolver, and forward registry. |
+| Deploy records    | scripts/deploy/DeployRecords.s.sol   | Per-name record layer: forward resolver, content resolver, and PopRules.                                         |
+| Deploy policy     | scripts/deploy/DeployPolicy.s.sol    | Commit-reveal controller and protocol registry.                                                                  |
+| Deploy Pop system | scripts/deploy/DeployPopSystem.s.sol | Proof-of-Personhood resolver and controller.                                                                     |
+| Wire deployments  | scripts/deploy/WireDeployments.s.sol | Authorisation and registry wire-up plus end-to-end verification. This stage does not deploy proxies.             |
 
 Each stage is a separate forge script invocation and therefore a separate EVM simulation. This keeps OpenZeppelin's upgrade-safety validator from accumulating enough simulated state to exhaust the EVM during validation.
 
@@ -333,12 +333,12 @@ Every stage writes its output to a shared JSON manifest. Later stages read the a
 
 The manifest folder defaults to a mapping from the current chain id:
 
-| Chain id | Default manifest folder |
-| ---: | --- |
+|  Chain id | Default manifest folder       |
+| --------: | ----------------------------- |
 | 420420422 | deployments/passethub-testnet |
-| 420420417 | deployments/paseo-assethub |
-| 420420420 | deployments/paseo-local |
-| other | deployments/localhost |
+| 420420417 | deployments/paseo-assethub    |
+| 420420420 | deployments/paseo-local       |
+|     other | deployments/localhost         |
 
 Some environments cannot be told apart by chain id alone. A previewnet and a next environment reached through the same local ETH-RPC adapter both report 420420417, so the default mapping would write both to `deployments/paseo-assethub/420420417.json`, and each fresh deploy would overwrite the previous network's manifest.
 
@@ -375,10 +375,10 @@ If a stage fails part way through, rerun the same command. Each stage adopts any
 
 Every network is deployed through the same CREATE3 factory, so the contract addresses are the same on all of them. Only the TLD differs per network.
 
-| Network | TLD |
-| --- | --- |
-| Paseo Asset Hub Previewnet | `.dot` |
-| Paseo Asset Hub Next V2 | `.paseo` |
+| Network                    | TLD      |
+| -------------------------- | -------- |
+| Paseo Asset Hub Previewnet | `.dot`   |
+| Paseo Asset Hub Next V2    | `.paseo` |
 
 **Create3Factory**
 

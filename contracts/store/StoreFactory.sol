@@ -74,27 +74,42 @@ contract StoreFactory is Ownable, IStoreFactory {
     /// @param protocolRegistry_ The protocol registry for writer auth on label stores.
     /// @param owner_ Account that owns this factory and can upgrade store implementations.
     constructor(address protocolRegistry_, address owner_) Ownable(owner_) {
-        require(protocolRegistry_ != address(0), InvalidProtocolRegistry(protocolRegistry_));
-        IDotnsProtocolRegistry(protocolRegistry_).isRegisteredAddress(address(0));
+        require(
+            protocolRegistry_ != address(0),
+            InvalidProtocolRegistry(protocolRegistry_)
+        );
+        IDotnsProtocolRegistry(protocolRegistry_).isRegisteredAddress(
+            address(0)
+        );
 
         protocolRegistry = protocolRegistry_;
-        labelStoreBeacon = address(new UpgradeableBeacon(address(new LabelStore()), address(this)));
-        userStoreBeacon = address(new UpgradeableBeacon(address(new UserStore()), address(this)));
+        labelStoreBeacon = address(
+            new UpgradeableBeacon(address(new LabelStore()), address(this))
+        );
+        userStoreBeacon = address(
+            new UpgradeableBeacon(address(new UserStore()), address(this))
+        );
     }
 
     /// @inheritdoc IStoreFactory
-    function deployLabelStoreFor(address user)
-        external
-        override
-        onlyOwnerOrProtocol
-        returns (address store)
-    {
+    function deployLabelStoreFor(
+        address user
+    ) external override onlyOwnerOrProtocol returns (address store) {
         require(user != address(0), InvalidUser(user));
-        require(_labelStores[user] == address(0), AlreadyDeployed(user, _labelStores[user]));
+        require(
+            _labelStores[user] == address(0),
+            AlreadyDeployed(user, _labelStores[user])
+        );
 
-        bytes memory initData = abi.encodeCall(ILabelStore.initialize, (user, protocolRegistry));
+        bytes memory initData = abi.encodeCall(
+            ILabelStore.initialize,
+            (user, protocolRegistry)
+        );
         store = address(new BeaconProxy(labelStoreBeacon, initData));
-        require(IDotnsStore(store).owner() == user, ImplementationBindingMismatch());
+        require(
+            IDotnsStore(store).owner() == user,
+            ImplementationBindingMismatch()
+        );
         _labelStores[user] = store;
         _labelStoreList.push(store);
 
@@ -102,12 +117,19 @@ contract StoreFactory is Ownable, IStoreFactory {
     }
 
     /// @inheritdoc IStoreFactory
-    function getLabelStore(address user) external view override returns (address store) {
+    function getLabelStore(
+        address user
+    ) external view override returns (address store) {
         return _labelStores[user];
     }
 
     /// @inheritdoc IStoreFactory
-    function getLabelStoreCount() external view override returns (uint256 count) {
+    function getLabelStoreCount()
+        external
+        view
+        override
+        returns (uint256 count)
+    {
         return _labelStoreList.length;
     }
 
@@ -115,22 +137,18 @@ contract StoreFactory is Ownable, IStoreFactory {
     function getLabelStores(
         uint256 offset,
         uint256 limit
-    )
-        external
-        view
-        override
-        returns (address[] memory stores)
-    {
+    ) external view override returns (address[] memory stores) {
         stores = _paginateAddresses(_labelStoreList, offset, limit);
     }
 
     /// @inheritdoc IStoreFactory
-    function upgradeLabelStoreImplementation(address newImplementation)
-        external
-        override
-        onlyOwner
-    {
-        require(newImplementation != address(0), InvalidImplementation(newImplementation));
+    function upgradeLabelStoreImplementation(
+        address newImplementation
+    ) external override onlyOwner {
+        require(
+            newImplementation != address(0),
+            InvalidImplementation(newImplementation)
+        );
         ILabelStore(newImplementation).protocolRegistry();
         UpgradeableBeacon(labelStoreBeacon).upgradeTo(newImplementation);
         emit LabelStoreImplementationUpgraded(newImplementation);
@@ -143,9 +161,15 @@ contract StoreFactory is Ownable, IStoreFactory {
             AlreadyDeployed(msg.sender, _userStores[msg.sender])
         );
 
-        bytes memory initData = abi.encodeCall(IUserStore.initialize, (msg.sender));
+        bytes memory initData = abi.encodeCall(
+            IUserStore.initialize,
+            (msg.sender)
+        );
         store = address(new BeaconProxy(userStoreBeacon, initData));
-        require(IDotnsStore(store).owner() == msg.sender, ImplementationBindingMismatch());
+        require(
+            IDotnsStore(store).owner() == msg.sender,
+            ImplementationBindingMismatch()
+        );
         _userStores[msg.sender] = store;
         _userStoreList.push(store);
 
@@ -153,12 +177,19 @@ contract StoreFactory is Ownable, IStoreFactory {
     }
 
     /// @inheritdoc IStoreFactory
-    function getUserStore(address user) external view override returns (address store) {
+    function getUserStore(
+        address user
+    ) external view override returns (address store) {
         return _userStores[user];
     }
 
     /// @inheritdoc IStoreFactory
-    function getUserStoreCount() external view override returns (uint256 count) {
+    function getUserStoreCount()
+        external
+        view
+        override
+        returns (uint256 count)
+    {
         return _userStoreList.length;
     }
 
@@ -166,18 +197,18 @@ contract StoreFactory is Ownable, IStoreFactory {
     function getUserStores(
         uint256 offset,
         uint256 limit
-    )
-        external
-        view
-        override
-        returns (address[] memory stores)
-    {
+    ) external view override returns (address[] memory stores) {
         stores = _paginateAddresses(_userStoreList, offset, limit);
     }
 
     /// @inheritdoc IStoreFactory
-    function upgradeUserStoreImplementation(address newImplementation) external override onlyOwner {
-        require(newImplementation != address(0), InvalidImplementation(newImplementation));
+    function upgradeUserStoreImplementation(
+        address newImplementation
+    ) external override onlyOwner {
+        require(
+            newImplementation != address(0),
+            InvalidImplementation(newImplementation)
+        );
         IUserStore(newImplementation).getKeyCount();
         UpgradeableBeacon(userStoreBeacon).upgradeTo(newImplementation);
         emit UserStoreImplementationUpgraded(newImplementation);
@@ -185,7 +216,12 @@ contract StoreFactory is Ownable, IStoreFactory {
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
+    function version()
+        external
+        pure
+        virtual
+        returns (string memory versionString)
+    {
         versionString = "1.0.0";
     }
 
@@ -193,7 +229,9 @@ contract StoreFactory is Ownable, IStoreFactory {
     function _onlyOwnerOrProtocol() internal view {
         if (msg.sender == owner()) return;
         require(
-            IDotnsProtocolRegistry(protocolRegistry).isRegisteredAddress(msg.sender),
+            IDotnsProtocolRegistry(protocolRegistry).isRegisteredAddress(
+                msg.sender
+            ),
             NotAuthorised(msg.sender)
         );
     }
@@ -208,11 +246,7 @@ contract StoreFactory is Ownable, IStoreFactory {
         address[] storage source,
         uint256 offset,
         uint256 limit
-    )
-        internal
-        view
-        returns (address[] memory slice)
-    {
+    ) internal view returns (address[] memory slice) {
         uint256 total = source.length;
         if (offset >= total) return new address[](0);
 

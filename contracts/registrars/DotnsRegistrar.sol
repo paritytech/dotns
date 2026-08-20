@@ -3,12 +3,8 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {
-    ERC721Upgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 
 import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
 import {IDotnsController} from "./IDotnsController.sol";
@@ -76,10 +72,7 @@ contract DotnsRegistrar is
         string calldata name,
         string calldata symbol,
         IDotnsProtocolRegistry registry
-    )
-        external
-        initializer
-    {
+    ) external initializer {
         require(address(registry) != address(0), ProtocolRegistryRequired());
         __Ownable_init(msg.sender);
         __ERC721_init(name, symbol);
@@ -99,7 +92,9 @@ contract DotnsRegistrar is
     }
 
     /// @inheritdoc IDotnsRegistrar
-    function available(uint256 id) public view override returns (bool isAvailable) {
+    function available(
+        uint256 id
+    ) public view override returns (bool isAvailable) {
         address holder = _ownerOf(id);
         if (holder == address(0)) return true;
         return holder == protocolRegistry.get(DotnsConstants.NAME_ESCROW);
@@ -110,49 +105,52 @@ contract DotnsRegistrar is
         uint256 id,
         address owner,
         string calldata label
-    )
-        external
-        override
-        onlyController
-    {
+    ) external override onlyController {
         // `available` returns true both for unminted ids and for ids currently held by escrow
         // (so the controller can route through `escrow.reclaim`). `register` only handles the
         // fresh-mint branch; the escrow-held branch must use the reclaim path and is rejected
         // here with the typed error so callers do not see OZ's `ERC721InvalidSender(0)`.
         require(!_exists(id), NameNotAvailable(id));
-        require(owner != protocolRegistry.get(DotnsConstants.NAME_ESCROW), InvalidOwner());
+        require(
+            owner != protocolRegistry.get(DotnsConstants.NAME_ESCROW),
+            InvalidOwner()
+        );
         // Empty labels are an intentional gateway-cold path (substrate Root cannot deploy a
         // `LabelStore` under `pallet-revive`, so the controller stashes a pending claim and the
         // user settles via @custom:function IDotnsPopController.claimLabelStore later). Non-empty
         // labels must still be canonical so the transfer-floor lookup in `_quoteTransferFee`
         // cannot brick the token by reverting on a malformed stem.
-        require(bytes(label).length == 0 || label.isSingleLabel(), InvalidLabel());
+        require(
+            bytes(label).length == 0 || label.isSingleLabel(),
+            InvalidLabel()
+        );
         _mint(owner, id);
         if (bytes(label).length != 0) _writeOwnerLabel(owner, id, label);
         emit NameRegistered(id, owner);
     }
 
     /// @inheritdoc IDotnsRegistrar
-    function labelOf(uint256 tokenId) external view override returns (string memory) {
+    function labelOf(
+        uint256 tokenId
+    ) external view override returns (string memory) {
         address holder = _ownerOf(tokenId);
         if (holder == address(0)) return "";
-        return LabelUtils.stripTld(protocolRegistry.tld(), _readLabel(tokenId, holder));
+        return
+            LabelUtils.stripTld(
+                protocolRegistry.tld(),
+                _readLabel(tokenId, holder)
+            );
     }
 
     /// @inheritdoc IDotnsRegistrar
     function quoteTransferFee(
         uint256 tokenId,
         address to
-    )
-        external
-        view
-        override
-        returns (uint256 requiredFee)
-    {
+    ) external view override returns (uint256 requiredFee) {
         require(to != address(0), ERC721InvalidReceiver(address(0)));
 
         address from = ownerOf(tokenId);
-        (,, requiredFee) = _quoteTransferFee(from, to, tokenId);
+        (, , requiredFee) = _quoteTransferFee(from, to, tokenId);
     }
 
     /// @inheritdoc IDotnsRegistrar
@@ -160,11 +158,7 @@ contract DotnsRegistrar is
         address from,
         address to,
         uint256 tokenId
-    )
-        public
-        payable
-        override(ERC721Upgradeable, IDotnsRegistrar)
-    {
+    ) public payable override(ERC721Upgradeable, IDotnsRegistrar) {
         super.transferFrom(from, to, tokenId);
     }
 
@@ -173,11 +167,7 @@ contract DotnsRegistrar is
         address from,
         address to,
         uint256 tokenId
-    )
-        public
-        payable
-        override(ERC721Upgradeable, IDotnsRegistrar)
-    {
+    ) public payable override(ERC721Upgradeable, IDotnsRegistrar) {
         super.safeTransferFrom(from, to, tokenId, "");
     }
 
@@ -187,22 +177,25 @@ contract DotnsRegistrar is
         address to,
         uint256 tokenId,
         bytes memory data
-    )
-        public
-        payable
-        override(ERC721Upgradeable, IDotnsRegistrar)
-    {
+    ) public payable override(ERC721Upgradeable, IDotnsRegistrar) {
         super.safeTransferFrom(from, to, tokenId, data);
     }
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
+    function version()
+        external
+        pure
+        virtual
+        returns (string memory versionString)
+    {
         versionString = "1.0.0";
     }
 
     /// @inheritdoc IDotnsRegistrar
-    function exists(uint256 tokenId) external view override returns (bool tokenExists) {
+    function exists(
+        uint256 tokenId
+    ) external view override returns (bool tokenExists) {
         tokenExists = _exists(tokenId);
     }
 
@@ -213,7 +206,10 @@ contract DotnsRegistrar is
 
     /// @notice Internal function to check for controller access.
     function _onlyController() internal view {
-        require(controllers[IDotnsController(msg.sender)], NotController(msg.sender));
+        require(
+            controllers[IDotnsController(msg.sender)],
+            NotController(msg.sender)
+        );
     }
 
     /// @inheritdoc ERC721Upgradeable
@@ -221,11 +217,7 @@ contract DotnsRegistrar is
         address to,
         uint256 tokenId,
         address auth
-    )
-        internal
-        override
-        returns (address from)
-    {
+    ) internal override returns (address from) {
         from = super._update(to, tokenId, auth);
 
         // Mints and self-transfers carry no economic event. Reject any attached value on those
@@ -241,7 +233,9 @@ contract DotnsRegistrar is
         IDotnsProtocolRegistry registry = protocolRegistry;
         address escrow = registry.get(DotnsConstants.NAME_ESCROW);
         require(escrow != address(0), EscrowNotConfigured());
-        IStoreFactory factory = IStoreFactory(registry.get(DotnsConstants.STORE_FACTORY));
+        IStoreFactory factory = IStoreFactory(
+            registry.get(DotnsConstants.STORE_FACTORY)
+        );
 
         bool isEscrowTouching = to == escrow || from == escrow;
         // Skip mirroring on escrow-touching paths: release deposits the NFT into custody where
@@ -251,10 +245,19 @@ contract DotnsRegistrar is
             _syncRecipientStore(factory, to, from, tokenId);
         }
 
-        (uint256 reachFloor, uint256 requiredFee) =
-            _quoteTransferFeeFor(registry, factory, isEscrowTouching, from, to, tokenId);
+        (uint256 reachFloor, uint256 requiredFee) = _quoteTransferFeeFor(
+            registry,
+            factory,
+            isEscrowTouching,
+            from,
+            to,
+            tokenId
+        );
         if (requiredFee != 0) {
-            require(msg.value >= requiredFee, TransferFeeRequired(tokenId, to, requiredFee));
+            require(
+                msg.value >= requiredFee,
+                TransferFeeRequired(tokenId, to, requiredFee)
+            );
         }
 
         // Deposits follow the NFT, not the depositor: every transfer that moves a name off the
@@ -265,16 +268,23 @@ contract DotnsRegistrar is
         // directly.
         bool positionSyncNeeded;
         if (!isEscrowTouching) {
-            IDotnsNameEscrow.ReleasePosition memory position =
-                IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId);
-            positionSyncNeeded = position.recipient != address(0) && to != position.recipient;
+            IDotnsNameEscrow.ReleasePosition memory position = IDotnsNameEscrow(
+                payable(escrow)
+            ).getReleasePosition(tokenId);
+            positionSyncNeeded =
+                position.recipient != address(0) &&
+                to != position.recipient;
         }
 
-        if (requiredFee == 0 && msg.value == 0 && !positionSyncNeeded) return from;
+        if (requiredFee == 0 && msg.value == 0 && !positionSyncNeeded)
+            return from;
 
         IDotnsNameEscrow(payable(escrow)).chargeTransferFee{value: msg.value}(
             IDotnsNameEscrow.ChargeTransferFeeParams({
-                tokenId: tokenId, reachFloor: reachFloor, payer: msg.sender, to: to
+                tokenId: tokenId,
+                reachFloor: reachFloor,
+                payer: msg.sender,
+                to: to
             })
         );
 
@@ -287,9 +297,7 @@ contract DotnsRegistrar is
         address to,
         address from,
         uint256 tokenId
-    )
-        internal
-    {
+    ) internal {
         string memory fullName = _readLabelFor(factory, tokenId, from);
         if (bytes(fullName).length == 0) {
             // Sender has no label entry for the token (typical of gateway-cold PoP mints).
@@ -306,11 +314,7 @@ contract DotnsRegistrar is
         IStoreFactory factory,
         uint256 tokenId,
         address holder
-    )
-        private
-        view
-        returns (string memory fullName)
-    {
+    ) private view returns (string memory fullName) {
         address store = factory.getLabelStore(holder);
         if (store == address(0)) return "";
         return ILabelStore(store).getLabel(bytes32(tokenId));
@@ -322,11 +326,7 @@ contract DotnsRegistrar is
     function _readLabel(
         uint256 tokenId,
         address holder
-    )
-        private
-        view
-        returns (string memory fullName)
-    {
+    ) private view returns (string memory fullName) {
         return _readLabelFor(_storeFactory(), tokenId, holder);
     }
 
@@ -342,7 +342,9 @@ contract DotnsRegistrar is
 
     /// @notice Resolves the configured store factory from the protocol registry.
     function _storeFactory() private view returns (IStoreFactory factory) {
-        factory = IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
+        factory = IStoreFactory(
+            protocolRegistry.get(DotnsConstants.STORE_FACTORY)
+        );
     }
 
     /// @notice Writes the canonical full name into `owner`'s `LabelStore` keyed by
@@ -350,9 +352,16 @@ contract DotnsRegistrar is
     /// @dev Caller (@custom:function register) is responsible for short-circuiting on empty label;
     /// the factory is a protocol-critical dependency and is assumed non-zero (a zero return from
     /// the registry would have already broken every other call site).
-    function _writeOwnerLabel(address owner, uint256 tokenId, string calldata label) private {
-        _storeFactory()
-            .writeLabel(owner, bytes32(tokenId), string.concat(label, protocolRegistry.tld()));
+    function _writeOwnerLabel(
+        address owner,
+        uint256 tokenId,
+        string calldata label
+    ) private {
+        _storeFactory().writeLabel(
+            owner,
+            bytes32(tokenId),
+            string.concat(label, protocolRegistry.tld())
+        );
     }
 
     /// @notice Quotes the friction fee required for a transfer.
@@ -377,9 +386,17 @@ contract DotnsRegistrar is
         require(escrow != address(0), EscrowNotConfigured());
 
         bool isEscrowTouching = to == escrow || from == escrow;
-        IStoreFactory factory = IStoreFactory(registry.get(DotnsConstants.STORE_FACTORY));
-        (reachFloor, requiredFee) =
-            _quoteTransferFeeFor(registry, factory, isEscrowTouching, from, to, tokenId);
+        IStoreFactory factory = IStoreFactory(
+            registry.get(DotnsConstants.STORE_FACTORY)
+        );
+        (reachFloor, requiredFee) = _quoteTransferFeeFor(
+            registry,
+            factory,
+            isEscrowTouching,
+            from,
+            to,
+            tokenId
+        );
     }
 
     /// @notice Quotes the transfer floor reusing a caller-cached registry and store factory.
@@ -393,11 +410,7 @@ contract DotnsRegistrar is
         address from,
         address to,
         uint256 tokenId
-    )
-        private
-        view
-        returns (uint256 reachFloor, uint256 requiredFee)
-    {
+    ) private view returns (uint256 reachFloor, uint256 requiredFee) {
         if (isEscrowTouching) return (0, 0);
 
         string memory fullName = _readLabelFor(factory, tokenId, from);
@@ -410,11 +423,13 @@ contract DotnsRegistrar is
         string memory label = LabelUtils.stripTld(registry.tld(), fullName);
         require(bytes(label).length != 0, InvalidLabel());
 
-        reachFloor =
-            IPopRules(registry.get(DotnsConstants.POP_RULES)).transferFloor(label, from, to);
+        reachFloor = IPopRules(registry.get(DotnsConstants.POP_RULES))
+            .transferFloor(label, from, to);
         requiredFee = reachFloor;
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }

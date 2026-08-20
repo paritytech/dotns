@@ -34,7 +34,10 @@ contract DotnsReverseResolverTests is BaseDotns {
     }
 
     function test_protocol_registry_bound_at_init() public view {
-        assertEq(address(dotnsReverseResolver.protocolRegistry()), address(protocolRegistry));
+        assertEq(
+            address(dotnsReverseResolver.protocolRegistry()),
+            address(protocolRegistry)
+        );
     }
 
     function test_claim_reverse_record_sets_for_current_owner() public {
@@ -46,7 +49,10 @@ contract DotnsReverseResolverTests is BaseDotns {
         vm.prank(ed);
         dotnsReverseResolver.claimReverseRecord(CLAIM_LABEL);
 
-        assertEq(dotnsReverseResolver.nameOf(ed), string.concat(CLAIM_LABEL, ".dot"));
+        assertEq(
+            dotnsReverseResolver.nameOf(ed),
+            string.concat(CLAIM_LABEL, ".dot")
+        );
     }
 
     function test_claim_reverse_record_overwrites_existing_primary() public {
@@ -55,15 +61,23 @@ contract DotnsReverseResolverTests is BaseDotns {
         // Second reserved registration leaves the primary at CLAIM_LABEL because
         // the controller skips auto-set when a primary already exists.
         _commitAndRegister(ALT_LABEL, ed, true);
-        assertEq(dotnsReverseResolver.nameOf(ed), string.concat(CLAIM_LABEL, ".dot"));
+        assertEq(
+            dotnsReverseResolver.nameOf(ed),
+            string.concat(CLAIM_LABEL, ".dot")
+        );
 
         vm.prank(ed);
         dotnsReverseResolver.claimReverseRecord(ALT_LABEL);
 
-        assertEq(dotnsReverseResolver.nameOf(ed), string.concat(ALT_LABEL, ".dot"));
+        assertEq(
+            dotnsReverseResolver.nameOf(ed),
+            string.concat(ALT_LABEL, ".dot")
+        );
     }
 
-    function test_revert_claim_reverse_record_when_caller_does_not_own() public {
+    function test_revert_claim_reverse_record_when_caller_does_not_own()
+        public
+    {
         _grantNoStatus(ed);
         _commitAndRegister(CLAIM_LABEL, ed, true);
 
@@ -71,7 +85,11 @@ contract DotnsReverseResolverTests is BaseDotns {
 
         vm.prank(leonardo);
         vm.expectRevert(
-            abi.encodeWithSelector(IDotnsReverseResolver.NotNameOwner.selector, leonardo, tokenId)
+            abi.encodeWithSelector(
+                IDotnsReverseResolver.NotNameOwner.selector,
+                leonardo,
+                tokenId
+            )
         );
         dotnsReverseResolver.claimReverseRecord(CLAIM_LABEL);
     }
@@ -84,7 +102,10 @@ contract DotnsReverseResolverTests is BaseDotns {
         // explicit claim must still emit a fresh ReverseNameSet event so wallets
         // can observe the user-initiated intent.
         vm.expectEmit(true, true, false, true, address(dotnsReverseResolver));
-        emit IDotnsReverseResolver.ReverseNameSet(ed, string.concat(CLAIM_LABEL, ".dot"));
+        emit IDotnsReverseResolver.ReverseNameSet(
+            ed,
+            string.concat(CLAIM_LABEL, ".dot")
+        );
 
         vm.prank(ed);
         dotnsReverseResolver.claimReverseRecord(CLAIM_LABEL);
@@ -113,10 +134,15 @@ contract DotnsReverseResolverTests is BaseDotns {
         vm.prank(leonardo);
         dotnsReverseResolver.claimReverseRecord(CLAIM_LABEL);
 
-        assertEq(dotnsReverseResolver.nameOf(leonardo), string.concat(CLAIM_LABEL, ".dot"));
+        assertEq(
+            dotnsReverseResolver.nameOf(leonardo),
+            string.concat(CLAIM_LABEL, ".dot")
+        );
     }
 
-    function test_nameof_fails_closed_when_caller_no_longer_owns_stored_name() public {
+    function test_nameof_fails_closed_when_caller_no_longer_owns_stored_name()
+        public
+    {
         // Bypass the registrar's eager-clear path by writing the reverse record
         // for an address that does not own the underlying name. The fail-closed
         // read must then reject it independently.
@@ -126,7 +152,10 @@ contract DotnsReverseResolverTests is BaseDotns {
         // ed is the owner; force a stale-looking primary onto leonardo via the
         // registrar-only seeder so the read-time check has to do the work.
         vm.prank(address(dotnsRegistrar));
-        dotnsReverseResolver.setReverseName(leonardo, string.concat(CLAIM_LABEL, ".dot"));
+        dotnsReverseResolver.setReverseName(
+            leonardo,
+            string.concat(CLAIM_LABEL, ".dot")
+        );
 
         assertEq(
             dotnsReverseResolver.nameOf(leonardo),
@@ -142,7 +171,9 @@ contract DotnsReverseResolverTests is BaseDotns {
         dotnsReverseResolver.setReverseName(ed, "ghostlabel001.dot");
 
         assertEq(
-            dotnsReverseResolver.nameOf(ed), "", "lookup for an unminted name must read as empty"
+            dotnsReverseResolver.nameOf(ed),
+            "",
+            "lookup for an unminted name must read as empty"
         );
     }
 

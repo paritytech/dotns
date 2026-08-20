@@ -13,7 +13,7 @@ name: 4naly3er Analysis
 on:
   pull_request:
     branches: [master, develop]
-    paths: ['contracts/**', 'foundry.toml', 'remappings.txt']
+    paths: ["contracts/**", "foundry.toml", "remappings.txt"]
   pull_request_target:
     types: [closed]
 

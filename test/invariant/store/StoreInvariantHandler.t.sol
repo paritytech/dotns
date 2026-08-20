@@ -37,10 +37,12 @@ contract StoreInvariantHandler is Test {
     mapping(address store => bytes32[]) internal _writtenLabelhashes;
 
     /// @notice Marker tracking whether a labelhash has been observed locked in `store`.
-    mapping(address store => mapping(bytes32 labelhash => bool)) public sawLocked;
+    mapping(address store => mapping(bytes32 labelhash => bool))
+        public sawLocked;
 
     /// @notice Frozen label text first observed when a labelhash was written.
-    mapping(address store => mapping(bytes32 labelhash => string)) public frozenLabel;
+    mapping(address store => mapping(bytes32 labelhash => string))
+        public frozenLabel;
 
     /// @notice User who claimed a given user store.
     mapping(address store => address) public userStoreOwnerOf;
@@ -65,7 +67,9 @@ contract StoreInvariantHandler is Test {
     /// @notice Adds a deterministic synthetic user derived from `seed`.
     /// @param seed Seed used to derive the user address.
     function addUser(uint8 seed) external {
-        address user = address(uint160(uint256(keccak256(abi.encode("user", seed)))));
+        address user = address(
+            uint160(uint256(keccak256(abi.encode("user", seed))))
+        );
         if (user == address(0)) return;
         users.push(user);
     }
@@ -89,7 +93,11 @@ contract StoreInvariantHandler is Test {
     /// @param storeSeed Seed selecting which label store to write to.
     /// @param labelhash Labelhash to lock.
     /// @param label Label text to associate with `labelhash`.
-    function storeLabel(uint8 storeSeed, bytes32 labelhash, string calldata label) external {
+    function storeLabel(
+        uint8 storeSeed,
+        bytes32 labelhash,
+        string calldata label
+    ) external {
         if (labelStores.length == 0) return;
         if (labelhash == bytes32(0)) return;
         address store = labelStores[storeSeed % labelStores.length];
@@ -121,7 +129,11 @@ contract StoreInvariantHandler is Test {
     /// @param storeSeed Seed selecting which user store to write to.
     /// @param key Key under which `value` is stored.
     /// @param value Value to associate with `key`.
-    function setValue(uint8 storeSeed, bytes32 key, bytes calldata value) external {
+    function setValue(
+        uint8 storeSeed,
+        bytes32 key,
+        bytes calldata value
+    ) external {
         if (userStores.length == 0) return;
         if (key == bytes32(0)) return;
         address store = userStores[storeSeed % userStores.length];
@@ -148,14 +160,19 @@ contract StoreInvariantHandler is Test {
 
     /// @notice Returns the number of labelhashes written into `store`.
     /// @param store Label store under inspection.
-    function writtenLabelhashCount(address store) external view returns (uint256) {
+    function writtenLabelhashCount(
+        address store
+    ) external view returns (uint256) {
         return _writtenLabelhashes[store].length;
     }
 
     /// @notice Returns the labelhash written into `store` at `index`.
     /// @param store Label store under inspection.
     /// @param index Position within the recorded labelhash array.
-    function writtenLabelhashAt(address store, uint256 index) external view returns (bytes32) {
+    function writtenLabelhashAt(
+        address store,
+        uint256 index
+    ) external view returns (bytes32) {
         return _writtenLabelhashes[store][index];
     }
 }

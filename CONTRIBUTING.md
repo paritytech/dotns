@@ -5,11 +5,13 @@ These guidelines apply to the DotNS repository ("dotns"). Contributions are welc
 ## Types of contributing
 
 1. Opening an issue
+
    - Check whether an issue already exists before creating a new one.
    - If a related issue exists, add details there rather than duplicating.
    - Use issues for bug reports, feature requests, and process suggestions.
 
 2. Resolving an issue
+
    - Fix with code, tests, documentation, or by demonstrating expected behaviour.
    - Reference the issue number in the pull request and commit messages where relevant.
 
@@ -49,14 +51,17 @@ Before opening a pull request:
 ## Standards
 
 1. Formatting
+
    - All contracts and tests should be formatted with `forge fmt`.
 
 2. Interfaces and implementations
+
    - External-facing contracts should implement and conform to their interfaces.
    - Interfaces should describe public/external functions with NatSpec.
    - Keep implementations aligned with the interface surface area. Avoid unused methods.
 
 3. Tests
+
    - Add unit tests for behaviour changes.
    - Use fuzz tests where they add meaningful coverage.
    - Prefer readable, behaviour-oriented test names and assertions.
@@ -110,18 +115,18 @@ Most features fit an existing contract and extending it is the right move. A new
 
 Example query paths. Each row starts from a small set of known contracts; every hop is a public view call, so any node can resolve the path without special access.
 
-| Lookup | Path |
-| --- | --- |
-| Lite labelhash => full-person node | Protocol registry => PoP resolver => `fullClaim(liteLabelhash)` |
-| Full-person node => lite labelhash | Protocol registry => PoP resolver => `liteLink(fullNode)` |
-| Node => chat key | Protocol registry => PoP resolver => `chatKey(node)` |
-| Node or tokenId => registered label | Protocol registry => registrar => `labelOf(uint256(node))` |
-| Base stem => gateway-reservation state | Protocol registry => PoP controller => `isReservedForClaim(baseLabel)` |
-| Base stem => cross-flow reservation state | Protocol registry => PopRules => `isBaseNameReserved(baseLabel)` |
-| Node => ERC721 owner | Protocol registry => registrar => `ownerOf(uint256(node))` |
-| Subnode => forward-registry owner | Protocol registry => registry => `owner(subnode)` |
-| Node => forward address record | Protocol registry => forward resolver => address record |
-| Address => primary name | Protocol registry => reverse resolver => primary name |
+| Lookup                                    | Path                                                                   |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
+| Lite labelhash => full-person node        | Protocol registry => PoP resolver => `fullClaim(liteLabelhash)`        |
+| Full-person node => lite labelhash        | Protocol registry => PoP resolver => `liteLink(fullNode)`              |
+| Node => chat key                          | Protocol registry => PoP resolver => `chatKey(node)`                   |
+| Node or tokenId => registered label       | Protocol registry => registrar => `labelOf(uint256(node))`             |
+| Base stem => gateway-reservation state    | Protocol registry => PoP controller => `isReservedForClaim(baseLabel)` |
+| Base stem => cross-flow reservation state | Protocol registry => PopRules => `isBaseNameReserved(baseLabel)`       |
+| Node => ERC721 owner                      | Protocol registry => registrar => `ownerOf(uint256(node))`             |
+| Subnode => forward-registry owner         | Protocol registry => registry => `owner(subnode)`                      |
+| Node => forward address record            | Protocol registry => forward resolver => address record                |
+| Address => primary name                   | Protocol registry => reverse resolver => primary name                  |
 
 ### New addresses go through the protocol registry
 
@@ -133,15 +138,15 @@ Bad — the registrar address is frozen at construction, so rotating it needs an
 
 ```solidity
 contract MyResolver {
-    address public immutable registrar;
+  address public immutable registrar;
 
-    constructor(address _registrar) {
-        registrar = _registrar;
-    }
+  constructor(address _registrar) {
+    registrar = _registrar;
+  }
 
-    function _someWrite() internal view {
-        require(msg.sender == registrar, "not registrar");
-    }
+  function _someWrite() internal view {
+    require(msg.sender == registrar, "not registrar");
+  }
 }
 ```
 
@@ -149,15 +154,18 @@ Good — fetched from the protocol registry on every call, so rotation is one `s
 
 ```solidity
 contract MyResolver {
-    IDotnsProtocolRegistry public immutable protocolRegistry;
+  IDotnsProtocolRegistry public immutable protocolRegistry;
 
-    constructor(IDotnsProtocolRegistry _protocolRegistry) {
-        protocolRegistry = _protocolRegistry;
-    }
+  constructor(IDotnsProtocolRegistry _protocolRegistry) {
+    protocolRegistry = _protocolRegistry;
+  }
 
-    function _someWrite() internal view {
-        require(msg.sender == protocolRegistry.get(DotnsConstants.REGISTRAR), "not registrar");
-    }
+  function _someWrite() internal view {
+    require(
+      msg.sender == protocolRegistry.get(DotnsConstants.REGISTRAR),
+      "not registrar"
+    );
+  }
 }
 ```
 
@@ -165,17 +173,22 @@ contract MyResolver {
 
 When a new contract is added, existing contracts that already read through the protocol registry need no work. A new `bytes32` key in `DotnsConstants.sol` plus a new `protocolRegistry.set(NEW_KEY, addr)` line in `WireDeployments.s.sol` is enough; every other contract picks it up automatically.
 
-An existing contract only needs an upgrade when it must *call* the new contract. The upgrade is small: add the consumer call site and read the address from the protocol registry at the point of use. Ship it as a normal proxy upgrade with the `Old.sol` snapshot and the cleanup checklist below.
+An existing contract only needs an upgrade when it must _call_ the new contract. The upgrade is small: add the consumer call site and read the address from the protocol registry at the point of use. Ship it as a normal proxy upgrade with the `Old.sol` snapshot and the cleanup checklist below.
 
 Example. A new `ScoreResolver` is added and `MyResolver` should check the caller's score on writes. The upgrade adds one `.get(...)` lookup, no storage moves, so the `Old.sol` diff is trivial:
 
 ```solidity
 function _someWrite() internal view {
-    require(msg.sender == protocolRegistry.get(DotnsConstants.REGISTRAR), "not registrar");
+  require(
+    msg.sender == protocolRegistry.get(DotnsConstants.REGISTRAR),
+    "not registrar"
+  );
 
-    // New consumer call site introduced by the upgrade.
-    uint256 score = IScoreResolver(protocolRegistry.get(DotnsConstants.SCORE_RESOLVER)).scoreOf(msg.sender);
-    require(score >= MIN_SCORE, "insufficient score");
+  // New consumer call site introduced by the upgrade.
+  uint256 score = IScoreResolver(
+    protocolRegistry.get(DotnsConstants.SCORE_RESOLVER)
+  ).scoreOf(msg.sender);
+  require(score >= MIN_SCORE, "insufficient score");
 }
 ```
 
@@ -188,10 +201,12 @@ DotNS uses automated checks (including static analysis) on pull requests.
 Important caveats:
 
 - The repository does not assume static analysis output is definitive.
+
   - Static analyzers can produce false positives and miss real issues.
   - Reports are treated as a sanity check and a review aid, not as proof of correctness.
 
 - Common reasons for false positives:
+
   - Upgradeable patterns (proxies, initializers, storage layout assumptions).
   - Custom access control or non-standard authorization flows.
   - Low-level code (assembly) and hand-rolled hashing/namehash logic.
@@ -210,6 +225,7 @@ Also note:
 ## Setup
 
 - Build:
+
   - `forge build`
 
 - Test:
