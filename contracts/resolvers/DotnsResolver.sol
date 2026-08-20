@@ -3,8 +3,12 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {ERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC165Upgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 
 import {IDotnsResolver} from "./IDotnsResolver.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
@@ -59,28 +63,20 @@ contract DotnsResolver is
     }
 
     /// @inheritdoc IDotnsResolver
-    function setAddress(
-        bytes32 node,
-        address value
-    ) external override onlyNodeOwner(node) {
+    function setAddress(bytes32 node, address value) external override onlyNodeOwner(node) {
         addresses[node] = value;
         emit AddressSet(node, value);
     }
 
     /// @inheritdoc IDotnsResolver
-    function addressOf(
-        bytes32 node
-    ) external view override returns (address value) {
+    function addressOf(bytes32 node) external view override returns (address value) {
         return addresses[node];
     }
 
     /// @inheritdoc ERC165Upgradeable
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
         return
-            interfaceId == type(IDotnsResolver).interfaceId ||
-            super.supportsInterface(interfaceId);
+            interfaceId == type(IDotnsResolver).interfaceId || super.supportsInterface(interfaceId);
     }
 
     /// @notice Internal ownership check for a registry node.
@@ -88,28 +84,16 @@ contract DotnsResolver is
     ///      upgrade or rewire is picked up automatically without a resolver upgrade.
     /// @param node Node identifier.
     function _onlyNodeOwner(bytes32 node) internal view {
-        IDotnsRegistry _registry = IDotnsRegistry(
-            protocolRegistry.get(DotnsConstants.REGISTRY)
-        );
-        require(
-            _registry.owner(node) == msg.sender,
-            NotAuthorised(node, msg.sender)
-        );
+        IDotnsRegistry _registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
+        require(_registry.owner(node) == msg.sender, NotAuthorised(node, msg.sender));
     }
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

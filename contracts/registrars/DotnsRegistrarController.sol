@@ -96,16 +96,16 @@ contract DotnsRegistrarController is
         IDotnsProtocolRegistry registry,
         uint256 minAge,
         uint256 maxAge
-    ) external initializer {
+    )
+        external
+        initializer
+    {
         __Ownable_init(msg.sender);
         _dotnsRoleManagerInit();
 
         require(minAge > 0, MinCommitmentAgeZero());
         require(maxAge > minAge, MaxCommitmentAgeTooLow());
-        require(
-            maxAge <= MAX_ALLOWED_COMMITMENT_AGE,
-            MaxCommitmentAgeTooHigh()
-        );
+        require(maxAge <= MAX_ALLOWED_COMMITMENT_AGE, MaxCommitmentAgeTooHigh());
 
         protocolRegistry = registry;
 
@@ -114,27 +114,23 @@ contract DotnsRegistrarController is
     }
 
     /// @inheritdoc IDotnsRegistrarController
-    function available(
-        string calldata label
-    ) public view override returns (bool) {
+    function available(string calldata label) public view override returns (bool) {
         bytes32 node;
         (, node) = _validatedLabelNode(label);
-        IDotnsRegistrar registrar = IDotnsRegistrar(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         return registrar.available(uint256(node));
     }
 
     /// @inheritdoc IDotnsRegistrarController
-    function makeCommitment(
-        Registration calldata registration
-    ) public pure override returns (bytes32 commitment) {
+    function makeCommitment(Registration calldata registration)
+        public
+        pure
+        override
+        returns (bytes32 commitment)
+    {
         commitment = keccak256(
             abi.encode(
-                registration.label,
-                registration.owner,
-                registration.secret,
-                registration.reserved
+                registration.label, registration.owner, registration.secret, registration.reserved
             )
         );
     }
@@ -152,20 +148,13 @@ contract DotnsRegistrarController is
     }
 
     /// @inheritdoc IDotnsRegistrarController
-    function register(
-        Registration calldata registration
-    ) external payable override nonReentrant {
-        (
-            IDotnsRegistrar registrar,
-            bytes32 labelhash,
-            bytes32 node
-        ) = _requireAvailableLabel(registration.label);
+    function register(Registration calldata registration) external payable override nonReentrant {
+        (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
+            _requireAvailableLabel(registration.label);
         _consumeCommitment(registration);
 
         address escrow = _escrow();
-        IPopRules rules = IPopRules(
-            protocolRegistry.get(DotnsConstants.POP_RULES)
-        );
+        IPopRules rules = IPopRules(protocolRegistry.get(DotnsConstants.POP_RULES));
 
         uint256 tokenId = uint256(node);
         bool isReclaim = registrar.exists(tokenId);
@@ -179,14 +168,10 @@ contract DotnsRegistrarController is
         // through the refresh in `_writeReservation`. Replacing the slot from this controller
         // would brick the sibling's release/advance paths.
         if (stemCanonical && isReclaim) {
-            (address reservationOwner, ) = rules.getBaseNameReservation(stem);
-            address expectedOwner = IDotnsNameEscrow(payable(escrow))
-                .getReleasePosition(tokenId)
-                .recipient;
-            if (
-                reservationOwner != address(0) &&
-                reservationOwner == expectedOwner
-            ) {
+            (address reservationOwner,) = rules.getBaseNameReservation(stem);
+            address expectedOwner =
+                IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId).recipient;
+            if (reservationOwner != address(0) && reservationOwner == expectedOwner) {
                 rules.releaseReservationForReclaim(stem, expectedOwner);
             }
         }
@@ -194,19 +179,11 @@ contract DotnsRegistrarController is
         bool isDirect = msg.sender == registration.owner;
         IPopRules.PriceWithMeta memory priced;
         if (isDirect) {
-            priced = rules.priceWithCheck(
-                registration.label,
-                registration.owner
-            );
+            priced = rules.priceWithCheck(registration.label, registration.owner);
         } else {
-            priced = rules.priceWithoutCheck(
-                registration.label,
-                registration.owner
-            );
+            priced = rules.priceWithoutCheck(registration.label, registration.owner);
             if (priced.status == IPopRules.PopStatus.Reserved) {
-                (IPopRules.PopStatus required, ) = rules.classifyName(
-                    registration.label
-                );
+                (IPopRules.PopStatus required,) = rules.classifyName(registration.label);
                 if (required == IPopRules.PopStatus.Reserved) {
                     revert GovernanceReserved(registration.label);
                 }
@@ -214,51 +191,28 @@ contract DotnsRegistrarController is
             }
             require(
                 priced.userStatus >= priced.status,
-                OwnerStatusInsufficient(
-                    registration.label,
-                    priced.userStatus,
-                    priced.status
-                )
+                OwnerStatusInsufficient(registration.label, priced.userStatus, priced.status)
             );
         }
 
-        uint256 friction = !isDirect
-            ? rules.transferFloor(
-                registration.label,
-                msg.sender,
-                registration.owner
-            )
-            : 0;
-        uint256 totalCharged = priced.price > friction
-            ? priced.price
-            : friction;
+        uint256 friction =
+            !isDirect ? rules.transferFloor(registration.label, msg.sender, registration.owner) : 0;
+        uint256 totalCharged = priced.price > friction ? priced.price : friction;
         require(msg.value >= totalCharged, InsufficientValue());
 
         IDotnsReverseResolver reverse;
         bool setReverseRecord;
         if (registration.reserved && isDirect) {
-            reverse = IDotnsReverseResolver(
-                protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER)
-            );
-            setReverseRecord =
-                bytes(reverse.nameOf(registration.owner)).length == 0;
+            reverse = IDotnsReverseResolver(protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER));
+            setReverseRecord = bytes(reverse.nameOf(registration.owner)).length == 0;
         }
 
         _completeRegistration(
-            registration,
-            labelhash,
-            node,
-            priced.price,
-            setReverseRecord,
-            reverse,
-            isReclaim
+            registration, labelhash, node, priced.price, setReverseRecord, reverse, isReclaim
         );
 
         if (isReclaim) {
-            IDotnsNameEscrow(payable(escrow)).reclaim(
-                tokenId,
-                registration.owner
-            );
+            IDotnsNameEscrow(payable(escrow)).reclaim(tokenId, registration.owner);
             // Reclaim hands the NFT to the new holder; rewrite the registry record so the prior
             // owner's resolver pointer cannot follow the name. Must run after `escrow.reclaim`
             // so the registry's `ownerOf` check sees the new holder, not the escrow.
@@ -266,31 +220,22 @@ contract DotnsRegistrarController is
                 .setOwner(node, registration.owner);
         }
 
-        _settleEscrow(
-            escrow,
-            tokenId,
-            registration.owner,
-            isDirect,
-            totalCharged
-        );
+        _settleEscrow(escrow, tokenId, registration.owner, isDirect, totalCharged);
 
         if (
-            priced.status == IPopRules.PopStatus.PopLite &&
-            priced.userStatus == IPopRules.PopStatus.PopLite &&
-            stemCanonical
+            priced.status == IPopRules.PopStatus.PopLite
+                && priced.userStatus == IPopRules.PopStatus.PopLite && stemCanonical
         ) {
             rules.reserveBaseName(stem, registration.owner);
         }
 
         if (msg.value > totalCharged) {
             uint256 refund = msg.value - totalCharged;
-            (bool ok, ) = payable(msg.sender).call{value: refund}("");
+            (bool ok,) = payable(msg.sender).call{value: refund}("");
             if (ok) {
                 emit OverpaymentRefunded(msg.sender, refund);
             } else {
-                IDotnsNameEscrow(payable(escrow)).creditOverpayment{
-                    value: refund
-                }(msg.sender);
+                IDotnsNameEscrow(payable(escrow)).creditOverpayment{value: refund}(msg.sender);
             }
         }
     }
@@ -308,25 +253,20 @@ contract DotnsRegistrarController is
         address nameOwner,
         bool isDirect,
         uint256 chargeAmount
-    ) internal {
+    )
+        internal
+    {
         uint256 depositAmount = isDirect ? chargeAmount : 0;
         IDotnsNameEscrow(payable(escrow)).deposit{value: depositAmount}(
             IDotnsNameEscrow.DepositParams({
-                tokenId: tokenId,
-                asset: address(0),
-                amount: depositAmount,
-                recipient: nameOwner
+                tokenId: tokenId, asset: address(0), amount: depositAmount, recipient: nameOwner
             })
         );
 
         if (!isDirect && chargeAmount > 0) {
-            IDotnsNameEscrow(payable(escrow)).depositInsurance{
-                value: chargeAmount
-            }(
+            IDotnsNameEscrow(payable(escrow)).depositInsurance{value: chargeAmount}(
                 IDotnsNameEscrow.InsuranceDepositParams({
-                    tokenId: tokenId,
-                    payer: msg.sender,
-                    recipient: nameOwner
+                    tokenId: tokenId, payer: msg.sender, recipient: nameOwner
                 })
             );
         }
@@ -341,41 +281,39 @@ contract DotnsRegistrarController is
     function whiteListAddress(
         address who,
         bool whiteListStatus
-    ) external override onlyWhitelistOperatorOrOwner {
+    )
+        external
+        override
+        onlyWhitelistOperatorOrOwner
+    {
         whiteList[who] = whiteListStatus;
         emit WhiteListed(who, whiteListStatus);
     }
 
     /// @inheritdoc IDotnsRegistrarController
-    function registerReserved(
-        Registration calldata registration
-    ) external override onlyWhiteListedOrOwner nonReentrant {
-        (, bytes32 labelhash, bytes32 node) = _requireAvailableLabel(
-            registration.label
-        );
+    function registerReserved(Registration calldata registration)
+        external
+        override
+        onlyWhiteListedOrOwner
+        nonReentrant
+    {
+        (, bytes32 labelhash, bytes32 node) = _requireAvailableLabel(registration.label);
         _consumeCommitment(registration);
 
-        IDotnsReverseResolver reverse = IDotnsReverseResolver(
-            protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER)
-        );
-        _completeRegistration(
-            registration,
-            labelhash,
-            node,
-            0,
-            true,
-            reverse,
-            false
-        );
+        IDotnsReverseResolver reverse =
+            IDotnsReverseResolver(protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER));
+        _completeRegistration(registration, labelhash, node, 0, true, reverse, false);
     }
 
     /// @inheritdoc IERC165
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(DotnsRoleManager, IERC165) returns (bool) {
-        return
-            interfaceId == type(IDotnsRegistrarController).interfaceId ||
-            super.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(DotnsRoleManager, IERC165)
+        returns (bool)
+    {
+        return interfaceId == type(IDotnsRegistrarController).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     /// @notice Validates label shape and derives `(labelhash, node)`.
@@ -384,28 +322,23 @@ contract DotnsRegistrarController is
     /// violations revert with `InvalidLabel()`; labels below the minimum length revert with
     /// `LabelTooShort(label)` so off-chain consumers can distinguish "shape-valid but below
     /// the policy minimum" from "shape-valid but already minted".
-    function _validatedLabelNode(
-        string calldata label
-    ) internal view returns (bytes32 labelhash, bytes32 node) {
+    function _validatedLabelNode(string calldata label)
+        internal
+        view
+        returns (bytes32 labelhash, bytes32 node)
+    {
         require(label.isSingleLabel(), InvalidLabel());
         require(bytes(label).length >= 3, LabelTooShort(label));
-        (labelhash, node) = LabelUtils.deriveNode(
-            protocolRegistry.tldNode(),
-            label
-        );
+        (labelhash, node) = LabelUtils.deriveNode(protocolRegistry.tldNode(), label);
     }
 
-    function _requireAvailableLabel(
-        string calldata label
-    )
+    function _requireAvailableLabel(string calldata label)
         internal
         view
         returns (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node)
     {
         (labelhash, node) = _validatedLabelNode(label);
-        registrar = IDotnsRegistrar(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
+        registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         require(registrar.available(uint256(node)), NameNotAvailable(label));
     }
 
@@ -416,19 +349,11 @@ contract DotnsRegistrarController is
         require(committedAt != 0, CommitmentNotFound(commitment));
         require(
             committedAt + minCommitmentAge <= block.timestamp,
-            CommitmentTooNew(
-                commitment,
-                committedAt + minCommitmentAge,
-                block.timestamp
-            )
+            CommitmentTooNew(commitment, committedAt + minCommitmentAge, block.timestamp)
         );
         require(
             committedAt + maxCommitmentAge > block.timestamp,
-            CommitmentTooOld(
-                commitment,
-                committedAt + maxCommitmentAge,
-                block.timestamp
-            )
+            CommitmentTooOld(commitment, committedAt + maxCommitmentAge, block.timestamp)
         );
 
         delete commitments[commitment];
@@ -451,7 +376,9 @@ contract DotnsRegistrarController is
         bool setReverseRecord,
         IDotnsReverseResolver reverse,
         bool isReclaim
-    ) internal {
+    )
+        internal
+    {
         address labelStore;
         if (!isReclaim) {
             labelStore = RegistrationUtils.registerAndStore(
@@ -466,30 +393,19 @@ contract DotnsRegistrarController is
         } else {
             // Registry reset on reclaim is deferred until after `escrow.reclaim` runs (see
             // @custom:function register) so the registry's `ownerOf` check sees the new holder.
-            IStoreFactory factory = IStoreFactory(
-                protocolRegistry.get(DotnsConstants.STORE_FACTORY)
-            );
-            string memory fullName = string.concat(
-                registration.label,
-                protocolRegistry.tld()
-            );
+            IStoreFactory factory =
+                IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
+            string memory fullName = string.concat(registration.label, protocolRegistry.tld());
             labelStore = factory.writeLabel(registration.owner, node, fullName);
         }
 
         if (setReverseRecord) {
             reverse.setReverseName(
-                registration.owner,
-                string.concat(registration.label, protocolRegistry.tld())
+                registration.owner, string.concat(registration.label, protocolRegistry.tld())
             );
         }
 
-        emit NameRegistered(
-            registration.label,
-            labelhash,
-            registration.owner,
-            baseCost,
-            labelStore
-        );
+        emit NameRegistered(registration.label, labelhash, registration.owner, baseCost, labelStore);
     }
 
     /// @notice Returns the configured name escrow from the protocol registry.
@@ -500,31 +416,19 @@ contract DotnsRegistrarController is
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 
     /// @notice Internal check enforcing whitelist-or-owner access.
     function _onlyWhiteListedOrOwner() internal view {
-        require(
-            whiteList[msg.sender] || msg.sender == owner(),
-            NotWhiteListedOrOwner(msg.sender)
-        );
+        require(whiteList[msg.sender] || msg.sender == owner(), NotWhiteListedOrOwner(msg.sender));
     }
 
-    function _isSupportedRole(
-        bytes32 role
-    ) internal view override returns (bool supported) {
+    function _isSupportedRole(bytes32 role) internal view override returns (bool supported) {
         return role == DotnsConstants.WHITELIST_OPERATOR_ROLE;
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

@@ -85,15 +85,10 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
 
         for (uint256 i; i < registeredLabels.length; ++i) {
             address registrationOwner = registeredOwners[i];
-            ILabelStore store = ILabelStore(
-                storeFactory.getLabelStore(registrationOwner)
-            );
+            ILabelStore store = ILabelStore(storeFactory.getLabelStore(registrationOwner));
 
             if (address(store) != address(0)) {
-                bytes32 node = _namehash(
-                    dotNode,
-                    keccak256(bytes(registeredLabels[i]))
-                );
+                bytes32 node = _namehash(dotNode, keccak256(bytes(registeredLabels[i])));
 
                 assertTrue(store.isLocked(node), "Store entry must be locked");
             }
@@ -103,11 +98,7 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
     /// @notice The controller never accumulates a residual balance; refunds
     ///         and price transfers always net to zero on its side.
     function invariant_no_stuck_funds() public view {
-        assertEq(
-            address(dotnsRegistrarController).balance,
-            0,
-            "Controller must not hold funds"
-        );
+        assertEq(address(dotnsRegistrarController).balance, 0, "Controller must not hold funds");
     }
 
     function invariant_value_conservation() public view {
@@ -159,9 +150,7 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
         }
 
         assertEq(
-            validTokenCount,
-            registrationCount,
-            "Valid token count must match registration count"
+            validTokenCount, registrationCount, "Valid token count must match registration count"
         );
     }
 
@@ -172,19 +161,10 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
         address[] memory reservedOwners = handler.getReservedOwners();
 
         for (uint256 i; i < reservedLabels.length; ++i) {
-            string memory expectedName = string.concat(
-                reservedLabels[i],
-                ".dot"
-            );
-            string memory actualName = dotnsReverseResolver.nameOf(
-                reservedOwners[i]
-            );
+            string memory expectedName = string.concat(reservedLabels[i], ".dot");
+            string memory actualName = dotnsReverseResolver.nameOf(reservedOwners[i]);
 
-            assertEq(
-                actualName,
-                expectedName,
-                "Reverse resolution must be set for reserved name"
-            );
+            assertEq(actualName, expectedName, "Reverse resolution must be set for reserved name");
         }
     }
 
@@ -193,24 +173,15 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
     ///         mutation.
     function invariant_transfer_recipients_have_store_entries() public view {
         string[] memory transferredLabels = handler.getTransferredLabels();
-        address[] memory transferredRecipients = handler
-            .getTransferredRecipients();
+        address[] memory transferredRecipients = handler.getTransferredRecipients();
 
         for (uint256 i; i < transferredLabels.length; ++i) {
             address recipient = transferredRecipients[i];
-            ILabelStore store = ILabelStore(
-                storeFactory.getLabelStore(recipient)
-            );
+            ILabelStore store = ILabelStore(storeFactory.getLabelStore(recipient));
 
-            assertTrue(
-                address(store) != address(0),
-                "Transfer recipient must have a store"
-            );
+            assertTrue(address(store) != address(0), "Transfer recipient must have a store");
 
-            bytes32 node = _namehash(
-                dotNode,
-                keccak256(bytes(transferredLabels[i]))
-            );
+            bytes32 node = _namehash(dotNode, keccak256(bytes(transferredLabels[i])));
 
             assertEq(
                 store.getLabel(node),
@@ -218,10 +189,7 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
                 "Transfer-created store entry must contain correct label"
             );
 
-            assertTrue(
-                store.isLocked(node),
-                "Transfer-created store entry must be locked"
-            );
+            assertTrue(store.isLocked(node), "Transfer-created store entry must be locked");
         }
     }
 
@@ -234,19 +202,11 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
 
         for (uint256 i; i < registeredLabels.length; ++i) {
             address currentOwner = registeredOwners[i];
-            ILabelStore store = ILabelStore(
-                storeFactory.getLabelStore(currentOwner)
-            );
+            ILabelStore store = ILabelStore(storeFactory.getLabelStore(currentOwner));
 
-            assertTrue(
-                address(store) != address(0),
-                "Current owner must have a store"
-            );
+            assertTrue(address(store) != address(0), "Current owner must have a store");
 
-            bytes32 node = _namehash(
-                dotNode,
-                keccak256(bytes(registeredLabels[i]))
-            );
+            bytes32 node = _namehash(dotNode, keccak256(bytes(registeredLabels[i])));
 
             assertEq(
                 store.getLabel(node),
@@ -269,9 +229,7 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
             try dotnsRegistrar.ownerOf(tokenId) returns (address tokenOwner) {
                 address registryOwner = dotnsRegistry.owner(node);
                 assertEq(
-                    registryOwner,
-                    tokenOwner,
-                    "Registry owner must match current ERC721 owner"
+                    registryOwner, tokenOwner, "Registry owner must match current ERC721 owner"
                 );
             } catch {}
         }

@@ -30,12 +30,9 @@ contract UserStoreTests is BaseDotns {
     }
 
     function test_initialize_reverts_on_zero_user() public {
-        IUserStore uninitialised = IUserStore(
-            address(new BeaconProxy(storeFactory.userStoreBeacon(), ""))
-        );
-        vm.expectRevert(
-            abi.encodeWithSelector(IUserStore.InvalidUser.selector, address(0))
-        );
+        IUserStore uninitialised =
+            IUserStore(address(new BeaconProxy(storeFactory.userStoreBeacon(), "")));
+        vm.expectRevert(abi.encodeWithSelector(IUserStore.InvalidUser.selector, address(0)));
         uninitialised.initialize(address(0));
     }
 
@@ -54,9 +51,7 @@ contract UserStoreTests is BaseDotns {
     function test_setValue_reverts_for_non_owner() public {
         IUserStore store = _freshUserStore(ed);
         vm.prank(tiago);
-        vm.expectRevert(
-            abi.encodeWithSelector(IUserStore.NotOwner.selector, tiago)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IUserStore.NotOwner.selector, tiago));
         store.setValue(KEY_A, bytes("hello"));
     }
 
@@ -110,9 +105,7 @@ contract UserStoreTests is BaseDotns {
         assertEq(store.getKeyCount(), 1);
     }
 
-    function test_setValue_empty_bytes_after_nonempty_snapshots_prior_value()
-        public
-    {
+    function test_setValue_empty_bytes_after_nonempty_snapshots_prior_value() public {
         IUserStore store = _freshUserStore(ed);
         vm.startPrank(ed);
         store.setValue(KEY_A, bytes("v1"));
@@ -125,9 +118,7 @@ contract UserStoreTests is BaseDotns {
         assertEq(store.getHistoryAt(KEY_A, 0).value, bytes("v1"));
     }
 
-    function test_setValue_fresh_key_with_empty_bytes_writes_no_history()
-        public
-    {
+    function test_setValue_fresh_key_with_empty_bytes_writes_no_history() public {
         IUserStore store = _freshUserStore(ed);
         vm.prank(ed);
         store.setValue(KEY_A, bytes(""));

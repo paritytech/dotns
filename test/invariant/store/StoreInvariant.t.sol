@@ -18,10 +18,7 @@ contract StoreInvariantTest is BaseDotns {
     function setUp() public override {
         super.setUp();
         handler = new StoreInvariantHandler(
-            storeFactory,
-            protocolRegistry,
-            owner,
-            address(dotnsRegistrarController)
+            storeFactory, protocolRegistry, owner, address(dotnsRegistrarController)
         );
         targetContract(address(handler));
     }
@@ -49,8 +46,7 @@ contract StoreInvariantTest is BaseDotns {
             for (uint256 j; j < labelhashCount; ++j) {
                 bytes32 labelhash = handler.writtenLabelhashAt(store, j);
                 assertEq(
-                    ILabelStore(store).getLabel(labelhash),
-                    handler.frozenLabel(store, labelhash)
+                    ILabelStore(store).getLabel(labelhash), handler.frozenLabel(store, labelhash)
                 );
             }
         }
@@ -79,14 +75,8 @@ contract StoreInvariantTest is BaseDotns {
 
     /// @notice The store factory must remain the sole owner of both beacons it deployed.
     function invariant_factory_owns_both_beacons() public view {
-        assertEq(
-            UpgradeableBeacon(storeFactory.labelStoreBeacon()).owner(),
-            address(storeFactory)
-        );
-        assertEq(
-            UpgradeableBeacon(storeFactory.userStoreBeacon()).owner(),
-            address(storeFactory)
-        );
+        assertEq(UpgradeableBeacon(storeFactory.labelStoreBeacon()).owner(), address(storeFactory));
+        assertEq(UpgradeableBeacon(storeFactory.userStoreBeacon()).owner(), address(storeFactory));
     }
 
     /// @notice The factory's enumeration counters must equal the number of stores tracked

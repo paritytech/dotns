@@ -12,14 +12,10 @@ contract DotnsContentResolverTests is BaseDotns {
     function test_set_contenthash() public {
         address nameOwner = ed;
 
-        bytes32 node = _register(
-            "contenthash01",
-            nameOwner,
-            IPopRules.PopStatus.NoStatus
-        );
+        bytes32 node = _register("contenthash01", nameOwner, IPopRules.PopStatus.NoStatus);
 
-        bytes
-            memory contentHash = hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        bytes memory contentHash =
+            hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
         vm.expectEmit(true, false, false, true);
         emit IDotnsContentResolver.ContentHashUpdated(node, contentHash);
@@ -34,11 +30,7 @@ contract DotnsContentResolverTests is BaseDotns {
     function test_set_text() public {
         address nameOwner = ed;
 
-        bytes32 node = _register(
-            "textrecord01",
-            nameOwner,
-            IPopRules.PopStatus.NoStatus
-        );
+        bytes32 node = _register("textrecord01", nameOwner, IPopRules.PopStatus.NoStatus);
 
         string memory textKey = "ipfs";
         string memory textValue = "bafytextcid1";
@@ -57,11 +49,7 @@ contract DotnsContentResolverTests is BaseDotns {
         address nameOwner = ed;
         address operator = address(this);
 
-        bytes32 node = _register(
-            "operatorrr01",
-            nameOwner,
-            IPopRules.PopStatus.NoStatus
-        );
+        bytes32 node = _register("operatorrr01", nameOwner, IPopRules.PopStatus.NoStatus);
 
         vm.expectEmit(true, true, false, true);
         emit IDotnsContentResolver.ApprovalForAll(nameOwner, operator, true);

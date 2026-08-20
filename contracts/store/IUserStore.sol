@@ -72,10 +72,7 @@ interface IUserStore is IDotnsStore {
     /// @param key The key to read.
     /// @param index Zero-based index into the history list.
     /// @return entry The `(value, timestamp)` pair.
-    function getHistoryAt(
-        bytes32 key,
-        uint256 index
-    ) external view returns (Entry memory entry);
+    function getHistoryAt(bytes32 key, uint256 index) external view returns (Entry memory entry);
 
     /// @notice Paginated read over the per-key history list.
     /// @dev `offset >= getHistoryCount(key)` returns an empty array. Length is
@@ -88,7 +85,10 @@ interface IUserStore is IDotnsStore {
         bytes32 key,
         uint256 offset,
         uint256 limit
-    ) external view returns (Entry[] memory entries);
+    )
+        external
+        view
+        returns (Entry[] memory entries);
 
     /// @notice Returns the number of distinct keys ever written.
     /// @return count Length of the key-insertion list.
@@ -105,8 +105,5 @@ interface IUserStore is IDotnsStore {
     /// @param offset Start index.
     /// @param limit Maximum entries to return.
     /// @return keys Slice of keys.
-    function getKeys(
-        uint256 offset,
-        uint256 limit
-    ) external view returns (bytes32[] memory keys);
+    function getKeys(uint256 offset, uint256 limit) external view returns (bytes32[] memory keys);
 }

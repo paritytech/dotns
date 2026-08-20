@@ -20,9 +20,7 @@ contract ReentrantOwner is IERC721Receiver {
     }
 
     /// @notice Stores the registration payload the receiver will replay inside the callback.
-    function arm(
-        IDotnsRegistrarController.Registration calldata payload
-    ) external {
+    function arm(IDotnsRegistrarController.Registration calldata payload) external {
         registration = payload;
     }
 
@@ -32,7 +30,11 @@ contract ReentrantOwner is IERC721Receiver {
         address,
         uint256,
         bytes calldata
-    ) external override returns (bytes4) {
+    )
+        external
+        override
+        returns (bytes4)
+    {
         CONTROLLER.register{value: 0}(registration);
         return IERC721Receiver.onERC721Received.selector;
     }

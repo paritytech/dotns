@@ -32,8 +32,6 @@ contract DeployCreate3Factory is Script {
         factory = address(new Create3Factory());
 
         console.log("Create3Factory deployed at:", factory);
-        console.log(
-            "Pass this address to the deploy pipeline as CREATE3_FACTORY."
-        );
+        console.log("Pass this address to the deploy pipeline as CREATE3_FACTORY.");
     }
 }

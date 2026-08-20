@@ -3,8 +3,12 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {ERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC165Upgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IDotnsReverseResolver} from "./IDotnsReverseResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
@@ -60,10 +64,7 @@ contract DotnsReverseResolver is
     }
 
     /// @inheritdoc IDotnsReverseResolver
-    function setReverseName(
-        address addr,
-        string calldata name
-    ) external override onlyRegistrar {
+    function setReverseName(address addr, string calldata name) external override onlyRegistrar {
         reverseNames[addr] = name;
         emit ReverseNameSet(addr, name);
     }
@@ -71,17 +72,10 @@ contract DotnsReverseResolver is
     /// @inheritdoc IDotnsReverseResolver
     function claimReverseRecord(string calldata label) external override {
         bytes32 labelhash = LabelUtils.labelhash(label);
-        uint256 tokenId = uint256(
-            LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash)
-        );
+        uint256 tokenId = uint256(LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash));
 
-        IERC721 registrar = IERC721(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
-        require(
-            registrar.ownerOf(tokenId) == msg.sender,
-            NotNameOwner(msg.sender, tokenId)
-        );
+        IERC721 registrar = IERC721(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        require(registrar.ownerOf(tokenId) == msg.sender, NotNameOwner(msg.sender, tokenId));
 
         string memory fullName = string.concat(label, protocolRegistry.tld());
         reverseNames[msg.sender] = fullName;
@@ -89,28 +83,19 @@ contract DotnsReverseResolver is
     }
 
     /// @inheritdoc IDotnsReverseResolver
-    function nameOf(
-        address addr
-    ) external view override returns (string memory name) {
+    function nameOf(address addr) external view override returns (string memory name) {
         string memory stored = reverseNames[addr];
         if (bytes(stored).length == 0) return "";
 
         // Strip the TLD suffix and validate against current ownership so a transferred-away
         // name never resolves under a stale reverse record.
-        string memory label = LabelUtils.stripTld(
-            protocolRegistry.tld(),
-            stored
-        );
+        string memory label = LabelUtils.stripTld(protocolRegistry.tld(), stored);
         if (bytes(label).length == 0) return "";
 
         bytes32 labelhash = LabelUtils.labelhashMemory(label);
-        uint256 tokenId = uint256(
-            LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash)
-        );
+        uint256 tokenId = uint256(LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash));
 
-        IERC721 registrar = IERC721(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
+        IERC721 registrar = IERC721(protocolRegistry.get(DotnsConstants.REGISTRAR));
         try registrar.ownerOf(tokenId) returns (address currentOwner) {
             if (currentOwner != addr) return "";
             return stored;
@@ -120,12 +105,14 @@ contract DotnsReverseResolver is
     }
 
     /// @inheritdoc ERC165Upgradeable
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(ERC165Upgradeable) returns (bool supported) {
-        return
-            interfaceId == type(IDotnsReverseResolver).interfaceId ||
-            super.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC165Upgradeable)
+        returns (bool supported)
+    {
+        return interfaceId == type(IDotnsReverseResolver).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     /// @notice Internal check enforcing registrar-only access.
@@ -133,24 +120,16 @@ contract DotnsReverseResolver is
         address controller = protocolRegistry.get(DotnsConstants.CONTROLLER);
         address registrar = protocolRegistry.get(DotnsConstants.REGISTRAR);
         require(
-            msg.sender == controller || msg.sender == registrar,
-            NotRegistrarController(msg.sender)
+            msg.sender == controller || msg.sender == registrar, NotRegistrarController(msg.sender)
         );
     }
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

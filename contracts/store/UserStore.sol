@@ -57,17 +57,12 @@ contract UserStore is Initializable, IUserStore {
     }
 
     /// @inheritdoc IUserStore
-    function setValue(
-        bytes32 key,
-        bytes calldata value
-    ) external override onlyOwner {
+    function setValue(bytes32 key, bytes calldata value) external override onlyOwner {
         require(key != bytes32(0), InvalidKey());
 
         bytes storage prev = _current[key];
         if (prev.length != 0) {
-            _history[key].push(
-                Entry({value: prev, timestamp: block.timestamp})
-            );
+            _history[key].push(Entry({value: prev, timestamp: block.timestamp}));
         }
 
         _current[key] = value;
@@ -87,23 +82,17 @@ contract UserStore is Initializable, IUserStore {
     }
 
     /// @inheritdoc IUserStore
-    function getValue(
-        bytes32 key
-    ) external view override returns (bytes memory value) {
+    function getValue(bytes32 key) external view override returns (bytes memory value) {
         return _current[key];
     }
 
     /// @inheritdoc IUserStore
-    function hasValue(
-        bytes32 key
-    ) external view override returns (bool present) {
+    function hasValue(bytes32 key) external view override returns (bool present) {
         return _current[key].length != 0;
     }
 
     /// @inheritdoc IUserStore
-    function getHistoryCount(
-        bytes32 key
-    ) external view override returns (uint256 count) {
+    function getHistoryCount(bytes32 key) external view override returns (uint256 count) {
         return _history[key].length;
     }
 
@@ -111,7 +100,12 @@ contract UserStore is Initializable, IUserStore {
     function getHistoryAt(
         bytes32 key,
         uint256 index
-    ) external view override returns (Entry memory entry) {
+    )
+        external
+        view
+        override
+        returns (Entry memory entry)
+    {
         return _history[key][index];
     }
 
@@ -120,7 +114,12 @@ contract UserStore is Initializable, IUserStore {
         bytes32 key,
         uint256 offset,
         uint256 limit
-    ) external view override returns (Entry[] memory entries) {
+    )
+        external
+        view
+        override
+        returns (Entry[] memory entries)
+    {
         Entry[] storage full = _history[key];
         uint256 total = full.length;
         if (offset >= total) {
@@ -142,9 +141,7 @@ contract UserStore is Initializable, IUserStore {
     }
 
     /// @inheritdoc IUserStore
-    function getKeyAt(
-        uint256 index
-    ) external view override returns (bytes32 key) {
+    function getKeyAt(uint256 index) external view override returns (bytes32 key) {
         return _keyList[index];
     }
 
@@ -152,7 +149,12 @@ contract UserStore is Initializable, IUserStore {
     function getKeys(
         uint256 offset,
         uint256 limit
-    ) external view override returns (bytes32[] memory keys) {
+    )
+        external
+        view
+        override
+        returns (bytes32[] memory keys)
+    {
         uint256 total = _keyList.length;
         if (offset >= total) {
             return new bytes32[](0);
@@ -169,12 +171,7 @@ contract UserStore is Initializable, IUserStore {
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 

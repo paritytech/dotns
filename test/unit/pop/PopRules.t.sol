@@ -10,73 +10,42 @@ import {IDotnsController} from "../../../contracts/registrars/IDotnsController.s
 /// authorisation.
 contract PopRulesTests is BaseDotns {
     function test_classify_governance() public view {
-        (
-            IPopRules.PopStatus classificationStatus,
-            string memory classificationMessage
-        ) = popRules.classifyName("hello");
+        (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
+            popRules.classifyName("hello");
 
-        assertEq(
-            uint256(classificationStatus),
-            uint256(IPopRules.PopStatus.Reserved)
-        );
+        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.Reserved));
         assertEq(classificationMessage, "Reserved for Governance");
     }
 
     function test_classify_poplite() public view {
-        (
-            IPopRules.PopStatus classificationStatus,
-            string memory classificationMessage
-        ) = popRules.classifyName("lights01");
+        (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
+            popRules.classifyName("lights01");
 
-        assertEq(
-            uint256(classificationStatus),
-            uint256(IPopRules.PopStatus.PopLite)
-        );
-        assertEq(
-            classificationMessage,
-            "Requires Lite personhood verification"
-        );
+        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.PopLite));
+        assertEq(classificationMessage, "Requires Lite personhood verification");
     }
 
     function test_classify_popfull() public view {
-        (
-            IPopRules.PopStatus classificationStatus,
-            string memory classificationMessage
-        ) = popRules.classifyName("alicebob");
+        (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
+            popRules.classifyName("alicebob");
 
-        assertEq(
-            uint256(classificationStatus),
-            uint256(IPopRules.PopStatus.PopFull)
-        );
-        assertEq(
-            classificationMessage,
-            "Requires Full personhood verification"
-        );
+        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.PopFull));
+        assertEq(classificationMessage, "Requires Full personhood verification");
     }
 
     function test_classify_nostatus() public view {
-        (
-            IPopRules.PopStatus classificationStatus,
-            string memory classificationMessage
-        ) = popRules.classifyName("longnamehere01");
+        (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
+            popRules.classifyName("longnamehere01");
 
-        assertEq(
-            uint256(classificationStatus),
-            uint256(IPopRules.PopStatus.NoStatus)
-        );
+        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.NoStatus));
         assertEq(classificationMessage, "Available to all");
     }
 
     function test_classify_nostatus_no_digits() public view {
-        (
-            IPopRules.PopStatus classificationStatus,
-            string memory classificationMessage
-        ) = popRules.classifyName("longnamehere");
+        (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
+            popRules.classifyName("longnamehere");
 
-        assertEq(
-            uint256(classificationStatus),
-            uint256(IPopRules.PopStatus.NoStatus)
-        );
+        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.NoStatus));
         assertEq(classificationMessage, "Available to all");
     }
 
@@ -116,10 +85,7 @@ contract PopRulesTests is BaseDotns {
 
     function test_price_with_check_revert_governance() public {
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IPopRules.PopError.selector,
-                "Reserved for Governance"
-            )
+            abi.encodeWithSelector(IPopRules.PopError.selector, "Reserved for Governance")
         );
         popRules.priceWithCheck("hello", ed);
     }
@@ -127,8 +93,7 @@ contract PopRulesTests is BaseDotns {
     function test_price_with_check_revert_full_needed() public {
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPopRules.PopError.selector,
-                "Requires Full Personhood verification"
+                IPopRules.PopError.selector, "Requires Full Personhood verification"
             )
         );
         popRules.priceWithCheck("alicebob", ed);
@@ -137,37 +102,19 @@ contract PopRulesTests is BaseDotns {
     function test_popfull_user_can_access_poplite_name() public {
         _grantPopFull(ed);
 
-        IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck(
-            "lights01",
-            ed
-        );
+        IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck("lights01", ed);
 
-        assertEq(
-            uint256(priceMetadata.status),
-            uint256(IPopRules.PopStatus.PopLite)
-        );
-        assertEq(
-            uint256(priceMetadata.userStatus),
-            uint256(IPopRules.PopStatus.PopFull)
-        );
+        assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.PopLite));
+        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.PopFull));
     }
 
     function test_poplite_user_can_access_nostatus_name() public {
         _grantPopLite(ed);
 
-        IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck(
-            "longnamehere01",
-            ed
-        );
+        IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck("longnamehere01", ed);
 
-        assertEq(
-            uint256(priceMetadata.status),
-            uint256(IPopRules.PopStatus.NoStatus)
-        );
-        assertEq(
-            uint256(priceMetadata.userStatus),
-            uint256(IPopRules.PopStatus.PopLite)
-        );
+        assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.NoStatus));
+        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.PopLite));
     }
 
     function test_base_reservation_blocks_others() public {
@@ -178,11 +125,8 @@ contract PopRulesTests is BaseDotns {
 
         popRules.reserveBaseName("lights", leonardo);
 
-        (
-            bool isReserved,
-            address reservationOwner,
-            uint64 expiryTimestamp
-        ) = popRules.isBaseNameReserved("lights");
+        (bool isReserved, address reservationOwner, uint64 expiryTimestamp) =
+            popRules.isBaseNameReserved("lights");
 
         assertTrue(isReserved);
         assertEq(reservationOwner, leonardo);
@@ -190,8 +134,7 @@ contract PopRulesTests is BaseDotns {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPopRules.PopError.selector,
-                "Base name reserved for original Lite registrant"
+                IPopRules.PopError.selector, "Base name reserved for original Lite registrant"
             )
         );
         popRules.priceWithCheck("lights", tiago);
@@ -202,13 +145,9 @@ contract PopRulesTests is BaseDotns {
 
         popRules.reserveBaseName("lights", leonardo);
 
-        IPopRules.PriceWithMeta memory priceMetadata = popRules
-            .priceWithoutCheck("lights", tiago);
+        IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithoutCheck("lights", tiago);
 
-        assertEq(
-            uint256(priceMetadata.status),
-            uint256(IPopRules.PopStatus.Reserved)
-        );
+        assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.Reserved));
         assertEq(priceMetadata.price, popRules.price("lights"));
     }
 
@@ -224,28 +163,21 @@ contract PopRulesTests is BaseDotns {
         popRules.releaseBaseName("longnamebob");
     }
 
-    function test_reserveBaseNameForPop_reverts_when_slot_held_by_other_user()
-        public
-    {
+    function test_reserveBaseNameForPop_reverts_when_slot_held_by_other_user() public {
         _authoriseTestAsController();
 
         popRules.reserveBaseNameForPop("longnamebob", leonardo);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IPopRules.PopError.selector,
-                "Base name held by another user"
-            )
+            abi.encodeWithSelector(IPopRules.PopError.selector, "Base name held by another user")
         );
         popRules.reserveBaseNameForPop("longnamebob", tiago);
 
-        (address holder, ) = popRules.getBaseNameReservation("longnamebob");
+        (address holder,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, leonardo);
     }
 
-    function test_reserveBaseNameForPop_refreshes_expiry_for_same_owner()
-        public
-    {
+    function test_reserveBaseNameForPop_refreshes_expiry_for_same_owner() public {
         _authoriseTestAsController();
 
         popRules.reserveBaseNameForPop("longnamebob", leonardo);
@@ -254,16 +186,13 @@ contract PopRulesTests is BaseDotns {
         vm.warp(block.timestamp + 1 days);
 
         popRules.reserveBaseNameForPop("longnamebob", leonardo);
-        (address holder, uint64 refreshedExpiry) = popRules
-            .getBaseNameReservation("longnamebob");
+        (address holder, uint64 refreshedExpiry) = popRules.getBaseNameReservation("longnamebob");
 
         assertEq(holder, leonardo);
         assertGt(refreshedExpiry, firstExpiry);
     }
 
-    function test_releaseBaseName_reverts_for_non_reserving_controller()
-        public
-    {
+    function test_releaseBaseName_reverts_for_non_reserving_controller() public {
         _authoriseTestAsController();
         popRules.reserveBaseNameForPop("longnamebob", leonardo);
 
@@ -274,13 +203,12 @@ contract PopRulesTests is BaseDotns {
         vm.prank(otherController);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPopRules.PopError.selector,
-                "Only reserving controller can release"
+                IPopRules.PopError.selector, "Only reserving controller can release"
             )
         );
         popRules.releaseBaseName("longnamebob");
 
-        (address holder, ) = popRules.getBaseNameReservation("longnamebob");
+        (address holder,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, leonardo);
     }
 
@@ -290,13 +218,11 @@ contract PopRulesTests is BaseDotns {
 
         popRules.releaseBaseName("longnamebob");
 
-        (address holder, ) = popRules.getBaseNameReservation("longnamebob");
+        (address holder,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, address(0));
     }
 
-    function test_releaseBaseName_expired_slot_cleared_by_any_controller()
-        public
-    {
+    function test_releaseBaseName_expired_slot_cleared_by_any_controller() public {
         _authoriseTestAsController();
         popRules.reserveBaseNameForPop("longnamebob", leonardo);
 
@@ -309,13 +235,11 @@ contract PopRulesTests is BaseDotns {
         vm.prank(otherController);
         popRules.releaseBaseName("longnamebob");
 
-        (address holder, ) = popRules.getBaseNameReservation("longnamebob");
+        (address holder,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, address(0));
     }
 
-    function test_writeReservation_preserves_original_controller_on_same_owner_refresh()
-        public
-    {
+    function test_writeReservation_preserves_original_controller_on_same_owner_refresh() public {
         _authoriseTestAsController();
         popRules.reserveBaseNameForPop("longnamebob", leonardo);
 
@@ -329,14 +253,13 @@ contract PopRulesTests is BaseDotns {
         vm.prank(otherController);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPopRules.PopError.selector,
-                "Only reserving controller can release"
+                IPopRules.PopError.selector, "Only reserving controller can release"
             )
         );
         popRules.releaseBaseName("longnamebob");
 
         popRules.releaseBaseName("longnamebob");
-        (address holder, ) = popRules.getBaseNameReservation("longnamebob");
+        (address holder,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, address(0));
     }
 }

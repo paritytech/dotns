@@ -3,7 +3,9 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IDotnsRegistry} from "./IDotnsRegistry.sol";
 import {IDotnsController} from "../registrars/IDotnsController.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
@@ -20,12 +22,7 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 /// @dev Tokenised second-level nodes store `owner == address(0)` as a sentinel and defer to
 ///      `IDotnsRegistrar.ownerOf`; subnodes carry an explicit owner address in `records`.
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistry is
-    Initializable,
-    UUPSUpgradeable,
-    OwnableUpgradeable,
-    IDotnsRegistry
-{
+contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistry {
     using StoreUtils for IStoreFactory;
     using StringUtils for *;
 
@@ -67,9 +64,7 @@ contract DotnsRegistry is
     }
 
     /// @inheritdoc IDotnsRegistry
-    function setSubnodeOwner(
-        SubnodeRecord calldata record
-    )
+    function setSubnodeOwner(SubnodeRecord calldata record)
         external
         override
         authorised(record.parentNode)
@@ -83,18 +78,13 @@ contract DotnsRegistry is
         string calldata parentLabel = record.parentLabel;
         require(subLabel.isSingleLabel(), InvalidLabel());
         require(parentLabel.isNamePath(), ParentLabelMismatch());
-        require(
-            _parentNamehash(parentLabel) == parentNode,
-            ParentLabelMismatch()
-        );
+        require(_parentNamehash(parentLabel) == parentNode, ParentLabelMismatch());
 
         bytes32 labelhash = LabelUtils.labelhash(subLabel);
         subnode = LabelUtils.namehashUnder(parentNode, labelhash);
 
         Record storage existing = records[subnode];
-        address reverseResolver = protocolRegistry.get(
-            DotnsConstants.REVERSE_RESOLVER
-        );
+        address reverseResolver = protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER);
         if (existing.exists) {
             address previousOwner = existing.owner;
             // Reset the resolver pointer on reassignment so the prior subnode owner's resolver
@@ -110,26 +100,14 @@ contract DotnsRegistry is
             }
 
             if (newOwner != previousOwner) {
-                string memory fullName = string.concat(
-                    subLabel,
-                    ".",
-                    parentLabel,
-                    protocolRegistry.tld()
-                );
+                string memory fullName =
+                    string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
                 _writeSubnodeToStore(newOwner, subnode, fullName);
             }
         } else {
-            records[subnode] = Record({
-                owner: newOwner,
-                resolver: reverseResolver,
-                exists: true
-            });
-            string memory fullName = string.concat(
-                subLabel,
-                ".",
-                parentLabel,
-                protocolRegistry.tld()
-            );
+            records[subnode] = Record({owner: newOwner, resolver: reverseResolver, exists: true});
+            string memory fullName =
+                string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
             _writeSubnodeToStore(newOwner, subnode, fullName);
         }
 
@@ -137,14 +115,9 @@ contract DotnsRegistry is
     }
 
     /// @inheritdoc IDotnsRegistry
-    function setOwner(
-        bytes32 node,
-        address newOwner
-    ) external override onlyRegistrarController {
+    function setOwner(bytes32 node, address newOwner) external override onlyRegistrarController {
         require(newOwner != address(0), NotAllowed());
-        IDotnsRegistrar registrar = IDotnsRegistrar(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         require(registrar.ownerOf(uint256(node)) == newOwner, NotAuthorised());
 
         // The resolver pointer is unconditionally reset to the default reverse resolver on every
@@ -161,31 +134,25 @@ contract DotnsRegistry is
     }
 
     /// @inheritdoc IDotnsRegistry
-    function setResolver(
-        bytes32 node,
-        address newResolver
-    ) external override authorised(node) {
+    function setResolver(bytes32 node, address newResolver) external override authorised(node) {
         records[node].resolver = newResolver;
         emit NewResolver(node, newResolver);
     }
 
     /// @inheritdoc IDotnsRegistry
-    function setSubnodeResolver(
-        SubnodeResolverRecord calldata record
-    ) external override authorised(record.parentNode) {
+    function setSubnodeResolver(SubnodeResolverRecord calldata record)
+        external
+        override
+        authorised(record.parentNode)
+    {
         string calldata subLabel = record.subLabel;
         string calldata parentLabel = record.parentLabel;
         require(subLabel.isSingleLabel(), InvalidLabel());
         require(parentLabel.isNamePath(), ParentLabelMismatch());
-        require(
-            _parentNamehash(parentLabel) == record.parentNode,
-            ParentLabelMismatch()
-        );
+        require(_parentNamehash(parentLabel) == record.parentNode, ParentLabelMismatch());
 
-        bytes32 subnode = LabelUtils.namehashUnder(
-            record.parentNode,
-            LabelUtils.labelhash(subLabel)
-        );
+        bytes32 subnode =
+            LabelUtils.namehashUnder(record.parentNode, LabelUtils.labelhash(subLabel));
         Record storage existing = records[subnode];
         require(existing.exists, NotAuthorised());
 
@@ -202,9 +169,7 @@ contract DotnsRegistry is
         address storedOwner = record.owner;
         if (storedOwner != address(0)) return storedOwner;
         if (!record.exists) return address(0);
-        IDotnsRegistrar registrar = IDotnsRegistrar(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         return registrar.ownerOf(uint256(node));
     }
 
@@ -222,7 +187,12 @@ contract DotnsRegistry is
     function isAuthorised(
         bytes32 node,
         address account
-    ) external view override returns (bool authorisedFlag) {
+    )
+        external
+        view
+        override
+        returns (bool authorisedFlag)
+    {
         authorisedFlag = _isAuthorised(node, account);
     }
 
@@ -233,10 +203,10 @@ contract DotnsRegistry is
         address storeOwner,
         bytes32 node,
         string memory fullName
-    ) internal {
-        IStoreFactory factory = IStoreFactory(
-            protocolRegistry.get(DotnsConstants.STORE_FACTORY)
-        );
+    )
+        internal
+    {
+        IStoreFactory factory = IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
         factory.writeLabel(storeOwner, node, fullName);
     }
 
@@ -244,9 +214,7 @@ contract DotnsRegistry is
     /// @dev Walks the label right-to-left in calldata using memory-safe assembly to avoid the
     ///      cost of slicing into intermediate `bytes` and to keep gas linear in the label depth.
     ///      Reads the TLD node from the protocol registry, so it is a view rather than pure.
-    function _parentNamehash(
-        string calldata parentLabel
-    ) internal view returns (bytes32 node) {
+    function _parentNamehash(string calldata parentLabel) internal view returns (bytes32 node) {
         bytes calldata labels = bytes(parentLabel);
         uint256 end = labels.length;
         require(end != 0, ParentLabelMismatch());
@@ -289,10 +257,7 @@ contract DotnsRegistry is
     /// @dev Honours the sentinel-zero pattern: if the registry has no explicit owner, fall back
     ///      to the registrar's ERC-721 owner / approved / operator-for-all chain. This is the
     ///      single source of truth `_authorised` and `isAuthorised` both delegate to.
-    function _isAuthorised(
-        bytes32 node,
-        address account
-    ) internal view returns (bool) {
+    function _isAuthorised(bytes32 node, address account) internal view returns (bool) {
         Record storage record = records[node];
 
         // Read `owner` first: a non-zero stored owner means this is a subnode with an explicit
@@ -305,9 +270,7 @@ contract DotnsRegistry is
 
         if (!record.exists) return false;
 
-        IDotnsRegistrar registrar = IDotnsRegistrar(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         uint256 tokenId = uint256(node);
         address tokenOwner = registrar.ownerOf(tokenId);
         if (account == tokenOwner) return true;
@@ -323,28 +286,16 @@ contract DotnsRegistry is
     ///      in one place and lets commit-reveal and PoP controllers coexist without registry
     ///      reconfiguration on each addition.
     function _onlyRegistrarController() internal view {
-        IDotnsRegistrar registrar = IDotnsRegistrar(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
-        require(
-            registrar.controllers(IDotnsController(msg.sender)),
-            NotAuthorised()
-        );
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        require(registrar.controllers(IDotnsController(msg.sender)), NotAuthorised());
     }
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

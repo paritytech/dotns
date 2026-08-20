@@ -6,7 +6,10 @@ import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {DotnsRegistry} from "../../../contracts/registry/DotnsRegistry.sol";
 import {LabelUtils} from "../../../contracts/utils/LabelUtils.sol";
 import {DotnsRegistrar} from "../../../contracts/registrars/DotnsRegistrar.sol";
-import {IDotnsRegistrarController, DotnsRegistrarController} from "../../../contracts/registrars/DotnsRegistrarController.sol";
+import {
+    IDotnsRegistrarController,
+    DotnsRegistrarController
+} from "../../../contracts/registrars/DotnsRegistrarController.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 import {IPersonhood} from "../../../contracts/external/personhood/IPersonhood.sol";
@@ -94,40 +97,26 @@ contract RegistryHandler is Test {
     /// @notice Mocks the personhood precompile so it reports `tier` for `account`.
     /// @param account Address whose status is being mocked.
     /// @param tier Verification tier to report for `account`.
-    function _mockPersonhoodTier(
-        address account,
-        IPopRules.PopStatus tier
-    ) internal {
+    function _mockPersonhoodTier(address account, IPopRules.PopStatus tier) internal {
         uint8 statusByte;
         if (tier == IPopRules.PopStatus.PopFull) statusByte = 2;
         else if (tier == IPopRules.PopStatus.PopLite) statusByte = 1;
 
-        bytes32 contextAlias = statusByte == 0
-            ? bytes32(0)
-            : keccak256(abi.encode(account, statusByte));
+        bytes32 contextAlias =
+            statusByte == 0 ? bytes32(0) : keccak256(abi.encode(account, statusByte));
         vm.mockCall(
             DotnsConstants.PERSONHOOD,
             abi.encodeWithSelector(
-                IPersonhood.personhoodStatus.selector,
-                account,
-                DotnsConstants.PERSONHOOD_CONTEXT
+                IPersonhood.personhoodStatus.selector, account, DotnsConstants.PERSONHOOD_CONTEXT
             ),
-            abi.encode(
-                IPersonhood.PersonhoodInfo({
-                    status: statusByte,
-                    contextAlias: contextAlias
-                })
-            )
+            abi.encode(IPersonhood.PersonhoodInfo({status: statusByte, contextAlias: contextAlias}))
         );
     }
 
     /// @notice Register a base domain and create a subnode under it.
     /// @param actorSeed Seed selecting the base domain owner.
     /// @param subnodeOwnerSeed Seed selecting the subnode owner.
-    function registerAndCreateSubnode(
-        uint256 actorSeed,
-        uint256 subnodeOwnerSeed
-    ) external {
+    function registerAndCreateSubnode(uint256 actorSeed, uint256 subnodeOwnerSeed) external {
         if (actors.length < 2) return;
 
         address domainOwner = actors[actorSeed % actors.length];
@@ -143,10 +132,7 @@ contract RegistryHandler is Test {
     /// @notice Reassign an existing subnode to a different owner.
     /// @param subnodeSeed Seed selecting which subnode to reassign.
     /// @param newOwnerSeed Seed selecting the new subnode owner.
-    function reassignSubnode(
-        uint256 subnodeSeed,
-        uint256 newOwnerSeed
-    ) external {
+    function reassignSubnode(uint256 subnodeSeed, uint256 newOwnerSeed) external {
         if (_subnodeHashes.length == 0 || actors.length < 2) return;
 
         uint256 index = subnodeSeed % _subnodeHashes.length;
@@ -173,13 +159,9 @@ contract RegistryHandler is Test {
 
         address newOwner = actors[newOwnerSeed % actors.length];
 
-        IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry
-            .SubnodeRecord({
-                parentNode: parentNode,
-                subLabel: "sub",
-                parentLabel: parentLabel,
-                owner: newOwner
-            });
+        IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNode, subLabel: "sub", parentLabel: parentLabel, owner: newOwner
+        });
 
         vm.prank(parentOwner);
         registry.setSubnodeOwner(record);
@@ -190,10 +172,7 @@ contract RegistryHandler is Test {
     /// @notice Transfer a base domain ERC721 token.
     /// @param labelSeed Seed selecting which registered label to transfer.
     /// @param recipientSeed Seed selecting the recipient.
-    function transferBaseDomain(
-        uint256 labelSeed,
-        uint256 recipientSeed
-    ) external {
+    function transferBaseDomain(uint256 labelSeed, uint256 recipientSeed) external {
         if (_registeredLabels.length == 0 || actors.length < 2) return;
 
         uint256 index = labelSeed % _registeredLabels.length;
@@ -240,19 +219,12 @@ contract RegistryHandler is Test {
     /// @notice Runs the commit-reveal flow and registers a base domain for `domainOwner`.
     /// @param label Label to register.
     /// @param domainOwner Address receiving ownership of the base domain.
-    function _registerBaseDomain(
-        string memory label,
-        address domainOwner
-    ) internal {
-        bytes32 secret = keccak256(
-            abi.encodePacked(label, domainOwner, block.timestamp, labelNonce)
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: label,
-                owner: domainOwner,
-                secret: secret,
-                reserved: true
+    function _registerBaseDomain(string memory label, address domainOwner) internal {
+        bytes32 secret =
+            keccak256(abi.encodePacked(label, domainOwner, block.timestamp, labelNonce));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: domainOwner, secret: secret, reserved: true
             });
 
         bytes32 commitment = controller.makeCommitment(registration);
@@ -280,14 +252,15 @@ contract RegistryHandler is Test {
         string memory parentLabel,
         address parentOwner,
         address subnodeOwner
-    ) internal {
-        IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry
-            .SubnodeRecord({
-                parentNode: parentNode,
-                subLabel: subLabel,
-                parentLabel: parentLabel,
-                owner: subnodeOwner
-            });
+    )
+        internal
+    {
+        IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNode,
+            subLabel: subLabel,
+            parentLabel: parentLabel,
+            owner: subnodeOwner
+        });
 
         vm.prank(parentOwner);
         bytes32 subnode = registry.setSubnodeOwner(record);
@@ -300,19 +273,13 @@ contract RegistryHandler is Test {
     /// @notice Computes the namehash for `label` under the suite's TLD.
     /// @param label Label whose node hash is required.
     function _computeNode(string memory label) internal view returns (bytes32) {
-        return
-            LabelUtils.namehashUnder(
-                TLD_NODE,
-                LabelUtils.labelhashMemory(label)
-            );
+        return LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(label));
     }
 
     /// @notice Generates a unique label for each registration in the run.
     /// @dev Uses an incrementing nonce to ensure uniqueness across calls.
     function _generateUniqueLabel() internal returns (string memory) {
-        string memory label = string(
-            abi.encodePacked("inv", vm.toString(labelNonce))
-        );
+        string memory label = string(abi.encodePacked("inv", vm.toString(labelNonce)));
         ++labelNonce;
         return label;
     }
@@ -321,10 +288,7 @@ contract RegistryHandler is Test {
     /// @param exclude Actor to skip.
     /// @param seed Seed selecting amongst the remaining actors.
     /// @return Address of a different actor, or `address(0)` if none qualifies.
-    function _pickDifferent(
-        address exclude,
-        uint256 seed
-    ) internal view returns (address) {
+    function _pickDifferent(address exclude, uint256 seed) internal view returns (address) {
         for (uint256 i; i < actors.length; ++i) {
             address candidate = actors[(seed + i) % actors.length];
             if (candidate != exclude) return candidate;

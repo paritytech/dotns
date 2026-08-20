@@ -23,9 +23,7 @@ contract LabelStoreTests is BaseDotns {
     /// @notice Deploys a brand-new LabelStore beacon proxy for `user` via the factory, pranked as
     /// `owner`. @param user The address that will own the freshly deployed LabelStore.
     /// @return store The newly deployed LabelStore proxy cast to the ILabelStore interface.
-    function _freshLabelStore(
-        address user
-    ) internal returns (ILabelStore store) {
+    function _freshLabelStore(address user) internal returns (ILabelStore store) {
         vm.prank(owner);
         store = ILabelStore(storeFactory.deployLabelStoreFor(user));
     }
@@ -37,24 +35,17 @@ contract LabelStoreTests is BaseDotns {
     }
 
     function test_initialize_reverts_on_zero_user() public {
-        ILabelStore uninitialised = ILabelStore(
-            address(new BeaconProxy(storeFactory.labelStoreBeacon(), ""))
-        );
-        vm.expectRevert(
-            abi.encodeWithSelector(ILabelStore.InvalidUser.selector, address(0))
-        );
+        ILabelStore uninitialised =
+            ILabelStore(address(new BeaconProxy(storeFactory.labelStoreBeacon(), "")));
+        vm.expectRevert(abi.encodeWithSelector(ILabelStore.InvalidUser.selector, address(0)));
         uninitialised.initialize(address(0), address(protocolRegistry));
     }
 
     function test_initialize_reverts_on_zero_registry() public {
-        ILabelStore uninitialised = ILabelStore(
-            address(new BeaconProxy(storeFactory.labelStoreBeacon(), ""))
-        );
+        ILabelStore uninitialised =
+            ILabelStore(address(new BeaconProxy(storeFactory.labelStoreBeacon(), "")));
         vm.expectRevert(
-            abi.encodeWithSelector(
-                ILabelStore.InvalidProtocolRegistry.selector,
-                address(0)
-            )
+            abi.encodeWithSelector(ILabelStore.InvalidProtocolRegistry.selector, address(0))
         );
         uninitialised.initialize(ed, address(0));
     }
@@ -74,21 +65,14 @@ contract LabelStoreTests is BaseDotns {
     function test_storeLabel_reverts_when_caller_not_registered() public {
         ILabelStore store = _freshLabelStore(ed);
         vm.prank(tiago);
-        vm.expectRevert(
-            abi.encodeWithSelector(ILabelStore.NotAuthorised.selector, tiago)
-        );
+        vm.expectRevert(abi.encodeWithSelector(ILabelStore.NotAuthorised.selector, tiago));
         store.storeLabel(LABELHASH_A, LABEL_A);
     }
 
     function test_storeLabel_reverts_when_labelhash_zero() public {
         ILabelStore store = _freshLabelStore(ed);
         vm.prank(address(dotnsRegistrarController));
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILabelStore.InvalidLabel.selector,
-                bytes32(0)
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(ILabelStore.InvalidLabel.selector, bytes32(0)));
         store.storeLabel(bytes32(0), LABEL_A);
     }
 
@@ -113,18 +97,13 @@ contract LabelStoreTests is BaseDotns {
         vm.startPrank(address(dotnsRegistrarController));
         store.storeLabel(LABELHASH_A, LABEL_A);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                ILabelStore.LabelAlreadyExists.selector,
-                LABELHASH_A
-            )
+            abi.encodeWithSelector(ILabelStore.LabelAlreadyExists.selector, LABELHASH_A)
         );
         store.storeLabel(LABELHASH_A, LABEL_B);
         vm.stopPrank();
     }
 
-    function test_caller_becoming_unregistered_rejects_subsequent_write()
-        public
-    {
+    function test_caller_becoming_unregistered_rejects_subsequent_write() public {
         // Give the attacker a temporary registered slot, then rotate the slot
         // to someone else so the attacker is no longer registered.
         address attacker = makeAddr("attacker");
@@ -146,9 +125,7 @@ contract LabelStoreTests is BaseDotns {
         vm.stopPrank();
 
         vm.prank(attacker);
-        vm.expectRevert(
-            abi.encodeWithSelector(ILabelStore.NotAuthorised.selector, attacker)
-        );
+        vm.expectRevert(abi.encodeWithSelector(ILabelStore.NotAuthorised.selector, attacker));
         store.storeLabel(LABELHASH_B, LABEL_B);
     }
 

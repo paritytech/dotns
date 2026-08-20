@@ -3,7 +3,9 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
@@ -59,10 +61,7 @@ contract DotnsProtocolRegistry is
         __Ownable_init(msg.sender);
 
         require(tldLabel.isSingleLabel(), InvalidTld());
-        _tldNode = LabelUtils.namehashUnder(
-            bytes32(0),
-            LabelUtils.labelhash(tldLabel)
-        );
+        _tldNode = LabelUtils.namehashUnder(bytes32(0), LabelUtils.labelhash(tldLabel));
         _tld = string.concat(".", tldLabel);
     }
 
@@ -88,9 +87,7 @@ contract DotnsProtocolRegistry is
     }
 
     /// @inheritdoc IDotnsProtocolRegistry
-    function isRegisteredAddress(
-        address addr
-    ) external view override returns (bool registered) {
+    function isRegisteredAddress(address addr) external view override returns (bool registered) {
         return addr != address(0) && _registeredRefcount[addr] > 0;
     }
 
@@ -106,17 +103,10 @@ contract DotnsProtocolRegistry is
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

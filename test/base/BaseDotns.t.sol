@@ -5,8 +5,14 @@ import {Test} from "forge-std/Test.sol";
 
 import {PopRules, IPopRules} from "../../contracts/pop/PopRules.sol";
 import {DotnsRegistrar} from "../../contracts/registrars/DotnsRegistrar.sol";
-import {DotnsRegistrarController, IDotnsRegistrarController} from "../../contracts/registrars/DotnsRegistrarController.sol";
-import {DotnsPopController, IDotnsPopController} from "../../contracts/registrars/DotnsPopController.sol";
+import {
+    DotnsRegistrarController,
+    IDotnsRegistrarController
+} from "../../contracts/registrars/DotnsRegistrarController.sol";
+import {
+    DotnsPopController,
+    IDotnsPopController
+} from "../../contracts/registrars/DotnsPopController.sol";
 import {RootGatewayDispatcher} from "../../contracts/registrars/RootGatewayDispatcher.sol";
 import {IDotnsController} from "../../contracts/registrars/IDotnsController.sol";
 import {DotnsRegistry} from "../../contracts/registry/DotnsRegistry.sol";
@@ -15,7 +21,10 @@ import {DotnsContentResolver} from "../../contracts/resolvers/DotnsContentResolv
 import {DotnsReverseResolver} from "../../contracts/resolvers/DotnsReverseResolver.sol";
 import {DotnsPopResolver} from "../../contracts/resolvers/DotnsPopResolver.sol";
 import {StoreFactory} from "../../contracts/store/StoreFactory.sol";
-import {DotnsProtocolRegistry, IDotnsProtocolRegistry} from "../../contracts/registry/DotnsProtocolRegistry.sol";
+import {
+    DotnsProtocolRegistry,
+    IDotnsProtocolRegistry
+} from "../../contracts/registry/DotnsProtocolRegistry.sol";
 import {DotnsNameEscrow} from "../../contracts/escrow/DotnsNameEscrow.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {LabelUtils} from "../../contracts/utils/LabelUtils.sol";
@@ -109,9 +118,7 @@ abstract contract BaseDotns is Test {
 
     /// @notice Selector for the typed registerBaseName entrypoint.
     bytes4 internal constant SELECTOR_REGISTER_BASE_TYPED =
-        bytes4(
-            keccak256("registerBaseName((string,address,(uint8,string,bytes)))")
-        );
+        bytes4(keccak256("registerBaseName((string,address,(uint8,string,bytes)))"));
 
     /// @notice Selector for the bytes-encoded registerBaseName entrypoint.
     bytes4 internal constant SELECTOR_REGISTER_BASE_BYTES =
@@ -139,7 +146,7 @@ abstract contract BaseDotns is Test {
     ///         @custom:constant MAX_COOLDOWN ceiling.
     uint256 public constant ESCROW_COOLDOWN = 15 minutes;
 
-    /// @notice Default redeem window for the freshly-deployed name escrow.
+    /// @notice Default escrow redeem window used in tests. Bounded by the escrow's
     ///         @custom:constant MAX_REDEEM_WINDOW ceiling.
     uint256 public constant ESCROW_REDEEM_WINDOW = 1 days;
 
@@ -216,19 +223,14 @@ abstract contract BaseDotns is Test {
         // fixture whose derived node or suffix disagreed would test the wrong protocol.
         assertEq(protocolRegistry.tldNode(), dotNode);
         assertEq(protocolRegistry.tld(), string.concat(".", TLD_LABEL));
-        IDotnsProtocolRegistry registry = IDotnsProtocolRegistry(
-            protocolRegistryAddress
-        );
+        IDotnsProtocolRegistry registry = IDotnsProtocolRegistry(protocolRegistryAddress);
 
         storeFactory = new StoreFactory(protocolRegistryAddress, owner);
         vm.label(address(storeFactory), "StoreFactory");
 
         address dotnsRegistrarAddress = Upgrades.deployUUPSProxy(
             "DotnsRegistrar.sol:DotnsRegistrar",
-            abi.encodeCall(
-                DotnsRegistrar.initialize,
-                ("Dotns", "Dotns", registry)
-            )
+            abi.encodeCall(DotnsRegistrar.initialize, ("Dotns", "Dotns", registry))
         );
         dotnsRegistrar = DotnsRegistrar(dotnsRegistrarAddress);
         vm.label(dotnsRegistrarAddress, "DotnsRegistrar");
@@ -237,14 +239,11 @@ abstract contract BaseDotns is Test {
             "DotnsReverseResolver.sol:DotnsReverseResolver",
             abi.encodeCall(DotnsReverseResolver.initialize, (registry))
         );
-        dotnsReverseResolver = DotnsReverseResolver(
-            dotnsReverseResolverAddress
-        );
+        dotnsReverseResolver = DotnsReverseResolver(dotnsReverseResolverAddress);
         vm.label(dotnsReverseResolverAddress, "DotnsReverseResolver");
 
         address dotnsRegistryAddress = Upgrades.deployUUPSProxy(
-            "DotnsRegistry.sol:DotnsRegistry",
-            abi.encodeCall(DotnsRegistry.initialize, (registry))
+            "DotnsRegistry.sol:DotnsRegistry", abi.encodeCall(DotnsRegistry.initialize, (registry))
         );
         dotnsRegistry = DotnsRegistry(dotnsRegistryAddress);
         vm.label(dotnsRegistryAddress, "DotnsRegistry");
@@ -253,40 +252,29 @@ abstract contract BaseDotns is Test {
             "DotnsContentResolver.sol:DotnsContentResolver",
             abi.encodeCall(DotnsContentResolver.initialize, (registry))
         );
-        dotnsContentResolver = DotnsContentResolver(
-            dotnsContentResolverAddress
-        );
+        dotnsContentResolver = DotnsContentResolver(dotnsContentResolverAddress);
         vm.label(dotnsContentResolverAddress, "DotnsContentResolver");
 
         address popRulesAddress = Upgrades.deployUUPSProxy(
-            "PopRules.sol:PopRules",
-            abi.encodeCall(PopRules.initialize, (RENT_PRICE, registry))
+            "PopRules.sol:PopRules", abi.encodeCall(PopRules.initialize, (RENT_PRICE, registry))
         );
         popRules = PopRules(popRulesAddress);
         vm.label(popRulesAddress, "PopRules");
 
         address dotnsResolverAddress = Upgrades.deployUUPSProxy(
-            "DotnsResolver.sol:DotnsResolver",
-            abi.encodeCall(DotnsResolver.initialize, (registry))
+            "DotnsResolver.sol:DotnsResolver", abi.encodeCall(DotnsResolver.initialize, (registry))
         );
         dotnsResolver = DotnsResolver(dotnsResolverAddress);
         vm.label(dotnsResolverAddress, "DotnsResolver");
 
         address dotnsRegistrarControllerAddress = Upgrades.deployUUPSProxy(
             "DotnsRegistrarController.sol:DotnsRegistrarController",
-            abi.encodeCall(
-                DotnsRegistrarController.initialize,
-                (registry, 6 seconds, 1 days)
-            )
+            abi.encodeCall(DotnsRegistrarController.initialize, (registry, 6 seconds, 1 days))
         );
-        dotnsRegistrarController = DotnsRegistrarController(
-            dotnsRegistrarControllerAddress
-        );
+        dotnsRegistrarController = DotnsRegistrarController(dotnsRegistrarControllerAddress);
         vm.label(dotnsRegistrarControllerAddress, "DotnsRegistrarController");
 
-        dotnsRegistrar.addController(
-            IDotnsController(dotnsRegistrarControllerAddress)
-        );
+        dotnsRegistrar.addController(IDotnsController(dotnsRegistrarControllerAddress));
 
         address dotnsPopResolverAddress = Upgrades.deployUUPSProxy(
             "DotnsPopResolver.sol:DotnsPopResolver",
@@ -297,22 +285,15 @@ abstract contract BaseDotns is Test {
 
         address dotnsPopControllerAddress = Upgrades.deployUUPSProxy(
             "DotnsPopController.sol:DotnsPopController",
-            abi.encodeCall(
-                DotnsPopController.initialize,
-                (registry, DEFAULT_RESERVATION_DURATION)
-            )
+            abi.encodeCall(DotnsPopController.initialize, (registry, DEFAULT_RESERVATION_DURATION))
         );
         dotnsPopController = DotnsPopController(dotnsPopControllerAddress);
         vm.label(dotnsPopControllerAddress, "DotnsPopController");
 
-        popGateway = address(
-            new RootGatewayDispatcher(dotnsPopControllerAddress)
-        );
+        popGateway = address(new RootGatewayDispatcher(dotnsPopControllerAddress));
         vm.label(popGateway, "RootGatewayDispatcher");
 
-        dotnsRegistrar.addController(
-            IDotnsController(dotnsPopControllerAddress)
-        );
+        dotnsRegistrar.addController(IDotnsController(dotnsPopControllerAddress));
 
         address dotnsNameEscrowAddress = Upgrades.deployUUPSProxy(
             "DotnsNameEscrow.sol:DotnsNameEscrow",
@@ -329,37 +310,16 @@ abstract contract BaseDotns is Test {
         vm.label(dotnsNameEscrowAddress, "DotnsNameEscrow");
 
         protocolRegistry.set(DotnsConstants.REGISTRAR, dotnsRegistrarAddress);
-        protocolRegistry.set(
-            DotnsConstants.CONTROLLER,
-            dotnsRegistrarControllerAddress
-        );
+        protocolRegistry.set(DotnsConstants.CONTROLLER, dotnsRegistrarControllerAddress);
         protocolRegistry.set(DotnsConstants.REGISTRY, dotnsRegistryAddress);
-        protocolRegistry.set(
-            DotnsConstants.REVERSE_RESOLVER,
-            dotnsReverseResolverAddress
-        );
+        protocolRegistry.set(DotnsConstants.REVERSE_RESOLVER, dotnsReverseResolverAddress);
         protocolRegistry.set(DotnsConstants.POP_RULES, popRulesAddress);
-        protocolRegistry.set(
-            DotnsConstants.STORE_FACTORY,
-            address(storeFactory)
-        );
+        protocolRegistry.set(DotnsConstants.STORE_FACTORY, address(storeFactory));
         protocolRegistry.set(DotnsConstants.RESOLVER, dotnsResolverAddress);
-        protocolRegistry.set(
-            DotnsConstants.CONTENT_RESOLVER,
-            dotnsContentResolverAddress
-        );
-        protocolRegistry.set(
-            DotnsConstants.POP_RESOLVER,
-            dotnsPopResolverAddress
-        );
-        protocolRegistry.set(
-            DotnsConstants.POP_CONTROLLER,
-            dotnsPopControllerAddress
-        );
-        protocolRegistry.set(
-            DotnsConstants.NAME_ESCROW,
-            dotnsNameEscrowAddress
-        );
+        protocolRegistry.set(DotnsConstants.CONTENT_RESOLVER, dotnsContentResolverAddress);
+        protocolRegistry.set(DotnsConstants.POP_RESOLVER, dotnsPopResolverAddress);
+        protocolRegistry.set(DotnsConstants.POP_CONTROLLER, dotnsPopControllerAddress);
+        protocolRegistry.set(DotnsConstants.NAME_ESCROW, dotnsNameEscrowAddress);
         // Stand-in for the Root gateway dispatcher. Dedicated dispatcher
         // coverage lives in test/unit/registrar/RootGatewayDispatcher.t.sol.
         protocolRegistry.set(DotnsConstants.POP_GATEWAY, popGateway);
@@ -372,12 +332,7 @@ abstract contract BaseDotns is Test {
         vm.mockCall(
             DotnsConstants.PERSONHOOD,
             abi.encodeWithSelector(IPersonhood.personhoodStatus.selector),
-            abi.encode(
-                IPersonhood.PersonhoodInfo({
-                    status: 0,
-                    contextAlias: bytes32(0)
-                })
-            )
+            abi.encode(IPersonhood.PersonhoodInfo({status: 0, contextAlias: bytes32(0)}))
         );
     }
 
@@ -397,10 +352,7 @@ abstract contract BaseDotns is Test {
     /// @param parent The parent node hash.
     /// @param labelhash The labelhash.
     /// @return node The resulting node hash.
-    function _namehash(
-        bytes32 parent,
-        bytes32 labelhash
-    ) internal pure returns (bytes32 node) {
+    function _namehash(bytes32 parent, bytes32 labelhash) internal pure returns (bytes32 node) {
         node = LabelUtils.namehashUnder(parent, labelhash);
     }
 
@@ -410,9 +362,7 @@ abstract contract BaseDotns is Test {
     ///      the tokenId.
     /// @param label The label to compute for (without the TLD suffix).
     /// @return tokenId The ERC721 tokenId (uint256(node)).
-    function _tokenIdForLabel(
-        string memory label
-    ) internal pure returns (uint256 tokenId) {
+    function _tokenIdForLabel(string memory label) internal pure returns (uint256 tokenId) {
         tokenId = uint256(_nodeOf(label));
     }
 
@@ -421,10 +371,7 @@ abstract contract BaseDotns is Test {
     ///      definition point drives every node; stays pure because keccak runs in a pure body.
     /// @return node The TLD node the registry is initialised with.
     function _tldNode() internal pure returns (bytes32 node) {
-        node = LabelUtils.namehashUnder(
-            ZERO_HASH,
-            LabelUtils.labelhashMemory(TLD_LABEL)
-        );
+        node = LabelUtils.namehashUnder(ZERO_HASH, LabelUtils.labelhashMemory(TLD_LABEL));
     }
 
     /// @notice Computes `namehash(tldNode, keccak256(label))` for a flat label.
@@ -432,18 +379,13 @@ abstract contract BaseDotns is Test {
     /// @param label Label (without the TLD suffix).
     /// @return node The node identifier under the suite's TLD.
     function _nodeOf(string memory label) internal pure returns (bytes32 node) {
-        node = LabelUtils.namehashUnder(
-            _tldNode(),
-            LabelUtils.labelhashMemory(label)
-        );
+        node = LabelUtils.namehashUnder(_tldNode(), LabelUtils.labelhashMemory(label));
     }
 
     /// @notice Returns a valid 65-byte chat key seeded with `seed`.
     /// @dev Format mimics the uncompressed secp256k1 encoding (1 prefix byte + 32 X + 32 Y)
     ///      so the resolver's length guard is satisfied.
-    function _validChatKey(
-        bytes1 seed
-    ) internal pure returns (bytes memory key) {
+    function _validChatKey(bytes1 seed) internal pure returns (bytes memory key) {
         key = new bytes(65);
         key[0] = 0x04;
         for (uint256 i = 1; i < 65; i++) {
@@ -463,22 +405,13 @@ abstract contract BaseDotns is Test {
         else if (tier == IPopRules.PopStatus.PopLite) status = 1;
         // PopStatus.Reserved is a label classification, never a user tier; map
         // anything else to None.
-        bytes32 contextAlias = status == 0
-            ? bytes32(0)
-            : keccak256(abi.encode(who, status));
+        bytes32 contextAlias = status == 0 ? bytes32(0) : keccak256(abi.encode(who, status));
         vm.mockCall(
             DotnsConstants.PERSONHOOD,
             abi.encodeWithSelector(
-                IPersonhood.personhoodStatus.selector,
-                who,
-                DotnsConstants.PERSONHOOD_CONTEXT
+                IPersonhood.personhoodStatus.selector, who, DotnsConstants.PERSONHOOD_CONTEXT
             ),
-            abi.encode(
-                IPersonhood.PersonhoodInfo({
-                    status: status,
-                    contextAlias: contextAlias
-                })
-            )
+            abi.encode(IPersonhood.PersonhoodInfo({status: status, contextAlias: contextAlias}))
         );
     }
 
@@ -503,21 +436,13 @@ abstract contract BaseDotns is Test {
     ///      integration suites.
     function _grantWhitelistOperator(address account) internal {
         vm.prank(owner);
-        dotnsRegistrarController.setRole(
-            DotnsConstants.WHITELIST_OPERATOR_ROLE,
-            account,
-            true
-        );
+        dotnsRegistrarController.setRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, account, true);
     }
 
     /// @notice Owner-prank shortcut that revokes `WHITELIST_OPERATOR_ROLE`.
     function _revokeWhitelistOperator(address account) internal {
         vm.prank(owner);
-        dotnsRegistrarController.setRole(
-            DotnsConstants.WHITELIST_OPERATOR_ROLE,
-            account,
-            false
-        );
+        dotnsRegistrarController.setRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, account, false);
     }
 
     /// @notice Drives a PoP reservation from the registered gateway address and settles
@@ -537,23 +462,21 @@ abstract contract BaseDotns is Test {
         string memory liteLabel,
         bytes memory chatKey,
         string memory reservedBaseLabel
-    ) internal {
+    )
+        internal
+    {
         _gatewayReserveBaseName(
             IDotnsPopController.BaseReservation({
                 lite: IDotnsPopController.LiteRegistration({
-                    liteLabel: _toGatewayLiteLabel(liteLabel),
-                    user: user,
-                    chatKey: chatKey
+                    liteLabel: _toGatewayLiteLabel(liteLabel), user: user, chatKey: chatKey
                 }),
                 reservedBaseLabel: reservedBaseLabel
             })
         );
-        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController
-            .pendingClaims(user);
+        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController.pendingClaims(user);
         if (
-            pending.length != 0 &&
-            pending[0].mintedAt + dotnsPopController.reservationDuration() >
-            block.timestamp
+            pending.length != 0
+                && pending[0].mintedAt + dotnsPopController.reservationDuration() > block.timestamp
         ) {
             vm.prank(user);
             dotnsPopController.claimLabelStore();
@@ -561,82 +484,58 @@ abstract contract BaseDotns is Test {
     }
 
     /// @notice Dispatches the typed `reserveLiteName` call through the gateway stand-in.
-    function _gatewayReserveLiteName(
-        IDotnsPopController.LiteRegistration memory params
-    ) internal {
+    function _gatewayReserveLiteName(IDotnsPopController.LiteRegistration memory params) internal {
         params.liteLabel = _toGatewayLiteLabel(params.liteLabel);
-        _dispatchFromRoot(
-            abi.encodeWithSelector(SELECTOR_RESERVE_LITE_TYPED, params)
-        );
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_LITE_TYPED, params));
     }
 
     /// @notice Dispatches a pre-encoded `reserveLiteName` payload through the gateway.
     function _gatewayReserveLiteName(bytes memory payload) internal {
-        _dispatchFromRoot(
-            abi.encodeWithSelector(SELECTOR_RESERVE_LITE_BYTES, payload)
-        );
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_LITE_BYTES, payload));
     }
 
     /// @notice Dispatches the typed `reserveBaseName` call through the gateway stand-in.
-    function _gatewayReserveBaseName(
-        IDotnsPopController.BaseReservation memory params
-    ) internal {
+    function _gatewayReserveBaseName(IDotnsPopController.BaseReservation memory params) internal {
         params.lite.liteLabel = _toGatewayLiteLabel(params.lite.liteLabel);
-        _dispatchFromRoot(
-            abi.encodeWithSelector(SELECTOR_RESERVE_BASE_TYPED, params)
-        );
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_TYPED, params));
     }
 
     /// @notice Dispatches a pre-encoded `reserveBaseName` payload through the gateway.
     function _gatewayReserveBaseName(bytes memory payload) internal {
-        _dispatchFromRoot(
-            abi.encodeWithSelector(SELECTOR_RESERVE_BASE_BYTES, payload)
-        );
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_BYTES, payload));
     }
 
     /// @notice Dispatches the typed `reserveBaseNameOnly` call through the gateway stand-in.
-    function _gatewayReserveBaseNameOnly(
-        IDotnsPopController.BaseNameReservation memory params
-    ) internal {
-        _dispatchFromRoot(
-            abi.encodeWithSelector(SELECTOR_RESERVE_BASE_ONLY_TYPED, params)
-        );
+    function _gatewayReserveBaseNameOnly(IDotnsPopController.BaseNameReservation memory params)
+        internal
+    {
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_ONLY_TYPED, params));
     }
 
     /// @notice Dispatches a pre-encoded `reserveBaseNameOnly` payload through the gateway.
     function _gatewayReserveBaseNameOnly(bytes memory payload) internal {
-        _dispatchFromRoot(
-            abi.encodeWithSelector(SELECTOR_RESERVE_BASE_ONLY_BYTES, payload)
-        );
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_ONLY_BYTES, payload));
     }
 
     /// @notice Dispatches the typed `registerBaseName` call through the gateway stand-in.
     /// @dev Normalises any LiteUsername link to its dotted form before dispatch.
-    function _gatewayRegisterBaseName(
-        IDotnsPopController.FullRegistration memory params
-    ) internal {
+    function _gatewayRegisterBaseName(IDotnsPopController.FullRegistration memory params) internal {
         if (params.link.kind == IDotnsPopController.LinkKind.LiteUsername) {
             params.link.liteLabel = _toGatewayLiteLabel(params.link.liteLabel);
         }
-        _dispatchFromRoot(
-            abi.encodeWithSelector(SELECTOR_REGISTER_BASE_TYPED, params)
-        );
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_REGISTER_BASE_TYPED, params));
     }
 
     /// @notice Dispatches a pre-encoded `registerBaseName` payload through the gateway.
     function _gatewayRegisterBaseName(bytes memory payload) internal {
-        _dispatchFromRoot(
-            abi.encodeWithSelector(SELECTOR_REGISTER_BASE_BYTES, payload)
-        );
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_REGISTER_BASE_BYTES, payload));
     }
 
     /// @notice Forwards `payload` to the gateway stand-in while pretending the call
     ///         originated from the root account.
     /// @dev Reverts with the inner error data when the forwarded call fails, so
     ///      `vm.expectRevert` assertions remain meaningful at the test level.
-    function _dispatchFromRoot(
-        bytes memory payload
-    ) internal returns (bytes memory ret) {
+    function _dispatchFromRoot(bytes memory payload) internal returns (bytes memory ret) {
         _mockCallerIsRoot(true);
 
         (bool ok, bytes memory data) = popGateway.call(payload);
@@ -650,23 +549,22 @@ abstract contract BaseDotns is Test {
     }
 
     /// @notice Constructs a `Link` that inherits the chat key from a prior lite label.
-    function _linkWithLite(
-        string memory liteLabel
-    ) internal pure returns (IDotnsPopController.Link memory) {
-        return
-            IDotnsPopController.Link({
-                kind: IDotnsPopController.LinkKind.LiteUsername,
-                liteLabel: _toGatewayLiteLabel(liteLabel),
-                chatKey: ""
-            });
+    function _linkWithLite(string memory liteLabel)
+        internal
+        pure
+        returns (IDotnsPopController.Link memory)
+    {
+        return IDotnsPopController.Link({
+            kind: IDotnsPopController.LinkKind.LiteUsername,
+            liteLabel: _toGatewayLiteLabel(liteLabel),
+            chatKey: ""
+        });
     }
 
     /// @notice Normalises a lite label into its dotted gateway form.
     /// @dev Inserts a `.` between the stem and the trailing two characters when
     ///      `liteLabel` lacks a dot, mirroring how the gateway encodes labels.
-    function _toGatewayLiteLabel(
-        string memory liteLabel
-    ) internal pure returns (string memory) {
+    function _toGatewayLiteLabel(string memory liteLabel) internal pure returns (string memory) {
         bytes memory raw = bytes(liteLabel);
         for (uint256 i = 0; i < raw.length; ++i) {
             if (raw[i] == bytes1(0x2e)) {
@@ -690,15 +588,14 @@ abstract contract BaseDotns is Test {
     }
 
     /// @notice Constructs a `Link` carrying a fresh chat key (no lite inheritance).
-    function _linkFresh(
-        bytes memory chatKey
-    ) internal pure returns (IDotnsPopController.Link memory) {
-        return
-            IDotnsPopController.Link({
-                kind: IDotnsPopController.LinkKind.None,
-                liteLabel: "",
-                chatKey: chatKey
-            });
+    function _linkFresh(bytes memory chatKey)
+        internal
+        pure
+        returns (IDotnsPopController.Link memory)
+    {
+        return IDotnsPopController.Link({
+            kind: IDotnsPopController.LinkKind.None, liteLabel: "", chatKey: chatKey
+        });
     }
 
     /// @notice Authorises the calling test contract on the registrar's controller set.
@@ -715,9 +612,7 @@ abstract contract BaseDotns is Test {
     /// @dev Uses Foundry's `makeAddr` to derive a deterministic address and labels it in traces.
     /// @param name Human-readable label used to derive and label the address.
     /// @return user Newly created payable address.
-    function _createUser(
-        string memory name
-    ) internal returns (address payable user) {
+    function _createUser(string memory name) internal returns (address payable user) {
         user = payable(makeAddr(name));
         vm.deal({account: user, newBalance: DEFAULT_BALANCE});
         vm.label(user, name);
@@ -726,18 +621,20 @@ abstract contract BaseDotns is Test {
     /// @notice Computes the commitment hash for a registration.
     /// @param registration Registration parameters.
     /// @return commitmentHash Commitment hash.
-    function _computeCommitmentHash(
-        IDotnsRegistrarController.Registration memory registration
-    ) internal view returns (bytes32 commitmentHash) {
+    function _computeCommitmentHash(IDotnsRegistrarController.Registration memory registration)
+        internal
+        view
+        returns (bytes32 commitmentHash)
+    {
         commitmentHash = dotnsRegistrarController.makeCommitment(registration);
     }
 
     /// @notice Submits a commitment for a registration.
     /// @dev Uses `registration.owner` as the committing account.
     /// @param registration Registration parameters.
-    function _commitRegistration(
-        IDotnsRegistrarController.Registration memory registration
-    ) internal {
+    function _commitRegistration(IDotnsRegistrarController.Registration memory registration)
+        internal
+    {
         bytes32 commitmentHash = _computeCommitmentHash(registration);
         vm.prank(registration.owner);
         dotnsRegistrarController.commit(commitmentHash);
@@ -747,11 +644,11 @@ abstract contract BaseDotns is Test {
     /// @param registration Registration parameters.
     function _commitRegistrationAndWaitMinimumAge(
         IDotnsRegistrarController.Registration memory registration
-    ) internal {
+    )
+        internal
+    {
         _commitRegistration(registration);
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
     }
 
     /// @notice Submits a commitment, waits for the minimum age, then registers with the exact
@@ -760,44 +657,31 @@ abstract contract BaseDotns is Test {
     /// @param registration Registration parameters.
     function _commitRegistrationAndRegister(
         IDotnsRegistrarController.Registration memory registration
-    ) internal {
+    )
+        internal
+    {
         _commitRegistrationAndWaitMinimumAge(registration);
 
-        IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck(
-            registration.label,
-            registration.owner
-        );
+        IPopRules.PriceWithMeta memory priceMetadata =
+            popRules.priceWithCheck(registration.label, registration.owner);
 
         vm.prank(registration.owner);
-        dotnsRegistrarController.register{value: priceMetadata.price}(
-            registration
-        );
+        dotnsRegistrarController.register{value: priceMetadata.price}(registration);
     }
 
     /// @notice Minimal commit-reveal helper aligned to IDotnsRegistrarController.
     /// @param label Label to register.
     /// @param nameOwner Address to assign as owner.
     /// @param reserveName Whether the name is reserved.
-    function _commitAndRegister(
-        string memory label,
-        address nameOwner,
-        bool reserveName
-    ) internal {
-        bytes32 secret = keccak256(
-            abi.encodePacked(label, nameOwner, block.timestamp)
-        );
+    function _commitAndRegister(string memory label, address nameOwner, bool reserveName) internal {
+        bytes32 secret = keccak256(abi.encodePacked(label, nameOwner, block.timestamp));
 
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: label,
-                owner: nameOwner,
-                secret: secret,
-                reserved: reserveName
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: nameOwner, secret: secret, reserved: reserveName
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
 
         vm.prank(nameOwner);
         dotnsRegistrarController.commit(commitment);
@@ -805,9 +689,7 @@ abstract contract BaseDotns is Test {
         uint256 minAge = dotnsRegistrarController.minCommitmentAge();
         vm.warp(block.timestamp + minAge + 1);
 
-        uint256 requiredPayment = popRules
-            .priceWithCheck(label, nameOwner)
-            .price;
+        uint256 requiredPayment = popRules.priceWithCheck(label, nameOwner).price;
 
         vm.prank(nameOwner);
         dotnsRegistrarController.register{value: requiredPayment}(registration);
@@ -825,7 +707,10 @@ abstract contract BaseDotns is Test {
         string memory label,
         address labelOwner,
         IPopRules.PopStatus status
-    ) internal returns (bytes32 node) {
+    )
+        internal
+        returns (bytes32 node)
+    {
         if (status != IPopRules.PopStatus.NoStatus) {
             _setUserPopStatus(labelOwner, status);
         }
@@ -843,7 +728,11 @@ abstract contract BaseDotns is Test {
     function _contains(
         string[] memory array,
         string memory needle
-    ) internal pure returns (bool found) {
+    )
+        internal
+        pure
+        returns (bool found)
+    {
         bytes32 needleHash = keccak256(bytes(needle));
         for (uint256 i = 0; i < array.length; i++) {
             if (keccak256(bytes(array[i])) == needleHash) return true;

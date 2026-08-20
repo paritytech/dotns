@@ -85,9 +85,7 @@ interface IDotnsRegistry {
     ///      under the new owner's `LabelStore` keyed by the namehashed `subnode` so off-chain
     ///      consumers can enumerate names per address. Emits @custom:emits NewOwner on each
     ///      successful assignment.
-    function setSubnodeOwner(
-        SubnodeRecord calldata record
-    ) external returns (bytes32 subnode);
+    function setSubnodeOwner(SubnodeRecord calldata record) external returns (bytes32 subnode);
 
     /// @notice Sets the resolver for an existing subnode.
     /// @dev Callable only by the current owner of `record.parentNode`, otherwise
@@ -148,8 +146,5 @@ interface IDotnsRegistry {
     /// @param node Node identifier.
     /// @param account Address whose authority is being checked.
     /// @return authorisedFlag True when `account` may manage `node`.
-    function isAuthorised(
-        bytes32 node,
-        address account
-    ) external view returns (bool authorisedFlag);
+    function isAuthorised(bytes32 node, address account) external view returns (bool authorisedFlag);
 }

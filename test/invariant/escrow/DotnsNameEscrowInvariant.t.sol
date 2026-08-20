@@ -17,12 +17,8 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
     function setUp() public override {
         super.setUp();
 
-        handler = new EscrowHandler(
-            dotnsRegistrarController,
-            dotnsRegistrar,
-            dotnsNameEscrow,
-            popRules
-        );
+        handler =
+            new EscrowHandler(dotnsRegistrarController, dotnsRegistrar, dotnsNameEscrow, popRules);
 
         vm.deal(address(handler), 1000 ether);
 
@@ -44,9 +40,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         selectors[7] = handler.transferDeposited.selector;
         selectors[8] = handler.transferPayable.selector;
         selectors[9] = handler.advanceTime.selector;
-        targetSelector(
-            FuzzSelector({addr: address(handler), selectors: selectors})
-        );
+        targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
 
         excludeContract(address(dotnsRegistrarController));
         excludeContract(address(dotnsRegistry));
@@ -93,9 +87,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
 
         uint256 actualReserves = dotnsNameEscrow.reserves(address(0));
         assertEq(
-            actualReserves,
-            expectedReserves,
-            "Reserves must match sum of active position amounts"
+            actualReserves, expectedReserves, "Reserves must match sum of active position amounts"
         );
     }
 
@@ -105,11 +97,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
 
         for (uint256 i; i < released.length; ++i) {
             address tokenOwner = dotnsRegistrar.ownerOf(released[i]);
-            assertEq(
-                tokenOwner,
-                address(dotnsNameEscrow),
-                "Released token must be owned by escrow"
-            );
+            assertEq(tokenOwner, address(dotnsNameEscrow), "Released token must be owned by escrow");
         }
     }
 
@@ -136,15 +124,12 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
     ///      release-and-withdraw leg rather than the NFT holder. Positions whose slot
     ///      has been deleted (after reclaim) are also exempt via the `amount == 0`
     ///      and `recipient == address(0)` skip.
-    function invariant_position_recipient_mirrors_current_nft_holder()
-        public
-        view
-    {
+    function invariant_position_recipient_mirrors_current_nft_holder() public view {
         uint256[] memory deposited = handler.getDepositedTokenIds();
         for (uint256 i; i < deposited.length; ++i) {
             uint256 tokenId = deposited[i];
-            IDotnsNameEscrow.ReleasePosition memory position = dotnsNameEscrow
-                .getReleasePosition(tokenId);
+            IDotnsNameEscrow.ReleasePosition memory position =
+                dotnsNameEscrow.getReleasePosition(tokenId);
 
             if (position.recipient == address(0) || position.released) continue;
 
@@ -158,11 +143,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
 
     /// @notice The controller must never hold native funds (all deposits flow to escrow).
     function invariant_no_funds_in_controller() public view {
-        assertEq(
-            address(dotnsRegistrarController).balance,
-            0,
-            "Controller must not hold funds"
-        );
+        assertEq(address(dotnsRegistrarController).balance, 0, "Controller must not hold funds");
     }
 
     /// @notice Every withdrawn token must have a zero amount in its release position.
@@ -170,24 +151,17 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         uint256[] memory withdrawn = handler.getWithdrawnTokenIds();
 
         for (uint256 i; i < withdrawn.length; ++i) {
-            IDotnsNameEscrow.ReleasePosition memory position = dotnsNameEscrow
-                .getReleasePosition(withdrawn[i]);
+            IDotnsNameEscrow.ReleasePosition memory position =
+                dotnsNameEscrow.getReleasePosition(withdrawn[i]);
 
-            assertEq(
-                position.amount,
-                0,
-                "Withdrawn position must have zero amount"
-            );
+            assertEq(position.amount, 0, "Withdrawn position must have zero amount");
         }
     }
 
     /// @notice Every withdrawn-but-not-reclaimed token must be held by escrow and available.
     /// @dev Under the custody model, withdrawn tokens stay in escrow custody until a new
     ///      registrant reclaims them. They must remain `available()` for re-registration.
-    function invariant_withdrawn_tokens_are_in_escrow_custody_and_available()
-        public
-        view
-    {
+    function invariant_withdrawn_tokens_are_in_escrow_custody_and_available() public view {
         uint256[] memory withdrawn = handler.getWithdrawnTokenIds();
 
         for (uint256 i; i < withdrawn.length; ++i) {
@@ -199,8 +173,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
                 "Withdrawn token must be held by escrow"
             );
             assertTrue(
-                dotnsRegistrar.available(tokenId),
-                "Withdrawn token must be available for reclaim"
+                dotnsRegistrar.available(tokenId), "Withdrawn token must be available for reclaim"
             );
         }
     }

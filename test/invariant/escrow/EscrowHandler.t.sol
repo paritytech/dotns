@@ -2,7 +2,10 @@
 pragma solidity ^0.8.34;
 
 import {Test, Vm} from "forge-std/Test.sol";
-import {DotnsRegistrarController, IDotnsRegistrarController} from "../../../contracts/registrars/DotnsRegistrarController.sol";
+import {
+    DotnsRegistrarController,
+    IDotnsRegistrarController
+} from "../../../contracts/registrars/DotnsRegistrarController.sol";
 import {DotnsRegistrar} from "../../../contracts/registrars/DotnsRegistrar.sol";
 import {DotnsNameEscrow, IDotnsNameEscrow} from "../../../contracts/escrow/DotnsNameEscrow.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
@@ -113,16 +116,11 @@ contract EscrowHandler is Test {
 
         _mockPersonhoodTier(actor, IPopRules.PopStatus.NoStatus);
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(label, actor, block.timestamp, labelNonce)
-        );
+        bytes32 secret = keccak256(abi.encodePacked(label, actor, block.timestamp, labelNonce));
 
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: label,
-                owner: actor,
-                secret: secret,
-                reserved: true
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: actor, secret: secret, reserved: true
             });
 
         bytes32 commitment = controller.makeCommitment(registration);
@@ -165,11 +163,7 @@ contract EscrowHandler is Test {
     /// @param ownerSeed Seed selecting the registrant.
     /// @param payerSeed Seed selecting the payer.
     /// @param statusSeed Seed selecting the random tier-elevation policy.
-    function registerCrossTier(
-        uint256 ownerSeed,
-        uint256 payerSeed,
-        uint256 statusSeed
-    ) external {
+    function registerCrossTier(uint256 ownerSeed, uint256 payerSeed, uint256 statusSeed) external {
         if (actors.length < 2) return;
 
         address payer = actors[ownerSeed % actors.length];
@@ -194,16 +188,11 @@ contract EscrowHandler is Test {
         }
 
         string memory label = _generateUniqueLabel();
-        bytes32 secret = keccak256(
-            abi.encodePacked(label, ownerAddr, block.timestamp, labelNonce)
-        );
+        bytes32 secret = keccak256(abi.encodePacked(label, ownerAddr, block.timestamp, labelNonce));
 
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: label,
-                owner: ownerAddr,
-                secret: secret,
-                reserved: true
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: ownerAddr, secret: secret, reserved: true
             });
 
         bytes32 commitment = controller.makeCommitment(registration);
@@ -238,14 +227,8 @@ contract EscrowHandler is Test {
         // `priceWithoutCheck` gives the owner-side price and `transferFloor`
         // returns the payer-to-owner friction; the max collapses both into the
         // single charge the controller demands.
-        uint256 frictionForCharge = popRules.transferFloor(
-            label,
-            payer,
-            ownerAddr
-        );
-        uint256 charge = ownerPrice > frictionForCharge
-            ? ownerPrice
-            : frictionForCharge;
+        uint256 frictionForCharge = popRules.transferFloor(label, payer, ownerAddr);
+        uint256 charge = ownerPrice > frictionForCharge ? ownerPrice : frictionForCharge;
 
         // Skip when no value moves: a zero charge produces a free zero-amount
         // position with no insurance or reserves delta, so adding it to the
@@ -295,8 +278,7 @@ contract EscrowHandler is Test {
 
         address tokenOwner = registrar.ownerOf(tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory positionBefore = escrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory positionBefore = escrow.getReleasePosition(tokenId);
         address recipient = positionBefore.recipient;
         if (recipient == address(0)) {
             _removeDeposited(index);
@@ -337,8 +319,7 @@ contract EscrowHandler is Test {
         address recipient = depositRecipients[tokenId];
 
         // Warp past cooldown to ensure withdrawal succeeds
-        IDotnsNameEscrow.ReleasePosition memory position = escrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory position = escrow.getReleasePosition(tokenId);
         if (block.timestamp < position.withdrawAvailableAt) {
             vm.warp(position.withdrawAvailableAt);
         }
@@ -388,10 +369,7 @@ contract EscrowHandler is Test {
     ///      every routing branch.
     /// @param actorSeed Seed selecting the actor whose status flips.
     /// @param statusSeed Seed selecting the new status.
-    function setRandomPopStatus(
-        uint256 actorSeed,
-        uint256 statusSeed
-    ) external {
+    function setRandomPopStatus(uint256 actorSeed, uint256 statusSeed) external {
         if (actors.length == 0) return;
 
         address actor = actors[actorSeed % actors.length];
@@ -403,30 +381,19 @@ contract EscrowHandler is Test {
     /// @notice Mocks the personhood precompile so it reports `tier` for `account`.
     /// @param account Address whose status is being mocked.
     /// @param tier Verification tier to report for `account`.
-    function _mockPersonhoodTier(
-        address account,
-        IPopRules.PopStatus tier
-    ) internal {
+    function _mockPersonhoodTier(address account, IPopRules.PopStatus tier) internal {
         uint8 statusByte;
         if (tier == IPopRules.PopStatus.PopFull) statusByte = 2;
         else if (tier == IPopRules.PopStatus.PopLite) statusByte = 1;
 
-        bytes32 contextAlias = statusByte == 0
-            ? bytes32(0)
-            : keccak256(abi.encode(account, statusByte));
+        bytes32 contextAlias =
+            statusByte == 0 ? bytes32(0) : keccak256(abi.encode(account, statusByte));
         vm.mockCall(
             DotnsConstants.PERSONHOOD,
             abi.encodeWithSelector(
-                IPersonhood.personhoodStatus.selector,
-                account,
-                DotnsConstants.PERSONHOOD_CONTEXT
+                IPersonhood.personhoodStatus.selector, account, DotnsConstants.PERSONHOOD_CONTEXT
             ),
-            abi.encode(
-                IPersonhood.PersonhoodInfo({
-                    status: statusByte,
-                    contextAlias: contextAlias
-                })
-            )
+            abi.encode(IPersonhood.PersonhoodInfo({status: statusByte, contextAlias: contextAlias}))
         );
     }
 
@@ -437,10 +404,7 @@ contract EscrowHandler is Test {
     ///      the token is in escrow custody; no separate finalise step exists.
     /// @param tokenSeed Seed for selecting which withdrawn token to reclaim.
     /// @param actorSeed Seed for selecting the new registrant.
-    function reRegisterReclaimed(
-        uint256 tokenSeed,
-        uint256 actorSeed
-    ) external {
+    function reRegisterReclaimed(uint256 tokenSeed, uint256 actorSeed) external {
         if (_withdrawnTokenIds.length == 0 || actors.length == 0) return;
 
         uint256 index = tokenSeed % _withdrawnTokenIds.length;
@@ -448,16 +412,11 @@ contract EscrowHandler is Test {
         string memory label = labelByTokenId[tokenId];
         address actor = actors[actorSeed % actors.length];
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(label, actor, block.timestamp, labelNonce)
-        );
+        bytes32 secret = keccak256(abi.encodePacked(label, actor, block.timestamp, labelNonce));
 
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: label,
-                owner: actor,
-                secret: secret,
-                reserved: true
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: actor, secret: secret, reserved: true
             });
 
         bytes32 commitment = controller.makeCommitment(registration);
@@ -514,8 +473,7 @@ contract EscrowHandler is Test {
             // rebinds to the new holder on every transfer; the locked amount itself
             // travels with the NFT, so on a zero-fee same-tier hop we expect both
             // the amount and the per-asset reserves to stay put.
-            IDotnsNameEscrow.ReleasePosition memory pos = escrow
-                .getReleasePosition(tokenId);
+            IDotnsNameEscrow.ReleasePosition memory pos = escrow.getReleasePosition(tokenId);
             depositAmounts[tokenId] = pos.amount;
         } catch {
             return;
@@ -531,11 +489,7 @@ contract EscrowHandler is Test {
     /// @param tokenIdSeed Seed for selecting which deposited token to transfer.
     /// @param fromSeed Unused (current owner is derived on-chain). Retained for fuzzer entropy.
     /// @param toSeed Seed for selecting the recipient.
-    function transferPayable(
-        uint256 tokenIdSeed,
-        uint256 fromSeed,
-        uint256 toSeed
-    ) external {
+    function transferPayable(uint256 tokenIdSeed, uint256 fromSeed, uint256 toSeed) external {
         // `fromSeed` injects fuzzer entropy without overriding the registrar's required
         // ownership check. Read it once so the parameter is not unused.
         fromSeed;
@@ -564,13 +518,7 @@ contract EscrowHandler is Test {
 
         vm.recordLogs();
         vm.prank(currentOwner);
-        try
-            registrar.transferFrom{value: requiredFee}(
-                currentOwner,
-                to,
-                tokenId
-            )
-        {
+        try registrar.transferFrom{value: requiredFee}(currentOwner, to, tokenId) {
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
             // Read the on-chain insurance delta rather than predicting it. The
@@ -590,8 +538,7 @@ contract EscrowHandler is Test {
             // rebinds the position to the new holder rather than refunding, so
             // the locked amount and per-asset reserves stay put while the
             // recipient pointer moves.
-            IDotnsNameEscrow.ReleasePosition memory pos = escrow
-                .getReleasePosition(tokenId);
+            IDotnsNameEscrow.ReleasePosition memory pos = escrow.getReleasePosition(tokenId);
             depositAmounts[tokenId] = pos.amount;
         } catch {
             return;
@@ -608,31 +555,19 @@ contract EscrowHandler is Test {
 
     /// @notice Returns all tokens with active deposits.
     /// @return tokenIds Array of deposited token identifiers.
-    function getDepositedTokenIds()
-        external
-        view
-        returns (uint256[] memory tokenIds)
-    {
+    function getDepositedTokenIds() external view returns (uint256[] memory tokenIds) {
         tokenIds = _depositedTokenIds;
     }
 
     /// @notice Returns all tokens that have been released into escrow.
     /// @return tokenIds Array of released token identifiers.
-    function getReleasedTokenIds()
-        external
-        view
-        returns (uint256[] memory tokenIds)
-    {
+    function getReleasedTokenIds() external view returns (uint256[] memory tokenIds) {
         tokenIds = _releasedTokenIds;
     }
 
     /// @notice Returns all tokens that have been withdrawn.
     /// @return tokenIds Array of withdrawn token identifiers.
-    function getWithdrawnTokenIds()
-        external
-        view
-        returns (uint256[] memory tokenIds)
-    {
+    function getWithdrawnTokenIds() external view returns (uint256[] memory tokenIds) {
         tokenIds = _withdrawnTokenIds;
     }
 
@@ -666,8 +601,8 @@ contract EscrowHandler is Test {
             address actor = actors[i];
             uint256 count = escrow.pendingRefundCount(actor);
             if (count == 0) continue;
-            (, IDotnsNameEscrow.RefundEntry[] memory entries) = escrow
-                .pendingRefunds(actor, 0, count);
+            (, IDotnsNameEscrow.RefundEntry[] memory entries) =
+                escrow.pendingRefunds(actor, 0, count);
             for (uint256 j; j < entries.length; ++j) {
                 total += entries[j].amount;
             }
@@ -678,9 +613,7 @@ contract EscrowHandler is Test {
     /// @dev Uses incrementing nonce to ensure uniqueness across calls.
     /// @return label A unique label string with minimum 10 characters.
     function _generateUniqueLabel() internal returns (string memory label) {
-        label = string(
-            abi.encodePacked("escrowname", vm.toString(labelNonce), "x12")
-        );
+        label = string(abi.encodePacked("escrowname", vm.toString(labelNonce), "x12"));
         ++labelNonce;
     }
 
@@ -721,7 +654,11 @@ contract EscrowHandler is Test {
     function _pickDifferentActor(
         address exclude,
         uint256 seed
-    ) internal view returns (address actor) {
+    )
+        internal
+        view
+        returns (address actor)
+    {
         uint256 length = actors.length;
         for (uint256 i; i < length; ++i) {
             address candidate = actors[(seed + i) % length];

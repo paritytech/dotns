@@ -31,10 +31,7 @@ interface IDotnsPopResolver {
     /// @notice Emitted when a full-person node's lite link is set or updated.
     /// @param fullNode The full-person node carrying the link.
     /// @param liteLabelhash The labelhash of the linked lite-person username.
-    event LiteLinkUpdated(
-        bytes32 indexed fullNode,
-        bytes32 indexed liteLabelhash
-    );
+    event LiteLinkUpdated(bytes32 indexed fullNode, bytes32 indexed liteLabelhash);
 
     /// @notice Thrown when the caller is not the authorised PoP controller.
     /// @param caller The address that attempted the write.
@@ -76,9 +73,7 @@ interface IDotnsPopResolver {
     /// @notice Returns the lite-person labelhash linked to a full-person node.
     /// @param fullNode The full-person node to query.
     /// @return liteLabelhash The linked lite-person labelhash, or zero if unset.
-    function liteLink(
-        bytes32 fullNode
-    ) external view returns (bytes32 liteLabelhash);
+    function liteLink(bytes32 fullNode) external view returns (bytes32 liteLabelhash);
 
     /// @notice Returns the full-person node a given lite label has claimed.
     /// @dev Reverse of @custom:function liteLink. Written by the same `setLiteLink` call so the
@@ -87,7 +82,5 @@ interface IDotnsPopResolver {
     /// @param liteLabelhash The labelhash of the lite-person username to query.
     /// @return fullNode The full-person node claimed from this lite label, or
     ///         zero if unset.
-    function fullClaim(
-        bytes32 liteLabelhash
-    ) external view returns (bytes32 fullNode);
+    function fullClaim(bytes32 liteLabelhash) external view returns (bytes32 fullNode);
 }

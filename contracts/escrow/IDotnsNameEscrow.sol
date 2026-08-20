@@ -102,10 +102,7 @@ interface IDotnsNameEscrow {
     /// @notice Emitted when a refund is credited to the recipient's pending balance.
     /// @param asset Refund asset. `address(0)` denotes native token.
     event RefundWithdrawn(
-        uint256 indexed tokenId,
-        address indexed recipient,
-        address indexed asset,
-        uint256 amount
+        uint256 indexed tokenId, address indexed recipient, address indexed asset, uint256 amount
     );
 
     /// @notice Emitted when a recipient pulls their accumulated pending refund balance.
@@ -129,31 +126,19 @@ interface IDotnsNameEscrow {
     /// @param recipient Address that pulled the entry.
     /// @param entryId Identifier of the claimed entry, now deleted.
     /// @param amount Native value transferred to `recipient`.
-    event RefundClaimed(
-        address indexed recipient,
-        uint256 indexed entryId,
-        uint256 amount
-    );
+    event RefundClaimed(address indexed recipient, uint256 indexed entryId, uint256 amount);
 
     /// @notice Emitted when a released token is reclaimed by a new owner via registration.
     /// @param previousRecipient Address that received the refund for the prior registration.
     event NameReclaimed(
-        uint256 indexed tokenId,
-        address indexed previousRecipient,
-        address indexed newOwner
+        uint256 indexed tokenId, address indexed previousRecipient, address indexed newOwner
     );
 
     /// @notice Emitted when the cooldown duration for future releases is updated.
-    event CooldownUpdated(
-        uint256 indexed currentCooldown,
-        uint256 indexed newCooldown
-    );
+    event CooldownUpdated(uint256 indexed currentCooldown, uint256 indexed newCooldown);
 
     /// @notice Emitted when the redeem window for future releases is updated.
-    event RedeemWindowUpdated(
-        uint256 indexed currentRedeemWindow,
-        uint256 indexed newRedeemWindow
-    );
+    event RedeemWindowUpdated(uint256 indexed currentRedeemWindow, uint256 indexed newRedeemWindow);
 
     /// @notice Emitted when a cross-tier fee is paid into the insurance fund.
     /// @param payer Original `msg.sender` whose value funded the fee.
@@ -248,11 +233,7 @@ interface IDotnsNameEscrow {
     /// @notice Thrown when withdrawal is attempted before cooldown has elapsed.
     /// @param availableAt Earliest withdrawal timestamp.
     /// @param currentTime Current block timestamp.
-    error WithdrawalTooEarly(
-        uint256 tokenId,
-        uint256 availableAt,
-        uint256 currentTime
-    );
+    error WithdrawalTooEarly(uint256 tokenId, uint256 availableAt, uint256 currentTime);
 
     /// @notice Thrown when a refund transfer fails.
     error RefundFailed(uint256 tokenId);
@@ -281,9 +262,10 @@ interface IDotnsNameEscrow {
     function reserves(address asset) external view returns (uint256 amount);
 
     /// @notice Returns the escrow state for a token.
-    function getReleasePosition(
-        uint256 tokenId
-    ) external view returns (ReleasePosition memory position);
+    function getReleasePosition(uint256 tokenId)
+        external
+        view
+        returns (ReleasePosition memory position);
 
     /// @notice Returns the number of tokens currently held by escrow pending reclaim or withdrawal.
     /// @return count Number of released tokens not yet reclaimed.
@@ -297,7 +279,10 @@ interface IDotnsNameEscrow {
     function releasedTokens(
         uint256 start,
         uint256 limit
-    ) external view returns (uint256[] memory tokenIds);
+    )
+        external
+        view
+        returns (uint256[] memory tokenIds);
 
     /// @notice Records an asset deposit position for a token.
     /// @dev Only the configured controller may call this, otherwise @custom:reverts NotController.
@@ -316,9 +301,7 @@ interface IDotnsNameEscrow {
     /// @dev Only the configured controller may call this, otherwise @custom:reverts NotController.
     ///      `msg.value` must be non-zero, otherwise @custom:reverts InvalidAmount. Emits
     ///      @custom:emits CrossTierFeePaid with `isRegistration = true` once the fee is booked.
-    function depositInsurance(
-        InsuranceDepositParams calldata params
-    ) external payable;
+    function depositInsurance(InsuranceDepositParams calldata params) external payable;
 
     /// @notice Credits `msg.value` to `recipient`'s pull-payment ledger so the caller can later
     ///         pull the balance with @custom:func claimWithdrawal.
@@ -342,9 +325,10 @@ interface IDotnsNameEscrow {
     ///      to insurance, and credits any surplus value to the payer on the time-locked refund
     ///      ledger via @custom:emits RefundCredited.
     /// @return charged Amount actually credited to insurance.
-    function chargeTransferFee(
-        ChargeTransferFeeParams calldata params
-    ) external payable returns (uint256 charged);
+    function chargeTransferFee(ChargeTransferFeeParams calldata params)
+        external
+        payable
+        returns (uint256 charged);
 
     /// @notice Returns the cumulative cross-tier fee balance held against future shortfalls.
     /// @return balance Current insurance fund balance, in wei.
@@ -398,9 +382,7 @@ interface IDotnsNameEscrow {
     /// @notice Returns the pending refund balance owed to `recipient`.
     /// @return amount Native amount currently credited to `recipient` and pullable via
     /// `claimWithdrawal`.
-    function pendingWithdrawal(
-        address recipient
-    ) external view returns (uint256 amount);
+    function pendingWithdrawal(address recipient) external view returns (uint256 amount);
 
     /// @notice Transfers a released-and-claimed token from escrow custody to a new owner.
     /// @dev Hands the NFT back to the controller for re-registration. Only the configured
@@ -450,14 +432,10 @@ interface IDotnsNameEscrow {
     ///      @custom:emits RefundClaimed once per entry.
     /// @param entryIds List of entry identifiers to claim.
     /// @return totalAmount Sum of the credited amounts transferred to the caller.
-    function claimRefundsBatch(
-        uint256[] calldata entryIds
-    ) external returns (uint256 totalAmount);
+    function claimRefundsBatch(uint256[] calldata entryIds) external returns (uint256 totalAmount);
 
     /// @notice Returns the number of pending refund entries owed to `recipient`.
-    function pendingRefundCount(
-        address recipient
-    ) external view returns (uint256 count);
+    function pendingRefundCount(address recipient) external view returns (uint256 count);
 
     /// @notice Returns up to `limit` pending refund entry ids for `recipient`, starting at
     ///         `offset`.
@@ -467,7 +445,10 @@ interface IDotnsNameEscrow {
         address recipient,
         uint256 offset,
         uint256 limit
-    ) external view returns (uint256[] memory entryIds);
+    )
+        external
+        view
+        returns (uint256[] memory entryIds);
 
     /// @notice Returns up to `limit` pending refund entries for `recipient`, paired with their
     ///         entry ids.
@@ -483,7 +464,5 @@ interface IDotnsNameEscrow {
         returns (uint256[] memory entryIds, RefundEntry[] memory entries);
 
     /// @notice Returns a single refund entry by id, or a zero-filled struct if the id is unknown.
-    function refundEntry(
-        uint256 entryId
-    ) external view returns (RefundEntry memory entry);
+    function refundEntry(uint256 entryId) external view returns (RefundEntry memory entry);
 }

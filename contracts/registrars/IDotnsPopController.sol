@@ -136,51 +136,28 @@ interface IDotnsPopController is IDotnsController {
     }
 
     /// @notice Emitted when a lite-person username is registered via the PoP gateway.
-    event LiteNameReserved(
-        bytes32 indexed labelhash,
-        address indexed user,
-        string label
-    );
+    event LiteNameReserved(bytes32 indexed labelhash, address indexed user, string label);
 
     /// @notice Emitted when a full-person username is claimed out of an existing reservation.
-    event BaseNameClaimed(
-        bytes32 indexed labelhash,
-        address indexed user,
-        string label
-    );
+    event BaseNameClaimed(bytes32 indexed labelhash, address indexed user, string label);
 
     /// @notice Emitted when a standalone full-person username is registered via the PoP gateway.
-    event StandaloneNameRegistered(
-        bytes32 indexed labelhash,
-        address indexed user,
-        string label
-    );
+    event StandaloneNameRegistered(bytes32 indexed labelhash, address indexed user, string label);
 
     /// @notice Emitted when a reservation entry is added to the queue for a base name.
     /// @param position Position in the queue at the time of joining (0 = active holder).
     event ReservationQueued(
-        bytes32 indexed reservedLabelhash,
-        address indexed user,
-        uint64 position
+        bytes32 indexed reservedLabelhash, address indexed user, uint64 position
     );
 
     /// @notice Emitted when a reservation entry is removed due to expiry.
-    event ReservationExpired(
-        bytes32 indexed reservedLabelhash,
-        address indexed user
-    );
+    event ReservationExpired(bytes32 indexed reservedLabelhash, address indexed user);
 
     /// @notice Emitted when a user voluntarily relinquishes their reservation.
-    event ReservationRelinquished(
-        bytes32 indexed reservedLabelhash,
-        address indexed user
-    );
+    event ReservationRelinquished(bytes32 indexed reservedLabelhash, address indexed user);
 
     /// @notice Emitted when a full-person username is linked to a lite-person username.
-    event LiteToFullLinked(
-        bytes32 indexed fullLabelhash,
-        bytes32 indexed liteLabelhash
-    );
+    event LiteToFullLinked(bytes32 indexed fullLabelhash, bytes32 indexed liteLabelhash);
 
     /// @notice Emitted when the reservation duration is updated.
     event ReservationDurationSet(uint64 duration);
@@ -188,27 +165,16 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Emitted when a name is successfully registered via the PoP controller.
     /// @param store The Store instance used to persist the immutable registration record.
     event NameRegistered(
-        string indexed label,
-        bytes32 indexed labelhash,
-        address indexed owner,
-        address store
+        string indexed label, bytes32 indexed labelhash, address indexed owner, address store
     );
 
     /// @notice Emitted when a gateway-path mint defers its `LabelStore` write into the
     /// pending-claim mapping because the user has no store yet.
-    event PendingClaimStashed(
-        address indexed user,
-        bytes32 indexed labelhash,
-        string label
-    );
+    event PendingClaimStashed(address indexed user, bytes32 indexed labelhash, string label);
 
     /// @notice Emitted when a user settles a deferred binding by deploying their
     /// `LabelStore` and backfilling the stashed label and chat key.
-    event PendingClaimSettled(
-        address indexed user,
-        bytes32 indexed labelhash,
-        address store
-    );
+    event PendingClaimSettled(address indexed user, bytes32 indexed labelhash, address store);
 
     /// @notice Emitted when a deferred binding is reaped because it sat unsettled past
     /// `reservationDuration`.
@@ -218,10 +184,7 @@ interface IDotnsPopController is IDotnsController {
     /// expiry of the prior head or via the explicit relinquish path.
     /// @param labelhash Base-label hash whose queue head changed.
     /// @param newHead Address now holding the head slot.
-    event ReservationHeadAdvanced(
-        bytes32 indexed labelhash,
-        address indexed newHead
-    );
+    event ReservationHeadAdvanced(bytes32 indexed labelhash, address indexed newHead);
 
     /// @notice Thrown when a gated entrypoint is reached from an address that
     ///         is not the gateway registered on the protocol registry under
@@ -464,9 +427,10 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Returns whether a label currently has a live reservation at the queue head.
     /// @dev Validates the DNS-label shape of `reservedBaseLabel` (otherwise
     /// @custom:reverts InvalidBaseLabel) before inspecting the queue.
-    function isReservedForClaim(
-        string calldata reservedBaseLabel
-    ) external view returns (bool reserved, address holder);
+    function isReservedForClaim(string calldata reservedBaseLabel)
+        external
+        view
+        returns (bool reserved, address holder);
 
     /// @notice Updates the reservation duration used to decide when queue entries expire.
     /// @dev Owner-gated (otherwise @custom:reverts OwnableUnauthorizedAccount); emits
@@ -481,9 +445,7 @@ interface IDotnsPopController is IDotnsController {
     /// @param labelhash Keccak-256 of the base label whose queue is being read.
     /// @return head Index of the live queue head.
     /// @return tail Index one past the last queued entry.
-    function reservationMeta(
-        bytes32 labelhash
-    ) external view returns (uint64 head, uint64 tail);
+    function reservationMeta(bytes32 labelhash) external view returns (uint64 head, uint64 tail);
 
     /// @notice Returns the queue entry at `index` for `labelhash`.
     /// @dev Sparse storage: a zero `entryOwner` means the slot was relinquished, expired and
@@ -497,16 +459,20 @@ interface IDotnsPopController is IDotnsController {
     function reservationEntry(
         bytes32 labelhash,
         uint64 index
-    ) external view returns (address entryOwner, uint64 joinedAt);
+    )
+        external
+        view
+        returns (address entryOwner, uint64 joinedAt);
 
     /// @notice Returns `user`'s current reservation pointer.
     /// @dev A zero `labelhash` on the returned struct means the user holds no reservation;
     /// `index` is meaningful only when `labelhash` is non-zero.
     /// @param user Account whose reservation pointer is being read.
     /// @return reservation Per-user reservation pointer; see @custom:struct UserReservation.
-    function userReservation(
-        address user
-    ) external view returns (UserReservation memory reservation);
+    function userReservation(address user)
+        external
+        view
+        returns (UserReservation memory reservation);
 
     /// @notice Settles the caller's deferred bindings by writing every stashed label into
     /// the caller's `LabelStore`, deploying the store first if the caller doesn't yet
@@ -550,9 +516,7 @@ interface IDotnsPopController is IDotnsController {
     /// settles them.
     /// @param user Account whose pending claims are being read.
     /// @return claims Per-user pending-claim entries; see @custom:struct PendingClaim.
-    function pendingClaims(
-        address user
-    ) external view returns (PendingClaim[] memory claims);
+    function pendingClaims(address user) external view returns (PendingClaim[] memory claims);
 
     /// @notice Returns the number of users with at least one live pending claim.
     /// @dev Exact live count, not an all-time tally: fully settled and fully expired users
@@ -571,5 +535,8 @@ interface IDotnsPopController is IDotnsController {
     function pendingClaimUsers(
         uint256 offset,
         uint256 limit
-    ) external view returns (address[] memory users);
+    )
+        external
+        view
+        returns (address[] memory users);
 }

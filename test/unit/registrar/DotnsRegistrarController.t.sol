@@ -12,7 +12,9 @@ import {DotnsRegistrarController} from "../../../contracts/registrars/DotnsRegis
 import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocolRegistry.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /// @title DotnsRegistrarControllerTest
 /// @notice Unit coverage for the public commit-reveal registrar controller:
@@ -25,9 +27,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
             DotnsRegistrarController.initialize,
             (IDotnsProtocolRegistry(address(protocolRegistry)), 0, 1 days)
         );
-        vm.expectRevert(
-            IDotnsRegistrarController.MinCommitmentAgeZero.selector
-        );
+        vm.expectRevert(IDotnsRegistrarController.MinCommitmentAgeZero.selector);
         new ERC1967Proxy(address(impl), initData);
     }
 
@@ -35,15 +35,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         DotnsRegistrarController impl = new DotnsRegistrarController();
         bytes memory initData = abi.encodeCall(
             DotnsRegistrarController.initialize,
-            (
-                IDotnsProtocolRegistry(address(protocolRegistry)),
-                10 seconds,
-                10 seconds
-            )
+            (IDotnsProtocolRegistry(address(protocolRegistry)), 10 seconds, 10 seconds)
         );
-        vm.expectRevert(
-            IDotnsRegistrarController.MaxCommitmentAgeTooLow.selector
-        );
+        vm.expectRevert(IDotnsRegistrarController.MaxCommitmentAgeTooLow.selector);
         new ERC1967Proxy(address(impl), initData);
     }
 
@@ -52,15 +46,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         DotnsRegistrarController impl = new DotnsRegistrarController();
         bytes memory initData = abi.encodeCall(
             DotnsRegistrarController.initialize,
-            (
-                IDotnsProtocolRegistry(address(protocolRegistry)),
-                6 seconds,
-                ceiling + 1
-            )
+            (IDotnsProtocolRegistry(address(protocolRegistry)), 6 seconds, ceiling + 1)
         );
-        vm.expectRevert(
-            IDotnsRegistrarController.MaxCommitmentAgeTooHigh.selector
-        );
+        vm.expectRevert(IDotnsRegistrarController.MaxCommitmentAgeTooHigh.selector);
         new ERC1967Proxy(address(impl), initData);
     }
 
@@ -83,96 +71,62 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     }
 
     function test_commit_sets_timestamp() public {
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: "alicebob",
-                owner: ed,
-                secret: keccak256("secret"),
-                reserved: true
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: "alicebob", owner: ed, secret: keccak256("secret"), reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
 
         vm.startPrank(ed);
         dotnsRegistrarController.commit(commitment);
         vm.stopPrank();
 
-        assertEq(
-            dotnsRegistrarController.commitments(commitment),
-            block.timestamp
-        );
+        assertEq(dotnsRegistrarController.commitments(commitment), block.timestamp);
     }
 
     function test_commit_allows_recommit_after_expiry() public {
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: "alicebob",
-                owner: ed,
-                secret: keccak256("secret"),
-                reserved: true
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: "alicebob", owner: ed, secret: keccak256("secret"), reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
 
         vm.startPrank(ed);
         dotnsRegistrarController.commit(commitment);
 
-        uint256 firstCommitTimestamp = dotnsRegistrarController.commitments(
-            commitment
-        );
-        vm.warp(
-            firstCommitTimestamp +
-                dotnsRegistrarController.maxCommitmentAge() +
-                1
-        );
+        uint256 firstCommitTimestamp = dotnsRegistrarController.commitments(commitment);
+        vm.warp(firstCommitTimestamp + dotnsRegistrarController.maxCommitmentAge() + 1);
 
         dotnsRegistrarController.commit(commitment);
         vm.stopPrank();
 
-        assertEq(
-            dotnsRegistrarController.commitments(commitment),
-            block.timestamp
-        );
+        assertEq(dotnsRegistrarController.commitments(commitment), block.timestamp);
     }
 
     function test_commit_allows_recommit_at_exact_expiry_boundary() public {
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: "alicebob",
-                owner: ed,
-                secret: keccak256("secret"),
-                reserved: true
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: "alicebob", owner: ed, secret: keccak256("secret"), reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
 
         vm.startPrank(ed);
         dotnsRegistrarController.commit(commitment);
 
-        uint256 firstCommitTimestamp = dotnsRegistrarController.commitments(
-            commitment
-        );
+        uint256 firstCommitTimestamp = dotnsRegistrarController.commitments(commitment);
         // Land exactly on the expiry boundary. `_consumeCommitment` treats this as expired
         // (`committedAt + maxCommitmentAge > block.timestamp` is false), so `commit` must
         // also treat it as overwritable; otherwise the slot is permanently dead-zoned for
         // that one timestamp.
-        vm.warp(
-            firstCommitTimestamp + dotnsRegistrarController.maxCommitmentAge()
-        );
+        vm.warp(firstCommitTimestamp + dotnsRegistrarController.maxCommitmentAge());
 
         dotnsRegistrarController.commit(commitment);
         vm.stopPrank();
 
-        assertEq(
-            dotnsRegistrarController.commitments(commitment),
-            block.timestamp
-        );
+        assertEq(dotnsRegistrarController.commitments(commitment), block.timestamp);
     }
 
     function test_register_reverts_at_exact_expiry_boundary() public {
@@ -180,17 +134,12 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         address nameOwner = ed;
         _grantPopFull(nameOwner);
 
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: nameLabel,
-                owner: nameOwner,
-                secret: keccak256("boundary"),
-                reserved: true
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: keccak256("boundary"), reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
 
         vm.startPrank(nameOwner);
         dotnsRegistrarController.commit(commitment);
@@ -221,25 +170,16 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.startPrank(nameOwner);
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(nameLabel, nameOwner, "store")
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: nameLabel,
-                owner: nameOwner,
-                secret: secret,
-                reserved: true
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "store"));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
         dotnsRegistrarController.register{value: 0}(registration);
         vm.stopPrank();
@@ -247,19 +187,11 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         bytes32 labelHash = keccak256(bytes(nameLabel));
         bytes32 node = _namehash(dotNode, labelHash);
 
-        assertEq(
-            IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)),
-            nameOwner
-        );
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), nameOwner);
         assertEq(dotnsRegistry.owner(node), nameOwner);
-        assertEq(
-            dotnsReverseResolver.nameOf(nameOwner),
-            string.concat(nameLabel, ".dot")
-        );
+        assertEq(dotnsReverseResolver.nameOf(nameOwner), string.concat(nameLabel, ".dot"));
 
-        ILabelStore ownerStore = ILabelStore(
-            storeFactory.getLabelStore(nameOwner)
-        );
+        ILabelStore ownerStore = ILabelStore(storeFactory.getLabelStore(nameOwner));
         assertEq(ownerStore.getLabel(node), string.concat(nameLabel, ".dot"));
         assertTrue(ownerStore.isLocked(node));
     }
@@ -271,65 +203,44 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         _grantPopLite(nameOwner);
         vm.startPrank(nameOwner);
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(nameLabel, nameOwner, "lite")
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: nameLabel,
-                owner: nameOwner,
-                secret: secret,
-                reserved: true
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "lite"));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
         dotnsRegistrarController.register{value: 0}(registration);
         vm.stopPrank();
 
-        (bool isReserved, address reservationOwner, ) = popRules
-            .isBaseNameReserved("lights");
+        (bool isReserved, address reservationOwner,) = popRules.isBaseNameReserved("lights");
         assertTrue(isReserved);
         assertEq(reservationOwner, nameOwner);
     }
 
-    function test_register_does_not_overwrite_third_party_reverse_record()
-        public
-    {
+    function test_register_does_not_overwrite_third_party_reverse_record() public {
         string memory victimLabel = "victimname01";
         string memory giftedLabel = "hijackname01";
 
         _register(victimLabel, tiago, IPopRules.PopStatus.NoStatus);
         assertEq(dotnsReverseResolver.nameOf(tiago), "victimname01.dot");
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(giftedLabel, tiago, ed, block.timestamp)
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: giftedLabel,
-                owner: tiago,
-                secret: secret,
-                reserved: true
+        bytes32 secret = keccak256(abi.encodePacked(giftedLabel, tiago, ed, block.timestamp));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: giftedLabel, owner: tiago, secret: secret, reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
 
         vm.prank(ed);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
         uint256 price = popRules.priceWithCheck(giftedLabel, tiago).price;
 
@@ -346,25 +257,16 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.startPrank(owner);
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(nameLabel, nameOwner, "reserved")
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: nameLabel,
-                owner: nameOwner,
-                secret: secret,
-                reserved: true
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "reserved"));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
         dotnsRegistrarController.registerReserved(registration);
         vm.stopPrank();
@@ -372,15 +274,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         bytes32 labelHash = keccak256(bytes(nameLabel));
         bytes32 node = _namehash(dotNode, labelHash);
 
-        assertEq(
-            IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)),
-            nameOwner
-        );
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), nameOwner);
         assertEq(dotnsRegistry.owner(node), nameOwner);
 
-        ILabelStore edStore = ILabelStore(
-            storeFactory.getLabelStore(nameOwner)
-        );
+        ILabelStore edStore = ILabelStore(storeFactory.getLabelStore(nameOwner));
         assertEq(edStore.getLabel(node), string.concat(nameLabel, ".dot"));
     }
 
@@ -390,33 +287,21 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.startPrank(owner);
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(nameLabel, nameOwner, "reserved")
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: nameLabel,
-                owner: nameOwner,
-                secret: secret,
-                reserved: true
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "reserved"));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
         vm.stopPrank();
 
         vm.prank(ed);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsRegistrarController.NotWhiteListedOrOwner.selector,
-                ed
-            )
+            abi.encodeWithSelector(IDotnsRegistrarController.NotWhiteListedOrOwner.selector, ed)
         );
         dotnsRegistrarController.registerReserved(registration);
     }
@@ -435,28 +320,16 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
     function test_owner_can_grant_and_revoke_whitelist_operator() public {
         vm.startPrank(owner);
-        dotnsRegistrarController.grantRole(
-            DotnsConstants.WHITELIST_OPERATOR_ROLE,
-            leonardo
-        );
+        dotnsRegistrarController.grantRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, leonardo);
         assertTrue(
-            dotnsRegistrarController.hasRole(
-                DotnsConstants.WHITELIST_OPERATOR_ROLE,
-                leonardo
-            )
+            dotnsRegistrarController.hasRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, leonardo)
         );
 
-        dotnsRegistrarController.revokeRole(
-            DotnsConstants.WHITELIST_OPERATOR_ROLE,
-            leonardo
-        );
+        dotnsRegistrarController.revokeRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, leonardo);
         vm.stopPrank();
 
         assertFalse(
-            dotnsRegistrarController.hasRole(
-                DotnsConstants.WHITELIST_OPERATOR_ROLE,
-                leonardo
-            )
+            dotnsRegistrarController.hasRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, leonardo)
         );
     }
 
@@ -472,16 +345,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     function test_setrole_reverts_for_zero_address() public {
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsRoleManager.InvalidRoleAccount.selector,
-                address(0)
-            )
+            abi.encodeWithSelector(IDotnsRoleManager.InvalidRoleAccount.selector, address(0))
         );
-        dotnsRegistrarController.setRole(
-            DotnsConstants.WHITELIST_OPERATOR_ROLE,
-            address(0),
-            true
-        );
+        dotnsRegistrarController.setRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, address(0), true);
     }
 
     function test_setrole_reverts_for_unsupported_role() public {
@@ -489,10 +355,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsRoleManager.UnsupportedRole.selector,
-                unsupportedRole
-            )
+            abi.encodeWithSelector(IDotnsRoleManager.UnsupportedRole.selector, unsupportedRole)
         );
         dotnsRegistrarController.setRole(unsupportedRole, leonardo, true);
     }
@@ -500,15 +363,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     function test_non_owner_cannot_grant_role() public {
         vm.prank(ed);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                ed
-            )
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, ed)
         );
-        dotnsRegistrarController.grantRole(
-            DotnsConstants.WHITELIST_OPERATOR_ROLE,
-            leonardo
-        );
+        dotnsRegistrarController.grantRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, leonardo);
     }
 
     function test_non_owner_cannot_revoke_role() public {
@@ -516,23 +373,13 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.prank(ed);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                ed
-            )
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, ed)
         );
-        dotnsRegistrarController.revokeRole(
-            DotnsConstants.WHITELIST_OPERATOR_ROLE,
-            leonardo
-        );
+        dotnsRegistrarController.revokeRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, leonardo);
     }
 
     function test_supports_idotnsrolemanager_interface() public view {
-        assertTrue(
-            dotnsRegistrarController.supportsInterface(
-                type(IDotnsRoleManager).interfaceId
-            )
-        );
+        assertTrue(dotnsRegistrarController.supportsInterface(type(IDotnsRoleManager).interfaceId));
     }
 
     function test_whitelisted_can_register_reserved() public {
@@ -545,25 +392,16 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.startPrank(ed);
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(nameLabel, nameOwner, "whitelisted")
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: nameLabel,
-                owner: nameOwner,
-                secret: secret,
-                reserved: true
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "whitelisted"));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
         dotnsRegistrarController.registerReserved(registration);
         vm.stopPrank();
@@ -571,10 +409,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         bytes32 labelHash = keccak256(bytes(nameLabel));
         bytes32 node = _namehash(dotNode, labelHash);
 
-        assertEq(
-            IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)),
-            nameOwner
-        );
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), nameOwner);
         assertEq(dotnsRegistry.owner(node), nameOwner);
     }
 
@@ -591,31 +426,19 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.startPrank(ed);
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(nameLabel, nameOwner, "removed")
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: nameLabel,
-                owner: nameOwner,
-                secret: secret,
-                reserved: true
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "removed"));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsRegistrarController.NotWhiteListedOrOwner.selector,
-                ed
-            )
+            abi.encodeWithSelector(IDotnsRegistrarController.NotWhiteListedOrOwner.selector, ed)
         );
         dotnsRegistrarController.registerReserved(registration);
         vm.stopPrank();
@@ -627,25 +450,16 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.startPrank(nameOwner);
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(nameLabel, nameOwner, "dotted")
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: nameLabel,
-                owner: nameOwner,
-                secret: secret,
-                reserved: false
+        bytes32 secret = keccak256(abi.encodePacked(nameLabel, nameOwner, "dotted"));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel, owner: nameOwner, secret: secret, reserved: false
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
         vm.expectRevert(IDotnsRegistrarController.InvalidLabel.selector);
         dotnsRegistrarController.register{value: 0}(registration);
@@ -672,10 +486,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         ILabelStore leonardoStore = ILabelStore(leonardoStoreAddr);
 
-        assertEq(
-            leonardoStore.getLabel(bytes32(tokenId)),
-            string.concat(nameLabel, ".dot")
-        );
+        assertEq(leonardoStore.getLabel(bytes32(tokenId)), string.concat(nameLabel, ".dot"));
         assertTrue(leonardoStore.isLocked(bytes32(tokenId)));
     }
 
@@ -686,10 +497,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
-        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(
-            tokenId,
-            leonardo
-        );
+        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
         dotnsRegistrar.transferFrom{value: outboundFee}(ed, leonardo, tokenId);
 
@@ -698,18 +506,13 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         dotnsRegistrar.transferFrom{value: returnFee}(leonardo, ed, tokenId);
 
         ILabelStore edStore = ILabelStore(storeFactory.getLabelStore(ed));
-        assertEq(
-            edStore.getLabel(bytes32(tokenId)),
-            string.concat(nameLabel, ".dot")
-        );
+        assertEq(edStore.getLabel(bytes32(tokenId)), string.concat(nameLabel, ".dot"));
         assertTrue(edStore.isLocked(bytes32(tokenId)));
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), ed);
     }
 
-    function test_transfer_clears_primary_reverse_name_when_current_name_is_moved()
-        public
-    {
+    function test_transfer_clears_primary_reverse_name_when_current_name_is_moved() public {
         string memory nameLabel = "primarymove01";
 
         _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
@@ -734,10 +537,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         ILabelStore tiagoStore = ILabelStore(storeFactory.getLabelStore(tiago));
         uint256 tokenId = _tokenIdForLabel(nameLabel);
-        assertEq(
-            tiagoStore.getLabel(bytes32(tokenId)),
-            string.concat(nameLabel, ".dot")
-        );
+        assertEq(tiagoStore.getLabel(bytes32(tokenId)), string.concat(nameLabel, ".dot"));
 
         assertEq(storeFactory.getLabelStore(address(0)), address(0));
     }
@@ -755,15 +555,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
 
-        ILabelStore leonardoStore = ILabelStore(
-            storeFactory.getLabelStore(leonardo)
-        );
+        ILabelStore leonardoStore = ILabelStore(storeFactory.getLabelStore(leonardo));
         assertTrue(address(leonardoStore) != address(0));
 
-        assertEq(
-            leonardoStore.getLabel(bytes32(tokenId)),
-            string.concat(nameLabel, ".dot")
-        );
+        assertEq(leonardoStore.getLabel(bytes32(tokenId)), string.concat(nameLabel, ".dot"));
         assertTrue(leonardoStore.isLocked(bytes32(tokenId)));
     }
 
@@ -774,35 +569,20 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         _grantPopFull(payer);
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(popfullLabel, ownerAddr, block.timestamp)
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: popfullLabel,
-                owner: ownerAddr,
-                secret: secret,
-                reserved: true
+        bytes32 secret = keccak256(abi.encodePacked(popfullLabel, ownerAddr, block.timestamp));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: popfullLabel, owner: ownerAddr, secret: secret, reserved: true
             });
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
 
         vm.prank(payer);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
-        uint256 priced = popRules
-            .priceWithoutCheck(popfullLabel, ownerAddr)
-            .price;
-        uint256 friction = popRules.transferFloor(
-            popfullLabel,
-            payer,
-            ownerAddr
-        );
+        uint256 priced = popRules.priceWithoutCheck(popfullLabel, ownerAddr).price;
+        uint256 friction = popRules.transferFloor(popfullLabel, payer, ownerAddr);
         uint256 charge = priced > friction ? priced : friction;
 
         vm.deal(payer, charge);
@@ -835,15 +615,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
 
-        ILabelStore leonardoStore = ILabelStore(
-            storeFactory.getLabelStore(leonardo)
-        );
+        ILabelStore leonardoStore = ILabelStore(storeFactory.getLabelStore(leonardo));
         assertTrue(address(leonardoStore) != address(0));
 
-        assertEq(
-            leonardoStore.getLabel(bytes32(tokenId)),
-            string.concat(nameLabel, ".dot")
-        );
+        assertEq(leonardoStore.getLabel(bytes32(tokenId)), string.concat(nameLabel, ".dot"));
         assertTrue(leonardoStore.isLocked(bytes32(tokenId)));
     }
 
@@ -883,44 +658,24 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         _register(nameLabel, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
-        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            before.amount,
-            RENT_PRICE,
-            "NoStatus mint must seed RENT_PRICE deposit"
-        );
-        assertEq(
-            before.recipient,
-            ed,
-            "deposit recipient must be original registrant at mint"
-        );
+        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(before.amount, RENT_PRICE, "NoStatus mint must seed RENT_PRICE deposit");
+        assertEq(before.recipient, ed, "deposit recipient must be original registrant at mint");
 
-        uint256 transferFee = dotnsRegistrar.quoteTransferFee(
-            tokenId,
-            leonardo
-        );
+        uint256 transferFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         assertEq(transferFee, 0, "NoStatus to NoStatus transfer floor is zero");
 
         uint256 priorReserve = dotnsNameEscrow.reserves(address(0));
         uint256 priorPendingRefundsEd = dotnsNameEscrow.pendingRefundCount(ed);
-        uint256 priorPendingRefundsLeonardo = dotnsNameEscrow
-            .pendingRefundCount(leonardo);
+        uint256 priorPendingRefundsLeonardo = dotnsNameEscrow.pendingRefundCount(leonardo);
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom{value: 0}(ed, leonardo, tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory after_ = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory after_ = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(after_.amount, RENT_PRICE, "deposit amount must travel with the NFT");
         assertEq(
-            after_.amount,
-            RENT_PRICE,
-            "deposit amount must travel with the NFT"
-        );
-        assertEq(
-            after_.recipient,
-            leonardo,
-            "position must rebind to the new holder, not be deleted"
+            after_.recipient, leonardo, "position must rebind to the new holder, not be deleted"
         );
         assertEq(
             dotnsNameEscrow.reserves(address(0)),
@@ -949,9 +704,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     /// @dev Defensive: confirms a depositor-to-foreign-to-depositor round trip leaves
     ///      the position pointing back at the original registrant after the return leg,
     ///      with reserves untouched and no refund accruals at any step.
-    function test_transfer_round_trip_to_original_depositor_rebinds_position_back()
-        public
-    {
+    function test_transfer_round_trip_to_original_depositor_rebinds_position_back() public {
         string memory nameLabel = NOSTATUS_LABEL_A;
 
         _register(nameLabel, ed, IPopRules.PopStatus.NoStatus);
@@ -959,43 +712,24 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         uint256 reserveAtMint = dotnsNameEscrow.reserves(address(0));
         uint256 edRefundsAtMint = dotnsNameEscrow.pendingRefundCount(ed);
-        uint256 leonardoRefundsAtMint = dotnsNameEscrow.pendingRefundCount(
-            leonardo
-        );
+        uint256 leonardoRefundsAtMint = dotnsNameEscrow.pendingRefundCount(leonardo);
 
         // Outbound leg ed to leonardo rebinds the position to leonardo.
         vm.prank(ed);
         dotnsRegistrar.transferFrom{value: 0}(ed, leonardo, tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory between = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            between.amount,
-            RENT_PRICE,
-            "deposit must travel through the first hop"
-        );
-        assertEq(
-            between.recipient,
-            leonardo,
-            "position recipient rebinds to leonardo on outbound"
-        );
+        IDotnsNameEscrow.ReleasePosition memory between =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(between.amount, RENT_PRICE, "deposit must travel through the first hop");
+        assertEq(between.recipient, leonardo, "position recipient rebinds to leonardo on outbound");
 
         // Return leg leonardo back to ed rebinds the position back to ed.
         vm.prank(leonardo);
         dotnsRegistrar.transferFrom{value: 0}(leonardo, ed, tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory after_ = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            after_.amount,
-            RENT_PRICE,
-            "deposit must travel through the return hop"
-        );
-        assertEq(
-            after_.recipient,
-            ed,
-            "position recipient rebinds back to ed on the return leg"
-        );
+        IDotnsNameEscrow.ReleasePosition memory after_ = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(after_.amount, RENT_PRICE, "deposit must travel through the return hop");
+        assertEq(after_.recipient, ed, "position recipient rebinds back to ed on the return leg");
 
         assertEq(
             dotnsNameEscrow.reserves(address(0)),

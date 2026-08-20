@@ -3,8 +3,12 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {ERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC165Upgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 
 import {IDotnsPopResolver} from "./IDotnsPopResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
@@ -74,11 +78,12 @@ contract DotnsPopResolver is
     function setChatKey(
         bytes32 node,
         bytes calldata chatKeyBytes
-    ) external override onlyPopController {
-        require(
-            chatKeyBytes.length == 65,
-            InvalidChatKeyLength(chatKeyBytes.length)
-        );
+    )
+        external
+        override
+        onlyPopController
+    {
+        require(chatKeyBytes.length == 65, InvalidChatKeyLength(chatKeyBytes.length));
         _chatKeys[node] = chatKeyBytes;
         emit ChatKeyUpdated(node, chatKeyBytes);
     }
@@ -87,7 +92,11 @@ contract DotnsPopResolver is
     function setLiteLink(
         bytes32 fullNode,
         bytes32 liteLabelhash
-    ) external override onlyPopController {
+    )
+        external
+        override
+        onlyPopController
+    {
         bytes32 oldLite = _liteLinks[fullNode];
         bytes32 oldFull = _fullClaims[liteLabelhash];
         if (oldLite != bytes32(0) && oldLite != liteLabelhash) {
@@ -102,23 +111,17 @@ contract DotnsPopResolver is
     }
 
     /// @inheritdoc IDotnsPopResolver
-    function chatKey(
-        bytes32 node
-    ) external view override returns (bytes memory) {
+    function chatKey(bytes32 node) external view override returns (bytes memory) {
         return _chatKeys[node];
     }
 
     /// @inheritdoc IDotnsPopResolver
-    function liteLink(
-        bytes32 fullNode
-    ) external view override returns (bytes32) {
+    function liteLink(bytes32 fullNode) external view override returns (bytes32) {
         return _liteLinks[fullNode];
     }
 
     /// @inheritdoc IDotnsPopResolver
-    function fullClaim(
-        bytes32 liteLabelhash
-    ) external view override returns (bytes32) {
+    function fullClaim(bytes32 liteLabelhash) external view override returns (bytes32) {
         return _fullClaims[liteLabelhash];
     }
 
@@ -126,34 +129,23 @@ contract DotnsPopResolver is
     /// @dev Bumped on every upgrade. Used by deployment scripts as a
     ///      post-upgrade assertion target.
     /// @return versionString Current version string.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 
     /// @inheritdoc ERC165Upgradeable
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
         return
-            interfaceId == type(IDotnsPopResolver).interfaceId ||
-            super.supportsInterface(interfaceId);
+            interfaceId == type(IDotnsPopResolver).interfaceId
+                || super.supportsInterface(interfaceId);
     }
 
     /// @notice Internal check enforcing PoP-controller-only access.
     function _onlyPopController() internal view {
-        address popController = protocolRegistry.get(
-            DotnsConstants.POP_CONTROLLER
-        );
+        address popController = protocolRegistry.get(DotnsConstants.POP_CONTROLLER);
         require(msg.sender == popController, NotPopController(msg.sender));
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

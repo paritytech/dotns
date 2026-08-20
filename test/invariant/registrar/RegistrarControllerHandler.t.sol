@@ -2,7 +2,10 @@
 pragma solidity ^0.8.34;
 
 import {Test} from "forge-std/Test.sol";
-import {IDotnsRegistrarController, DotnsRegistrarController} from "../../../contracts/registrars/DotnsRegistrarController.sol";
+import {
+    IDotnsRegistrarController,
+    DotnsRegistrarController
+} from "../../../contracts/registrars/DotnsRegistrarController.sol";
 import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {IDotnsReverseResolver} from "../../../contracts/resolvers/IDotnsReverseResolver.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
@@ -134,30 +137,19 @@ contract RegistrarControllerHandler is Test {
     /// @dev Mirrors the `BaseDotns._setUserPopStatus` mapping (PopFull = 2,
     ///      PopLite = 1, anything else = 0) so the handler stays consistent
     ///      with the test base.
-    function _mockPersonhoodTier(
-        address account,
-        IPopRules.PopStatus tier
-    ) internal {
+    function _mockPersonhoodTier(address account, IPopRules.PopStatus tier) internal {
         uint8 statusByte;
         if (tier == IPopRules.PopStatus.PopFull) statusByte = 2;
         else if (tier == IPopRules.PopStatus.PopLite) statusByte = 1;
 
-        bytes32 contextAlias = statusByte == 0
-            ? bytes32(0)
-            : keccak256(abi.encode(account, statusByte));
+        bytes32 contextAlias =
+            statusByte == 0 ? bytes32(0) : keccak256(abi.encode(account, statusByte));
         vm.mockCall(
             DotnsConstants.PERSONHOOD,
             abi.encodeWithSelector(
-                IPersonhood.personhoodStatus.selector,
-                account,
-                DotnsConstants.PERSONHOOD_CONTEXT
+                IPersonhood.personhoodStatus.selector, account, DotnsConstants.PERSONHOOD_CONTEXT
             ),
-            abi.encode(
-                IPersonhood.PersonhoodInfo({
-                    status: statusByte,
-                    contextAlias: contextAlias
-                })
-            )
+            abi.encode(IPersonhood.PersonhoodInfo({status: statusByte, contextAlias: contextAlias}))
         );
     }
 
@@ -165,26 +157,18 @@ contract RegistrarControllerHandler is Test {
     /// @dev Generates a unique label, commits, warps time, and registers.
     /// @param actorSeed Seed for selecting an actor.
     /// @param reservedSeed Seed for determining if the name should be reserved.
-    function commitAndRegister(
-        uint256 actorSeed,
-        uint256 reservedSeed
-    ) external {
+    function commitAndRegister(uint256 actorSeed, uint256 reservedSeed) external {
         if (actors.length == 0) return;
 
         address actor = actors[actorSeed % actors.length];
         bool reserved = reservedSeed % 2 == 0;
         string memory label = _generateUniqueLabel();
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(label, actor, block.timestamp, labelNonce)
-        );
+        bytes32 secret = keccak256(abi.encodePacked(label, actor, block.timestamp, labelNonce));
 
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: label,
-                owner: actor,
-                secret: secret,
-                reserved: reserved
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: actor, secret: secret, reserved: reserved
             });
 
         bytes32 commitment = controller.makeCommitment(registration);
@@ -226,16 +210,11 @@ contract RegistrarControllerHandler is Test {
         address actor = actors[actorSeed % actors.length];
         string memory label = _generateUniqueLabel();
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(label, actor, block.timestamp, labelNonce)
-        );
+        bytes32 secret = keccak256(abi.encodePacked(label, actor, block.timestamp, labelNonce));
 
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: label,
-                owner: actor,
-                secret: secret,
-                reserved: true
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: actor, secret: secret, reserved: true
             });
 
         bytes32 commitment = controller.makeCommitment(registration);
@@ -254,7 +233,9 @@ contract RegistrarControllerHandler is Test {
         uint256 actorSeed,
         uint256 overpaymentSeed,
         uint256 reservedSeed
-    ) external {
+    )
+        external
+    {
         if (actors.length == 0) return;
 
         address actor = actors[actorSeed % actors.length];
@@ -262,16 +243,11 @@ contract RegistrarControllerHandler is Test {
         string memory label = _generateUniqueLabel();
         uint256 overpayment = (overpaymentSeed % 10) * 1e15;
 
-        bytes32 secret = keccak256(
-            abi.encodePacked(label, actor, block.timestamp, labelNonce)
-        );
+        bytes32 secret = keccak256(abi.encodePacked(label, actor, block.timestamp, labelNonce));
 
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: label,
-                owner: actor,
-                secret: secret,
-                reserved: reserved
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: actor, secret: secret, reserved: reserved
             });
 
         bytes32 commitment = controller.makeCommitment(registration);
@@ -289,11 +265,7 @@ contract RegistrarControllerHandler is Test {
 
         // Verify refund occurred
         if (overpayment > 0 && price == 0) {
-            assertEq(
-                actor.balance,
-                balanceBefore,
-                "Full overpayment must be refunded"
-            );
+            assertEq(actor.balance, balanceBefore, "Full overpayment must be refunded");
         }
 
         _registeredLabels.push(label);
@@ -317,56 +289,32 @@ contract RegistrarControllerHandler is Test {
     }
 
     /// @notice Returns all successfully registered labels.
-    function getRegisteredLabels()
-        external
-        view
-        returns (string[] memory labels)
-    {
+    function getRegisteredLabels() external view returns (string[] memory labels) {
         labels = _registeredLabels;
     }
 
     /// @notice Returns owners corresponding to registered labels.
-    function getRegisteredOwners()
-        external
-        view
-        returns (address[] memory owners)
-    {
+    function getRegisteredOwners() external view returns (address[] memory owners) {
         owners = _registeredOwners;
     }
 
     /// @notice Returns labels registered with `reserved=true`.
-    function getReservedLabels()
-        external
-        view
-        returns (string[] memory labels)
-    {
+    function getReservedLabels() external view returns (string[] memory labels) {
         labels = _reservedLabels;
     }
 
     /// @notice Returns owners of reserved registrations.
-    function getReservedOwners()
-        external
-        view
-        returns (address[] memory owners)
-    {
+    function getReservedOwners() external view returns (address[] memory owners) {
         owners = _reservedOwners;
     }
 
     /// @notice Returns commitments consumed by successful registrations.
-    function getConsumedCommitments()
-        external
-        view
-        returns (bytes32[] memory commitments)
-    {
+    function getConsumedCommitments() external view returns (bytes32[] memory commitments) {
         commitments = _consumedCommitments;
     }
 
     /// @notice Returns currently active (pending) commitments.
-    function getActiveCommitments()
-        external
-        view
-        returns (bytes32[] memory commitments)
-    {
+    function getActiveCommitments() external view returns (bytes32[] memory commitments) {
         commitments = _activeCommitments;
     }
 
@@ -379,10 +327,7 @@ contract RegistrarControllerHandler is Test {
     /// @dev Picks a random registered name and transfers it to a different actor.
     /// @param registrationSeed Seed for selecting which registered name to transfer.
     /// @param recipientSeed Seed for selecting the recipient actor.
-    function transferName(
-        uint256 registrationSeed,
-        uint256 recipientSeed
-    ) external {
+    function transferName(uint256 registrationSeed, uint256 recipientSeed) external {
         if (_registeredLabels.length == 0 || actors.length < 2) return;
 
         uint256 index = registrationSeed % _registeredLabels.length;
@@ -444,20 +389,12 @@ contract RegistrarControllerHandler is Test {
     }
 
     /// @notice Returns labels that have been transferred.
-    function getTransferredLabels()
-        external
-        view
-        returns (string[] memory labels)
-    {
+    function getTransferredLabels() external view returns (string[] memory labels) {
         labels = _transferredLabels;
     }
 
     /// @notice Returns recipients of transferred labels.
-    function getTransferredRecipients()
-        external
-        view
-        returns (address[] memory recipients)
-    {
+    function getTransferredRecipients() external view returns (address[] memory recipients) {
         recipients = _transferredRecipients;
     }
 
@@ -468,7 +405,11 @@ contract RegistrarControllerHandler is Test {
     function _pickDifferentActor(
         address exclude,
         uint256 seed
-    ) internal view returns (address actor) {
+    )
+        internal
+        view
+        returns (address actor)
+    {
         for (uint256 i; i < actors.length; ++i) {
             address candidate = actors[(seed + i) % actors.length];
             if (candidate != exclude) return candidate;

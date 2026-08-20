@@ -71,11 +71,7 @@ interface IDotnsRegistrar is IERC721 {
     /// (otherwise @custom:reverts NameNotAvailable). Emits @custom:emits NameRegistered on
     /// success.
     /// @param label The human-readable label string (e.g. "alice").
-    function register(
-        uint256 id,
-        address owner,
-        string calldata label
-    ) external;
+    function register(uint256 id, address owner, string calldata label) external;
 
     /// @notice Returns whether a given token id has been minted.
     function exists(uint256 tokenId) external view returns (bool tokenExists);
@@ -101,17 +97,13 @@ interface IDotnsRegistrar is IERC721 {
     /// @param controller Candidate controller.
     /// @return authorised True when `controller` was added via @custom:function addController and
     /// has not been removed.
-    function controllers(
-        IDotnsController controller
-    ) external view returns (bool authorised);
+    function controllers(IDotnsController controller) external view returns (bool authorised);
 
     /// @notice Returns the human-readable label a token was registered with.
     /// @dev Canonical state source for the label string; any client that holds a node or
     /// tokenId can resolve the original label in one view call without scanning registration
     /// events. Returns the empty string when the token does not exist.
-    function labelOf(
-        uint256 tokenId
-    ) external view returns (string memory label);
+    function labelOf(uint256 tokenId) external view returns (string memory label);
 
     /// @notice Quotes the additional native fee required to transfer a token to `to`.
     /// @dev Returns the reach floor from @custom:function PopRules.transferFloor: the
@@ -139,7 +131,10 @@ interface IDotnsRegistrar is IERC721 {
     function quoteTransferFee(
         uint256 tokenId,
         address to
-    ) external view returns (uint256 requiredFee);
+    )
+        external
+        view
+        returns (uint256 requiredFee);
 
     /// @inheritdoc IERC721
     /// @dev The registrar's `_update` hook consults @custom:function PopRules.transferFloor
@@ -152,25 +147,20 @@ interface IDotnsRegistrar is IERC721 {
         address to,
         uint256 tokenId,
         bytes calldata data
-    ) external payable override;
+    )
+        external
+        payable
+        override;
 
     /// @inheritdoc IERC721
     /// @dev Subject to the same fee-on-transfer gate as the four-argument overload; reverts with
     /// @custom:reverts TransferFeeRequired when the recipient owes a non-zero reach floor and
     /// the caller has not forwarded it as `msg.value`.
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) external payable override;
+    function safeTransferFrom(address from, address to, uint256 tokenId) external payable override;
 
     /// @inheritdoc IERC721
     /// @dev Subject to the same fee-on-transfer gate as the safe overloads; reverts with
     /// @custom:reverts TransferFeeRequired when the recipient owes a non-zero reach floor and
     /// the caller has not forwarded it as `msg.value`.
-    function transferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) external payable override;
+    function transferFrom(address from, address to, uint256 tokenId) external payable override;
 }

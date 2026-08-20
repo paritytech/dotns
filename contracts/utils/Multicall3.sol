@@ -39,14 +39,16 @@ contract Multicall3 {
     /// @param calls An array of Call structs.
     /// @return blockNumber The block number where the calls were executed.
     /// @return returnData An array of bytes containing the responses.
-    function aggregate(
-        Call[] calldata calls
-    ) public payable returns (uint256 blockNumber, bytes[] memory returnData) {
+    function aggregate(Call[] calldata calls)
+        public
+        payable
+        returns (uint256 blockNumber, bytes[] memory returnData)
+    {
         blockNumber = block.number;
         uint256 length = calls.length;
         returnData = new bytes[](length);
         Call calldata call;
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length;) {
             bool success;
             call = calls[i];
             (success, returnData[i]) = call.target.call(call.callData);
@@ -65,18 +67,21 @@ contract Multicall3 {
     function tryAggregate(
         bool requireSuccess,
         Call[] calldata calls
-    ) public payable returns (Result[] memory returnData) {
+    )
+        public
+        payable
+        returns (Result[] memory returnData)
+    {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call calldata call;
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length;) {
             Result memory result = returnData[i];
             call = calls[i];
-            (result.success, result.returnData) = call.target.call(
-                call.callData
-            );
-            if (requireSuccess)
+            (result.success, result.returnData) = call.target.call(call.callData);
+            if (requireSuccess) {
                 require(result.success, "Multicall3: call failed");
+            }
             unchecked {
                 ++i;
             }
@@ -96,11 +101,7 @@ contract Multicall3 {
     )
         public
         payable
-        returns (
-            uint256 blockNumber,
-            bytes32 blockHash,
-            Result[] memory returnData
-        )
+        returns (uint256 blockNumber, bytes32 blockHash, Result[] memory returnData)
     {
         blockNumber = block.number;
         blockHash = blockhash(block.number);
@@ -113,56 +114,35 @@ contract Multicall3 {
     /// @return blockNumber The block number where the calls were executed.
     /// @return blockHash The hash of the block where the calls were executed.
     /// @return returnData An array of Result structs.
-    function blockAndAggregate(
-        Call[] calldata calls
-    )
+    function blockAndAggregate(Call[] calldata calls)
         public
         payable
-        returns (
-            uint256 blockNumber,
-            bytes32 blockHash,
-            Result[] memory returnData
-        )
+        returns (uint256 blockNumber, bytes32 blockHash, Result[] memory returnData)
     {
-        (blockNumber, blockHash, returnData) = tryBlockAndAggregate(
-            true,
-            calls
-        );
+        (blockNumber, blockHash, returnData) = tryBlockAndAggregate(true, calls);
     }
 
     /// @notice Aggregate calls, ensuring each returns success if required.
     /// @param calls An array of Call3 structs.
     /// @return returnData An array of Result structs.
-    function aggregate3(
-        Call3[] calldata calls
-    ) public payable returns (Result[] memory returnData) {
+    function aggregate3(Call3[] calldata calls)
+        public
+        payable
+        returns (Result[] memory returnData)
+    {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call3 calldata calli;
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length;) {
             Result memory result = returnData[i];
             calli = calls[i];
-            (result.success, result.returnData) = calli.target.call(
-                calli.callData
-            );
+            (result.success, result.returnData) = calli.target.call(calli.callData);
             assembly {
                 if iszero(or(calldataload(add(calli, 0x20)), mload(result))) {
-                    mstore(
-                        0x00,
-                        0x08c379a000000000000000000000000000000000000000000000000000000000
-                    )
-                    mstore(
-                        0x04,
-                        0x0000000000000000000000000000000000000000000000000000000000000020
-                    )
-                    mstore(
-                        0x24,
-                        0x0000000000000000000000000000000000000000000000000000000000000017
-                    )
-                    mstore(
-                        0x44,
-                        0x4d756c746963616c6c333a2063616c6c206661696c6564000000000000000000
-                    )
+                    mstore(0x00, 0x08c379a000000000000000000000000000000000000000000000000000000000)
+                    mstore(0x04, 0x0000000000000000000000000000000000000000000000000000000000000020)
+                    mstore(0x24, 0x0000000000000000000000000000000000000000000000000000000000000017)
+                    mstore(0x44, 0x4d756c746963616c6c333a2063616c6c206661696c6564000000000000000000)
                     revert(0x00, 0x64)
                 }
             }
@@ -176,41 +156,29 @@ contract Multicall3 {
     /// @notice Reverts if msg.value is not equal to the sum of the call values.
     /// @param calls An array of Call3Value structs.
     /// @return returnData An array of Result structs.
-    function aggregate3Value(
-        Call3Value[] calldata calls
-    ) public payable returns (Result[] memory returnData) {
+    function aggregate3Value(Call3Value[] calldata calls)
+        public
+        payable
+        returns (Result[] memory returnData)
+    {
         uint256 valAccumulator;
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call3Value calldata calli;
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length;) {
             Result memory result = returnData[i];
             calli = calls[i];
             uint256 val = calli.value;
             unchecked {
                 valAccumulator += val;
             }
-            (result.success, result.returnData) = calli.target.call{value: val}(
-                calli.callData
-            );
+            (result.success, result.returnData) = calli.target.call{value: val}(calli.callData);
             assembly {
                 if iszero(or(calldataload(add(calli, 0x20)), mload(result))) {
-                    mstore(
-                        0x00,
-                        0x08c379a000000000000000000000000000000000000000000000000000000000
-                    )
-                    mstore(
-                        0x04,
-                        0x0000000000000000000000000000000000000000000000000000000000000020
-                    )
-                    mstore(
-                        0x24,
-                        0x0000000000000000000000000000000000000000000000000000000000000017
-                    )
-                    mstore(
-                        0x44,
-                        0x4d756c746963616c6c333a2063616c6c206661696c6564000000000000000000
-                    )
+                    mstore(0x00, 0x08c379a000000000000000000000000000000000000000000000000000000000)
+                    mstore(0x04, 0x0000000000000000000000000000000000000000000000000000000000000020)
+                    mstore(0x24, 0x0000000000000000000000000000000000000000000000000000000000000017)
+                    mstore(0x44, 0x4d756c746963616c6c333a2063616c6c206661696c6564000000000000000000)
                     revert(0x00, 0x84)
                 }
             }
@@ -223,9 +191,7 @@ contract Multicall3 {
 
     /// @notice Returns the block hash for the given block number.
     /// @param blockNumber The block number.
-    function getBlockHash(
-        uint256 blockNumber
-    ) public view returns (bytes32 blockHash) {
+    function getBlockHash(uint256 blockNumber) public view returns (bytes32 blockHash) {
         blockHash = blockhash(blockNumber);
     }
 
@@ -240,11 +206,7 @@ contract Multicall3 {
     }
 
     /// @notice Returns the block prevrandao value.
-    function getCurrentBlockDifficulty()
-        public
-        view
-        returns (uint256 difficulty)
-    {
+    function getCurrentBlockDifficulty() public view returns (uint256 difficulty) {
         difficulty = block.prevrandao;
     }
 
@@ -254,11 +216,7 @@ contract Multicall3 {
     }
 
     /// @notice Returns the block timestamp.
-    function getCurrentBlockTimestamp()
-        public
-        view
-        returns (uint256 timestamp)
-    {
+    function getCurrentBlockTimestamp() public view returns (uint256 timestamp) {
         timestamp = block.timestamp;
     }
 

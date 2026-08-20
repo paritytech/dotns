@@ -20,9 +20,7 @@ contract ReentrantOverpaymentAttacker is IERC721Receiver {
     }
 
     /// @notice Arms the attacker with a registration payload it will replay inside `receive`.
-    function arm(
-        IDotnsRegistrarController.Registration calldata payload
-    ) external {
+    function arm(IDotnsRegistrarController.Registration calldata payload) external {
         registration = payload;
     }
 
@@ -32,7 +30,11 @@ contract ReentrantOverpaymentAttacker is IERC721Receiver {
         address,
         uint256,
         bytes calldata
-    ) external pure returns (bytes4) {
+    )
+        external
+        pure
+        returns (bytes4)
+    {
         return IERC721Receiver.onERC721Received.selector;
     }
 

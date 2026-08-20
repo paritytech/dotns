@@ -3,9 +3,13 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
-import {ERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {
+    ERC165Upgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
@@ -66,8 +70,7 @@ contract DotnsNameEscrow is
     uint256[] private _releasedTokens;
 
     /// @notice Reverse lookup into `_releasedTokens` (one-based) for O(1) remove-by-swap.
-    mapping(uint256 tokenId => uint256 indexPlusOne)
-        private _releasedIndexPlusOne;
+    mapping(uint256 tokenId => uint256 indexPlusOne) private _releasedIndexPlusOne;
 
     /// @notice Cumulative balance of cross-tier fees held against unreleased shortfalls.
     /// @dev Credited by cross-tier registration deposits, reach-floor friction, and transfer-fee
@@ -88,8 +91,7 @@ contract DotnsNameEscrow is
     mapping(uint256 entryId => RefundEntry entry) private _refundEntries;
 
     /// @notice Per-recipient list of pending entryIds for paginated enumeration and batch claim.
-    mapping(address recipient => uint256[] entryIds)
-        private _entriesByRecipient;
+    mapping(address recipient => uint256[] entryIds) private _entriesByRecipient;
 
     /// @notice Reverse lookup into `_entriesByRecipient` (one-based) for O(1) remove-by-swap.
     mapping(uint256 entryId => uint256 indexPlusOne) private _entryIndexPlusOne;
@@ -139,13 +141,16 @@ contract DotnsNameEscrow is
     ///      and any value above @custom:constant MAX_REDEEM_WINDOW (@custom:reverts
     ///      RedeemWindowTooLong), and emits @custom:emits RedeemWindowUpdated.
     /// @param registry Protocol registry used to resolve registrar and controller addresses.
-    /// @param cooldownSeconds Refund cooldown after release.
+    /// @param cooldownSeconds Delay after release before the deposit withdrawal may be credited.
     /// @param redeemWindowSeconds Period after release in which only the previous holder may act.
     function initialize(
         IDotnsProtocolRegistry registry,
         uint256 cooldownSeconds,
         uint256 redeemWindowSeconds
-    ) external initializer {
+    )
+        external
+        initializer
+    {
         require(address(registry) != address(0), InvalidAsset());
 
         __Ownable_init(msg.sender);
@@ -159,10 +164,7 @@ contract DotnsNameEscrow is
     /// @inheritdoc IDotnsNameEscrow
     function updateCooldown(uint256 newCooldown) public override onlyOwner {
         require(newCooldown != 0, InvalidCooldown());
-        require(
-            newCooldown <= MAX_COOLDOWN,
-            CooldownTooLong(newCooldown, MAX_COOLDOWN)
-        );
+        require(newCooldown <= MAX_COOLDOWN, CooldownTooLong(newCooldown, MAX_COOLDOWN));
 
         uint256 currentCooldown = cooldown;
         cooldown = newCooldown;
@@ -171,9 +173,7 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function updateRedeemWindow(
-        uint256 newRedeemWindow
-    ) public override onlyOwner {
+    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyOwner {
         require(newRedeemWindow != 0, InvalidRedeemWindow());
         require(
             newRedeemWindow <= MAX_REDEEM_WINDOW,
@@ -187,19 +187,17 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function getReleasePosition(
-        uint256 tokenId
-    ) external view override returns (ReleasePosition memory position) {
+    function getReleasePosition(uint256 tokenId)
+        external
+        view
+        override
+        returns (ReleasePosition memory position)
+    {
         position = _positions[tokenId];
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function releasedTokenCount()
-        external
-        view
-        override
-        returns (uint256 count)
-    {
+    function releasedTokenCount() external view override returns (uint256 count) {
         count = _releasedTokens.length;
     }
 
@@ -212,11 +210,13 @@ contract DotnsNameEscrow is
     function releasedTokens(
         uint256 start,
         uint256 limit
-    ) external view override returns (uint256[] memory tokenIds) {
-        require(
-            limit != 0 && limit <= MAX_RELEASED_PAGE_SIZE,
-            InvalidPageSize(limit)
-        );
+    )
+        external
+        view
+        override
+        returns (uint256[] memory tokenIds)
+    {
+        require(limit != 0 && limit <= MAX_RELEASED_PAGE_SIZE, InvalidPageSize(limit));
 
         uint256 length = _releasedTokens.length;
         if (start >= length) return new uint256[](0);
@@ -233,9 +233,7 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function deposit(
-        DepositParams calldata params
-    ) external payable override onlyController {
+    function deposit(DepositParams calldata params) external payable override onlyController {
         // Reject mismatched amount/msg.value so callers cannot under-fund a position.
         require(msg.value == params.amount, InvalidAmount());
         // Only native deposits are currently supported; ERC20 support can be added in a
@@ -248,10 +246,7 @@ contract DotnsNameEscrow is
         // Use `recipient` as the "is this slot funded?" sentinel so zero-amount
         // positions (seeded by free PopFull / PopLite registrations) still count
         // as funded and cannot be re-seeded with a different recipient.
-        require(
-            position.recipient == address(0),
-            PositionAlreadyFunded(params.tokenId)
-        );
+        require(position.recipient == address(0), PositionAlreadyFunded(params.tokenId));
         require(!position.released, AlreadyReleased(params.tokenId));
 
         position.asset = params.asset;
@@ -264,9 +259,7 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function creditOverpayment(
-        address recipient
-    ) external payable override onlyController {
+    function creditOverpayment(address recipient) external payable override onlyController {
         require(recipient != address(0), InvalidRecipient());
         require(msg.value != 0, InvalidAmount());
         _pendingWithdrawals[recipient] += msg.value;
@@ -274,9 +267,12 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function depositInsurance(
-        InsuranceDepositParams calldata params
-    ) external payable override onlyController {
+    function depositInsurance(InsuranceDepositParams calldata params)
+        external
+        payable
+        override
+        onlyController
+    {
         require(msg.value > 0, InvalidAmount());
 
         insuranceFund += msg.value;
@@ -292,9 +288,13 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function chargeTransferFee(
-        ChargeTransferFeeParams calldata params
-    ) external payable override onlyRegistrar returns (uint256 charged) {
+    function chargeTransferFee(ChargeTransferFeeParams calldata params)
+        external
+        payable
+        override
+        onlyRegistrar
+        returns (uint256 charged)
+    {
         ReleasePosition storage position = _positions[params.tokenId];
         // Released positions are mid-lifecycle in escrow custody and must not be rebound; the
         // recipient is the original releaser who will claim the refund. The canonical transfer
@@ -346,10 +346,7 @@ contract DotnsNameEscrow is
         // Recipient is the canonical "is this position present?" sentinel; zero-amount positions
         // seeded for free PopFull / PopLite registrations are still releasable so every minted
         // name has a reachable lifecycle.
-        require(
-            position.recipient != address(0),
-            DepositNotConfigured(tokenId)
-        );
+        require(position.recipient != address(0), DepositNotConfigured(tokenId));
         require(!position.released, AlreadyReleased(tokenId));
 
         // Position recipient mirrors the current NFT holder (rebound on every transfer), so the
@@ -361,9 +358,8 @@ contract DotnsNameEscrow is
             NotRefundRecipient(msg.sender, tokenId)
         );
 
-        bool approvedForEscrow = registrar.getApproved(tokenId) ==
-            address(this) ||
-            registrar.isApprovedForAll(currentOwner, address(this));
+        bool approvedForEscrow = registrar.getApproved(tokenId) == address(this)
+            || registrar.isApprovedForAll(currentOwner, address(this));
 
         require(approvedForEscrow, EscrowNotApproved(tokenId));
 
@@ -393,14 +389,7 @@ contract DotnsNameEscrow is
 
         _addReleasedToken(tokenId);
 
-        emit NameReleased(
-            tokenId,
-            msg.sender,
-            asset,
-            amount,
-            availableAt,
-            redeemUntil
-        );
+        emit NameReleased(tokenId, msg.sender, asset, amount, availableAt, redeemUntil);
     }
 
     /// @inheritdoc IDotnsNameEscrow
@@ -409,17 +398,10 @@ contract DotnsNameEscrow is
 
         require(position.released, NotReleased(tokenId));
         require(!position.claimed, AlreadyClaimed(tokenId));
-        require(
-            position.recipient == msg.sender,
-            NotRefundRecipient(msg.sender, tokenId)
-        );
+        require(position.recipient == msg.sender, NotRefundRecipient(msg.sender, tokenId));
         require(
             block.timestamp >= position.withdrawAvailableAt,
-            WithdrawalTooEarly(
-                tokenId,
-                position.withdrawAvailableAt,
-                block.timestamp
-            )
+            WithdrawalTooEarly(tokenId, position.withdrawAvailableAt, block.timestamp)
         );
 
         uint256 owed = position.amount;
@@ -458,19 +440,14 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function claimWithdrawal()
-        external
-        override
-        nonReentrant
-        returns (uint256 amount)
-    {
+    function claimWithdrawal() external override nonReentrant returns (uint256 amount) {
         amount = _pendingWithdrawals[msg.sender];
         require(amount > 0, NoPendingWithdrawal());
 
         // Effects before interaction.
         _pendingWithdrawals[msg.sender] = 0;
 
-        (bool ok, ) = payable(msg.sender).call{value: amount}("");
+        (bool ok,) = payable(msg.sender).call{value: amount}("");
         // tokenId is not meaningful here since a single pending balance can aggregate
         // multiple positions; surface 0 to keep the existing error shape.
         require(ok, RefundFailed(0));
@@ -479,16 +456,12 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function pendingWithdrawal(
-        address recipient
-    ) external view override returns (uint256 amount) {
+    function pendingWithdrawal(address recipient) external view override returns (uint256 amount) {
         amount = _pendingWithdrawals[recipient];
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function claimRefund(
-        uint256 entryId
-    ) external override nonReentrant returns (uint256 amount) {
+    function claimRefund(uint256 entryId) external override nonReentrant returns (uint256 amount) {
         // Storage pointer over memory copy: only the fields we actually need are SLOAD-ed.
         RefundEntry storage entry = _refundEntries[entryId];
         amount = entry.amount;
@@ -497,46 +470,34 @@ contract DotnsNameEscrow is
         // against the zero-address sentinel.
         require(amount > 0, NoSuchRefundEntry(entryId));
         uint256 entryTokenId = entry.tokenId;
-        require(
-            entry.recipient == msg.sender,
-            NotRefundRecipient(msg.sender, entryTokenId)
-        );
-        require(
-            block.timestamp >= entry.availableAt,
-            RefundLocked(entryId, entry.availableAt)
-        );
+        require(entry.recipient == msg.sender, NotRefundRecipient(msg.sender, entryTokenId));
+        require(block.timestamp >= entry.availableAt, RefundLocked(entryId, entry.availableAt));
 
         _removeRefundEntry(entryId, msg.sender);
 
-        (bool ok, ) = payable(msg.sender).call{value: amount}("");
+        (bool ok,) = payable(msg.sender).call{value: amount}("");
         require(ok, RefundFailed(entryTokenId));
 
         emit RefundClaimed(msg.sender, entryId, amount);
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function claimRefundsBatch(
-        uint256[] calldata entryIds
-    ) external override nonReentrant returns (uint256 totalAmount) {
+    function claimRefundsBatch(uint256[] calldata entryIds)
+        external
+        override
+        nonReentrant
+        returns (uint256 totalAmount)
+    {
         uint256 length = entryIds.length;
-        require(
-            length > 0 && length <= MAX_REFUND_PAGE_SIZE,
-            InvalidPageSize(length)
-        );
+        require(length > 0 && length <= MAX_REFUND_PAGE_SIZE, InvalidPageSize(length));
 
         for (uint256 i; i < length; ++i) {
             uint256 entryId = entryIds[i];
             RefundEntry storage entry = _refundEntries[entryId];
             uint256 amount = entry.amount;
             require(amount > 0, NoSuchRefundEntry(entryId));
-            require(
-                entry.recipient == msg.sender,
-                NotRefundRecipient(msg.sender, entry.tokenId)
-            );
-            require(
-                block.timestamp >= entry.availableAt,
-                RefundLocked(entryId, entry.availableAt)
-            );
+            require(entry.recipient == msg.sender, NotRefundRecipient(msg.sender, entry.tokenId));
+            require(block.timestamp >= entry.availableAt, RefundLocked(entryId, entry.availableAt));
 
             totalAmount += amount;
             _removeRefundEntry(entryId, msg.sender);
@@ -544,14 +505,12 @@ contract DotnsNameEscrow is
             emit RefundClaimed(msg.sender, entryId, amount);
         }
 
-        (bool ok, ) = payable(msg.sender).call{value: totalAmount}("");
+        (bool ok,) = payable(msg.sender).call{value: totalAmount}("");
         require(ok, RefundFailed(0));
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function pendingRefundCount(
-        address recipient
-    ) external view override returns (uint256 count) {
+    function pendingRefundCount(address recipient) external view override returns (uint256 count) {
         count = _entriesByRecipient[recipient].length;
     }
 
@@ -560,11 +519,13 @@ contract DotnsNameEscrow is
         address recipient,
         uint256 offset,
         uint256 limit
-    ) external view override returns (uint256[] memory entryIds) {
-        require(
-            limit > 0 && limit <= MAX_REFUND_PAGE_SIZE,
-            InvalidPageSize(limit)
-        );
+    )
+        external
+        view
+        override
+        returns (uint256[] memory entryIds)
+    {
+        require(limit > 0 && limit <= MAX_REFUND_PAGE_SIZE, InvalidPageSize(limit));
 
         uint256[] storage all = _entriesByRecipient[recipient];
         uint256 total = all.length;
@@ -590,10 +551,7 @@ contract DotnsNameEscrow is
         override
         returns (uint256[] memory entryIds, RefundEntry[] memory entries)
     {
-        require(
-            limit > 0 && limit <= MAX_REFUND_PAGE_SIZE,
-            InvalidPageSize(limit)
-        );
+        require(limit > 0 && limit <= MAX_REFUND_PAGE_SIZE, InvalidPageSize(limit));
 
         uint256[] storage all = _entriesByRecipient[recipient];
         uint256 total = all.length;
@@ -615,9 +573,12 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function refundEntry(
-        uint256 entryId
-    ) external view override returns (RefundEntry memory entry) {
+    function refundEntry(uint256 entryId)
+        external
+        view
+        override
+        returns (RefundEntry memory entry)
+    {
         entry = _refundEntries[entryId];
     }
 
@@ -630,7 +591,10 @@ contract DotnsNameEscrow is
         address recipient,
         uint256 amount,
         uint256 tokenId
-    ) internal returns (uint256 entryId) {
+    )
+        internal
+        returns (uint256 entryId)
+    {
         require(recipient != address(0), InvalidRecipient());
         require(amount > 0, InvalidAmount());
 
@@ -639,10 +603,7 @@ contract DotnsNameEscrow is
         uint64 availableAt = uint64(block.timestamp + cooldown);
 
         _refundEntries[entryId] = RefundEntry({
-            recipient: recipient,
-            amount: amount,
-            availableAt: availableAt,
-            tokenId: tokenId
+            recipient: recipient, amount: amount, availableAt: availableAt, tokenId: tokenId
         });
 
         uint256[] storage list = _entriesByRecipient[recipient];
@@ -678,7 +639,12 @@ contract DotnsNameEscrow is
     function reclaim(
         uint256 tokenId,
         address newOwner
-    ) external override onlyController nonReentrant {
+    )
+        external
+        override
+        onlyController
+        nonReentrant
+    {
         ReleasePosition storage position = _positions[tokenId];
 
         require(position.released && position.claimed, NotReclaimable(tokenId));
@@ -699,11 +665,13 @@ contract DotnsNameEscrow is
         address,
         uint256 tokenId,
         bytes calldata
-    ) external view override returns (bytes4 selector) {
-        require(
-            msg.sender == address(_registrar()),
-            NotAcceptedTransfer(msg.sender)
-        );
+    )
+        external
+        view
+        override
+        returns (bytes4 selector)
+    {
+        require(msg.sender == address(_registrar()), NotAcceptedTransfer(msg.sender));
         // Only accept transfers that this contract itself initiated via `release`. A holder calling
         // `registrar.safeTransferFrom(holder, escrow, tokenId)` directly would otherwise land the
         // NFT in custody with no `released` position, leaving the token (and any prior deposit)
@@ -713,31 +681,21 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc ERC165Upgradeable
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override returns (bool supported) {
-        supported =
-            interfaceId == type(IDotnsNameEscrow).interfaceId ||
-            interfaceId == type(IERC721Receiver).interfaceId ||
-            super.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId) public view override returns (bool supported) {
+        supported = interfaceId == type(IDotnsNameEscrow).interfaceId
+            || interfaceId == type(IERC721Receiver).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 
     /// @notice Returns the configured registrar from the protocol registry.
     function _registrar() internal view returns (IDotnsRegistrar registrar) {
-        registrar = IDotnsRegistrar(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
+        registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
     }
 
     /// @notice Restricts calls to the configured controller from the protocol registry.
@@ -779,7 +737,5 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

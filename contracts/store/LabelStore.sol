@@ -55,15 +55,9 @@ contract LabelStore is Initializable, ILabelStore {
     }
 
     /// @inheritdoc ILabelStore
-    function initialize(
-        address user_,
-        address protocolRegistry_
-    ) external override initializer {
+    function initialize(address user_, address protocolRegistry_) external override initializer {
         require(user_ != address(0), InvalidUser(user_));
-        require(
-            protocolRegistry_ != address(0),
-            InvalidProtocolRegistry(protocolRegistry_)
-        );
+        require(protocolRegistry_ != address(0), InvalidProtocolRegistry(protocolRegistry_));
         _owner = user_;
         _protocolRegistry = protocolRegistry_;
     }
@@ -72,7 +66,11 @@ contract LabelStore is Initializable, ILabelStore {
     function storeLabel(
         bytes32 labelhash,
         string calldata label
-    ) external override onlyAuthorisedProtocol {
+    )
+        external
+        override
+        onlyAuthorisedProtocol
+    {
         require(labelhash != bytes32(0), InvalidLabel(labelhash));
         require(_labelIndex[labelhash] == 0, LabelAlreadyExists(labelhash));
 
@@ -92,33 +90,22 @@ contract LabelStore is Initializable, ILabelStore {
     }
 
     /// @inheritdoc ILabelStore
-    function protocolRegistry()
-        external
-        view
-        override
-        returns (address protocolRegistry_)
-    {
+    function protocolRegistry() external view override returns (address protocolRegistry_) {
         return _protocolRegistry;
     }
 
     /// @inheritdoc ILabelStore
-    function hasLabel(
-        bytes32 labelhash
-    ) external view override returns (bool exists) {
+    function hasLabel(bytes32 labelhash) external view override returns (bool exists) {
         return _labelIndex[labelhash] != 0;
     }
 
     /// @inheritdoc ILabelStore
-    function isLocked(
-        bytes32 labelhash
-    ) external view override returns (bool locked) {
+    function isLocked(bytes32 labelhash) external view override returns (bool locked) {
         return _labelIndex[labelhash] != 0;
     }
 
     /// @inheritdoc ILabelStore
-    function getLabel(
-        bytes32 labelhash
-    ) external view override returns (string memory label) {
+    function getLabel(bytes32 labelhash) external view override returns (string memory label) {
         return _labels[labelhash];
     }
 
@@ -128,16 +115,12 @@ contract LabelStore is Initializable, ILabelStore {
     }
 
     /// @inheritdoc ILabelStore
-    function getLabelAt(
-        uint256 index
-    ) external view override returns (string memory label) {
+    function getLabelAt(uint256 index) external view override returns (string memory label) {
         return _labels[_labelList[index]];
     }
 
     /// @inheritdoc ILabelStore
-    function getLabelhashAt(
-        uint256 index
-    ) external view override returns (bytes32 labelhash) {
+    function getLabelhashAt(uint256 index) external view override returns (bytes32 labelhash) {
         return _labelList[index];
     }
 
@@ -145,7 +128,12 @@ contract LabelStore is Initializable, ILabelStore {
     function getLabels(
         uint256 offset,
         uint256 limit
-    ) external view override returns (string[] memory labels) {
+    )
+        external
+        view
+        override
+        returns (string[] memory labels)
+    {
         uint256 total = _labelList.length;
         if (offset >= total) return new string[](0);
 
@@ -162,7 +150,12 @@ contract LabelStore is Initializable, ILabelStore {
     function getLabelhashes(
         uint256 offset,
         uint256 limit
-    ) external view override returns (bytes32[] memory labelhashes) {
+    )
+        external
+        view
+        override
+        returns (bytes32[] memory labelhashes)
+    {
         uint256 total = _labelList.length;
         if (offset >= total) return new bytes32[](0);
 
@@ -177,21 +170,14 @@ contract LabelStore is Initializable, ILabelStore {
 
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 
     /// @notice Internal authorisation check deferred from the `onlyAuthorisedProtocol` modifier.
     function _onlyAuthorisedProtocol() internal view {
         require(
-            IDotnsProtocolRegistry(_protocolRegistry).isRegisteredAddress(
-                msg.sender
-            ),
+            IDotnsProtocolRegistry(_protocolRegistry).isRegisteredAddress(msg.sender),
             NotAuthorised(msg.sender)
         );
     }

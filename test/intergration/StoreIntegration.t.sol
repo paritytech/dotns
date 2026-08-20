@@ -62,11 +62,7 @@ contract StoreIntegrationTest is BaseDotns {
         }
 
         _gatewayRegisterBaseName(
-            IDotnsPopController.FullRegistration({
-                label: base,
-                user: ed,
-                link: _linkFresh(chatKey)
-            })
+            IDotnsPopController.FullRegistration({label: base, user: ed, link: _linkFresh(chatKey)})
         );
 
         vm.prank(ed);
@@ -87,34 +83,23 @@ contract StoreIntegrationTest is BaseDotns {
         bytes32 node = _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = uint256(node);
 
-        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(
-            tokenId,
-            leonardo
-        );
+        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
         dotnsRegistrar.transferFrom{value: outboundFee}(ed, leonardo, tokenId);
 
         address recipientStore = storeFactory.getLabelStore(leonardo);
         assertTrue(recipientStore != address(0));
-        assertEq(
-            ILabelStore(recipientStore).getLabel(node),
-            string.concat(label, ".dot")
-        );
+        assertEq(ILabelStore(recipientStore).getLabel(node), string.concat(label, ".dot"));
         assertTrue(ILabelStore(recipientStore).isLocked(node));
     }
 
-    function test_double_transfer_back_does_not_revert_on_existing_lock()
-        public
-    {
+    function test_double_transfer_back_does_not_revert_on_existing_lock() public {
         // Base must be >= 9 chars to classify as NoStatus under PopRules.
         string memory label = NOSTATUS_LABEL_A;
         bytes32 node = _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = uint256(node);
 
-        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(
-            tokenId,
-            leonardo
-        );
+        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
         dotnsRegistrar.transferFrom{value: outboundFee}(ed, leonardo, tokenId);
         uint256 returnFee = dotnsRegistrar.quoteTransferFee(tokenId, ed);
@@ -153,15 +138,10 @@ contract StoreIntegrationTest is BaseDotns {
 
         LabelStoreV2Int newImplementation = new LabelStoreV2Int();
         vm.prank(owner);
-        storeFactory.upgradeLabelStoreImplementation(
-            address(newImplementation)
-        );
+        storeFactory.upgradeLabelStoreImplementation(address(newImplementation));
 
         assertEq(LabelStoreV2Int(storeAddr).marker(), "label-v2");
-        assertEq(
-            ILabelStore(storeAddr).getLabel(node),
-            string.concat(label, ".dot")
-        );
+        assertEq(ILabelStore(storeAddr).getLabel(node), string.concat(label, ".dot"));
     }
 
     function test_beacon_upgrade_preserves_user_store_state() public {

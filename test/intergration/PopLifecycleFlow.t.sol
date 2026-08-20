@@ -38,18 +38,13 @@ contract PopLifecycleFlow is BaseDotns {
         bytes32 fullNode = dotnsPopResolver.fullClaim(liteLabelhash);
         assertTrue(fullNode != bytes32(0), "lite label has no full claim");
 
-        address owner = IERC721(address(dotnsRegistrar)).ownerOf(
-            uint256(fullNode)
-        );
+        address owner = IERC721(address(dotnsRegistrar)).ownerOf(uint256(fullNode));
         assertEq(owner, ed);
         assertEq(dotnsRegistrar.labelOf(uint256(fullNode)), FULL_LABEL);
         assertEq(dotnsPopResolver.chatKey(fullNode), CHAT_KEY);
         // Same label mirrored in the owner's Store under the canonical store key.
         ILabelStore ownerStore = ILabelStore(storeFactory.getLabelStore(owner));
-        assertEq(
-            ownerStore.getLabel(fullNode),
-            string.concat(FULL_LABEL, protocolRegistry.tld())
-        );
+        assertEq(ownerStore.getLabel(fullNode), string.concat(FULL_LABEL, protocolRegistry.tld()));
     }
 
     function test_pop_full_name_is_first_class_erc721_name() public {
@@ -70,13 +65,7 @@ contract PopLifecycleFlow is BaseDotns {
         dotnsContentResolver.setContenthash(fullNode, CONTENT_HASH_A);
         assertEq(dotnsContentResolver.contenthash(fullNode), CONTENT_HASH_A);
 
-        bytes32 subnode = _setSubnode(
-            ed,
-            fullNode,
-            SUB_LABEL,
-            FULL_LABEL,
-            leonardo
-        );
+        bytes32 subnode = _setSubnode(ed, fullNode, SUB_LABEL, FULL_LABEL, leonardo);
         assertEq(dotnsRegistry.owner(subnode), leonardo);
 
         uint256 _xferFee = dotnsRegistrar.quoteTransferFee(fullTokenId, tiago);
@@ -97,57 +86,37 @@ contract PopLifecycleFlow is BaseDotns {
         dotnsContentResolver.setContenthash(fullNode, CONTENT_HASH_B);
         assertEq(dotnsContentResolver.contenthash(fullNode), CONTENT_HASH_B);
 
-        bytes32 reassignedSubnode = _setSubnode(
-            tiago,
-            fullNode,
-            SUB_LABEL,
-            FULL_LABEL,
-            ed
-        );
+        bytes32 reassignedSubnode = _setSubnode(tiago, fullNode, SUB_LABEL, FULL_LABEL, ed);
         assertEq(reassignedSubnode, subnode);
         assertEq(dotnsRegistry.owner(subnode), ed);
         // The lite token is not transferred alongside the full token.
-        assertEq(
-            IERC721(address(dotnsRegistrar)).ownerOf(
-                uint256(_nodeOf(LITE_LABEL))
-            ),
-            ed
-        );
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(LITE_LABEL))), ed);
         // Store writes are one-shot-locked at registration time, so the label
         // stays under the original owner's Store even after transfer.
         ILabelStore edStore = ILabelStore(storeFactory.getLabelStore(ed));
         assertEq(
-            edStore.getLabel(_nodeOf(FULL_LABEL)),
-            string.concat(FULL_LABEL, protocolRegistry.tld())
+            edStore.getLabel(_nodeOf(FULL_LABEL)), string.concat(FULL_LABEL, protocolRegistry.tld())
         );
     }
 
-    function test_cold_gateway_reserve_then_user_settles_pending_claim()
-        public
-    {
+    function test_cold_gateway_reserve_then_user_settles_pending_claim() public {
         _grantPopFull(ed);
 
         _gatewayReserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL,
-                user: ed,
-                chatKey: CHAT_KEY
+                liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
         );
 
         bytes32 liteNode = _nodeOf(LITE_LABEL);
-        assertEq(
-            IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)),
-            ed
-        );
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)), ed);
         assertEq(dotnsRegistry.owner(liteNode), ed);
         assertEq(storeFactory.getLabelStore(ed), address(0));
         // Chat key is persisted eagerly on the resolver at reserve time; only the
         // LabelStore write is deferred for cold-path users.
         assertEq(dotnsPopResolver.chatKey(liteNode), CHAT_KEY);
 
-        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController
-            .pendingClaims(ed);
+        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController.pendingClaims(ed);
         assertEq(pending[0].label, LITE_LABEL);
         assertGt(pending[0].mintedAt, 0);
 
@@ -157,8 +126,7 @@ contract PopLifecycleFlow is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(liteNode),
-            string.concat(LITE_LABEL, protocolRegistry.tld())
+            ILabelStore(store).getLabel(liteNode), string.concat(LITE_LABEL, protocolRegistry.tld())
         );
         assertEq(dotnsPopResolver.chatKey(liteNode), CHAT_KEY);
         assertEq(dotnsPopController.pendingClaims(ed).length, 0);
@@ -169,9 +137,7 @@ contract PopLifecycleFlow is BaseDotns {
         _grantPopFull(ed);
         _gatewayReserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL,
-                user: ed,
-                chatKey: CHAT_KEY
+                liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
         );
         uint64 firstMintedAt = dotnsPopController.pendingClaims(ed)[0].mintedAt;
@@ -182,33 +148,26 @@ contract PopLifecycleFlow is BaseDotns {
         assertEq(dotnsPopController.pendingClaimUserCount(), 0);
 
         string memory secondLabel = "aliceli02";
-        bytes
-            memory secondKey = hex"04beefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafe";
+        bytes memory secondKey =
+            hex"04beefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafe";
         _gatewayReserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: secondLabel,
-                user: ed,
-                chatKey: secondKey
+                liteLabel: secondLabel, user: ed, chatKey: secondKey
             })
         );
 
-        IDotnsPopController.PendingClaim[] memory second = dotnsPopController
-            .pendingClaims(ed);
+        IDotnsPopController.PendingClaim[] memory second = dotnsPopController.pendingClaims(ed);
         assertEq(second[0].label, secondLabel);
         assertEq(dotnsPopResolver.chatKey(_nodeOf(secondLabel)), secondKey);
         assertGt(second[0].mintedAt, firstMintedAt);
         assertEq(dotnsPopController.pendingClaimUserCount(), 1);
     }
 
-    function test_transfer_of_token_with_live_pending_claim_does_not_move_claim()
-        public
-    {
+    function test_transfer_of_token_with_live_pending_claim_does_not_move_claim() public {
         _grantPopFull(ed);
         _gatewayReserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL,
-                user: ed,
-                chatKey: CHAT_KEY
+                liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
         );
 
@@ -222,8 +181,7 @@ contract PopLifecycleFlow is BaseDotns {
         // the registrar's transfer-sync path because `ed` has no store yet to
         // copy the label from; this is current `DotnsRegistrar._update`
         // behaviour and is independent of the pending-claim mapping.
-        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController
-            .pendingClaims(ed);
+        IDotnsPopController.PendingClaim[] memory pending = dotnsPopController.pendingClaims(ed);
         assertEq(pending[0].label, LITE_LABEL);
         assertGt(pending[0].mintedAt, 0);
         assertEq(dotnsPopController.pendingClaims(tiago).length, 0);
@@ -234,20 +192,15 @@ contract PopLifecycleFlow is BaseDotns {
         assertTrue(edStore != address(0));
         bytes32 node = _nodeOf(LITE_LABEL);
         assertEq(
-            ILabelStore(edStore).getLabel(node),
-            string.concat(LITE_LABEL, protocolRegistry.tld())
+            ILabelStore(edStore).getLabel(node), string.concat(LITE_LABEL, protocolRegistry.tld())
         );
     }
 
-    function test_lapsed_pending_claim_is_swept_without_deploying_store()
-        public
-    {
+    function test_lapsed_pending_claim_is_swept_without_deploying_store() public {
         _grantPopFull(ed);
         _gatewayReserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL,
-                user: ed,
-                chatKey: CHAT_KEY
+                liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
         );
 
@@ -266,17 +219,12 @@ contract PopLifecycleFlow is BaseDotns {
         _grantPopLite(ed);
         _gatewayReserveLiteName(
             IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL,
-                user: ed,
-                chatKey: CHAT_KEY
+                liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
         );
 
         bytes32 liteNode = _nodeOf(LITE_LABEL);
-        assertEq(
-            IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)),
-            ed
-        );
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)), ed);
 
         _grantPopFull(ed);
 
@@ -284,14 +232,8 @@ contract PopLifecycleFlow is BaseDotns {
         _commitAndRegister(popfullLabel, ed, false);
 
         bytes32 fullNode = _nodeOf(popfullLabel);
-        assertEq(
-            IERC721(address(dotnsRegistrar)).ownerOf(uint256(fullNode)),
-            ed
-        );
-        assertEq(
-            IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)),
-            ed
-        );
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(fullNode)), ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)), ed);
     }
 
     /// @notice Mints the lite label for `user` then claims the full label against it.
@@ -307,9 +249,7 @@ contract PopLifecycleFlow is BaseDotns {
         _reservePop(user, LITE_LABEL, CHAT_KEY, FULL_LABEL);
         _gatewayRegisterBaseName(
             IDotnsPopController.FullRegistration({
-                label: FULL_LABEL,
-                user: user,
-                link: _linkWithLite(LITE_LABEL)
+                label: FULL_LABEL, user: user, link: _linkWithLite(LITE_LABEL)
             })
         );
     }
@@ -327,14 +267,13 @@ contract PopLifecycleFlow is BaseDotns {
         string memory subLabel,
         string memory parentLabel,
         address subOwner
-    ) internal returns (bytes32 subnode) {
-        IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry
-            .SubnodeRecord({
-                parentNode: parentNode,
-                subLabel: subLabel,
-                parentLabel: parentLabel,
-                owner: subOwner
-            });
+    )
+        internal
+        returns (bytes32 subnode)
+    {
+        IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: subOwner
+        });
 
         vm.prank(parentOwner);
         subnode = dotnsRegistry.setSubnodeOwner(record);

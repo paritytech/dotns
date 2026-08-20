@@ -27,17 +27,12 @@ contract LabelStoreV2 is LabelStore {
 contract StoreFactoryTests is BaseDotns {
     function test_constructor_reverts_on_zero_registry() public {
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IStoreFactory.InvalidProtocolRegistry.selector,
-                address(0)
-            )
+            abi.encodeWithSelector(IStoreFactory.InvalidProtocolRegistry.selector, address(0))
         );
         new StoreFactory(address(0), owner);
     }
 
-    function test_constructor_deploys_both_beacons_and_implementations()
-        public
-    {
+    function test_constructor_deploys_both_beacons_and_implementations() public {
         StoreFactory fresh = new StoreFactory(address(protocolRegistry), owner);
         assertTrue(fresh.labelStoreBeacon() != address(0));
         assertTrue(fresh.userStoreBeacon() != address(0));
@@ -46,14 +41,8 @@ contract StoreFactoryTests is BaseDotns {
     }
 
     function test_beacon_owner_is_factory_for_both_beacons() public view {
-        assertEq(
-            UpgradeableBeacon(storeFactory.labelStoreBeacon()).owner(),
-            address(storeFactory)
-        );
-        assertEq(
-            UpgradeableBeacon(storeFactory.userStoreBeacon()).owner(),
-            address(storeFactory)
-        );
+        assertEq(UpgradeableBeacon(storeFactory.labelStoreBeacon()).owner(), address(storeFactory));
+        assertEq(UpgradeableBeacon(storeFactory.userStoreBeacon()).owner(), address(storeFactory));
     }
 
     function test_deployLabelStoreFor_succeeds_for_owner() public {
@@ -61,55 +50,32 @@ contract StoreFactoryTests is BaseDotns {
         address store = storeFactory.deployLabelStoreFor(ed);
         assertEq(storeFactory.getLabelStore(ed), store);
         assertEq(ILabelStore(store).owner(), ed);
-        assertEq(
-            ILabelStore(store).protocolRegistry(),
-            address(protocolRegistry)
-        );
+        assertEq(ILabelStore(store).protocolRegistry(), address(protocolRegistry));
     }
 
-    function test_deployLabelStoreFor_succeeds_for_registered_protocol()
-        public
-    {
+    function test_deployLabelStoreFor_succeeds_for_registered_protocol() public {
         vm.prank(address(dotnsRegistrarController));
         address store = storeFactory.deployLabelStoreFor(ed);
         assertEq(storeFactory.getLabelStore(ed), store);
     }
 
-    function test_deployLabelStoreFor_reverts_for_unregistered_non_owner()
-        public
-    {
+    function test_deployLabelStoreFor_reverts_for_unregistered_non_owner() public {
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IStoreFactory.NotAuthorised.selector,
-                attacker
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IStoreFactory.NotAuthorised.selector, attacker));
         storeFactory.deployLabelStoreFor(ed);
     }
 
     function test_deployLabelStoreFor_reverts_on_zero_user() public {
         vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IStoreFactory.InvalidUser.selector,
-                address(0)
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IStoreFactory.InvalidUser.selector, address(0)));
         storeFactory.deployLabelStoreFor(address(0));
     }
 
     function test_deployLabelStoreFor_reverts_on_double_deploy() public {
         vm.startPrank(owner);
         address first = storeFactory.deployLabelStoreFor(ed);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IStoreFactory.AlreadyDeployed.selector,
-                ed,
-                first
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IStoreFactory.AlreadyDeployed.selector, ed, first));
         storeFactory.deployLabelStoreFor(ed);
         vm.stopPrank();
     }
@@ -124,13 +90,7 @@ contract StoreFactoryTests is BaseDotns {
     function test_claimUserStore_reverts_on_double_claim() public {
         vm.startPrank(ed);
         address first = storeFactory.claimUserStore();
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IStoreFactory.AlreadyDeployed.selector,
-                ed,
-                first
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IStoreFactory.AlreadyDeployed.selector, ed, first));
         storeFactory.claimUserStore();
         vm.stopPrank();
     }
@@ -148,46 +108,28 @@ contract StoreFactoryTests is BaseDotns {
         assertEq(IUserStore(victimStore).owner(), ed);
     }
 
-    function test_upgradeLabelStoreImplementation_reverts_for_non_owner()
-        public
-    {
+    function test_upgradeLabelStoreImplementation_reverts_for_non_owner() public {
         LabelStoreV2 newImplementation = new LabelStoreV2();
         vm.prank(ed);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Ownable.OwnableUnauthorizedAccount.selector,
-                ed
-            )
-        );
-        storeFactory.upgradeLabelStoreImplementation(
-            address(newImplementation)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, ed));
+        storeFactory.upgradeLabelStoreImplementation(address(newImplementation));
     }
 
-    function test_upgradeLabelStoreImplementation_reverts_on_zero_impl()
-        public
-    {
+    function test_upgradeLabelStoreImplementation_reverts_on_zero_impl() public {
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IStoreFactory.InvalidImplementation.selector,
-                address(0)
-            )
+            abi.encodeWithSelector(IStoreFactory.InvalidImplementation.selector, address(0))
         );
         storeFactory.upgradeLabelStoreImplementation(address(0));
     }
 
-    function test_upgradeLabelStoreImplementation_propagates_to_live_proxies()
-        public
-    {
+    function test_upgradeLabelStoreImplementation_propagates_to_live_proxies() public {
         vm.prank(owner);
         address store = storeFactory.deployLabelStoreFor(ed);
 
         LabelStoreV2 newImplementation = new LabelStoreV2();
         vm.prank(owner);
-        storeFactory.upgradeLabelStoreImplementation(
-            address(newImplementation)
-        );
+        storeFactory.upgradeLabelStoreImplementation(address(newImplementation));
 
         assertEq(LabelStoreV2(store).versionMarker(), "v2");
     }

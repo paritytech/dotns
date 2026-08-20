@@ -13,14 +13,9 @@ contract DotnsProtocolRegistryFuzzTest is BaseDotns {
     /// @notice Deploys an uninitialised registry behind a bare proxy.
     /// @dev Wires the proxy directly so `initialize` is called in the open and its revert
     ///      surfaces raw, rather than wrapped by the upgrades plugin's deploy helper.
-    function _uninitialisedRegistry()
-        internal
-        returns (DotnsProtocolRegistry registry)
-    {
+    function _uninitialisedRegistry() internal returns (DotnsProtocolRegistry registry) {
         DotnsProtocolRegistry implementation = new DotnsProtocolRegistry();
-        registry = DotnsProtocolRegistry(
-            address(new ERC1967Proxy(address(implementation), ""))
-        );
+        registry = DotnsProtocolRegistry(address(new ERC1967Proxy(address(implementation), "")));
     }
 
     function test_initialise_reverts_on_empty_tld() public {
@@ -41,7 +36,9 @@ contract DotnsProtocolRegistryFuzzTest is BaseDotns {
         bytes32 k3,
         address a,
         address b
-    ) public {
+    )
+        public
+    {
         vm.assume(k1 != k2 && k2 != k3 && k1 != k3);
         vm.assume(a != address(0) && b != address(0) && a != b);
         // Exclude fixture-registered addresses so the refcount transitions under test aren't
@@ -70,11 +67,7 @@ contract DotnsProtocolRegistryFuzzTest is BaseDotns {
         vm.stopPrank();
     }
 
-    function testFuzz_set_same_pair_is_no_op(
-        bytes32 key,
-        address a,
-        address b
-    ) public {
+    function testFuzz_set_same_pair_is_no_op(bytes32 key, address a, address b) public {
         vm.assume(a != address(0) && b != address(0) && a != b);
         // Exclude addresses already wired up by the BaseDotns fixture (registrar,
         // controller, resolvers, etc.) so the single-key accounting this test exercises
@@ -97,10 +90,7 @@ contract DotnsProtocolRegistryFuzzTest is BaseDotns {
         vm.stopPrank();
     }
 
-    function testFuzz_zero_address_never_registered(
-        bytes32 key,
-        address a
-    ) public {
+    function testFuzz_zero_address_never_registered(bytes32 key, address a) public {
         vm.assume(a != address(0));
 
         assertFalse(protocolRegistry.isRegisteredAddress(address(0)));

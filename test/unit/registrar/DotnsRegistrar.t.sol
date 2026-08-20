@@ -12,7 +12,9 @@ import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /// @title DotnsRegistrarTests
 /// @notice Unit coverage for the ERC721 registrar's controller authorisation,
@@ -26,18 +28,14 @@ contract DotnsRegistrarTests is BaseDotns {
         dotnsRegistrar.addController(IDotnsController(additionalController));
         vm.stopPrank();
 
-        assertTrue(
-            dotnsRegistrar.controllers(IDotnsController(additionalController))
-        );
+        assertTrue(dotnsRegistrar.controllers(IDotnsController(additionalController)));
     }
 
     function test_add_controller_emits_event() public {
         address additionalController = makeAddr("additionalController");
 
         vm.expectEmit(true, false, false, true, address(dotnsRegistrar));
-        emit IDotnsRegistrar.ControllerAdded(
-            IDotnsController(additionalController)
-        );
+        emit IDotnsRegistrar.ControllerAdded(IDotnsController(additionalController));
 
         vm.prank(owner);
         dotnsRegistrar.addController(IDotnsController(additionalController));
@@ -51,9 +49,7 @@ contract DotnsRegistrarTests is BaseDotns {
         dotnsRegistrar.removeController(IDotnsController(temporaryController));
         vm.stopPrank();
 
-        assertFalse(
-            dotnsRegistrar.controllers(IDotnsController(temporaryController))
-        );
+        assertFalse(dotnsRegistrar.controllers(IDotnsController(temporaryController)));
     }
 
     function test_remove_controller_emits_event() public {
@@ -62,9 +58,7 @@ contract DotnsRegistrarTests is BaseDotns {
         dotnsRegistrar.addController(IDotnsController(temporaryController));
 
         vm.expectEmit(true, false, false, true, address(dotnsRegistrar));
-        emit IDotnsRegistrar.ControllerRemoved(
-            IDotnsController(temporaryController)
-        );
+        emit IDotnsRegistrar.ControllerRemoved(IDotnsController(temporaryController));
 
         vm.prank(owner);
         dotnsRegistrar.removeController(IDotnsController(temporaryController));
@@ -72,10 +66,7 @@ contract DotnsRegistrarTests is BaseDotns {
 
     function test_add_controller_reverts_for_non_owner() public {
         vm.expectRevert(
-            abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                ed
-            )
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, ed)
         );
         vm.prank(ed);
         dotnsRegistrar.addController(IDotnsController(address(this)));
@@ -83,15 +74,10 @@ contract DotnsRegistrarTests is BaseDotns {
 
     function test_remove_controller_reverts_for_non_owner() public {
         vm.expectRevert(
-            abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                ed
-            )
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, ed)
         );
         vm.prank(ed);
-        dotnsRegistrar.removeController(
-            IDotnsController(address(dotnsRegistrarController))
-        );
+        dotnsRegistrar.removeController(IDotnsController(address(dotnsRegistrarController)));
     }
 
     function test_register_mints_to_owner() public {
@@ -122,9 +108,7 @@ contract DotnsRegistrarTests is BaseDotns {
         string memory label = "intruder";
         uint256 tokenId = _tokenIdForLabel(label);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IDotnsRegistrar.NotController.selector, ed)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDotnsRegistrar.NotController.selector, ed));
         vm.prank(ed);
         dotnsRegistrar.register(tokenId, ed, label);
     }
@@ -136,12 +120,7 @@ contract DotnsRegistrarTests is BaseDotns {
         vm.prank(address(dotnsRegistrarController));
         dotnsRegistrar.register(tokenId, ed, label);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsRegistrar.NameNotAvailable.selector,
-                tokenId
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDotnsRegistrar.NameNotAvailable.selector, tokenId));
         vm.prank(address(dotnsRegistrarController));
         dotnsRegistrar.register(tokenId, leonardo, label);
     }
@@ -154,14 +133,8 @@ contract DotnsRegistrarTests is BaseDotns {
         dotnsRegistrar.register(tokenId, ed, label);
 
         address store = storeFactory.getLabelStore(ed);
-        assertTrue(
-            store != address(0),
-            "label store must be deployed on register"
-        );
-        assertEq(
-            ILabelStore(store).getLabel(bytes32(tokenId)),
-            string.concat(label, ".dot")
-        );
+        assertTrue(store != address(0), "label store must be deployed on register");
+        assertEq(ILabelStore(store).getLabel(bytes32(tokenId)), string.concat(label, ".dot"));
     }
 
     function test_register_with_empty_label_skips_store_write() public {
@@ -173,11 +146,7 @@ contract DotnsRegistrarTests is BaseDotns {
         vm.prank(address(dotnsRegistrarController));
         dotnsRegistrar.register(tokenId, ed, "");
 
-        assertEq(
-            storeFactory.getLabelStore(ed),
-            address(0),
-            "no store must be deployed"
-        );
+        assertEq(storeFactory.getLabelStore(ed), address(0), "no store must be deployed");
         assertEq(dotnsRegistrar.ownerOf(tokenId), ed);
         // Avoid `unused variable` warnings under stricter solc settings.
         label;
@@ -243,9 +212,7 @@ contract DotnsRegistrarTests is BaseDotns {
         assertEq(dotnsRegistrar.labelOf(tokenId), label);
     }
 
-    function test_label_of_returns_empty_when_owner_has_no_label_store()
-        public
-    {
+    function test_label_of_returns_empty_when_owner_has_no_label_store() public {
         // Register with an empty label so no LabelStore is provisioned. `labelOf` reads
         // from the holder's store and must fall through to the empty-string sentinel
         // rather than reverting on the missing store.
@@ -265,10 +232,7 @@ contract DotnsRegistrarTests is BaseDotns {
         uint256 tokenId = _tokenIdForLabel(label);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IERC721Errors.ERC721InvalidReceiver.selector,
-                address(0)
-            )
+            abi.encodeWithSelector(IERC721Errors.ERC721InvalidReceiver.selector, address(0))
         );
         dotnsRegistrar.quoteTransferFee(tokenId, address(0));
     }
@@ -283,10 +247,7 @@ contract DotnsRegistrarTests is BaseDotns {
         // mutating storage.
         vm.mockCall(
             address(protocolRegistry),
-            abi.encodeWithSelector(
-                IDotnsProtocolRegistry.get.selector,
-                DotnsConstants.NAME_ESCROW
-            ),
+            abi.encodeWithSelector(IDotnsProtocolRegistry.get.selector, DotnsConstants.NAME_ESCROW),
             abi.encode(address(0))
         );
 
@@ -307,10 +268,7 @@ contract DotnsRegistrarTests is BaseDotns {
         _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = _tokenIdForLabel(label);
 
-        assertEq(
-            dotnsRegistrar.quoteTransferFee(tokenId, address(dotnsNameEscrow)),
-            0
-        );
+        assertEq(dotnsRegistrar.quoteTransferFee(tokenId, address(dotnsNameEscrow)), 0);
     }
 
     function test_quote_transfer_fee_zero_when_no_label_recorded() public {
@@ -326,9 +284,7 @@ contract DotnsRegistrarTests is BaseDotns {
         label;
     }
 
-    function test_transfer_reverts_when_fee_required_but_no_value_attached()
-        public
-    {
+    function test_transfer_reverts_when_fee_required_but_no_value_attached() public {
         string memory label = "feerequired01";
         // Grant Full to ed so the mint succeeds, but leave leonardo at NoStatus so the
         // transfer floor charges a non-zero downgrade fee.
@@ -340,10 +296,7 @@ contract DotnsRegistrarTests is BaseDotns {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IDotnsRegistrar.TransferFeeRequired.selector,
-                tokenId,
-                leonardo,
-                fee
+                IDotnsRegistrar.TransferFeeRequired.selector, tokenId, leonardo, fee
             )
         );
         vm.prank(ed);
@@ -356,14 +309,13 @@ contract DotnsRegistrarTests is BaseDotns {
         _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = _tokenIdForLabel(label);
 
-        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom{value: 0}(ed, ed, tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory afterPos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory afterPos =
+            dotnsNameEscrow.getReleasePosition(tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), ed);
         assertEq(afterPos.recipient, before.recipient);
@@ -377,9 +329,7 @@ contract DotnsRegistrarTests is BaseDotns {
     function test_initialize_cannot_be_called_twice() public {
         vm.expectRevert(); // OZ InvalidInitialization
         dotnsRegistrar.initialize(
-            "Dotns",
-            "Dotns",
-            IDotnsProtocolRegistry(address(protocolRegistry))
+            "Dotns", "Dotns", IDotnsProtocolRegistry(address(protocolRegistry))
         );
     }
 
@@ -387,10 +337,7 @@ contract DotnsRegistrarTests is BaseDotns {
         DotnsRegistrar newImpl = new DotnsRegistrar();
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                ed
-            )
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, ed)
         );
         vm.prank(ed);
         dotnsRegistrar.upgradeToAndCall(address(newImpl), bytes(""));

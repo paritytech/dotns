@@ -23,10 +23,7 @@ contract Create3Factory {
     /// @param initCodeHash `keccak256` of the init code passed to @custom:function deploy.
     /// @param value Native value forwarded to the constructor (zero for the dotNS pipeline).
     event Deployed(
-        bytes32 indexed salt,
-        address indexed deployed,
-        bytes32 initCodeHash,
-        uint256 value
+        bytes32 indexed salt, address indexed deployed, bytes32 initCodeHash, uint256 value
     );
 
     /// @notice Thrown when @custom:function deploy is called with an empty `initCode` blob.
@@ -54,7 +51,11 @@ contract Create3Factory {
     function deploy(
         bytes32 salt,
         bytes calldata initCode
-    ) external payable returns (address deployed) {
+    )
+        external
+        payable
+        returns (address deployed)
+    {
         if (initCode.length == 0) revert EmptyInitCode();
 
         deployed = CREATE3.deployDeterministic(msg.value, initCode, salt);

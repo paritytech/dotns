@@ -40,14 +40,14 @@ contract DeployPopSystem is BaseDeployer {
     function _deployPopResolver(
         address owner,
         address protocolRegistry
-    ) internal returns (address proxy) {
+    )
+        internal
+        returns (address proxy)
+    {
         proxy = _broadcastDeployUups(
             owner,
             "DotnsPopResolver.sol:DotnsPopResolver",
-            abi.encodeCall(
-                DotnsPopResolver.initialize,
-                (IDotnsProtocolRegistry(protocolRegistry))
-            ),
+            abi.encodeCall(DotnsPopResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
             "DotnsPopResolver"
         );
     }
@@ -55,16 +55,16 @@ contract DeployPopSystem is BaseDeployer {
     function _deployPopController(
         address owner,
         address protocolRegistry
-    ) internal returns (address proxy) {
+    )
+        internal
+        returns (address proxy)
+    {
         proxy = _broadcastDeployUups(
             owner,
             "DotnsPopController.sol:DotnsPopController",
             abi.encodeCall(
                 DotnsPopController.initialize,
-                (
-                    IDotnsProtocolRegistry(protocolRegistry),
-                    DEFAULT_RESERVATION_DURATION
-                )
+                (IDotnsProtocolRegistry(protocolRegistry), DEFAULT_RESERVATION_DURATION)
             ),
             "DotnsPopController"
         );
@@ -84,7 +84,10 @@ contract DeployPopSystem is BaseDeployer {
     function _deployGatewayDispatcher(
         address owner,
         address popController
-    ) internal returns (address dispatcher) {
+    )
+        internal
+        returns (address dispatcher)
+    {
         dispatcher = _broadcastDeployCreate3(
             owner,
             "RootGatewayDispatcher.sol:RootGatewayDispatcher",

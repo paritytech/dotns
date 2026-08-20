@@ -23,11 +23,7 @@ interface IDotnsContentResolver {
     /// @param owner The owner of the nodes.
     /// @param operator The operator address.
     /// @param approved True if approved, false if revoked.
-    event ApprovalForAll(
-        address indexed owner,
-        address indexed operator,
-        bool approved
-    );
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
     /// @notice Thrown when the caller is not authorised to modify a node.
     /// @param node The node being modified.
@@ -46,9 +42,7 @@ interface IDotnsContentResolver {
     /// @notice Returns the content hash associated with a node.
     /// @param node The node to query.
     /// @return hash The stored content hash bytes, or empty if unset.
-    function contenthash(
-        bytes32 node
-    ) external view returns (bytes memory hash);
+    function contenthash(bytes32 node) external view returns (bytes memory hash);
 
     /// @notice Sets a text record for a node.
     /// @dev The caller must own the node in the DotNS registry or be an approved operator,
@@ -58,20 +52,13 @@ interface IDotnsContentResolver {
     /// @param node The node whose text record is being set.
     /// @param key Text record key (e.g., "ipfs", "avatar").
     /// @param value Text record value.
-    function setText(
-        bytes32 node,
-        string calldata key,
-        string calldata value
-    ) external;
+    function setText(bytes32 node, string calldata key, string calldata value) external;
 
     /// @notice Returns a text record for a node.
     /// @param node The node to query.
     /// @param key Text record key.
     /// @return value Stored text value, or empty string if unset.
-    function text(
-        bytes32 node,
-        string calldata key
-    ) external view returns (string memory value);
+    function text(bytes32 node, string calldata key) external view returns (string memory value);
 
     /// @notice Enable or disable approval for a third party ("operator") to manage all of
     /// `msg.sender`'s nodes.
@@ -85,8 +72,5 @@ interface IDotnsContentResolver {
     /// @param owner The owner of the nodes.
     /// @param operator The address acting on behalf of the owner.
     /// @return True if operator is approved, false otherwise.
-    function isApprovedForAll(
-        address owner,
-        address operator
-    ) external view returns (bool);
+    function isApprovedForAll(address owner, address operator) external view returns (bool);
 }

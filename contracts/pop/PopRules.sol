@@ -3,8 +3,12 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {ERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC165Upgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {IPopRules} from "./IPopRules.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
@@ -66,7 +70,10 @@ contract PopRules is
     function initialize(
         uint256 _startingPrice,
         IDotnsProtocolRegistry registry
-    ) public initializer {
+    )
+        public
+        initializer
+    {
         __Ownable_init(msg.sender);
         __ERC165_init();
         updateStartingPrice(_startingPrice);
@@ -74,18 +81,14 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function updateStartingPrice(
-        uint256 newStartingPrice
-    ) public override onlyOwner {
+    function updateStartingPrice(uint256 newStartingPrice) public override onlyOwner {
         require(newStartingPrice > 0, PopError("Price must be greater than 0"));
         emit StartingPriceUpdated(startingPrice, newStartingPrice);
         startingPrice = newStartingPrice;
     }
 
     /// @inheritdoc IPopRules
-    function classifyName(
-        string calldata name
-    )
+    function classifyName(string calldata name)
         external
         pure
         override
@@ -99,33 +102,29 @@ contract PopRules is
     function reserveBaseName(
         string calldata stem,
         address userAddress
-    ) external override onlyRegistry {
+    )
+        external
+        override
+        onlyRegistry
+    {
         _requireCanonicalLabel(stem);
         uint256 stemLength = bytes(stem).length;
         require(
-            stemLength >= 6 &&
-                stemLength <= 8 &&
-                _countTrailingDigits(stem) == 0,
-            PopError(
-                "Reservation stem must be 6-8 chars with no trailing digits"
-            )
+            stemLength >= 6 && stemLength <= 8 && _countTrailingDigits(stem) == 0,
+            PopError("Reservation stem must be 6-8 chars with no trailing digits")
         );
         _writeReservation(stem, userAddress);
     }
 
     /// @inheritdoc IPopRules
-    function isBaseName(
-        string calldata baseName
-    ) external pure override returns (bool isBase) {
+    function isBaseName(string calldata baseName) external pure override returns (bool isBase) {
         _requireCanonicalLabel(baseName);
         uint256 digits = _countTrailingDigits(baseName);
         return digits == 0;
     }
 
     /// @inheritdoc IPopRules
-    function getBaseNameReservation(
-        string calldata baseName
-    )
+    function getBaseNameReservation(string calldata baseName)
         external
         view
         override
@@ -137,17 +136,11 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function isBaseNameReserved(
-        string calldata baseName
-    )
+    function isBaseNameReserved(string calldata baseName)
         external
         view
         override
-        returns (
-            bool isReserved,
-            address reservationOwner,
-            uint64 expiryTimestamp
-        )
+        returns (bool isReserved, address reservationOwner, uint64 expiryTimestamp)
     {
         _requireCanonicalLabel(baseName);
         Reservation memory reservation = reservations[baseName];
@@ -158,19 +151,20 @@ contract PopRules is
     function priceWithCheck(
         string calldata name,
         address userAddress
-    ) external view override returns (PriceWithMeta memory metadata) {
+    )
+        external
+        view
+        override
+        returns (PriceWithMeta memory metadata)
+    {
         _requireCanonicalLabel(name);
         _enforceReservationRules(name, userAddress);
 
-        (
-            PopStatus requiredStatus,
-            string memory classification
-        ) = _classifyValidatedName(name);
+        (PopStatus requiredStatus, string memory classification) = _classifyValidatedName(name);
         PopStatus userStatus = _personhoodTier(userAddress);
 
-        metadata.price = userStatus == PopStatus.NoStatus
-            ? _priceValidatedName(bytes(name).length)
-            : 0;
+        metadata.price =
+            userStatus == PopStatus.NoStatus ? _priceValidatedName(bytes(name).length) : 0;
         metadata.status = requiredStatus;
         metadata.userStatus = userStatus;
         metadata.message = classification;
@@ -179,13 +173,11 @@ contract PopRules is
 
         if (requiredStatus == PopStatus.PopFull) {
             require(
-                userStatus == PopStatus.PopFull,
-                PopError("Requires Full Personhood verification")
+                userStatus == PopStatus.PopFull, PopError("Requires Full Personhood verification")
             );
         } else if (requiredStatus == PopStatus.PopLite) {
             require(
-                userStatus == PopStatus.PopLite ||
-                    userStatus == PopStatus.PopFull,
+                userStatus == PopStatus.PopLite || userStatus == PopStatus.PopFull,
                 PopError("Requires Personhood Lite verification")
             );
         }
@@ -198,18 +190,19 @@ contract PopRules is
     function priceWithoutCheck(
         string calldata name,
         address userAddress
-    ) external view override returns (PriceWithMeta memory metadata) {
+    )
+        external
+        view
+        override
+        returns (PriceWithMeta memory metadata)
+    {
         _requireCanonicalLabel(name);
 
-        (
-            PopStatus requiredStatus,
-            string memory classification
-        ) = _classifyValidatedName(name);
+        (PopStatus requiredStatus, string memory classification) = _classifyValidatedName(name);
         PopStatus userStatus = _personhoodTier(userAddress);
 
-        metadata.price = userStatus == PopStatus.NoStatus
-            ? _priceValidatedName(bytes(name).length)
-            : 0;
+        metadata.price =
+            userStatus == PopStatus.NoStatus ? _priceValidatedName(bytes(name).length) : 0;
         metadata.status = requiredStatus;
         metadata.userStatus = userStatus;
         metadata.message = classification;
@@ -218,8 +211,7 @@ contract PopRules is
         Reservation memory reservation = reservations[baseName];
 
         if (_isLive(reservation) && reservation.owner != userAddress) {
-            metadata
-                .message = "Base name reserved for original Lite registrant";
+            metadata.message = "Base name reserved for original Lite registrant";
             metadata.status = IPopRules.PopStatus.Reserved;
         }
 
@@ -227,9 +219,7 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function price(
-        string calldata name
-    ) external view override returns (uint256) {
+    function price(string calldata name) external view override returns (uint256) {
         _requireCanonicalLabel(name);
         return _priceValidatedName(bytes(name).length);
     }
@@ -238,9 +228,14 @@ contract PopRules is
     function reachFee(
         string calldata name,
         address account
-    ) external view override returns (uint256 fee) {
+    )
+        external
+        view
+        override
+        returns (uint256 fee)
+    {
         _requireCanonicalLabel(name);
-        (PopStatus required, ) = _classifyValidatedName(name);
+        (PopStatus required,) = _classifyValidatedName(name);
         if (_meetsReach(required, _personhoodTier(account))) {
             return 0;
         }
@@ -252,25 +247,25 @@ contract PopRules is
         string calldata name,
         address from,
         address to
-    ) external view override returns (uint256 floor) {
+    )
+        external
+        view
+        override
+        returns (uint256 floor)
+    {
         _requireCanonicalLabel(name);
         if (from == to) return 0;
-        (PopStatus required, ) = _classifyValidatedName(name);
+        (PopStatus required,) = _classifyValidatedName(name);
 
         PopStatus toTier = _personhoodTier(to);
-        uint256 reachComponent = _meetsReach(required, toTier)
-            ? 0
-            : startingPrice;
+        uint256 reachComponent = _meetsReach(required, toTier) ? 0 : startingPrice;
 
         PopStatus fromTier = _personhoodTier(from);
         // `_personhoodTier` never returns Reserved, so users are in {NoStatus, PopLite, PopFull}
         // and enum comparison reflects tier ordering directly.
         uint256 downgradeComponent = toTier < fromTier ? startingPrice : 0;
 
-        return
-            reachComponent > downgradeComponent
-                ? reachComponent
-                : downgradeComponent;
+        return reachComponent > downgradeComponent ? reachComponent : downgradeComponent;
     }
 
     /// @notice Reads `account`'s dotns-scoped personhood tier from the alias-accounts
@@ -281,9 +276,8 @@ contract PopRules is
     ///      collapses to `NoStatus` so a future tier addition fails closed instead of
     ///      silently being treated as a higher level than it actually is.
     function _personhoodTier(address account) private view returns (PopStatus) {
-        IPersonhood.PersonhoodInfo memory info = IPersonhood(
-            DotnsConstants.PERSONHOOD
-        ).personhoodStatus(account, DotnsConstants.PERSONHOOD_CONTEXT);
+        IPersonhood.PersonhoodInfo memory info = IPersonhood(DotnsConstants.PERSONHOOD)
+            .personhoodStatus(account, DotnsConstants.PERSONHOOD_CONTEXT);
         if (info.status == 2) return PopStatus.PopFull;
         if (info.status == 1) return PopStatus.PopLite;
         return PopStatus.NoStatus;
@@ -297,16 +291,11 @@ contract PopRules is
     /// (governance label) is unreachable by any verified user, so the comparison returns false and
     /// the caller charges the friction fee, providing defence-in-depth if a Reserved label ever
     /// enters circulation.
-    function _meetsReach(
-        PopStatus required,
-        PopStatus userStatus
-    ) private pure returns (bool) {
+    function _meetsReach(PopStatus required, PopStatus userStatus) private pure returns (bool) {
         return userStatus >= required;
     }
 
-    function _priceValidatedName(
-        uint256 namelength
-    ) internal view returns (uint256 priceValue) {
+    function _priceValidatedName(uint256 namelength) internal view returns (uint256 priceValue) {
         if (namelength < 9) {
             return 0;
         }
@@ -316,10 +305,7 @@ contract PopRules is
     /// @notice Enforces base-name reservation rules.
     /// @param name Domain label.
     /// @param userAddress Registering user.
-    function _enforceReservationRules(
-        string calldata name,
-        address userAddress
-    ) internal view {
+    function _enforceReservationRules(string calldata name, address userAddress) internal view {
         string memory baseName = _stripDigits(name);
         Reservation memory reservation = reservations[baseName];
 
@@ -332,20 +318,18 @@ contract PopRules is
     }
 
     /// @notice Returns whether `reservation` is live at `block.timestamp`.
-    function _isLive(
-        Reservation memory reservation
-    ) internal view returns (bool) {
-        return
-            reservation.owner != address(0) &&
-            reservation.expires > block.timestamp;
+    function _isLive(Reservation memory reservation) internal view returns (bool) {
+        return reservation.owner != address(0) && reservation.expires > block.timestamp;
     }
 
     /// @notice Counts trailing digits in a string.
     /// @param label String to analyse.
     /// @return digitCount Number of trailing digits.
-    function _countTrailingDigits(
-        string calldata label
-    ) internal pure returns (uint256 digitCount) {
+    function _countTrailingDigits(string calldata label)
+        internal
+        pure
+        returns (uint256 digitCount)
+    {
         bytes calldata bytesLabel = bytes(label);
         for (uint256 i = bytesLabel.length; i > 0; i--) {
             if (bytesLabel[i - 1] >= 0x30 && bytesLabel[i - 1] <= 0x39) {
@@ -358,16 +342,13 @@ contract PopRules is
 
     /// @notice Strips trailing digits from a name.
     /// @param name Domain label.
-    function _stripDigits(
-        string calldata name
-    ) internal pure returns (string memory baseName) {
+    function _stripDigits(string calldata name) internal pure returns (string memory baseName) {
         bytes calldata bytesName = bytes(name);
         uint256 endPosition = bytesName.length;
 
         while (
-            endPosition > 0 &&
-            bytesName[endPosition - 1] >= 0x30 &&
-            bytesName[endPosition - 1] <= 0x39
+            endPosition > 0 && bytesName[endPosition - 1] >= 0x30
+                && bytesName[endPosition - 1] <= 0x39
         ) {
             endPosition--;
         }
@@ -383,9 +364,11 @@ contract PopRules is
         return string(output);
     }
 
-    function _classifyValidatedName(
-        string calldata name
-    ) internal pure returns (PopStatus requirement, string memory message) {
+    function _classifyValidatedName(string calldata name)
+        internal
+        pure
+        returns (PopStatus requirement, string memory message)
+    {
         uint256 totallength = bytes(name).length;
         uint256 trailingDigits = _countTrailingDigits(name);
 
@@ -402,10 +385,7 @@ contract PopRules is
 
         if (baselength >= 6 && baselength <= 8) {
             if (trailingDigits == 2) {
-                return (
-                    PopStatus.PopLite,
-                    "Requires Lite personhood verification"
-                );
+                return (PopStatus.PopLite, "Requires Lite personhood verification");
             }
             return (PopStatus.PopFull, "Requires Full personhood verification");
         }
@@ -415,52 +395,43 @@ contract PopRules is
     }
 
     function _requireCanonicalLabel(string calldata name) internal pure {
-        require(
-            name.isSingleLabel(),
-            PopError("Name must be lowercase ASCII DNS label")
-        );
+        require(name.isSingleLabel(), PopError("Name must be lowercase ASCII DNS label"));
     }
 
     /// @inheritdoc ERC165Upgradeable
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view virtual override returns (bool supported) {
-        return
-            interfaceId == type(IPopRules).interfaceId ||
-            super.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override
+        returns (bool supported)
+    {
+        return interfaceId == type(IPopRules).interfaceId || super.supportsInterface(interfaceId);
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /// @notice Returns implementation version.
-    function version()
-        external
-        pure
-        virtual
-        returns (string memory versionString)
-    {
+    function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
 
     /// @notice Ensures the caller is any controller authorised on the registrar.
     function _onlyRegistry() internal view {
-        DotnsRegistrar registrar = DotnsRegistrar(
-            protocolRegistry.get(DotnsConstants.REGISTRAR)
-        );
-        require(
-            registrar.controllers(IDotnsController(msg.sender)),
-            NotRegistry()
-        );
+        DotnsRegistrar registrar = DotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        require(registrar.controllers(IDotnsController(msg.sender)), NotRegistry());
     }
 
     /// @inheritdoc IPopRules
     function reserveBaseNameForPop(
         string calldata stem,
         address userAddress
-    ) external override onlyRegistry {
+    )
+        external
+        override
+        onlyRegistry
+    {
         _requireCanonicalLabel(stem);
         require(
             _countTrailingDigits(stem) == 0,
@@ -470,17 +441,13 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function stripDigits(
-        string calldata name
-    ) external pure override returns (string memory stem) {
+    function stripDigits(string calldata name) external pure override returns (string memory stem) {
         _requireCanonicalLabel(name);
         return _stripDigits(name);
     }
 
     /// @inheritdoc IPopRules
-    function releaseBaseName(
-        string calldata stem
-    ) external override onlyRegistry {
+    function releaseBaseName(string calldata stem) external override onlyRegistry {
         _requireCanonicalLabel(stem);
         require(
             _countTrailingDigits(stem) == 0,
@@ -505,7 +472,11 @@ contract PopRules is
     function releaseReservationForReclaim(
         string calldata stem,
         address expectedOwner
-    ) external override onlyRegistry {
+    )
+        external
+        override
+        onlyRegistry
+    {
         _requireCanonicalLabel(stem);
         require(
             _countTrailingDigits(stem) == 0,
@@ -516,10 +487,7 @@ contract PopRules is
         // so the public registrar controller can clear a PoP-stamped slot during reclaim
         // when the prior occupant is the reservation owner.
         if (_isLive(reservation)) {
-            require(
-                reservation.owner == expectedOwner,
-                PopError("Reservation owner mismatch")
-            );
+            require(reservation.owner == expectedOwner, PopError("Reservation owner mismatch"));
         }
         delete reservations[stem];
         emit BaseNameReleased(stem);
@@ -533,17 +501,11 @@ contract PopRules is
     ///      to `block.timestamp + MAX_RESERVATION_TIME`. Callers are responsible for validating
     ///      `stem` is canonical and stem-shaped (no trailing digits); this helper does no input
     ///      validation of its own so each public entry can layer additional eligibility checks.
-    function _writeReservation(
-        string calldata stem,
-        address userAddress
-    ) internal {
+    function _writeReservation(string calldata stem, address userAddress) internal {
         Reservation memory existing = reservations[stem];
         bool liveSlot = _isLive(existing);
         if (liveSlot) {
-            require(
-                existing.owner == userAddress,
-                PopError("Base name held by another user")
-            );
+            require(existing.owner == userAddress, PopError("Base name held by another user"));
         }
 
         // `block.timestamp + MAX_RESERVATION_TIME` cannot overflow `uint64`: `MAX_RESERVATION_TIME`
@@ -555,14 +517,9 @@ contract PopRules is
         // tracking the same stem (e.g. the PoP queue head) retains the right to release. Without
         // this, a same-user re-reservation through a different controller silently steals the slot
         // and bricks the original controller's release/advance/claim paths.
-        address stampingController = liveSlot
-            ? existing.controller
-            : msg.sender;
-        reservations[stem] = Reservation({
-            owner: userAddress,
-            expires: expiryTime,
-            controller: stampingController
-        });
+        address stampingController = liveSlot ? existing.controller : msg.sender;
+        reservations[stem] =
+            Reservation({owner: userAddress, expires: expiryTime, controller: stampingController});
         emit BaseNameReserved(stem, userAddress, expiryTime);
     }
 }

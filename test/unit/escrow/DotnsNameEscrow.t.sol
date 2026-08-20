@@ -40,7 +40,10 @@ contract DotnsNameEscrowTest is BaseDotns {
     function _registerNoStatus(
         string memory label,
         address nameOwner
-    ) internal returns (uint256 tokenId) {
+    )
+        internal
+        returns (uint256 tokenId)
+    {
         _register(label, nameOwner, IPopRules.PopStatus.NoStatus);
         tokenId = _tokenIdForLabel(label);
     }
@@ -58,7 +61,10 @@ contract DotnsNameEscrowTest is BaseDotns {
     function _fullWithdrawFlow(
         string memory label,
         address nameOwner
-    ) internal returns (uint256 tokenId) {
+    )
+        internal
+        returns (uint256 tokenId)
+    {
         tokenId = _registerNoStatus(label, nameOwner);
         _approveAndRelease(tokenId, nameOwner);
         vm.warp(block.timestamp + ESCROW_COOLDOWN + 1);
@@ -69,8 +75,7 @@ contract DotnsNameEscrowTest is BaseDotns {
     function test_deposit_records_position() public {
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
 
         assertEq(pos.amount, RENT_PRICE, "amount should equal RENT_PRICE");
         assertEq(pos.asset, address(0), "asset should be native (address(0))");
@@ -83,20 +88,13 @@ contract DotnsNameEscrowTest is BaseDotns {
         _approveAndRelease(tokenId, ed);
 
         assertEq(
-            dotnsRegistrar.ownerOf(tokenId),
-            address(dotnsNameEscrow),
-            "escrow should own the token"
+            dotnsRegistrar.ownerOf(tokenId), address(dotnsNameEscrow), "escrow should own the token"
         );
 
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(pos.recipient, ed, "recipient should be snapshotted as ed");
         assertTrue(pos.released, "released should be true");
-        assertGt(
-            pos.withdrawAvailableAt,
-            0,
-            "withdrawAvailableAt should be set"
-        );
+        assertGt(pos.withdrawAvailableAt, 0, "withdrawAvailableAt should be set");
     }
 
     function test_withdraw_sends_refund_after_cooldown() public {
@@ -121,22 +119,13 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(ed);
         dotnsNameEscrow.claimWithdrawal();
 
-        assertEq(
-            ed.balance,
-            balanceBefore + RENT_PRICE,
-            "ed should receive RENT_PRICE refund"
-        );
+        assertEq(ed.balance, balanceBefore + RENT_PRICE, "ed should receive RENT_PRICE refund");
 
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
         assertTrue(pos.claimed, "claimed should be true");
 
         uint256 reservesAfter = dotnsNameEscrow.reserves(address(0));
-        assertEq(
-            reservesAfter,
-            reservesBefore - RENT_PRICE,
-            "reserves should be decremented"
-        );
+        assertEq(reservesAfter, reservesBefore - RENT_PRICE, "reserves should be decremented");
     }
 
     function test_reclaim_transfers_custody_to_new_owner() public {
@@ -151,19 +140,10 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(address(dotnsRegistrarController));
         dotnsNameEscrow.reclaim(tokenId, leonardo);
 
-        assertEq(
-            dotnsRegistrar.ownerOf(tokenId),
-            leonardo,
-            "leonardo owns token after reclaim"
-        );
+        assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo, "leonardo owns token after reclaim");
 
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            pos.recipient,
-            address(0),
-            "position fully cleared after reclaim"
-        );
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(pos.recipient, address(0), "position fully cleared after reclaim");
         assertEq(pos.amount, 0, "position amount zeroed after reclaim");
         assertFalse(pos.released, "released flag cleared after reclaim");
     }
@@ -172,15 +152,10 @@ contract DotnsNameEscrowTest is BaseDotns {
         uint256 tokenId = _tokenIdForLabel(LABEL);
 
         vm.prank(ed);
-        vm.expectRevert(
-            abi.encodeWithSelector(IDotnsNameEscrow.NotController.selector, ed)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDotnsNameEscrow.NotController.selector, ed));
         dotnsNameEscrow.deposit(
             IDotnsNameEscrow.DepositParams({
-                tokenId: tokenId,
-                asset: address(0),
-                amount: 1 ether,
-                recipient: ed
+                tokenId: tokenId, asset: address(0), amount: 1 ether, recipient: ed
             })
         );
     }
@@ -192,18 +167,11 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         vm.prank(ed);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.NotAcceptedTransfer.selector,
-                address(ghost)
-            )
+            abi.encodeWithSelector(IDotnsNameEscrow.NotAcceptedTransfer.selector, address(ghost))
         );
         ghost.safeTransferFrom(ed, address(dotnsNameEscrow), ghostId);
 
-        assertEq(
-            ghost.ownerOf(ghostId),
-            ed,
-            "ghost NFT must remain with the original owner"
-        );
+        assertEq(ghost.ownerOf(ghostId), ed, "ghost NFT must remain with the original owner");
     }
 
     function test_pop_full_name_releases_through_zero_amount_position() public {
@@ -218,14 +186,10 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(ed);
         dotnsNameEscrow.release(tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory position = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory position =
+            dotnsNameEscrow.getReleasePosition(tokenId);
         assertTrue(position.released, "PopFull mint must be releasable");
-        assertEq(
-            position.amount,
-            0,
-            "zero-priced mint seeds a zero-amount position"
-        );
+        assertEq(position.amount, 0, "zero-priced mint seeds a zero-amount position");
         assertEq(position.recipient, ed, "position is bound to the registrant");
     }
 
@@ -234,11 +198,7 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         vm.prank(tiago);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.NotRefundRecipient.selector,
-                tiago,
-                tokenId
-            )
+            abi.encodeWithSelector(IDotnsNameEscrow.NotRefundRecipient.selector, tiago, tokenId)
         );
         dotnsNameEscrow.release(tokenId);
     }
@@ -251,11 +211,7 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         vm.prank(tiago);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.NotRefundRecipient.selector,
-                tiago,
-                tokenId
-            )
+            abi.encodeWithSelector(IDotnsNameEscrow.NotRefundRecipient.selector, tiago, tokenId)
         );
         dotnsNameEscrow.withdraw(tokenId);
     }
@@ -264,9 +220,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         uint256 tokenId = _fullWithdrawFlow(LABEL, ed);
 
         vm.prank(ed);
-        vm.expectRevert(
-            abi.encodeWithSelector(IDotnsNameEscrow.NotController.selector, ed)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDotnsNameEscrow.NotController.selector, ed));
         dotnsNameEscrow.reclaim(tokenId, leonardo);
     }
 
@@ -275,12 +229,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         _approveAndRelease(tokenId, ed);
 
         vm.prank(address(dotnsNameEscrow));
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.AlreadyReleased.selector,
-                tokenId
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDotnsNameEscrow.AlreadyReleased.selector, tokenId));
         dotnsNameEscrow.release(tokenId);
     }
 
@@ -288,8 +237,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         uint256 tokenId = _registerNoStatus(LABEL, ed);
         _approveAndRelease(tokenId, ed);
 
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
 
         vm.prank(ed);
         vm.expectRevert(
@@ -309,12 +257,7 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         // Released but not claimed/withdrawn; not reclaimable yet.
         vm.prank(address(dotnsRegistrarController));
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.NotReclaimable.selector,
-                tokenId
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDotnsNameEscrow.NotReclaimable.selector, tokenId));
         dotnsNameEscrow.reclaim(tokenId, leonardo);
     }
 
@@ -324,17 +267,11 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.deal(address(dotnsRegistrarController), RENT_PRICE);
         vm.prank(address(dotnsRegistrarController));
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.PositionAlreadyFunded.selector,
-                tokenId
-            )
+            abi.encodeWithSelector(IDotnsNameEscrow.PositionAlreadyFunded.selector, tokenId)
         );
         dotnsNameEscrow.deposit{value: RENT_PRICE}(
             IDotnsNameEscrow.DepositParams({
-                tokenId: tokenId,
-                asset: address(0),
-                amount: RENT_PRICE,
-                recipient: ed
+                tokenId: tokenId, asset: address(0), amount: RENT_PRICE, recipient: ed
             })
         );
     }
@@ -344,20 +281,13 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         vm.prank(ed);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.EscrowNotApproved.selector,
-                tokenId
-            )
+            abi.encodeWithSelector(IDotnsNameEscrow.EscrowNotApproved.selector, tokenId)
         );
         dotnsNameEscrow.release(tokenId);
     }
 
     function test_released_tokens_pagination() public {
-        string[3] memory labels = [
-            "longernameaa01",
-            "longernameab02",
-            "longernameac03"
-        ];
+        string[3] memory labels = ["longernameaa01", "longernameab02", "longernameac03"];
         uint256[3] memory tokenIds;
 
         for (uint256 i = 0; i < 3; i++) {
@@ -365,11 +295,7 @@ contract DotnsNameEscrowTest is BaseDotns {
             _approveAndRelease(tokenIds[i], ed);
         }
 
-        assertEq(
-            dotnsNameEscrow.releasedTokenCount(),
-            3,
-            "releasedTokenCount should be 3"
-        );
+        assertEq(dotnsNameEscrow.releasedTokenCount(), 3, "releasedTokenCount should be 3");
 
         uint256[] memory page1 = dotnsNameEscrow.releasedTokens(0, 2);
         assertEq(page1.length, 2, "first page should have 2 entries");
@@ -378,11 +304,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(page2.length, 1, "second page should have 1 entry");
 
         uint256[] memory empty = dotnsNameEscrow.releasedTokens(10, 2);
-        assertEq(
-            empty.length,
-            0,
-            "out-of-bounds start should return empty array"
-        );
+        assertEq(empty.length, 0, "out-of-bounds start should return empty array");
     }
 
     function test_update_cooldown() public {
@@ -393,20 +315,13 @@ contract DotnsNameEscrowTest is BaseDotns {
         emit IDotnsNameEscrow.CooldownUpdated(ESCROW_COOLDOWN, newCooldown);
         dotnsNameEscrow.updateCooldown(newCooldown);
 
-        assertEq(
-            dotnsNameEscrow.cooldown(),
-            newCooldown,
-            "cooldown should be updated"
-        );
+        assertEq(dotnsNameEscrow.cooldown(), newCooldown, "cooldown should be updated");
     }
 
-    function test_same_tier_NoStatus_transfer_rebinds_position_to_new_holder()
-        public
-    {
+    function test_same_tier_NoStatus_transfer_rebinds_position_to_new_holder() public {
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
-        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(before.recipient, ed);
         assertEq(before.amount, RENT_PRICE);
 
@@ -415,9 +330,7 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
         uint256 edRefundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
-        uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(
-            leonardo
-        );
+        uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(leonardo);
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
@@ -426,18 +339,14 @@ contract DotnsNameEscrowTest is BaseDotns {
         // to the original payer, so transferring a funded NoStatus name forfeits the locked
         // deposit. The recycle that drove the old refund-and-delete model is closed off: the only
         // path back to D is for the current holder to release into escrow.
-        IDotnsNameEscrow.ReleasePosition memory afterTransfer = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory afterTransfer =
+            dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(
             afterTransfer.recipient,
             leonardo,
             "position must rebind to the new holder when the NFT leaves the depositor"
         );
-        assertEq(
-            afterTransfer.amount,
-            RENT_PRICE,
-            "deposit must travel with the name"
-        );
+        assertEq(afterTransfer.amount, RENT_PRICE, "deposit must travel with the name");
 
         assertEq(
             dotnsNameEscrow.reserves(address(0)),
@@ -456,9 +365,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         );
     }
 
-    function test_zero_amount_position_rebinds_to_new_holder_on_transfer()
-        public
-    {
+    function test_zero_amount_position_rebinds_to_new_holder_on_transfer() public {
         string memory label = BASE_LABEL_A;
 
         _grantPopFull(ed);
@@ -466,43 +373,24 @@ contract DotnsNameEscrowTest is BaseDotns {
         _register(label, ed, IPopRules.PopStatus.PopFull);
         uint256 tokenId = _tokenIdForLabel(label);
 
-        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(before.recipient, ed, "zero position starts with registrant");
-        assertEq(
-            before.amount,
-            0,
-            "PopFull registration has no refundable deposit"
-        );
+        assertEq(before.amount, 0, "PopFull registration has no refundable deposit");
 
         uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         assertEq(quotedFee, 0, "same-tier PopFull transfer should be free");
 
         uint256 edRefundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
-        uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(
-            leonardo
-        );
+        uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(leonardo);
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory afterTransfer = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            afterTransfer.recipient,
-            leonardo,
-            "zero marker must follow current holder"
-        );
-        assertEq(
-            afterTransfer.amount,
-            0,
-            "no deposit may be created on marker rebind"
-        );
-        assertEq(
-            dotnsNameEscrow.pendingRefundCount(ed),
-            edRefundsBefore,
-            "no refund for marker"
-        );
+        IDotnsNameEscrow.ReleasePosition memory afterTransfer =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(afterTransfer.recipient, leonardo, "zero marker must follow current holder");
+        assertEq(afterTransfer.amount, 0, "no deposit may be created on marker rebind");
+        assertEq(dotnsNameEscrow.pendingRefundCount(ed), edRefundsBefore, "no refund for marker");
         assertEq(
             dotnsNameEscrow.pendingRefundCount(leonardo),
             leonardoRefundsBefore,
@@ -514,22 +402,13 @@ contract DotnsNameEscrowTest is BaseDotns {
         dotnsNameEscrow.release(tokenId);
         vm.stopPrank();
 
-        IDotnsNameEscrow.ReleasePosition memory afterRelease = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory afterRelease =
+            dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(
-            dotnsRegistrar.ownerOf(tokenId),
-            address(dotnsNameEscrow),
-            "escrow owns released NFT"
+            dotnsRegistrar.ownerOf(tokenId), address(dotnsNameEscrow), "escrow owns released NFT"
         );
-        assertTrue(
-            afterRelease.released,
-            "new holder can release transferred zero marker"
-        );
-        assertEq(
-            afterRelease.recipient,
-            leonardo,
-            "release recipient is the current holder"
-        );
+        assertTrue(afterRelease.released, "new holder can release transferred zero marker");
+        assertEq(afterRelease.recipient, leonardo, "release recipient is the current holder");
     }
 
     function test_PopFull_to_PopLite_on_PopLite_tier_name_pays_D() public {
@@ -573,30 +452,19 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         uint256 startingPrice = popRules.startingPrice();
         uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-        assertEq(
-            quotedFee,
-            startingPrice,
-            "PopFull holder downgrading to NoStatus pays D"
-        );
+        assertEq(quotedFee, startingPrice, "PopFull holder downgrading to NoStatus pays D");
 
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
         uint256 insuranceBefore = dotnsNameEscrow.insuranceFund();
         uint256 edRefundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
-        uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(
-            leonardo
-        );
+        uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(leonardo);
 
         vm.deal(ed, quotedFee);
         vm.prank(ed);
         dotnsRegistrar.transferFrom{value: quotedFee}(ed, leonardo, tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            pos.recipient,
-            leonardo,
-            "position must rebind to the new holder"
-        );
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(pos.recipient, leonardo, "position must rebind to the new holder");
         assertEq(pos.amount, RENT_PRICE, "deposit amount untouched on rebind");
 
         assertEq(
@@ -621,9 +489,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         );
     }
 
-    function test_transfer_no_rebind_when_to_equals_position_recipient()
-        public
-    {
+    function test_transfer_no_rebind_when_to_equals_position_recipient() public {
         // Defensive: if `chargeTransferFee` is ever invoked with `to == position.recipient`
         // (only reachable through a future code path or a direct registrar-pranked call), the
         // rebind branch must not fire. The position stays funded with the same recipient, no
@@ -632,14 +498,9 @@ contract DotnsNameEscrowTest is BaseDotns {
         // passes without trying to perform an NFT move.
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
-        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(before.recipient, ed, "precondition: position bound to ed");
-        assertEq(
-            before.amount,
-            RENT_PRICE,
-            "precondition: deposit at RENT_PRICE"
-        );
+        assertEq(before.amount, RENT_PRICE, "precondition: deposit at RENT_PRICE");
 
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
         uint256 insuranceBefore = dotnsNameEscrow.insuranceFund();
@@ -650,25 +511,13 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(address(dotnsRegistrar));
         dotnsNameEscrow.chargeTransferFee{value: fee}(
             IDotnsNameEscrow.ChargeTransferFeeParams({
-                tokenId: tokenId,
-                reachFloor: fee,
-                payer: leonardo,
-                to: ed
+                tokenId: tokenId, reachFloor: fee, payer: leonardo, to: ed
             })
         );
 
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            pos.recipient,
-            ed,
-            "position recipient untouched when to == recipient"
-        );
-        assertEq(
-            pos.amount,
-            RENT_PRICE,
-            "deposit amount untouched when to == recipient"
-        );
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(pos.recipient, ed, "position recipient untouched when to == recipient");
+        assertEq(pos.amount, RENT_PRICE, "deposit amount untouched when to == recipient");
 
         assertEq(
             dotnsNameEscrow.reserves(address(0)),
@@ -687,9 +536,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         );
     }
 
-    function test_release_and_withdraw_subject_to_cooldown_after_transfer()
-        public
-    {
+    function test_release_and_withdraw_subject_to_cooldown_after_transfer() public {
         // Deposits follow the NFT: a NoStatus name transferred to a new holder carries its
         // locked D with it. The only path back to the deposit is for the current holder to
         // release into escrow and withdraw after the configured cooldown. This is the lock
@@ -699,13 +546,8 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            pos.recipient,
-            leonardo,
-            "position recipient must follow the NFT"
-        );
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(pos.recipient, leonardo, "position recipient must follow the NFT");
         assertEq(pos.amount, RENT_PRICE, "deposit amount untouched on rebind");
         assertEq(
             dotnsNameEscrow.pendingRefundCount(ed),
@@ -718,8 +560,8 @@ contract DotnsNameEscrowTest is BaseDotns {
         dotnsNameEscrow.release(tokenId);
         vm.stopPrank();
 
-        IDotnsNameEscrow.ReleasePosition memory released = dotnsNameEscrow
-            .getReleasePosition(tokenId);
+        IDotnsNameEscrow.ReleasePosition memory released =
+            dotnsNameEscrow.getReleasePosition(tokenId);
         assertTrue(released.released, "current holder may release into escrow");
         uint64 availableAt = released.withdrawAvailableAt;
 
@@ -727,10 +569,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(leonardo);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IDotnsNameEscrow.WithdrawalTooEarly.selector,
-                tokenId,
-                availableAt,
-                block.timestamp
+                IDotnsNameEscrow.WithdrawalTooEarly.selector, tokenId, availableAt, block.timestamp
             )
         );
         dotnsNameEscrow.withdraw(tokenId);
@@ -740,10 +579,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(leonardo);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IDotnsNameEscrow.WithdrawalTooEarly.selector,
-                tokenId,
-                availableAt,
-                block.timestamp
+                IDotnsNameEscrow.WithdrawalTooEarly.selector, tokenId, availableAt, block.timestamp
             )
         );
         dotnsNameEscrow.withdraw(tokenId);
@@ -764,11 +600,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         uint256 claimed = dotnsNameEscrow.claimWithdrawal();
 
         assertEq(claimed, RENT_PRICE, "claim returns the full deposit");
-        assertEq(
-            leonardo.balance - balanceBefore,
-            RENT_PRICE,
-            "current holder receives the refund"
-        );
+        assertEq(leonardo.balance - balanceBefore, RENT_PRICE, "current holder receives the refund");
         assertEq(
             dotnsNameEscrow.pendingRefundCount(ed),
             0,
@@ -776,9 +608,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         );
     }
 
-    function test_funded_position_follows_NFT_through_multiple_transfers()
-        public
-    {
+    function test_funded_position_follows_NFT_through_multiple_transfers() public {
         // Deposits travel with the NFT. The first hop ed -> leonardo rebinds the position to
         // leonardo; the second hop leonardo -> tiago rebinds it again to tiago. The locked
         // deposit and the per-asset reserves stay put across the chain of transfers, no
@@ -789,27 +619,16 @@ contract DotnsNameEscrowTest is BaseDotns {
         uint256 reservesAtStart = dotnsNameEscrow.reserves(address(0));
         uint256 insuranceAtStart = dotnsNameEscrow.insuranceFund();
         uint256 edRefundsAtStart = dotnsNameEscrow.pendingRefundCount(ed);
-        uint256 leonardoRefundsAtStart = dotnsNameEscrow.pendingRefundCount(
-            leonardo
-        );
+        uint256 leonardoRefundsAtStart = dotnsNameEscrow.pendingRefundCount(leonardo);
         uint256 tiagoRefundsAtStart = dotnsNameEscrow.pendingRefundCount(tiago);
         uint256 escrowBalanceAtStart = address(dotnsNameEscrow).balance;
 
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
-        IDotnsNameEscrow.ReleasePosition memory midPos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            midPos.recipient,
-            leonardo,
-            "position rebinds to leonardo on the first hop"
-        );
-        assertEq(
-            midPos.amount,
-            RENT_PRICE,
-            "deposit amount untouched on the first hop"
-        );
+        IDotnsNameEscrow.ReleasePosition memory midPos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(midPos.recipient, leonardo, "position rebinds to leonardo on the first hop");
+        assertEq(midPos.amount, RENT_PRICE, "deposit amount untouched on the first hop");
 
         // Same-tier free transfer; quote must agree this is a zero-fee move that still rebinds.
         uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, tiago);
@@ -818,24 +637,12 @@ contract DotnsNameEscrowTest is BaseDotns {
         vm.prank(leonardo);
         dotnsRegistrar.transferFrom(leonardo, tiago, tokenId);
 
-        assertEq(
-            dotnsRegistrar.ownerOf(tokenId),
-            tiago,
-            "tiago receives the NFT on the second hop"
-        );
+        assertEq(dotnsRegistrar.ownerOf(tokenId), tiago, "tiago receives the NFT on the second hop");
 
-        IDotnsNameEscrow.ReleasePosition memory tailPos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            tailPos.recipient,
-            tiago,
-            "position rebinds again to tiago on the second hop"
-        );
-        assertEq(
-            tailPos.amount,
-            RENT_PRICE,
-            "deposit amount untouched on the second hop"
-        );
+        IDotnsNameEscrow.ReleasePosition memory tailPos =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(tailPos.recipient, tiago, "position rebinds again to tiago on the second hop");
+        assertEq(tailPos.amount, RENT_PRICE, "deposit amount untouched on the second hop");
 
         assertEq(
             dotnsNameEscrow.reserves(address(0)),
@@ -879,28 +686,22 @@ contract DotnsNameEscrowTest is BaseDotns {
         address payer,
         address nameOwner,
         uint256 attachedValue
-    ) internal returns (uint256 tokenId) {
-        bytes32 secret = keccak256(
-            abi.encodePacked(label, nameOwner, block.timestamp, payer)
-        );
-        IDotnsRegistrarController.Registration
-            memory registration = IDotnsRegistrarController.Registration({
-                label: label,
-                owner: nameOwner,
-                secret: secret,
-                reserved: true
+    )
+        internal
+        returns (uint256 tokenId)
+    {
+        bytes32 secret = keccak256(abi.encodePacked(label, nameOwner, block.timestamp, payer));
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: nameOwner, secret: secret, reserved: true
             });
 
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(
-            registration
-        );
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
 
         vm.prank(payer);
         dotnsRegistrarController.commit(commitment);
 
-        vm.warp(
-            block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1
-        );
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
         vm.prank(payer);
         dotnsRegistrarController.register{value: attachedValue}(registration);
@@ -947,18 +748,9 @@ contract DotnsNameEscrowTest is BaseDotns {
 
         // The owner-side position is seeded with zero amount so the release lifecycle stays
         // reachable; the recipient sentinel binds to the registrant.
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            pos.recipient,
-            ed,
-            "position recipient must be the registrant"
-        );
-        assertEq(
-            pos.amount,
-            0,
-            "no refundable deposit seeded for cross-payer registration"
-        );
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(pos.recipient, ed, "position recipient must be the registrant");
+        assertEq(pos.amount, 0, "no refundable deposit seeded for cross-payer registration");
     }
 
     /// @notice Verified payer sponsoring a verified owner on a verified-tier label must pay
@@ -989,25 +781,12 @@ contract DotnsNameEscrowTest is BaseDotns {
             priorReserves,
             "reserves must not move when no deposit is seeded"
         );
-        assertEq(
-            leonardo.balance,
-            priorBalance,
-            "payer must not be debited when charge is zero"
-        );
+        assertEq(leonardo.balance, priorBalance, "payer must not be debited when charge is zero");
 
         // The zero-amount position is still seeded so the release lifecycle stays reachable.
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            pos.recipient,
-            ed,
-            "position recipient must be the registrant"
-        );
-        assertEq(
-            pos.amount,
-            0,
-            "no refundable deposit seeded when the cross-payer charge is zero"
-        );
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(pos.recipient, ed, "position recipient must be the registrant");
+        assertEq(pos.amount, 0, "no refundable deposit seeded when the cross-payer charge is zero");
     }
 
     /// @notice Defensive coverage for the cross-payer branch where the owner-side price is
@@ -1045,18 +824,9 @@ contract DotnsNameEscrowTest is BaseDotns {
             "payer must be debited the friction-only charge, not the sum"
         );
 
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow
-            .getReleasePosition(tokenId);
-        assertEq(
-            pos.recipient,
-            ed,
-            "position recipient must be the registrant"
-        );
-        assertEq(
-            pos.amount,
-            0,
-            "no refundable deposit seeded for cross-payer registration"
-        );
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(pos.recipient, ed, "position recipient must be the registrant");
+        assertEq(pos.amount, 0, "no refundable deposit seeded for cross-payer registration");
     }
 
     function test_solvency_after_force_sent_funds() public {
@@ -1085,9 +855,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         dotnsNameEscrow.claimWithdrawal();
 
         assertEq(
-            ed.balance,
-            balanceBefore + RENT_PRICE,
-            "withdraw should still transfer correct amount"
+            ed.balance, balanceBefore + RENT_PRICE, "withdraw should still transfer correct amount"
         );
     }
 }

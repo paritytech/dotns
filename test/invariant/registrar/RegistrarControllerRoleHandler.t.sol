@@ -26,11 +26,7 @@ contract RegistrarControllerRoleHandler is Test {
     /// @param _controller The registrar controller.
     /// @param _owner The admin owner used to authorise role mutations.
     /// @param actorList Pool of accounts the handler cycles through.
-    constructor(
-        DotnsRegistrarController _controller,
-        address _owner,
-        address[] memory actorList
-    ) {
+    constructor(DotnsRegistrarController _controller, address _owner, address[] memory actorList) {
         controller = _controller;
         owner = _owner;
         _actors = actorList;
@@ -42,11 +38,7 @@ contract RegistrarControllerRoleHandler is Test {
         address account = _actors[actorSeed % _actors.length];
 
         vm.prank(owner);
-        controller.setRole(
-            DotnsConstants.WHITELIST_OPERATOR_ROLE,
-            account,
-            enabled
-        );
+        controller.setRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, account, enabled);
 
         ghostWhitelistOperator[account] = enabled;
     }
