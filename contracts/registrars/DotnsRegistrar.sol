@@ -102,7 +102,19 @@ contract DotnsRegistrar is
     function available(uint256 id) public view override returns (bool isAvailable) {
         address holder = _ownerOf(id);
         if (holder == address(0)) return true;
-        return holder == protocolRegistry.get(DotnsConstants.NAME_ESCROW);
+
+        address escrow = protocolRegistry.get(DotnsConstants.NAME_ESCROW);
+        if (holder != escrow) return false;
+
+        // Escrow custody on its own no longer means registrable. While a released position is
+        // inside its redeem window the name still belongs to its previous holder, and reclaim
+        // would revert with NotReclaimable. Reporting it available there would advertise the name
+        // as free and send registrants through an entire commit-reveal cycle that cannot succeed,
+        // so availability tracks the window rather than custody.
+        IDotnsNameEscrow.ReleasePosition memory position =
+            IDotnsNameEscrow(payable(escrow)).getReleasePosition(id);
+
+        return block.timestamp >= position.redeemableUntil;
     }
 
     /// @inheritdoc IDotnsRegistrar

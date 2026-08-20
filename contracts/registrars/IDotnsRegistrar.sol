@@ -57,10 +57,16 @@ interface IDotnsRegistrar is IERC721 {
     /// @notice Returns whether a registration call may proceed for `id`.
     /// @dev Signals two distinct paths to the controller. Returns `true` when the owner slot is
     /// empty (a fresh @custom:function register call may mint) AND when the current owner is
-    /// the configured escrow (the controller must then route through
-    /// @custom:function IDotnsNameEscrow.reclaim instead of @custom:function register, because
-    /// `register` calls `_mint` which rejects existing tokens). All other holders return
-    /// `false`. The controller distinguishes the two `true` cases via @custom:function exists.
+    /// the configured escrow and the released position's redeem window has elapsed (the
+    /// controller must then route through @custom:function IDotnsNameEscrow.reclaim instead of
+    /// @custom:function register, because `register` calls `_mint` which rejects existing
+    /// tokens). All other holders return `false`. The controller distinguishes the two `true`
+    /// cases via @custom:function exists.
+    /// Escrow custody inside the redeem window returns `false`: that window belongs to the
+    /// previous holder, who may still @custom:function IDotnsNameEscrow.redeem the name, and
+    /// reclaim would revert until it elapses. Clients wanting the exact moment a released name
+    /// becomes registrable should read `redeemableUntil` from
+    /// @custom:function IDotnsNameEscrow.getReleasePosition.
     function available(uint256 id) external view returns (bool isAvailable);
 
     /// @notice Registers a name permanently.
