@@ -140,6 +140,12 @@ interface IDotnsNameEscrow {
     /// @notice Emitted when the redeem window for future releases is updated.
     event RedeemWindowUpdated(uint256 indexed currentRedeemWindow, uint256 indexed newRedeemWindow);
 
+    /// @notice Emitted when a released token is redeemed by its previous holder.
+    /// @dev The counterpart to @custom:emits NameReleased: custody returns to `recipient` and the
+    ///      deposit stays locked, so no value event accompanies this.
+    /// @param recipient Address the NFT was returned to, which is also the position recipient.
+    event NameRedeemed(uint256 indexed tokenId, address indexed recipient);
+
     /// @notice Emitted when a cross-tier fee is paid into the insurance fund.
     /// @param payer Original `msg.sender` whose value funded the fee.
     /// @param isRegistration True when emitted from `depositInsurance`; false from
@@ -221,8 +227,18 @@ interface IDotnsNameEscrow {
     /// @notice Thrown when the refund has already been claimed.
     error AlreadyClaimed(uint256 tokenId);
 
-    /// @notice Thrown when a token is not in a reclaimable state (released + claimed).
+    /// @notice Thrown when a token is not in a reclaimable state.
+    /// @dev Reclaimable means released with the redeem window elapsed. A released token still
+    ///      inside its window is deliberately not reclaimable: that window belongs to the previous
+    ///      holder. Whether the deposit was withdrawn is irrelevant, because reclaim settles any
+    ///      unwithdrawn amount itself.
     error NotReclaimable(uint256 tokenId);
+
+    /// @notice Thrown when a token is not in a redeemable state.
+    /// @dev Redeemable means released, not yet withdrawn, and still inside the redeem window.
+    ///      A withdrawn position is excluded on purpose: the holder has already taken the deposit
+    ///      value out, so returning the name as well would leave it unbacked.
+    error NotRedeemable(uint256 tokenId);
 
     /// @notice Thrown when escrow is not approved to transfer the token.
     error EscrowNotApproved(uint256 tokenId);
@@ -384,13 +400,37 @@ interface IDotnsNameEscrow {
     /// `claimWithdrawal`.
     function pendingWithdrawal(address recipient) external view returns (uint256 amount);
 
-    /// @notice Transfers a released-and-claimed token from escrow custody to a new owner.
+    /// @notice Transfers a released token whose redeem window has elapsed to a new owner.
     /// @dev Hands the NFT back to the controller for re-registration. Only the configured
     ///      controller may call this, otherwise @custom:reverts NotController, and the position
-    ///      must be both released and claimed, otherwise @custom:reverts NotReclaimable. Emits
-    ///      @custom:emits NameReclaimed once custody is transferred.
+    ///      must be released with `redeemableUntil` reached, otherwise @custom:reverts
+    ///      NotReclaimable. Emits @custom:emits NameReclaimed once custody is transferred.
+    ///      Reclaim does not require the deposit to have been withdrawn first. If the position
+    ///      still holds value, this call settles it: the amount is debited from `tokenReserved`
+    ///      (topping up from the insurance fund on shortfall, @custom:reverts InsufficientFunds if
+    ///      even the combined balance is short) and credited to the previous recipient's
+    ///      pull-payment balance, claimable through @custom:function claimWithdrawal with no
+    ///      deadline. That is what keeps a name recyclable when its previous holder never returns:
+    ///      the value follows them, the name does not wait for them. Emits @custom:emits
+    ///      RefundWithdrawn on settlement, and @custom:emits InsuranceDraw when the insurance fund
+    ///      tops up a shortfall.
     /// @param newOwner Address of the new registrant taking over the name.
     function reclaim(uint256 tokenId, address newOwner) external;
+
+    /// @notice Returns a released token to its previous holder during the redeem window.
+    /// @dev The undo for an accidental release, and the reason the redeem window exists. Only the
+    ///      position recipient may call this (@custom:reverts NotRefundRecipient otherwise), the
+    ///      position must be released and not yet withdrawn, and `block.timestamp` must still be
+    ///      below `redeemableUntil`; a position failing any of those is not redeemable and
+    ///      @custom:reverts NotRedeemable.
+    ///      No value moves. The position keeps its recipient, asset and amount, so the deposit
+    ///      stays locked exactly as it was before the release and the name returns to its
+    ///      pre-release state, releasable again later on a fresh pair of clocks. Excluding
+    ///      withdrawn positions is deliberate: a holder who has already pulled the deposit would
+    ///      otherwise recover the name without it being deposit-backed, breaking the one-deposit-
+    ///      per-live-name bound. The choice is therefore exclusive — take the value back, or take
+    ///      the name back. Emits @custom:emits NameRedeemed once custody returns.
+    function redeem(uint256 tokenId) external;
 
     /// @notice Updates the cooldown duration for future releases.
     /// @dev Owner-only. Affects only releases recorded after this call; positions already released

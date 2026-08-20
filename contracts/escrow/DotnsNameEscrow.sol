@@ -404,11 +404,40 @@ contract DotnsNameEscrow is
             WithdrawalTooEarly(tokenId, position.withdrawAvailableAt, block.timestamp)
         );
 
-        uint256 owed = position.amount;
-        address asset = position.asset;
         // `position.recipient == msg.sender` was just enforced above, so reuse the local in place
         // of an extra warm SLOAD.
-        address recipient = msg.sender;
+        _settleDeposit(position, tokenId, msg.sender);
+    }
+
+    /// @notice Moves a position's outstanding deposit onto the recipient's pull-payment balance.
+    /// @dev Shared by @custom:function withdraw, where the recipient pulls the deposit themselves,
+    ///      and by @custom:function reclaim, where a third party takes the name and the deposit is
+    ///      settled on the departing holder's behalf. Both credit the same ledger and neither
+    ///      transfers value, so the accounting is identical and lives here once. Draws from the
+    ///      per-asset `tokenReserved` pool first and tops up from `insuranceFund` on shortfall;
+    ///      @custom:reverts InsufficientFunds when even the combined balance cannot cover the
+    ///      amount owed. Emits @custom:emits RefundWithdrawn, and @custom:emits InsuranceDraw
+    ///      whenever the insurance fund contributes.
+    ///      A zero-amount position is a no-op: it writes nothing and emits nothing, which keeps the
+    ///      free-registration lifecycle free of meaningless ledger entries and events.
+    /// @param position Storage pointer to the position being settled.
+    /// @param recipient Address credited with the deposit. Always the position recipient.
+    function _settleDeposit(
+        ReleasePosition storage position,
+        uint256 tokenId,
+        address recipient
+    )
+        private
+    {
+        uint256 owed = position.amount;
+        address asset = position.asset;
+
+        // Effects: flag the position settled regardless of amount so `claimed` remains a faithful
+        // record of "the deposit for this position has been dealt with".
+        position.claimed = true;
+
+        if (owed == 0) return;
+
         uint256 reserved = tokenReserved[asset];
 
         uint256 fromRefundable;
@@ -425,8 +454,6 @@ contract DotnsNameEscrow is
             );
         }
 
-        // Effects: mutate state only after all checks have passed.
-        position.claimed = true;
         position.amount = 0;
         tokenReserved[asset] -= fromRefundable;
         if (fromInsurance > 0) {
@@ -647,9 +674,22 @@ contract DotnsNameEscrow is
     {
         ReleasePosition storage position = _positions[tokenId];
 
-        require(position.released && position.claimed, NotReclaimable(tokenId));
+        // The gate is the elapsed redeem window, not the `claimed` flag. Gating on `claimed` made
+        // recyclability depend on the previous holder choosing to withdraw, which strands the name
+        // forever whenever they have no reason to: a zero-amount position has nothing to collect,
+        // so "never withdraws" is the default rather than the exception. The window bounds the
+        // wait instead, and any unwithdrawn value is settled below rather than held hostage.
+        require(
+            position.released && block.timestamp >= position.redeemableUntil,
+            NotReclaimable(tokenId)
+        );
 
         address previousRecipient = position.recipient;
+
+        // Settle before deleting: the departing holder keeps their claim on the deposit even though
+        // they are losing the name. `_settleDeposit` is a no-op for a zero-amount position and for
+        // one already withdrawn, so the common paths cost nothing extra.
+        _settleDeposit(position, tokenId, previousRecipient);
 
         delete _positions[tokenId];
         _removeReleasedToken(tokenId);
@@ -657,6 +697,33 @@ contract DotnsNameEscrow is
         _registrar().safeTransferFrom(address(this), newOwner, tokenId);
 
         emit NameReclaimed(tokenId, previousRecipient, newOwner);
+    }
+
+    /// @inheritdoc IDotnsNameEscrow
+    function redeem(uint256 tokenId) external override nonReentrant {
+        ReleasePosition storage position = _positions[tokenId];
+
+        require(position.recipient == msg.sender, NotRefundRecipient(msg.sender, tokenId));
+        // One error for the whole state predicate: unreleased, already withdrawn, or past the
+        // window are all simply "not redeemable" from the caller's point of view, and collapsing
+        // them avoids leaking a three-way state machine into the revert surface.
+        require(
+            position.released && !position.claimed && block.timestamp < position.redeemableUntil,
+            NotRedeemable(tokenId)
+        );
+
+        // Restore the pre-release state and nothing more. Recipient, asset and amount are left
+        // untouched so the deposit stays locked against the name; clearing the clocks means a later
+        // release starts a fresh pair rather than inheriting stale deadlines.
+        position.released = false;
+        position.withdrawAvailableAt = 0;
+        position.redeemableUntil = 0;
+
+        _removeReleasedToken(tokenId);
+
+        _registrar().safeTransferFrom(address(this), msg.sender, tokenId);
+
+        emit NameRedeemed(tokenId, msg.sender);
     }
 
     /// @inheritdoc IERC721Receiver
