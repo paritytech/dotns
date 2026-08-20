@@ -17,18 +17,6 @@ DotNS is a naming system for Polkadot. An account can register a .dot name, rece
 
 Current network addresses and deployment notes are listed in [DEPLOYMENTS.md](./DEPLOYMENTS.md).
 
-### Cutting a release
-
-A release publishes the contract ABIs as GitHub release assets. It does not deploy anything; deploying contracts to a network is a separate process, described in [DEPLOYMENTS.md](./DEPLOYMENTS.md).
-
-Run **Publish Release Package** from the Actions tab, pick the branch to release from, and enter the version (`v0.5.5`). The workflow does the rest: it builds, tests, extracts the ABIs listed in [.github/abi-contracts.txt](./.github/abi-contracts.txt), creates the release as a draft with every asset attached, verifies the set against what the build produced, and only then publishes. Pushing a matching tag runs the same workflow, so `git tag v0.5.5 && git push origin v0.5.5` remains equivalent.
-
-Pre-releases use **Publish Beta Package** with a suffixed version, `v0.5.5-rc1`. The version is the release identity; the `version` field in `package.json` is unrelated and nothing reads it.
-
-Do not create releases through the GitHub UI's release form, or with `gh release create`. Both publish immediately, and because this repository has immutable releases enabled, a published release can no longer accept assets: only its title and notes stay editable. A release made that way carries no ABIs at all. The workflow rejects an already-published version before building, so the mistake fails in seconds rather than silently shipping an empty release.
-
-If a run fails partway, re-run it from the Actions tab; the draft is updated rather than duplicated. One case needs a manual step: the upload replaces an asset of the same name but never removes others, so if the contract list changed since the failed run, the draft still carries the assets it no longer expects and the verification step will keep refusing to publish. Delete the draft and re-run. If the version has already been published, use a different one, since its assets cannot be changed.
-
 ## Economics
 
 dotNS uses a single tunable constant, written **D** throughout the protocol. D is the starting price used by PopRules and equals ten DOT at launch; governance can adjust it under the same gate as the upgrade authority. D is the only money quantity the protocol charges; everything else is a composition of D with zero.
@@ -72,11 +60,33 @@ The friction is constant and additive across downward hops. Every step that cros
 The escrow maintains two separate pull-payment ledgers. The split is deliberate: one ledger is for immediate overpayment withdrawals, and the other is for refunds that must wait behind a cooldown.
 
 - **Overpayment ledger.** No cooldown. Used only as the fallback when a direct registration overpayment cannot be returned to the sender inline.
-- **Refund ledger.** Every refund has its own cooldown clock. Used for the deposit unlocked when a holder releases a funded name back to escrow, and for transfer-fee overpayments. Transfers never credit the refund ledger because the position rides with the name; only release-and-withdraw does.
+- **Refund ledger.** Every refund has its own cooldown clock. Used for transfer-fee overpayments. Transfers never credit the refund ledger because the position rides with the name.
 
-Only registrations try to return surplus immediately. Every other refund path waits behind its own cooldown. The cooldown is bounded to minutes: it is the window between release and reclaim during which the original payer has an uncontested chance to pull their refund before the controller hands the name out again, not a long-lived lock. Governance can tune it within that band.
+Only registrations try to return surplus immediately. Every other refund path waits behind a clock. The deposit unlocked by releasing a funded name is credited to the overpayment ledger rather than the refund ledger: the delay comes from the position's own `withdrawAvailableAt` stamp, so once `withdraw` lands the credit is immediately pullable. The cooldown is bounded to minutes and governance can tune it within that band.
 
 Clients can enumerate pending refunds through the escrow's public refund views. Pagination is capped so refund discovery remains bounded.
+
+### Release lifecycle
+
+Releasing a name starts two independent clocks, and the distinction between them is what makes a released name both recoverable and recyclable.
+
+| Clock | Length | What it gates |
+|---|---|---|
+| `withdrawAvailableAt` | release + `cooldown` (15 minutes at launch, ≤ 1 hour) | When the holder may credit the deposit to themselves via `withdraw` |
+| `redeemableUntil` | release + `redeemWindow` (1 day at launch, ≤ 30 days) | When the holder's exclusive claim on the name ends and `reclaim` opens to anyone |
+
+Both are snapshotted at release time, so a governance change never moves the goalposts on a name already in flight. `redeemWindow` is tuned through `updateRedeemWindow` under the same gate as the upgrade authority.
+
+Inside the redeem window the name belongs to its previous holder. They alone may act on it, and `DotnsRegistrar.available` reports **false** so no client advertises the name as free and no registrant burns a commit-reveal cycle on a registration that cannot succeed. Their options are exclusive:
+
+- **`redeem`** returns the NFT and moves no value. The position keeps its recipient, asset and amount, so the deposit stays locked and the name lands back in its exact pre-release state, releasable again later on a fresh pair of clocks. This is the undo for an accidental release.
+- **`withdraw`** credits the deposit and forfeits the right to redeem. A holder who has been paid for the name cannot also take it back; otherwise they would hold a NoStatus name that no deposit backs, and the Sybil bound of one D per live NoStatus name would not hold.
+
+Once `redeemableUntil` is reached, `reclaim` is permissionless through the ordinary commit-reveal path, **whether or not the previous holder ever withdrew**. If the position still holds value, reclaim settles it: the amount is credited to the previous holder's pull-payment balance and stays claimable through `claimWithdrawal` with no deadline. The value follows the departing holder; the name does not wait for them.
+
+That last point is the whole reason the window exists. Reclaim used to require the previous holder to have withdrawn first, which meant a holder who released a name and never came back removed the label from circulation permanently. For the zero-amount positions seeded by free PopFull and PopLite registrations there is nothing to withdraw, so never withdrawing was the default rather than the exception. Bounding the wait with a clock replaces a dependency on someone else's action with one that elapses on its own.
+
+Clients wanting the exact moment a released name becomes registrable should read `redeemableUntil` from `getReleasePosition` rather than polling `available`.
 
 ## Contracts
 
