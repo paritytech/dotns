@@ -17,6 +17,7 @@ contract DeployPolicy is BaseDeployer {
     uint64 public constant MIN_COMMITMENT_AGE = 6 seconds;
     uint64 public constant MAX_COMMITMENT_AGE = 1 days;
     uint256 public constant ESCROW_COOLDOWN = 15 minutes;
+    uint256 public constant ESCROW_REDEEM_WINDOW = 1 days;
 
     function run() external {
         address owner = msg.sender;
@@ -61,7 +62,11 @@ contract DeployPolicy is BaseDeployer {
             "DotnsNameEscrow.sol:DotnsNameEscrow",
             abi.encodeCall(
                 DotnsNameEscrow.initialize,
-                (IDotnsProtocolRegistry(protocolRegistry), ESCROW_COOLDOWN)
+                (
+                    IDotnsProtocolRegistry(protocolRegistry),
+                    ESCROW_COOLDOWN,
+                    ESCROW_REDEEM_WINDOW
+                )
             ),
             "DotnsNameEscrow"
         );

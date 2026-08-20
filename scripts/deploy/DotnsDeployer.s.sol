@@ -39,6 +39,14 @@ contract DotnsDeployer is BaseDeployer {
     ///      post-deploy via @custom:function DotnsNameEscrow.updateCooldown.
     uint256 public constant ESCROW_COOLDOWN = 15 minutes;
 
+    /// @notice Default redeem window for the freshly-deployed name escrow.
+    /// @dev The period after a release in which only the previous holder may act: they alone may
+    ///      `redeem` the name back, and `available` reports false so nobody wastes a commitment on
+    ///      it. Once it elapses, reclaim is permissionless. Well below the escrow's
+    ///      @custom:constant MAX_REDEEM_WINDOW ceiling. The protocol owner rotates this post-deploy
+    ///      via @custom:function DotnsNameEscrow.updateRedeemWindow.
+    uint256 public constant ESCROW_REDEEM_WINDOW = 1 days;
+
     /// @notice Operator address granted `WHITELIST_OPERATOR_ROLE` on the
     ///         registrar controller at fresh-deploy time.
     /// @dev Permits managing the public-controller whitelist via
@@ -328,7 +336,11 @@ contract DotnsDeployer is BaseDeployer {
             "DotnsNameEscrow.sol:DotnsNameEscrow",
             abi.encodeCall(
                 DotnsNameEscrow.initialize,
-                (IDotnsProtocolRegistry(protocolRegistryProxy), ESCROW_COOLDOWN)
+                (
+                    IDotnsProtocolRegistry(protocolRegistryProxy),
+                    ESCROW_COOLDOWN,
+                    ESCROW_REDEEM_WINDOW
+                )
             ),
             "DotnsNameEscrow"
         );

@@ -53,6 +53,10 @@ interface IDotnsNameEscrow {
     ///      ledger). The position is deleted on `reclaim`, freeing the slot for re-registration.
     /// @param asset Deposit asset. `address(0)` denotes native token.
     /// @param withdrawAvailableAt Earliest timestamp at which withdrawal is permitted.
+    /// @param redeemableUntil Timestamp at which the holder's exclusive redeem window closes and
+    ///        permissionless reclaim opens. Appended last so every pre-existing field keeps its
+    ///        byte offset across the upgrade; it packs into the trailing slot alongside
+    ///        `withdrawAvailableAt`, `released` and `claimed` without consuming a new one.
     struct ReleasePosition {
         address recipient;
         address asset;
@@ -60,6 +64,7 @@ interface IDotnsNameEscrow {
         uint64 withdrawAvailableAt;
         bool released;
         bool claimed;
+        uint64 redeemableUntil;
     }
 
     /// @notice Time-locked refund entry produced when the protocol owes a recipient value
@@ -84,12 +89,14 @@ interface IDotnsNameEscrow {
     /// @param recipient Refund recipient snapshotted at release time.
     /// @param asset Deposit asset. `address(0)` denotes native token.
     /// @param withdrawAvailableAt Earliest withdrawal timestamp.
+    /// @param redeemableUntil Timestamp at which the redeem window closes and reclaim opens.
     event NameReleased(
         uint256 indexed tokenId,
         address indexed recipient,
         address indexed asset,
         uint256 amount,
-        uint256 withdrawAvailableAt
+        uint256 withdrawAvailableAt,
+        uint256 redeemableUntil
     );
 
     /// @notice Emitted when a refund is credited to the recipient's pending balance.
@@ -142,6 +149,12 @@ interface IDotnsNameEscrow {
         uint256 indexed newCooldown
     );
 
+    /// @notice Emitted when the redeem window for future releases is updated.
+    event RedeemWindowUpdated(
+        uint256 indexed currentRedeemWindow,
+        uint256 indexed newRedeemWindow
+    );
+
     /// @notice Emitted when a cross-tier fee is paid into the insurance fund.
     /// @param payer Original `msg.sender` whose value funded the fee.
     /// @param isRegistration True when emitted from `depositInsurance`; false from
@@ -190,6 +203,17 @@ interface IDotnsNameEscrow {
     /// @param supplied Cooldown value the caller asked for.
     /// @param maxAllowed Upper bound enforced by the contract.
     error CooldownTooLong(uint256 supplied, uint256 maxAllowed);
+
+    /// @notice Thrown when the configured redeem window is invalid.
+    /// @dev Also thrown by `release` when the window has never been seeded, which fails the release
+    ///      closed rather than collapsing the holder's exclusive redeem phase to zero length.
+    error InvalidRedeemWindow();
+
+    /// @notice Thrown when the supplied redeem window exceeds the contract's configured upper
+    /// bound.
+    /// @param supplied Redeem window value the caller asked for.
+    /// @param maxAllowed Upper bound enforced by the contract.
+    error RedeemWindowTooLong(uint256 supplied, uint256 maxAllowed);
 
     /// @notice Thrown when the supplied amount is invalid.
     error InvalidAmount();
@@ -339,6 +363,11 @@ interface IDotnsNameEscrow {
     ///      minted name has a reachable lifecycle. The escrow must additionally be approved to
     ///      move the NFT, otherwise @custom:reverts EscrowNotApproved. Emits @custom:emits
     ///      NameReleased once the NFT is moved into custody.
+    ///      Release stamps two independent clocks. `withdrawAvailableAt` (release + `cooldown`)
+    ///      opens the deposit withdrawal; `redeemableUntil` (release + `redeemWindow`) closes the
+    ///      holder's exclusive redeem phase and opens permissionless reclaim. Both are snapshots
+    ///      so later policy changes never move an in-flight position. A release attempted while
+    ///      `redeemWindow` is unseeded triggers @custom:reverts InvalidRedeemWindow.
     function release(uint256 tokenId) external;
 
     /// @notice Credits the refundable deposit for a released token to the recipient's pending
@@ -390,6 +419,18 @@ interface IDotnsNameEscrow {
     ///      release from truncation. Emits @custom:emits CooldownUpdated with the prior and new
     ///      values.
     function updateCooldown(uint256 newCooldown) external;
+
+    /// @notice Updates the redeem window for future releases.
+    /// @dev Owner-only. Affects only releases recorded after this call; positions already released
+    ///      keep the `redeemableUntil` snapshot taken at their release time. `newRedeemWindow` must
+    ///      be non-zero, otherwise @custom:reverts InvalidRedeemWindow, and must not exceed the
+    ///      contract's `MAX_REDEEM_WINDOW` upper bound, otherwise @custom:reverts
+    ///      RedeemWindowTooLong; the bound limits how long policy can hold a released name out of
+    ///      circulation and protects the `uint64` cast in release from truncation. Emits
+    ///      @custom:emits RedeemWindowUpdated with the prior and new values.
+    ///      This is also the post-upgrade seeding hook: pair it with `upgradeToAndCall` so an
+    ///      upgraded proxy never runs with an unseeded window.
+    function updateRedeemWindow(uint256 newRedeemWindow) external;
 
     /// @notice Pulls a single time-locked refund entry.
     /// @dev Caller must be the entry's recipient (@custom:reverts NotRefundRecipient otherwise),
