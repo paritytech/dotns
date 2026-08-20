@@ -269,13 +269,9 @@ contract EscrowHandler is Test {
         uint256 index = tokenSeed % _depositedTokenIds.length;
         uint256 tokenId = _depositedTokenIds[index];
 
-        // Only release if the deposit has a non-zero amount (NoStatus names with a refundable
-        // position)
-        if (depositAmounts[tokenId] == 0) {
-            _removeDeposited(index);
-            return;
-        }
-
+        // Zero-amount positions are released too. They used to be skipped here, which meant the
+        // fuzzer never explored the exact state the reclaim deadlock lived in: a released position
+        // with nothing to withdraw, and therefore no reason for its holder ever to call `withdraw`.
         address tokenOwner = registrar.ownerOf(tokenId);
 
         IDotnsNameEscrow.ReleasePosition memory positionBefore = escrow.getReleasePosition(tokenId);
@@ -336,6 +332,91 @@ contract EscrowHandler is Test {
         _removeReleased(index);
         ghost_pendingCredits += owed;
         _accountInsuranceDraws(logs);
+    }
+
+    /// @notice Redeems a released token back to its previous holder inside the redeem window.
+    /// @dev Picks from `_releasedTokenIds` and only acts while the position is still redeemable
+    ///      (released, unwithdrawn, inside the window). Moves the token back to
+    ///      `_depositedTokenIds` because a redeem restores the pre-release state exactly: the
+    ///      deposit is still locked and the name is releasable again. No value moves, so no ghost
+    ///      accounting changes.
+    /// @param tokenSeed Seed for selecting which released token to redeem.
+    function redeemReleased(uint256 tokenSeed) external {
+        if (_releasedTokenIds.length == 0) return;
+
+        uint256 index = tokenSeed % _releasedTokenIds.length;
+        uint256 tokenId = _releasedTokenIds[index];
+
+        IDotnsNameEscrow.ReleasePosition memory position = escrow.getReleasePosition(tokenId);
+        if (!position.released || position.claimed) return;
+        if (block.timestamp >= position.redeemableUntil) return;
+
+        vm.prank(position.recipient);
+        escrow.redeem(tokenId);
+
+        _depositedTokenIds.push(tokenId);
+        _removeReleased(index);
+    }
+
+    /// @notice Re-registers a released token whose window elapsed, without any prior withdrawal.
+    /// @dev The path the old `released && claimed` gate made unreachable, and the reason this
+    ///      action exists separately from `reRegisterReclaimed`: that one draws from
+    ///      `_withdrawnTokenIds`, so nothing ever exercised reclaim against an unwithdrawn
+    ///      position. Reclaim settles any outstanding deposit onto the previous recipient's
+    ///      pull-payment balance, so the credit is mirrored into `ghost_pendingCredits`.
+    /// @param tokenSeed Seed for selecting which released token to re-register.
+    /// @param actorSeed Seed selecting the new registrant.
+    function reRegisterReleased(uint256 tokenSeed, uint256 actorSeed) external {
+        if (_releasedTokenIds.length == 0 || actors.length == 0) return;
+
+        uint256 index = tokenSeed % _releasedTokenIds.length;
+        uint256 tokenId = _releasedTokenIds[index];
+        string memory label = labelByTokenId[tokenId];
+        address actor = actors[actorSeed % actors.length];
+
+        IDotnsNameEscrow.ReleasePosition memory position = escrow.getReleasePosition(tokenId);
+        if (!position.released) return;
+        if (block.timestamp < position.redeemableUntil) {
+            vm.warp(position.redeemableUntil);
+        }
+
+        // Outstanding value on the position is what reclaim will settle. A position already
+        // withdrawn carries a zero amount, so this is naturally zero for those.
+        uint256 outstanding = position.amount;
+
+        bytes32 secret = keccak256(abi.encodePacked(label, actor, block.timestamp, labelNonce));
+
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label, owner: actor, secret: secret, reserved: true
+            });
+
+        bytes32 commitment = controller.makeCommitment(registration);
+
+        vm.prank(actor);
+        controller.commit(commitment);
+
+        uint256 minAge = controller.minCommitmentAge();
+        vm.warp(block.timestamp + minAge + 1);
+
+        uint256 price = popRules.priceWithCheck(label, actor).price;
+
+        vm.recordLogs();
+        vm.prank(actor);
+        try controller.register{value: price}(registration) {
+            Vm.Log[] memory logs = vm.getRecordedLogs();
+
+            _removeReleased(index);
+            _depositedTokenIds.push(tokenId);
+            depositAmounts[tokenId] = price;
+            depositRecipients[tokenId] = address(0);
+            labelByTokenId[tokenId] = label;
+
+            ghost_pendingCredits += outstanding;
+            _accountInsuranceDraws(logs);
+        } catch {
+            return;
+        }
     }
 
     /// @notice Pulls the caller's accumulated pending refund balance.
@@ -411,6 +492,14 @@ contract EscrowHandler is Test {
         uint256 tokenId = _withdrawnTokenIds[index];
         string memory label = labelByTokenId[tokenId];
         address actor = actors[actorSeed % actors.length];
+
+        // Reclaim is gated on the redeem window, not on the withdrawal. Without this warp every
+        // attempt would revert NotReclaimable and be swallowed by the try/catch below, so the
+        // action would look like it was running while covering nothing.
+        IDotnsNameEscrow.ReleasePosition memory position = escrow.getReleasePosition(tokenId);
+        if (block.timestamp < position.redeemableUntil) {
+            vm.warp(position.redeemableUntil);
+        }
 
         bytes32 secret = keccak256(abi.encodePacked(label, actor, block.timestamp, labelNonce));
 

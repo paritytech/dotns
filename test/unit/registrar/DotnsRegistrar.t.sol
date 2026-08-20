@@ -166,9 +166,10 @@ contract DotnsRegistrarTests is BaseDotns {
         assertFalse(dotnsRegistrar.available(tokenId));
     }
 
-    function test_available_when_token_held_by_escrow_returns_true() public {
+    function test_available_is_false_while_released_token_is_inside_redeem_window() public {
         // Drive a registration through the public controller so a deposit position seeds,
-        // approve the escrow, release the token, then assert availability flips back to true.
+        // approve the escrow, release the token, then assert the name is NOT advertised as free
+        // while its previous holder can still redeem it.
         string memory label = "availreclaim01";
         _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = _tokenIdForLabel(label);
@@ -179,9 +180,42 @@ contract DotnsRegistrarTests is BaseDotns {
         vm.stopPrank();
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), address(dotnsNameEscrow));
+        assertFalse(
+            dotnsRegistrar.available(tokenId),
+            "a released token inside its redeem window must not report available"
+        );
+
+        // Still false one second before the boundary: the window is inclusive of its final second.
+        IDotnsNameEscrow.ReleasePosition memory position =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        vm.warp(position.redeemableUntil - 1);
+        assertFalse(
+            dotnsRegistrar.available(tokenId),
+            "availability must not open before redeemableUntil is reached"
+        );
+    }
+
+    function test_available_when_redeem_window_elapsed_returns_true() public {
+        string memory label = "availreclaim02";
+        _register(label, ed, IPopRules.PopStatus.NoStatus);
+        uint256 tokenId = _tokenIdForLabel(label);
+
+        vm.startPrank(ed);
+        dotnsRegistrar.setApprovalForAll(address(dotnsNameEscrow), true);
+        dotnsNameEscrow.release(tokenId);
+        vm.stopPrank();
+
+        IDotnsNameEscrow.ReleasePosition memory position =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+
+        // Exactly at the boundary the name is registrable, matching reclaim's `>=` gate so the
+        // two views can never disagree about whether a registration would succeed.
+        vm.warp(position.redeemableUntil);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), address(dotnsNameEscrow));
         assertTrue(
             dotnsRegistrar.available(tokenId),
-            "escrow-held tokens must be available for re-registration"
+            "escrow-held tokens must be available once the redeem window has elapsed"
         );
     }
 

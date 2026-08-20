@@ -29,7 +29,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
 
         targetContract(address(handler));
 
-        bytes4[] memory selectors = new bytes4[](10);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = handler.commitRegisterAndDeposit.selector;
         selectors[1] = handler.registerCrossTier.selector;
         selectors[2] = handler.releaseToken.selector;
@@ -40,6 +40,10 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         selectors[7] = handler.transferDeposited.selector;
         selectors[8] = handler.transferPayable.selector;
         selectors[9] = handler.advanceTime.selector;
+        // The two halves of the redeem window. Without both, the fuzzer can only reach reclaim by
+        // way of a withdrawal, which is precisely the assumption the reclaim deadlock rested on.
+        selectors[10] = handler.redeemReleased.selector;
+        selectors[11] = handler.reRegisterReleased.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
 
         excludeContract(address(dotnsRegistrarController));
@@ -158,9 +162,12 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         }
     }
 
-    /// @notice Every withdrawn-but-not-reclaimed token must be held by escrow and available.
-    /// @dev Under the custody model, withdrawn tokens stay in escrow custody until a new
-    ///      registrant reclaims them. They must remain `available()` for re-registration.
+    /// @notice Every withdrawn-but-not-reclaimed token must be held by escrow, and available
+    ///         exactly when its redeem window has elapsed.
+    /// @dev Withdrawn tokens stay in escrow custody until a new registrant reclaims them. Custody
+    ///      alone no longer implies availability: withdrawing does not shorten the previous
+    ///      holder's redeem window, so a withdrawn position can still be inside it. Availability
+    ///      is therefore asserted against the window rather than unconditionally.
     function invariant_withdrawn_tokens_are_in_escrow_custody_and_available() public view {
         uint256[] memory withdrawn = handler.getWithdrawnTokenIds();
 
@@ -172,9 +179,47 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
                 address(dotnsNameEscrow),
                 "Withdrawn token must be held by escrow"
             );
-            assertTrue(
-                dotnsRegistrar.available(tokenId), "Withdrawn token must be available for reclaim"
+
+            IDotnsNameEscrow.ReleasePosition memory position =
+                dotnsNameEscrow.getReleasePosition(tokenId);
+
+            assertEq(
+                dotnsRegistrar.available(tokenId),
+                block.timestamp >= position.redeemableUntil,
+                "Withdrawn token is available exactly once its redeem window has elapsed"
             );
+        }
+    }
+
+    /// @notice No released token can ever be stuck: it is always either redeemable or reclaimable.
+    /// @dev This is the property the bug violated, stated directly. Under the old
+    ///      `released && claimed` reclaim gate a released position whose holder never withdrew was
+    ///      neither redeemable (no such call existed) nor reclaimable (the flag was never set), so
+    ///      the name left circulation permanently. The two phases must tile the whole timeline with
+    ///      no gap, and must not overlap -- an overlap would mean the previous holder and a new
+    ///      registrant could both act on the same name.
+    function invariant_released_tokens_are_never_stuck() public view {
+        uint256[] memory released = handler.getReleasedTokenIds();
+
+        for (uint256 i; i < released.length; ++i) {
+            uint256 tokenId = released[i];
+
+            IDotnsNameEscrow.ReleasePosition memory position =
+                dotnsNameEscrow.getReleasePosition(tokenId);
+
+            if (!position.released) continue;
+
+            bool insideWindow = block.timestamp < position.redeemableUntil;
+            // Withdrawing forfeits the redeem right, but it cannot strand the name: reclaim opens
+            // on the same boundary regardless.
+            bool redeemable = insideWindow && !position.claimed;
+            bool reclaimable = !insideWindow;
+
+            assertTrue(
+                redeemable || reclaimable,
+                "A released position must always be redeemable or reclaimable, never neither"
+            );
+            assertFalse(redeemable && reclaimable, "The redeem and reclaim phases must not overlap");
         }
     }
 }

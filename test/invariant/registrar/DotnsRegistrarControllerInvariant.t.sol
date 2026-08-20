@@ -101,25 +101,33 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
         assertEq(address(dotnsRegistrarController).balance, 0, "Controller must not hold funds");
     }
 
+    /// @notice The escrow always holds at least the value it owes across every ledger.
+    /// @dev Previously asserted strict equality against reserves + insurance + pending withdrawals
+    ///      while iterating only the first five actors and omitting the time-locked refund ledger
+    ///      entirely. Both were latent: any refund entry, or a sixth actor holding a pending
+    ///      balance, made the equality wrong for reasons unrelated to solvency. Now that reclaim
+    ///      settles unwithdrawn deposits onto the pull-payment ledger, more paths reach that state,
+    ///      so the assertion is stated as the property that actually matters -- the escrow is never
+    ///      short -- over every actor and every ledger.
+    ///      Balance may legitimately exceed the sum: force-sent value (`selfdestruct`) is
+    ///      unaccounted-for surplus the escrow has no ledger for, which is why this is `assertGe`.
+    ///      The time-locked refund ledger is not summed here because this handler does not drive
+    ///      it; `DotnsNameEscrowInvariant.invariant_solvency` covers all four ledgers together.
     function invariant_value_conservation() public view {
-        // Escrow balance equals reserves + insurance + pending withdrawals.
         uint256 reservedAmount = dotnsNameEscrow.reserves(address(0));
         uint256 insurance = dotnsNameEscrow.insuranceFund();
 
+        address[] memory actorList = handler.getActors();
         uint256 pendingTotal;
-        for (uint256 i; i < 5; ++i) {
-            try handler.actors(i) returns (address actor) {
-                pendingTotal += dotnsNameEscrow.pendingWithdrawal(actor);
-            } catch {
-                break;
-            }
+        for (uint256 i; i < actorList.length; ++i) {
+            pendingTotal += dotnsNameEscrow.pendingWithdrawal(actorList[i]);
         }
 
         uint256 escrowBalance = address(dotnsNameEscrow).balance;
-        assertEq(
+        assertGe(
             escrowBalance,
             reservedAmount + insurance + pendingTotal,
-            "Escrow balance must equal reserves + insurance + pending withdrawals"
+            "Escrow balance must cover reserves + insurance + pending withdrawals"
         );
     }
 

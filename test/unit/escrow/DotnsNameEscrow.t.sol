@@ -137,6 +137,10 @@ contract DotnsNameEscrowTest is BaseDotns {
             "escrow holds token before reclaim"
         );
 
+        // Withdrawing no longer opens reclaim on its own: the redeem window has to elapse, because
+        // that window is the previous holder's exclusive claim on the name.
+        vm.warp(block.timestamp + ESCROW_REDEEM_WINDOW + 1);
+
         vm.prank(address(dotnsRegistrarController));
         dotnsNameEscrow.reclaim(tokenId, leonardo);
 

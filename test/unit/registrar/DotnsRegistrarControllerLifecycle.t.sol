@@ -41,6 +41,9 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         vm.prank(originalOwner);
         dotnsNameEscrow.withdraw(tokenId);
 
+        // Reclaim opens on the redeem window elapsing, not on the withdrawal landing.
+        vm.warp(block.timestamp + ESCROW_REDEEM_WINDOW + 1);
+
         // Inline the new owner's commit-reveal because BaseDotns helpers quote
         // priceWithCheck up-front, which reverts against the stale reservation.
         // The controller's reclaim path is what garbage-collects the slot.
@@ -232,6 +235,9 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         vm.warp(block.timestamp + ESCROW_COOLDOWN + 1);
         vm.prank(ed);
         dotnsNameEscrow.withdraw(tokenId);
+
+        // Reclaim opens on the redeem window elapsing, not on the withdrawal landing.
+        vm.warp(block.timestamp + ESCROW_REDEEM_WINDOW + 1);
 
         RegistrationProbe probe =
             new RegistrationProbe(address(dotnsRegistry), address(dotnsReverseResolver));
@@ -512,6 +518,9 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         vm.warp(block.timestamp + ESCROW_COOLDOWN + 1);
         vm.prank(ed);
         dotnsNameEscrow.withdraw(tokenId);
+
+        // Reclaim opens on the redeem window elapsing, not on the withdrawal landing.
+        vm.warp(block.timestamp + ESCROW_REDEEM_WINDOW + 1);
 
         ReentrantOwner attacker = new ReentrantOwner(dotnsRegistrarController);
         vm.deal(address(attacker), DEFAULT_BALANCE);
