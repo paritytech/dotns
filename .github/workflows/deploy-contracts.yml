@@ -157,7 +157,7 @@ jobs:
             python3 << 'EOF'
           import re
           import os
-
+          
           def extract_errors(log_content):
               errors = []
               lines = log_content.split('\n')
@@ -199,7 +199,7 @@ jobs:
                   stack_lines.append("```")
               
               return errors, stack_lines
-
+          
           try:
               with open('deploy.log', 'r') as f:
                   log_content = f.read()
@@ -445,7 +445,7 @@ jobs:
 
             let rows = {};
             let existingDetails = {};
-
+            
             if (existing?.body) {
               const parts = existing.body.split(detailsMarker);
               const tableSection = parts[0] || '';
