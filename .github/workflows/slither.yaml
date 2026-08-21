@@ -13,7 +13,7 @@ name: Slither Analysis
 on:
   pull_request:
     branches: [master, develop]
-    paths: ["contracts/**", "foundry.toml"]
+    paths: ['contracts/**', 'foundry.toml']
   pull_request_target:
     types: [closed]
 
