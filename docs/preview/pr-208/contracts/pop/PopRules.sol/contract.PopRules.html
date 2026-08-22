@@ -180,20 +180,22 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="poprules"><a class="header" href="#poprules">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
 PopRules</p>
 <p>Implements DotNS classification, scarcity pricing on a geometric curve, and base-name
 reservations.</p>
-<p>Tier shape: base lengths &lt;= 5 are governance-reserved, base lengths 6-8 require PopFull
+<p>Tiers: base lengths &lt;= 5 are governance-reserved, base lengths 6-8 require PopFull
 (or PopLite when carrying exactly two trailing digits, for gateway-issued lite names),
 base lengths &gt;= 9 are open to any caller as NoStatus when they carry zero or exactly two
 trailing digits. A one-digit suffix and more than two trailing digits are invalid.
 Every caller pays the same curve for a given base length: price(n) = D * 2^(9 - n) below
-nine characters, and the base fee D at nine and above, where D is <code>startingPrice</code>.
-Personhood buys access to the premium band, not a discount inside it.</p>
+nine characters, and D halved for each character from nine upward, never below the floor
+<code>minPrice</code>, where D is <code>startingPrice</code>. Personhood only unlocks the premium band. Base
+lengths below nine are closed to the public paid path until governance sets
+<code>shortNamesEnabled</code>; the gateway and registerReserved do not consult it.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
@@ -203,7 +205,7 @@ security-contact: admin@parity.io</p>
 </code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="startingprice"><a class="header" href="#startingprice">startingPrice</a></h3>
-<p>Base fee D in wei. Base lengths &gt;= 9 pay D; shorter base lengths pay D * 2^(9 - n).</p>
+<p>Base fee D in wei: the scarcity curve's value at nine characters.</p>
 <pre><code class="language-solidity">uint256 public startingPrice
 </code></pre>
 <h3 id="reservations"><a class="header" href="#reservations">reservations</a></h3>
@@ -213,6 +215,16 @@ security-contact: admin@parity.io</p>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
 <p>Protocol-level address registry for all DotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
+</code></pre>
+<h3 id="minprice"><a class="header" href="#minprice">minPrice</a></h3>
+<p>Price floor F in wei: the least any name can cost, so a long base length decays
+towards it rather than to zero. Never above <code>startingPrice</code>.</p>
+<pre><code class="language-solidity">uint256 public minPrice
+</code></pre>
+<h3 id="shortnamesenabled"><a class="header" href="#shortnamesenabled">shortNamesEnabled</a></h3>
+<p>Whether the public paid path may register names shorter than nine characters.
+Closed by default; only governance opens it.</p>
+<pre><code class="language-solidity">bool public shortNamesEnabled
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <pre><code class="language-solidity">uint256[50] private __gap
@@ -235,6 +247,7 @@ InvalidInitialization via the <code>initializer</code> modifier. Seeds <code>sta
 function: updateStartingPrice.</p>
 <pre><code class="language-solidity">function initialize(
     uint256 _startingPrice,
+    uint256 _minPrice,
     IDotnsProtocolRegistry registry
 )
     public
@@ -243,6 +256,7 @@ function: updateStartingPrice.</p>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>_startingPrice</code></td><td><code>uint256</code></td><td>Base fee D in wei anchoring the scarcity curve, paid by every caller.</td></tr>
+<tr><td><code>_minPrice</code></td><td><code>uint256</code></td><td>Price floor F in wei; the least any name can cost. Must not exceed D.</td></tr>
 <tr><td><code>registry</code></td><td><code>IDotnsProtocolRegistry</code></td><td>Protocol-level address registry used to resolve sibling contracts.</td></tr>
 </tbody></table>
 </div>
@@ -259,6 +273,36 @@ prior and new values.</p>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>newStartingPrice</code></td><td><code>uint256</code></td><td>New base price in wei.</td></tr>
+</tbody></table>
+</div>
+<h3 id="updateminprice"><a class="header" href="#updateminprice">updateMinPrice</a></h3>
+<p>Sets the price floor F, the least any name can cost on the scarcity curve.</p>
+<p>Owner-only; unauthorised callers trigger @custom:reverts OwnableUnauthorizedAccount.
+<code>newMinPrice</code> must be strictly positive and no greater than the base fee D, otherwise</p>
+<p><strong>Note:</strong>
+reverts: PopError. A base length below nine always prices above D, so the floor
+only binds from nine characters upward. Emits @custom:emits MinPriceUpdated.</p>
+<pre><code class="language-solidity">function updateMinPrice(uint256 newMinPrice) public override onlyOwner;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>newMinPrice</code></td><td><code>uint256</code></td><td>New price floor in wei.</td></tr>
+</tbody></table>
+</div>
+<h3 id="setshortnamesenabled"><a class="header" href="#setshortnamesenabled">setShortNamesEnabled</a></h3>
+<p>Opens or closes the public market for names shorter than nine characters.</p>
+<p>Owner-only; unauthorised callers trigger @custom:reverts OwnableUnauthorizedAccount.
+While closed, which is the deploy default, @custom:function priceWithCheck and</p>
+<p><strong>Note:</strong>
+function: priceWithoutCheck trigger @custom:reverts PopError for a base length
+below nine, so no public caller buys a short name. The gateway free grant and the
+registrar's registerReserved path do not read this flag. Emits @custom:emits
+ShortNamesEnabledUpdated.</p>
+<pre><code class="language-solidity">function setShortNamesEnabled(bool enabled) external override onlyOwner;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>enabled</code></td><td><code>bool</code></td><td>Whether names shorter than nine characters may be bought.</td></tr>
 </tbody></table>
 </div>
 <h3 id="classifyname"><a class="header" href="#classifyname">classifyName</a></h3>
@@ -383,7 +427,7 @@ as free. Non-canonical labels trigger @custom:reverts PopError.</p>
 <p>Calculates price with PoP classification and reservation enforcement.</p>
 <p>Reverting pricing path used by the commit-reveal controller. Price is the scarcity
 curve for the label's base length and is charged to every caller, verified or not;
-personhood gates access to the premium band rather than discounting it. Non-canonical
+personhood only unlocks the premium band. Non-canonical
 labels, a base stem held live by another user, a governance-reserved label, or a
 <code>userAddress</code> whose personhood tier does not meet the label's required tier each
 trigger @custom:reverts PopError.</p>
@@ -439,8 +483,9 @@ contested.</p>
 </div>
 <h3 id="price"><a class="header" href="#price">price</a></h3>
 <p>Calculates registration cost for a label.</p>
-<p>Prices the label on the scarcity curve by base length: D * 2^(9 - n) for a base length
-below nine, and the base fee D at nine and above. Ignores the caller's personhood
+<p>Prices the label on the scarcity curve by base length: D * 2^(9 - n) below nine,
+halved for each character from nine upward and floored at <code>minPrice</code>. Ignores the
+caller's personhood
 status and reservation state. A label whose trailing-digit suffix is neither zero nor
 exactly two, and any non-canonical label, trigger @custom:reverts PopError.</p>
 <pre><code class="language-solidity">function price(string calldata name) external view override returns (uint256);
@@ -462,7 +507,7 @@ sender-tier-downgrade component, each priced at the name's own length.</p>
 either (i) the recipient does not meet the label's required tier, or (ii) the
 recipient's personhood tier is strictly below the sender's, and zero when neither
 holds. Passing a name to a wallet that could never have registered it therefore costs
-what the name is worth, not the open-band floor. The two components overlap on pure
+the name's own curve price. The two components overlap on pure
 tier mismatches, so the function takes their maximum rather than their sum to avoid
 double-charging. Consumed by @custom:function DotnsRegistrar.quoteTransferFee.
 Non-canonical labels and labels with exactly one or more than two trailing digits
@@ -510,14 +555,27 @@ enters circulation.</p>
 <pre><code class="language-solidity">function _meetsReach(PopStatus required, PopStatus userStatus) private pure returns (bool);
 </code></pre>
 <h3 id="_pricevalidatedname"><a class="header" href="#_pricevalidatedname">_priceValidatedName</a></h3>
-<p>Scarcity price for a base length: D * 2 ** (9 - n) below nine, else the base fee D.</p>
-<p>The multiplier is at most 512; @custom:function updateStartingPrice caps the base fee
-at <code>type(uint256).max / 512</code> so the checked multiplication never overflows.</p>
+<p>Scarcity price for a base length, floored at <code>minPrice</code>.</p>
+<p>Below nine the multiplier is at most 512, and @custom:function updateStartingPrice caps
+D at <code>type(uint256).max / 512</code> so the checked multiplication cannot overflow. From nine
+upward the price is D right-shifted by <code>n - 9</code>, so it only ever decreases; base lengths
+cap at 63 characters, so the shift is at most 54 and never reaches the word width. The
+floor stops a long base length costing nothing and is <code>updateMinPrice</code>-bounded to D, so
+it only binds from nine upward, never in the doubling range below nine.</p>
 <pre><code class="language-solidity">function _priceValidatedName(uint256 baseLength) internal view returns (uint256 priceValue);
 </code></pre>
+<h3 id="_requireshortnamesopen"><a class="header" href="#_requireshortnamesopen">_requireShortNamesOpen</a></h3>
+<p>Reverts a public paid registration of a base length below nine while the short-name
+market is closed.</p>
+<p>The one gate both public price reads share. Base lengths of nine and above are always
+open. @custom:reverts PopError when a base length below nine is priced while
+<code>shortNamesEnabled</code> is false. The gateway and @custom:function registerReserved never
+reach this, so neither is gated.</p>
+<pre><code class="language-solidity">function _requireShortNamesOpen(uint256 baseLength) private view;
+</code></pre>
 <h3 id="_validatedbaselength"><a class="header" href="#_validatedbaselength">_validatedBaseLength</a></h3>
-<p>Validates the digit suffix and returns the base length, the single source pricing
-and classification both derive a name's band from.</p>
+<p>Validates the digit suffix and returns the base length that pricing and
+classification both use to place a name in its band.</p>
 <p>A name carries no digit suffix or exactly two digits; any other count triggers</p>
 <p><strong>Note:</strong>
 reverts: PopError, so a longer suffix cannot slip a name into a shorter band.</p>

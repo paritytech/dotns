@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Constants</p>
 <p>Protocol-level invariants shared across DotNS contracts.</p>
@@ -216,14 +216,20 @@ forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant PERSONHOOD_CONTEXT = bytes32("dotns")
 </code></pre>
 <h3 id="rent_price"><a class="header" href="#rent_price">RENT_PRICE</a></h3>
-<p>Default deploy-time NoStatus rent price passed into
-<code>PopRules.initialize</code> as <code>_startingPrice</code>.</p>
-<p>10 DOT under revive's 18-decimal Asset Hub convention. Single
-source of truth for deploy scripts and tests so the value cannot
-drift between call sites. Live deployments rotate the runtime
-<code>startingPrice</code> on <code>PopRules</code> rather than rebuilding consumers
-against a new constant.</p>
+<p>Initial-deployment base fee D passed into <code>PopRules.initialize</code> as <code>_startingPrice</code>.</p>
+<p>Purely the value the contract is seeded with at deployment: 10 DOT under revive's
+18-decimal Asset Hub convention. Governance sets the live value through
+<code>PopRules.updateStartingPrice</code>, so this is never read after deployment and consumers
+are not rebuilt against a new constant. Single source of truth for deploy scripts and
+tests so the seed cannot drift between call sites.</p>
 <pre><code class="language-solidity">uint256 internal constant RENT_PRICE = 10 ether
+</code></pre>
+<h3 id="min_price"><a class="header" href="#min_price">MIN_PRICE</a></h3>
+<p>Initial-deployment price floor F passed into <code>PopRules.initialize</code> as <code>_minPrice</code>.</p>
+<p>Purely the seed value: below <code>RENT_PRICE</code> so the curve falls above nine characters.
+Governance sets the live floor through <code>PopRules.updateMinPrice</code>; never read after
+deployment.</p>
+<pre><code class="language-solidity">uint256 internal constant MIN_PRICE = 0.1 ether
 </code></pre>
 <h3 id="whitelist_operator_role"><a class="header" href="#whitelist_operator_role">WHITELIST_OPERATOR_ROLE</a></h3>
 <p>Operational role allowed to manage the public controller whitelist.</p>

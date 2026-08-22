@@ -200,29 +200,33 @@ This open source code is provided for research, experimentation, and developer e
 <p>If a run fails partway, re-run it from the Actions tab; the draft is updated rather than duplicated. One case needs a manual step: the upload replaces an asset of the same name but never removes others, so if the contract list changed since the failed run, the draft still carries the assets it no longer expects and the verification step will keep refusing to publish. Delete the draft and re-run. If the version has already been published, use a different one, since its assets cannot be changed.</p>
 <h2 id="economics"><a class="header" href="#economics">Economics</a></h2>
 <p>Every price comes from one number. The base fee D is set in the native token and equals ten DOT at launch. A name's price depends only on its base length, the character count once a trailing number is set aside:</p>
-<p>price(n) = D · 2^(9 − n) for a base length n below nine, and D for n of nine or more.</p>
-<p>The price doubles for each character below nine and flattens to D from nine upward. Short names are scarce, so they cost more, and the curve follows how the count of available names falls as they shorten. A trailing number never changes the price, because it comes off before the length is measured, so <code>andrew</code> and <code>andrew01</code> both cost 8D. A name carries no digits or exactly two; any other trailing-digit count is rejected.</p>
+<p>$$
+\text{price}(n) = \max!\left(F,; D \cdot 2^{,9 - n}\right)
+$$</p>
+<p>The price doubles for each character below nine and halves for each character above it, down to the floor F. Short names are scarce, so they cost more; long names are abundant, so each extra character costs less, until the floor F stops the price reaching zero. Governance configures both values: D anchors the curve at nine, F is the least a name can cost. A trailing number never changes the price, because it comes off before the length is measured, so <code>andrew</code> and <code>andrew01</code> both price as <code>andrew</code>, at 8D. A name carries no digits or exactly two; any other trailing-digit count is rejected.</p>
 <div class="table-wrapper"><table><thead><tr><th>Base length</th><th>Price</th></tr></thead><tbody>
-<tr><td>9 or more</td><td>D</td></tr>
-<tr><td>8</td><td>2D</td></tr>
-<tr><td>7</td><td>4D</td></tr>
 <tr><td>6</td><td>8D</td></tr>
-<tr><td>5</td><td>16D</td></tr>
-<tr><td>4</td><td>32D</td></tr>
-<tr><td>3</td><td>64D</td></tr>
+<tr><td>7</td><td>4D</td></tr>
+<tr><td>8</td><td>2D</td></tr>
+<tr><td>9</td><td>D</td></tr>
+<tr><td>10</td><td>D/2</td></tr>
+<tr><td>11</td><td>D/4</td></tr>
+<tr><td>n above 9</td><td>D / 2^(n − 9), down to the floor F</td></tr>
 </tbody></table>
 </div>
 <h3 id="bands-and-who-pays"><a class="header" href="#bands-and-who-pays">Bands and who pays</a></h3>
-<p>Three bands share the one curve. Names of nine characters or more are open to anyone at the flat fee D. Names of six to eight characters are the premium band: only a verified person may register there, and they pay the curve for the length, 8D, 4D or 2D. Personhood buys access to the premium band, not a discount inside it. Names of five characters or fewer are reserved to governance; no user registers them, and governance releases them itself at the price their length sets, into the treasury it already controls.</p>
-<p>Every caller pays the same curve for a given length. Each wallet gets one free name through the personhood gateway, the unpriced lane: the gateway waives the price and issues that grant per wallet, and the name can be any length. The bands above are the public curve; the gateway lane does not apply them and only refuses the governance-reserved stems of five characters or fewer. Governance releasing a reserved name charges itself that length's price, which settles in a circle into its own treasury and nets nothing.</p>
+<p>Three bands share the one curve. Names of nine characters or more are open to anyone at the curve price for the length, D at nine and less for each character above it. Names of six to eight characters are the premium band: only a verified person may register there, and they pay the curve for the length, 8D, 4D or 2D. Personhood only unlocks that band; the price there is the same curve everyone pays. Names of five characters or fewer are reserved to governance; no user registers them, and governance releases them itself at the price their length sets, into the treasury it already controls.</p>
+<p>Names shorter than nine are closed on the public curve by default. A paid registration of a base length below nine reverts until governance opens the short-name market with a single switch; while it is off no caller buys a name shorter than nine, and while it is on the two short bands above apply, six to eight to verified persons and five or fewer to governance alone. The switch defaults off, so at launch only names of nine characters or more are for sale. It gates the public paid path alone: the personhood gateway's free grant is unpriced and issues names of any length either way, and governance's own reserved releases and the operator whitelist do not pass through it.</p>
+<p>The switch gates primary purchase, not transfer. A transferable name still moves whatever the switch reads, re-priced at its own length through the transfer floor below, so a short name registered on the public curve still transfers at its scarcity price after the market closes.</p>
+<p>Every caller pays the same curve for a given length. Each wallet gets one free name through the personhood gateway, the unpriced lane: the gateway waives the price and issues that grant per wallet, and the name can be any length. The bands above are the public curve; the gateway lane does not apply them and only refuses the governance-reserved stems of five characters or fewer. Governance releasing a reserved name charges itself that length's price, which returns to the treasury it controls and nets nothing.</p>
 <h3 id="deposits-and-protocol-fees"><a class="header" href="#deposits-and-protocol-fees">Deposits and protocol fees</a></h3>
 <p>Registering a name under your own key locks a refundable deposit equal to the name's price. The deposit is bound to the name rather than the depositor, so it travels with the token on every transfer and unlocks only when the current holder releases the name back to escrow. Holding many names ties up capital on the same curve, and the cost rises with scarcity because the price does.</p>
 <p>A fee is non-refundable. Two things pay a fee instead of a deposit: a name someone else pays for, and a transfer. Fees flow into one protocol fee pot that only accumulates. Governance can route the pot to one of a fixed pair, a burn or the on-chain treasury, and to nowhere else. A holder's own deposit is their money held in trust and is never swept into fees.</p>
 <h3 id="transfers-re-price-at-the-names-own-length"><a class="header" href="#transfers-re-price-at-the-names-own-length">Transfers re-price at the name's own length</a></h3>
-<p>Moving a name re-prices it from scratch at its own length on every move. Passing a six-character name to a wallet that could never have registered it costs 8D, the name's own price, not the flat D floor. <code>andrew</code> and <code>andrew01</code> re-derive to the same 8D. The exit price equals what the name was worth to acquire, so there is no cheap way to hand a scarce name to a party who could not have earned it. A move between parties who both clear the name's band costs nothing, and the fee, when one is owed, settles into protocol fees.</p>
+<p>Moving a name re-prices it from scratch at its own length on every move. Passing a six-character name to a wallet that could never have registered it costs 8D, the name's own price. <code>andrew</code> and <code>andrew01</code> re-derive to the same 8D. The exit price equals what the name was worth to acquire, so there is no cheap way to hand a scarce name to a party who could not have earned it. A move between parties who both clear the name's band costs nothing, and the fee, when one is owed, settles into protocol fees.</p>
 <p>The deposit, when present, is bound to the name and rides with it on every transfer. The escrow position is rebound to the new holder rather than refunded; only releasing the name back to escrow ever unlocks the locked deposit. Transferring a funded name hands the locked deposit to the recipient along with the token.</p>
 <h3 id="what-governance-controls"><a class="header" href="#what-governance-controls">What governance controls</a></h3>
-<p>Everything hangs off D. Governance can move D, but only inside a fixed band and by at most a set multiple per vote, so it can neither drop the price to zero, which would free every short name, nor raise it to an extractive level, and any change is legible several votes ahead. Governance sets how long the interval on the free grant runs, and chooses where fees go, a burn or the treasury, from that fixed pair. Nothing in that surface lets governance seize, reassign or destroy a name anyone already holds.</p>
+<p>Everything hangs off D. Governance sets D and the floor F to whatever values it chooses; the contracts hold them coherent and nothing more, requiring D above zero and F in the range one to D, so the curve can never invert and no name ever prices at zero. They put no ceiling on how high or low D goes, nor any limit on how fast it moves, so the economic policy is the owner's to set and any rate limit or advance notice comes from the governance process, not from these contracts. Governance also sets the floor F, opens or closes the short-name market with the switch above (while it is closed no name shorter than nine is for sale), sets how long the interval on the free grant runs, and chooses where fees go, a burn or the treasury, from that fixed pair. None of these controls lets governance seize, reassign or destroy a name anyone already holds.</p>
 <h3 id="refund-and-cooldown-model"><a class="header" href="#refund-and-cooldown-model">Refund and cooldown model</a></h3>
 <p>The escrow maintains two separate pull-payment ledgers. The split is deliberate: one ledger is for immediate overpayment withdrawals, and the other is for refunds that must wait behind a cooldown.</p>
 <ul>
@@ -336,7 +340,7 @@ This open source code is provided for research, experimentation, and developer e
 <li><a href="contracts/access/IDotnsRoleManager.sol/interface.IDotnsRoleManager.html">IDotnsRoleManager</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsrolemanager"><a class="header" href="#dotnsrolemanager">DotnsRoleManager</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/access/DotnsRoleManager.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/access/DotnsRoleManager.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 AccessControlUpgradeable, OwnableUpgradeable, <a href="contracts/access/DotnsRoleManager.sol//contracts/access/IDotnsRoleManager.sol/interface.IDotnsRoleManager.html">IDotnsRoleManager</a></p>
 <p><strong>Title:</strong>
@@ -445,7 +449,7 @@ with @custom:reverts NotRoleOrOwner.</p>
 <pre><code class="language-solidity">function _isSupportedRole(bytes32 role) internal view virtual returns (bool supported);
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsrolemanager"><a class="header" href="#idotnsrolemanager">IDotnsRoleManager</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/access/IDotnsRoleManager.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/access/IDotnsRoleManager.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IAccessControl</p>
 <p><strong>Title:</strong>
@@ -498,7 +502,7 @@ grant and @custom:emits IAccessControl.RoleRevoked on revoke.</p>
 <li><a href="contracts/deploy/Create3Factory.sol/contract.Create3Factory.html">Create3Factory</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="create3factory"><a class="header" href="#create3factory">Create3Factory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/deploy/Create3Factory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/deploy/Create3Factory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns CREATE3 Factory</p>
 <p>Permissionless wrapper around Solady's audited CREATE3 library.</p>
@@ -596,7 +600,7 @@ artefact lookup rather than land a useless deployment.</p>
 <li><a href="contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="contracts/escrow/DotnsNameEscrow.sol//contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
@@ -1089,7 +1093,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Name Escrow Interface</p>
 <p>Escrows refundable deposits for registered names and manages the release lifecycle.</p>
@@ -1728,7 +1732,7 @@ reset earlier entries' clocks. Recipients claim entries individually or in batch
 <li><a href="contracts/external/personhood/IPersonhood.sol/interface.IPersonhood.html">IPersonhood</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ipersonhood"><a class="header" href="#ipersonhood">IPersonhood</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/external/personhood/IPersonhood.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/external/personhood/IPersonhood.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IPersonhood - Proof of Personhood Precompile</p>
 <p>Query personhood status of an account.</p>
@@ -1786,7 +1790,7 @@ If we add more types in the future, the existing ones remain unchanged.</p>
 <li><a href="contracts/external/revive/ISystem.sol/interface.ISystem.html">ISystem</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="isystem"><a class="header" href="#isystem">ISystem</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/external/revive/ISystem.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/external/revive/ISystem.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 ISystem</p>
 <p>Minimal subset of revive's System precompile, vendored from
@@ -1808,7 +1812,7 @@ Reverts on a <code>RuntimeOrigin::Signed(_)</code> or non-Root origin.</p>
 <li><a href="contracts/pop/PopRules.sol/contract.PopRules.html">PopRules</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
 <p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements,
@@ -1820,9 +1824,9 @@ every caller as NoStatus when they carry zero or exactly two trailing digits. An
 suffix, and any suffix longer than two digits, is invalid; internal digits do not affect
 classification. Reservations are keyed by the digit-stripped stem so <code>alice</code> and <code>alice42</code>
 share a slot.
-Pricing is a geometric scarcity curve on the base length: price(n) = D * 2^(9 - n) below
-nine characters and the base fee D at nine and above. Every caller pays the same curve for
-a given length; personhood buys access to the premium band, not a discount inside it.</p>
+Pricing is a geometric scarcity curve on the base length: price(n) = D * 2^(9 - n),
+halved for each character above nine and floored at <code>minPrice</code>. Every caller pays the same
+curve for a given length; personhood only unlocks the premium band.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions-7"><a class="header" href="#functions-7">Functions</a></h2>
@@ -1861,6 +1865,36 @@ prior and new values.</p>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>newStartingPrice</code></td><td><code>uint256</code></td><td>New base price in wei.</td></tr>
+</tbody></table>
+</div>
+<h3 id="updateminprice"><a class="header" href="#updateminprice">updateMinPrice</a></h3>
+<p>Sets the price floor F, the least any name can cost on the scarcity curve.</p>
+<p>Owner-only; unauthorised callers trigger @custom:reverts OwnableUnauthorizedAccount.
+<code>newMinPrice</code> must be strictly positive and no greater than the base fee D, otherwise</p>
+<p><strong>Note:</strong>
+reverts: PopError. A base length below nine always prices above D, so the floor
+only binds from nine characters upward. Emits @custom:emits MinPriceUpdated.</p>
+<pre><code class="language-solidity">function updateMinPrice(uint256 newMinPrice) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>newMinPrice</code></td><td><code>uint256</code></td><td>New price floor in wei.</td></tr>
+</tbody></table>
+</div>
+<h3 id="setshortnamesenabled"><a class="header" href="#setshortnamesenabled">setShortNamesEnabled</a></h3>
+<p>Opens or closes the public market for names shorter than nine characters.</p>
+<p>Owner-only; unauthorised callers trigger @custom:reverts OwnableUnauthorizedAccount.
+While closed, which is the deploy default, @custom:function priceWithCheck and</p>
+<p><strong>Note:</strong>
+function: priceWithoutCheck trigger @custom:reverts PopError for a base length
+below nine, so no public caller buys a short name. The gateway free grant and the
+registrar's registerReserved path do not read this flag. Emits @custom:emits
+ShortNamesEnabledUpdated.</p>
+<pre><code class="language-solidity">function setShortNamesEnabled(bool enabled) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>enabled</code></td><td><code>bool</code></td><td>Whether names shorter than nine characters may be bought.</td></tr>
 </tbody></table>
 </div>
 <h3 id="reservebasename"><a class="header" href="#reservebasename">reserveBaseName</a></h3>
@@ -2023,7 +2057,7 @@ as free. Non-canonical labels trigger @custom:reverts PopError.</p>
 <p>Calculates price with PoP classification and reservation enforcement.</p>
 <p>Reverting pricing path used by the commit-reveal controller. Price is the scarcity
 curve for the label's base length and is charged to every caller, verified or not;
-personhood gates access to the premium band rather than discounting it. Non-canonical
+personhood only unlocks the premium band. Non-canonical
 labels, a base stem held live by another user, a governance-reserved label, or a
 <code>userAddress</code> whose personhood tier does not meet the label's required tier each
 trigger @custom:reverts PopError.</p>
@@ -2082,7 +2116,7 @@ sender-tier-downgrade component, each priced at the name's own length.</p>
 either (i) the recipient does not meet the label's required tier, or (ii) the
 recipient's personhood tier is strictly below the sender's, and zero when neither
 holds. Passing a name to a wallet that could never have registered it therefore costs
-what the name is worth, not the open-band floor. The two components overlap on pure
+the name's own curve price. The two components overlap on pure
 tier mismatches, so the function takes their maximum rather than their sum to avoid
 double-charging. Consumed by @custom:function DotnsRegistrar.quoteTransferFee.
 Non-canonical labels and labels with exactly one or more than two trailing digits
@@ -2128,8 +2162,9 @@ reverts: PopError.</p>
 </div>
 <h3 id="price"><a class="header" href="#price">price</a></h3>
 <p>Calculates registration cost for a label.</p>
-<p>Prices the label on the scarcity curve by base length: D * 2^(9 - n) for a base length
-below nine, and the base fee D at nine and above. Ignores the caller's personhood
+<p>Prices the label on the scarcity curve by base length: D * 2^(9 - n) below nine,
+halved for each character from nine upward and floored at <code>minPrice</code>. Ignores the
+caller's personhood
 status and reservation state. A label whose trailing-digit suffix is neither zero nor
 exactly two, and any non-canonical label, trigger @custom:reverts PopError.</p>
 <pre><code class="language-solidity">function price(string calldata name) external view returns (uint256 cost);
@@ -2166,6 +2201,28 @@ the scarcity curve consumed by <code>_priceValidatedName</code> on the next pric
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>oldPrice</code></td><td><code>uint256</code></td><td>Previous wei value.</td></tr>
 <tr><td><code>newPrice</code></td><td><code>uint256</code></td><td>New wei value.</td></tr>
+</tbody></table>
+</div>
+<h3 id="minpriceupdated"><a class="header" href="#minpriceupdated">MinPriceUpdated</a></h3>
+<p>Emitted when the price floor F is changed.</p>
+<p>Owner-only setter @custom:function updateMinPrice.</p>
+<pre><code class="language-solidity">event MinPriceUpdated(uint256 oldMinPrice, uint256 newMinPrice);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>oldMinPrice</code></td><td><code>uint256</code></td><td>Previous wei value.</td></tr>
+<tr><td><code>newMinPrice</code></td><td><code>uint256</code></td><td>New wei value.</td></tr>
+</tbody></table>
+</div>
+<h3 id="shortnamesenabledupdated"><a class="header" href="#shortnamesenabledupdated">ShortNamesEnabledUpdated</a></h3>
+<p>Emitted when the public market for names shorter than nine characters is opened or
+closed.</p>
+<p>Owner-only setter @custom:function setShortNamesEnabled.</p>
+<pre><code class="language-solidity">event ShortNamesEnabledUpdated(bool enabled);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>enabled</code></td><td><code>bool</code></td><td>Whether names shorter than nine characters may now be bought.</td></tr>
 </tbody></table>
 </div>
 <h3 id="basenamereleased"><a class="header" href="#basenamereleased">BaseNameReleased</a></h3>
@@ -2238,20 +2295,22 @@ another user through the reservation table.</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="poprules-1"><a class="header" href="#poprules-1">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/pop/PopRules.sol//contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
 PopRules</p>
 <p>Implements DotNS classification, scarcity pricing on a geometric curve, and base-name
 reservations.</p>
-<p>Tier shape: base lengths &lt;= 5 are governance-reserved, base lengths 6-8 require PopFull
+<p>Tiers: base lengths &lt;= 5 are governance-reserved, base lengths 6-8 require PopFull
 (or PopLite when carrying exactly two trailing digits, for gateway-issued lite names),
 base lengths &gt;= 9 are open to any caller as NoStatus when they carry zero or exactly two
 trailing digits. A one-digit suffix and more than two trailing digits are invalid.
 Every caller pays the same curve for a given base length: price(n) = D * 2^(9 - n) below
-nine characters, and the base fee D at nine and above, where D is <code>startingPrice</code>.
-Personhood buys access to the premium band, not a discount inside it.</p>
+nine characters, and D halved for each character from nine upward, never below the floor
+<code>minPrice</code>, where D is <code>startingPrice</code>. Personhood only unlocks the premium band. Base
+lengths below nine are closed to the public paid path until governance sets
+<code>shortNamesEnabled</code>; the gateway and registerReserved do not consult it.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="constants-1"><a class="header" href="#constants-1">Constants</a></h2>
@@ -2261,7 +2320,7 @@ security-contact: admin@parity.io</p>
 </code></pre>
 <h2 id="state-variables-1"><a class="header" href="#state-variables-1">State Variables</a></h2>
 <h3 id="startingprice"><a class="header" href="#startingprice">startingPrice</a></h3>
-<p>Base fee D in wei. Base lengths &gt;= 9 pay D; shorter base lengths pay D * 2^(9 - n).</p>
+<p>Base fee D in wei: the scarcity curve's value at nine characters.</p>
 <pre><code class="language-solidity">uint256 public startingPrice
 </code></pre>
 <h3 id="reservations"><a class="header" href="#reservations">reservations</a></h3>
@@ -2271,6 +2330,16 @@ security-contact: admin@parity.io</p>
 <h3 id="protocolregistry-1"><a class="header" href="#protocolregistry-1">protocolRegistry</a></h3>
 <p>Protocol-level address registry for all DotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
+</code></pre>
+<h3 id="minprice"><a class="header" href="#minprice">minPrice</a></h3>
+<p>Price floor F in wei: the least any name can cost, so a long base length decays
+towards it rather than to zero. Never above <code>startingPrice</code>.</p>
+<pre><code class="language-solidity">uint256 public minPrice
+</code></pre>
+<h3 id="shortnamesenabled"><a class="header" href="#shortnamesenabled">shortNamesEnabled</a></h3>
+<p>Whether the public paid path may register names shorter than nine characters.
+Closed by default; only governance opens it.</p>
+<pre><code class="language-solidity">bool public shortNamesEnabled
 </code></pre>
 <h3 id="__gap-1"><a class="header" href="#__gap-1">__gap</a></h3>
 <pre><code class="language-solidity">uint256[50] private __gap
@@ -2293,6 +2362,7 @@ InvalidInitialization via the <code>initializer</code> modifier. Seeds <code>sta
 function: updateStartingPrice.</p>
 <pre><code class="language-solidity">function initialize(
     uint256 _startingPrice,
+    uint256 _minPrice,
     IDotnsProtocolRegistry registry
 )
     public
@@ -2301,6 +2371,7 @@ function: updateStartingPrice.</p>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>_startingPrice</code></td><td><code>uint256</code></td><td>Base fee D in wei anchoring the scarcity curve, paid by every caller.</td></tr>
+<tr><td><code>_minPrice</code></td><td><code>uint256</code></td><td>Price floor F in wei; the least any name can cost. Must not exceed D.</td></tr>
 <tr><td><code>registry</code></td><td><code>IDotnsProtocolRegistry</code></td><td>Protocol-level address registry used to resolve sibling contracts.</td></tr>
 </tbody></table>
 </div>
@@ -2317,6 +2388,36 @@ prior and new values.</p>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>newStartingPrice</code></td><td><code>uint256</code></td><td>New base price in wei.</td></tr>
+</tbody></table>
+</div>
+<h3 id="updateminprice-1"><a class="header" href="#updateminprice-1">updateMinPrice</a></h3>
+<p>Sets the price floor F, the least any name can cost on the scarcity curve.</p>
+<p>Owner-only; unauthorised callers trigger @custom:reverts OwnableUnauthorizedAccount.
+<code>newMinPrice</code> must be strictly positive and no greater than the base fee D, otherwise</p>
+<p><strong>Note:</strong>
+reverts: PopError. A base length below nine always prices above D, so the floor
+only binds from nine characters upward. Emits @custom:emits MinPriceUpdated.</p>
+<pre><code class="language-solidity">function updateMinPrice(uint256 newMinPrice) public override onlyOwner;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>newMinPrice</code></td><td><code>uint256</code></td><td>New price floor in wei.</td></tr>
+</tbody></table>
+</div>
+<h3 id="setshortnamesenabled-1"><a class="header" href="#setshortnamesenabled-1">setShortNamesEnabled</a></h3>
+<p>Opens or closes the public market for names shorter than nine characters.</p>
+<p>Owner-only; unauthorised callers trigger @custom:reverts OwnableUnauthorizedAccount.
+While closed, which is the deploy default, @custom:function priceWithCheck and</p>
+<p><strong>Note:</strong>
+function: priceWithoutCheck trigger @custom:reverts PopError for a base length
+below nine, so no public caller buys a short name. The gateway free grant and the
+registrar's registerReserved path do not read this flag. Emits @custom:emits
+ShortNamesEnabledUpdated.</p>
+<pre><code class="language-solidity">function setShortNamesEnabled(bool enabled) external override onlyOwner;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>enabled</code></td><td><code>bool</code></td><td>Whether names shorter than nine characters may be bought.</td></tr>
 </tbody></table>
 </div>
 <h3 id="classifyname-1"><a class="header" href="#classifyname-1">classifyName</a></h3>
@@ -2441,7 +2542,7 @@ as free. Non-canonical labels trigger @custom:reverts PopError.</p>
 <p>Calculates price with PoP classification and reservation enforcement.</p>
 <p>Reverting pricing path used by the commit-reveal controller. Price is the scarcity
 curve for the label's base length and is charged to every caller, verified or not;
-personhood gates access to the premium band rather than discounting it. Non-canonical
+personhood only unlocks the premium band. Non-canonical
 labels, a base stem held live by another user, a governance-reserved label, or a
 <code>userAddress</code> whose personhood tier does not meet the label's required tier each
 trigger @custom:reverts PopError.</p>
@@ -2497,8 +2598,9 @@ contested.</p>
 </div>
 <h3 id="price-1"><a class="header" href="#price-1">price</a></h3>
 <p>Calculates registration cost for a label.</p>
-<p>Prices the label on the scarcity curve by base length: D * 2^(9 - n) for a base length
-below nine, and the base fee D at nine and above. Ignores the caller's personhood
+<p>Prices the label on the scarcity curve by base length: D * 2^(9 - n) below nine,
+halved for each character from nine upward and floored at <code>minPrice</code>. Ignores the
+caller's personhood
 status and reservation state. A label whose trailing-digit suffix is neither zero nor
 exactly two, and any non-canonical label, trigger @custom:reverts PopError.</p>
 <pre><code class="language-solidity">function price(string calldata name) external view override returns (uint256);
@@ -2520,7 +2622,7 @@ sender-tier-downgrade component, each priced at the name's own length.</p>
 either (i) the recipient does not meet the label's required tier, or (ii) the
 recipient's personhood tier is strictly below the sender's, and zero when neither
 holds. Passing a name to a wallet that could never have registered it therefore costs
-what the name is worth, not the open-band floor. The two components overlap on pure
+the name's own curve price. The two components overlap on pure
 tier mismatches, so the function takes their maximum rather than their sum to avoid
 double-charging. Consumed by @custom:function DotnsRegistrar.quoteTransferFee.
 Non-canonical labels and labels with exactly one or more than two trailing digits
@@ -2568,14 +2670,27 @@ enters circulation.</p>
 <pre><code class="language-solidity">function _meetsReach(PopStatus required, PopStatus userStatus) private pure returns (bool);
 </code></pre>
 <h3 id="_pricevalidatedname"><a class="header" href="#_pricevalidatedname">_priceValidatedName</a></h3>
-<p>Scarcity price for a base length: D * 2 ** (9 - n) below nine, else the base fee D.</p>
-<p>The multiplier is at most 512; @custom:function updateStartingPrice caps the base fee
-at <code>type(uint256).max / 512</code> so the checked multiplication never overflows.</p>
+<p>Scarcity price for a base length, floored at <code>minPrice</code>.</p>
+<p>Below nine the multiplier is at most 512, and @custom:function updateStartingPrice caps
+D at <code>type(uint256).max / 512</code> so the checked multiplication cannot overflow. From nine
+upward the price is D right-shifted by <code>n - 9</code>, so it only ever decreases; base lengths
+cap at 63 characters, so the shift is at most 54 and never reaches the word width. The
+floor stops a long base length costing nothing and is <code>updateMinPrice</code>-bounded to D, so
+it only binds from nine upward, never in the doubling range below nine.</p>
 <pre><code class="language-solidity">function _priceValidatedName(uint256 baseLength) internal view returns (uint256 priceValue);
 </code></pre>
+<h3 id="_requireshortnamesopen"><a class="header" href="#_requireshortnamesopen">_requireShortNamesOpen</a></h3>
+<p>Reverts a public paid registration of a base length below nine while the short-name
+market is closed.</p>
+<p>The one gate both public price reads share. Base lengths of nine and above are always
+open. @custom:reverts PopError when a base length below nine is priced while
+<code>shortNamesEnabled</code> is false. The gateway and @custom:function registerReserved never
+reach this, so neither is gated.</p>
+<pre><code class="language-solidity">function _requireShortNamesOpen(uint256 baseLength) private view;
+</code></pre>
 <h3 id="_validatedbaselength"><a class="header" href="#_validatedbaselength">_validatedBaseLength</a></h3>
-<p>Validates the digit suffix and returns the base length, the single source pricing
-and classification both derive a name's band from.</p>
+<p>Validates the digit suffix and returns the base length that pricing and
+classification both use to place a name in its band.</p>
 <p>A name carries no digit suffix or exactly two digits; any other count triggers</p>
 <p><strong>Note:</strong>
 reverts: PopError, so a longer suffix cannot slip a name into a shorter band.</p>
@@ -2769,7 +2884,7 @@ validation of its own so each public entry can layer additional eligibility chec
 <li><a href="contracts/registrars/RootGatewayDispatcher.sol/contract.RootGatewayDispatcher.html">RootGatewayDispatcher</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspopcontroller-1"><a class="header" href="#dotnspopcontroller-1">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/registrars/DotnsPopController.sol//contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -3623,7 +3738,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrar-1"><a class="header" href="#dotnsregistrar-1">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="contracts/registrars/DotnsRegistrar.sol//contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -3958,7 +4073,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrarcontroller-1"><a class="header" href="#dotnsregistrarcontroller-1">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, <a href="contracts/registrars/DotnsRegistrarController.sol//contracts/access/DotnsRoleManager.sol/abstract.DotnsRoleManager.html">DotnsRoleManager</a>, ReentrancyGuardTransient, <a href="contracts/registrars/DotnsRegistrarController.sol//contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -4231,7 +4346,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscontroller"><a class="header" href="#idotnscontroller">IDotnsController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registrars/IDotnsController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registrars/IDotnsController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC165</p>
 <p><strong>Title:</strong>
@@ -4245,7 +4360,7 @@ which concrete controller interface a given address implements.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/IDotnsPopController.sol//contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -5065,7 +5180,7 @@ username (<code>link.liteLabel</code>) and inherits its chat key.</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -5284,7 +5399,7 @@ label.</p>
 <pre><code class="language-solidity">error InvalidLabel();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/IDotnsRegistrarController.sol//contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -5549,7 +5664,7 @@ commit-reveal and defeat the front-running guard.</p>
 <tr><td><code>reserved</code></td><td><code>bool</code></td><td>True when the registration flows through the whitelisted reserved pipeline (<code>registerReserved</code>); false for the standard public flow (<code>register</code>).</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="rootgatewaydispatcher-1"><a class="header" href="#rootgatewaydispatcher-1">RootGatewayDispatcher</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registrars/RootGatewayDispatcher.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registrars/RootGatewayDispatcher.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 RootGatewayDispatcher</p>
 <p>Non-upgradeable shim that translates a substrate Root-origin
@@ -5627,7 +5742,7 @@ on a non-Root origin, so the gate has to surface its own error.</p>
 <li><a href="contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsprotocolregistry-1"><a class="header" href="#dotnsprotocolregistry-1">DotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsProtocolRegistry.sol//contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></p>
 <p><strong>Title:</strong>
@@ -5742,7 +5857,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistry-1"><a class="header" href="#dotnsregistry-1">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsRegistry.sol//contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -5963,7 +6078,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p><strong>Author:</strong>
@@ -6027,7 +6142,7 @@ as the root parent when deriving a name's node.</p>
 <pre><code class="language-solidity">error InvalidTld();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistry"><a class="header" href="#idotnsregistry">IDotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsRegistry</p>
 <p><strong>Author:</strong>
@@ -6266,7 +6381,7 @@ false for a node that does not exist.</p>
 <li><a href="contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnscontentresolver-1"><a class="header" href="#dotnscontentresolver-1">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsContentResolver.sol//contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
@@ -6461,7 +6576,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspopresolver-1"><a class="header" href="#dotnspopresolver-1">DotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsPopResolver.sol//contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html">IDotnsPopResolver</a></p>
 <p><strong>Title:</strong>
@@ -6653,7 +6768,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsresolver-1"><a class="header" href="#dotnsresolver-1">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsResolver.sol//contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
@@ -6768,7 +6883,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsreverseresolver-1"><a class="header" href="#dotnsreverseresolver-1">DotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsReverseResolver.sol//contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></p>
 <p><strong>Title:</strong>
@@ -6893,7 +7008,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscontentresolver"><a class="header" href="#idotnscontentresolver">IDotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Content Resolver</p>
 <p>Defines storage and retrieval for content hash, text records, and operator approvals for
@@ -7034,7 +7149,7 @@ idempotent writes that do not change the stored value.</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopresolver"><a class="header" href="#idotnspopresolver">IDotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopResolver</p>
 <p>Resolver for per-name records produced by the PoP username flow.</p>
@@ -7191,7 +7306,7 @@ has never been linked to a full claim.</p>
 <tr><td><code>length</code></td><td><code>uint256</code></td><td>The length of the payload that was rejected.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsresolver"><a class="header" href="#idotnsresolver">IDotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Resolver</p>
 <p>Defines forward-resolution address records for DotNS nodes.</p>
@@ -7250,7 +7365,7 @@ write.</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsreverseresolver"><a class="header" href="#idotnsreverseresolver">IDotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Reverse Resolver</p>
 <p>Interface for writing and reading reverse name records for addresses.</p>
@@ -7347,7 +7462,7 @@ when the address no longer owns the name pointed to by the stored record.</p>
 <li><a href="contracts/store/UserStore.sol/contract.UserStore.html">UserStore</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsstore"><a class="header" href="#idotnsstore">IDotnsStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/store/IDotnsStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/store/IDotnsStore.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsStore</p>
 <p>Baseline interface implemented by every per-user DotNS store.</p>
@@ -7372,7 +7487,7 @@ and immutable thereafter.</p>
 <tr><td><code>owner_</code></td><td><code>address</code></td><td>The bound user address.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="ilabelstore"><a class="header" href="#ilabelstore">ILabelStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/store/ILabelStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/store/ILabelStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/ILabelStore.sol//contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></p>
 <p><strong>Title:</strong>
@@ -7620,7 +7735,7 @@ for the same labelhash fails with this error regardless of caller or session.</p
 <tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>The conflicting labelhash.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="istorefactory"><a class="header" href="#istorefactory">IStoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/store/IStoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/store/IStoreFactory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStoreFactory</p>
 <p>Interface for the DotNS per-user store factory.</p>
@@ -7934,7 +8049,7 @@ upgrade. @param implementation The invalid implementation argument.</p>
 <pre><code class="language-solidity">error ImplementationBindingMismatch();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="iuserstore"><a class="header" href="#iuserstore">IUserStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/store/IUserStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/store/IUserStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/IUserStore.sol//contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></p>
 <p><strong>Title:</strong>
@@ -8148,7 +8263,7 @@ snapshotted. @param value The prior value that was just superseded.</p>
 <tr><td><code>timestamp</code></td><td><code>uint256</code></td><td>Block timestamp at the moment of supersession.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="labelstore"><a class="header" href="#labelstore">LabelStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/store/LabelStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/store/LabelStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, <a href="contracts/store/LabelStore.sol//contracts/store/ILabelStore.sol/interface.ILabelStore.html">ILabelStore</a></p>
 <p><strong>Title:</strong>
@@ -8404,7 +8519,7 @@ function: getLabels; same indices map to the same entries.</p>
 <pre><code class="language-solidity">function _onlyAuthorisedProtocol() internal view;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="storefactory"><a class="header" href="#storefactory">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Ownable, <a href="contracts/store/StoreFactory.sol//contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
@@ -8720,7 +8835,7 @@ does not implement that selector the probe reverts and the upgrade does not land
 <tr><td><code>slice</code></td><td><code>address[]</code></td><td>Result slice; empty when <code>offset &gt;= source.length</code>.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="userstore"><a class="header" href="#userstore">UserStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/store/UserStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/store/UserStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, <a href="contracts/store/UserStore.sol//contracts/store/IUserStore.sol/interface.IUserStore.html">IUserStore</a></p>
 <p><strong>Title:</strong>
@@ -8972,7 +9087,7 @@ and immutable thereafter.</p>
 <li><a href="contracts/utils/StringUtils.sol/library.StringUtils.html">StringUtils</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Constants</p>
 <p>Protocol-level invariants shared across DotNS contracts.</p>
@@ -9008,14 +9123,20 @@ forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant PERSONHOOD_CONTEXT = bytes32("dotns")
 </code></pre>
 <h3 id="rent_price"><a class="header" href="#rent_price">RENT_PRICE</a></h3>
-<p>Default deploy-time NoStatus rent price passed into
-<code>PopRules.initialize</code> as <code>_startingPrice</code>.</p>
-<p>10 DOT under revive's 18-decimal Asset Hub convention. Single
-source of truth for deploy scripts and tests so the value cannot
-drift between call sites. Live deployments rotate the runtime
-<code>startingPrice</code> on <code>PopRules</code> rather than rebuilding consumers
-against a new constant.</p>
+<p>Initial-deployment base fee D passed into <code>PopRules.initialize</code> as <code>_startingPrice</code>.</p>
+<p>Purely the value the contract is seeded with at deployment: 10 DOT under revive's
+18-decimal Asset Hub convention. Governance sets the live value through
+<code>PopRules.updateStartingPrice</code>, so this is never read after deployment and consumers
+are not rebuilt against a new constant. Single source of truth for deploy scripts and
+tests so the seed cannot drift between call sites.</p>
 <pre><code class="language-solidity">uint256 internal constant RENT_PRICE = 10 ether
+</code></pre>
+<h3 id="min_price"><a class="header" href="#min_price">MIN_PRICE</a></h3>
+<p>Initial-deployment price floor F passed into <code>PopRules.initialize</code> as <code>_minPrice</code>.</p>
+<p>Purely the seed value: below <code>RENT_PRICE</code> so the curve falls above nine characters.
+Governance sets the live floor through <code>PopRules.updateMinPrice</code>; never read after
+deployment.</p>
+<pre><code class="language-solidity">uint256 internal constant MIN_PRICE = 0.1 ether
 </code></pre>
 <h3 id="whitelist_operator_role"><a class="header" href="#whitelist_operator_role">WHITELIST_OPERATOR_ROLE</a></h3>
 <p>Operational role allowed to manage the public controller whitelist.</p>
@@ -9135,7 +9256,7 @@ forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant POP_GATEWAY = bytes32("popGateway")
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="labelutils"><a class="header" href="#labelutils">LabelUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/utils/LabelUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/utils/LabelUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Label Utilities Library</p>
 <p>Canonical keccak labelhash and namehash helpers shared by every DotNS contract that
@@ -9252,7 +9373,7 @@ an empty return as a "do not trust this record" signal.</p>
 <tr><td><code>fullName</code></td><td><code>string</code></td><td>Stored full name to strip.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="multicall3-2"><a class="header" href="#multicall3-2">Multicall3</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/utils/Multicall3.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/utils/Multicall3.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Multicall3</p>
 <p><strong>Authors:</strong>
@@ -9456,7 +9577,7 @@ Michael Elliot, Joshua Levine, Nick Johnson, Andreas Bigger, Matt Solomon</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="registrationutils"><a class="header" href="#registrationutils">RegistrationUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Registration Utilities Library</p>
 <p>Single canonical implementation of the "mint + forward-registry + store-write"
@@ -9549,7 +9670,7 @@ callers; kept in memory for the lifetime of one <code>registerAndStore</code>.</
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="storeutils"><a class="header" href="#storeutils">StoreUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/utils/StoreUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/utils/StoreUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Store Utilities Library</p>
 <p>Canonical helpers for protocol writes into per-user <code>LabelStore</code> instances.</p>
@@ -9610,7 +9731,7 @@ protocol-registered @custom:reverts NotAuthorised when the user has no store yet
 <tr><td><code>store</code></td><td><code>address</code></td><td>The resolved or newly deployed store address.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="stringutils"><a class="header" href="#stringutils">StringUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/008996e4dfd85199bd18fc842332d8ee11b438b2/contracts/utils/StringUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f9c7d6dc18754ec7b5baff9247bfa7818b9daf7d/contracts/utils/StringUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 String Utilities Library</p>
 <p>Provides string manipulation utilities for DotNS contracts.</p>
