@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnamewhitelist"><a class="header" href="#idotnsnamewhitelist">IDotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/eefa9ff85fe682cf8fa767b6c63a7ac92acadacf/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/59a09fb047172249b3559c92559648fc6bd2b395/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsNameWhitelist</p>
 <p>Interface for the pre-launch name whitelist. A name is Open until governance either
@@ -312,10 +312,9 @@ name; a Reserved name is released through @custom:function setReserved, not here
 </div>
 <h3 id="setreserved"><a class="header" href="#setreserved">setReserved</a></h3>
 <p>Reserves or releases <code>label</code>.</p>
-<p>Restricted to Root or the owner. Reserving requires the name Open with no claims;
-releasing requires it <code>Reserved</code>. @custom:reverts NameNotOpen, @custom:reverts HasClaims or</p>
-<p><strong>Note:</strong>
-reverts: NotReserved. @custom:emits NameReserved or @custom:emits
+<p>Restricted to Root or the owner. Reserving requires the name Open and clears any
+pending claims, rejecting each; releasing requires it <code>Reserved</code>. @custom:reverts
+NameNotOpen or @custom:reverts NotReserved. @custom:emits NameReserved or @custom:emits
 NameUnreserved. @param label Bare label.</p>
 <pre><code class="language-solidity">function setReserved(string calldata label, bool reserved) external;
 </code></pre>
@@ -607,7 +606,7 @@ when <code>newMax</code> is zero or above the ceiling. @custom:emits MaxGrantBat
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
 <h3 id="namerequested"><a class="header" href="#namerequested">NameRequested</a></h3>
 <p>Emitted when a beneficiary claims a name.</p>
-<pre><code class="language-solidity">event NameRequested(bytes32 indexed node, address indexed user, string label);
+<pre><code class="language-solidity">event NameRequested(bytes32 indexed node, address indexed user, string label, string reason);
 </code></pre>
 <h3 id="nameaccepted"><a class="header" href="#nameaccepted">NameAccepted</a></h3>
 <p>Emitted when a claim wins a name, including an operator direct grant.</p>
@@ -736,15 +735,6 @@ when <code>newMax</code> is zero or above the ceiling. @custom:emits MaxGrantBat
 <tr><td><code>user</code></td><td><code>address</code></td><td>Beneficiary whose claim was expected to be pending.</td></tr>
 </tbody></table>
 </div>
-<h3 id="hasclaims"><a class="header" href="#hasclaims">HasClaims</a></h3>
-<p>Thrown when reserving a name that still holds claims.</p>
-<pre><code class="language-solidity">error HasClaims(bytes32 node);
-</code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Namehash of the label under the active TLD.</td></tr>
-</tbody></table>
-</div>
 <h3 id="notreserved"><a class="header" href="#notreserved">NotReserved</a></h3>
 <p>Thrown when releasing a name that is not reserved.</p>
 <pre><code class="language-solidity">error NotReserved(bytes32 node);
@@ -797,12 +787,13 @@ when <code>newMax</code> is zero or above the ceiling. @custom:emits MaxGrantBat
 <h2 id="structs"><a class="header" href="#structs">Structs</a></h2>
 <h3 id="claim"><a class="header" href="#claim">Claim</a></h3>
 <p>A claim by one beneficiary on one name.</p>
-<p><code>user</code>, <code>status</code> and <code>requestedAt</code> co-locate in one storage slot; the dynamic <code>reason</code>
-is stored separately.</p>
+<p><code>user</code>, <code>status</code> and <code>requestedAt</code> co-locate in one storage slot; <code>submitter</code> takes the
+next, and the dynamic <code>reason</code> is stored separately.</p>
 <pre><code class="language-solidity">struct Claim {
     address user;
     ClaimStatus status;
     uint64 requestedAt;
+    address submitter;
     string reason;
 }
 </code></pre>
@@ -811,6 +802,7 @@ is stored separately.</p>
 <tr><td><code>user</code></td><td><code>address</code></td><td>Beneficiary the name would bind to if this claim wins.</td></tr>
 <tr><td><code>status</code></td><td><code>ClaimStatus</code></td><td>Claim status; see ClaimStatus.</td></tr>
 <tr><td><code>requestedAt</code></td><td><code>uint64</code></td><td>Timestamp the claim was made.</td></tr>
+<tr><td><code>submitter</code></td><td><code>address</code></td><td>Address that filed the claim, which may differ from the beneficiary.</td></tr>
 <tr><td><code>reason</code></td><td><code>string</code></td><td>Free-text justification for the claim.</td></tr>
 </tbody></table>
 </div>
@@ -861,11 +853,13 @@ withheld by governance. <code>Claimed</code> has a single winner.</p>
 </code></pre>
 <h3 id="claimstatus"><a class="header" href="#claimstatus">ClaimStatus</a></h3>
 <p>Status of a single claim on a name.</p>
-<p><code>None</code> is the zero-value default of an absent claim. A claim is deleted when it is
-rejected, cleared on a win, or consumed, so it never holds a terminal status.</p>
+<p><code>None</code> is the zero-value default of an absent claim. <code>Rejected</code> is sticky: it is kept
+only when the beneficiary filed the claim themselves, so they cannot re-request; a
+claim filed on their behalf is deleted on rejection and does not bind them.</p>
 <pre><code class="language-solidity">enum ClaimStatus {
     None,
-    Requested
+    Requested,
+    Rejected
 }
 </code></pre>
 
