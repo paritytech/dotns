@@ -8,12 +8,12 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">DotNS Test Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-08-24 08:55 UTC | 35 suites</p>
+<p class="text-sm text-gray-500">Generated 2026-08-26 07:00 UTC | 37 suites</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">Status</p><p class="text-xl font-bold text-green-400">All Passed</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">453</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">453</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">520</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">520</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-gray-500">0</p></div>
 </div></div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
@@ -375,7 +375,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsNameEscrowRedeemTest</span><span class="ml-2 text-xs text-gray-500">test/unit/escrow/DotnsNameEscrowRedeem.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">20/20</span>
+<span class="text-sm font-mono text-green-400">23/23</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -405,6 +405,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_redeem_then_release_again_starts_fresh_clocks</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_release_emits_both_clocks_on_NameReleased</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -449,6 +454,11 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_revert_updateRedeemWindow_below_the_floor</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_revert_updateRedeemWindow_from_a_non_owner</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
@@ -460,6 +470,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_settled_deposit_stays_claimable_long_after_reclaim</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_updateRedeemWindow_accepts_both_bounds</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -575,8 +590,329 @@
 </div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsNameWhitelistTests</span><span class="ml-2 text-xs text-gray-500">test/unit/whitelist/DotnsNameWhitelist.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">53/53</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_accept_picks_winner_and_rejects_losers</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_accept_reverts_for_unauthorised_caller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_accept_reverts_when_not_requested</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_claims_pagination</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_consume_by_pop_controller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_consume_by_public_controller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_consume_reverts_for_non_controller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_consume_reverts_for_wrong_registrant</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_full_lifecycle_request_accept_consume</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_governance_root_grants_from_any_caller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_governance_root_reserves_from_any_caller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_governance_root_sets_operator_from_any_caller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_grantName_clears_pending_claims</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_grantName_direct</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_grantName_reverts_for_zero_user</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_grantName_reverts_when_not_open</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_grantNames_batch</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_grantNames_reverts_above_batch_limit</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_initial_caps_are_the_defaults</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_initialize_reverts_on_second_call</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_isWindowOpen_tracks_the_window</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_names_pagination_lists_active</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_reject_clears_single_claim</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_reject_on_behalf_does_not_bind</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_reject_self_filed_is_sticky</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_requestName_allows_competing_claims</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_requestName_records_and_emits</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_requestName_reverts_for_non_canonical_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_requestName_reverts_for_reason_too_long</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_requestName_reverts_for_same_user_twice</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_requestName_reverts_for_zero_user</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_requestName_reverts_outside_window</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_requestName_reverts_when_reserved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_requestName_submitter_may_differ_from_user</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_revokeName_clears_open_name_with_claims</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_revokeName_rejects_operator</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_revokeName_resets_claimed</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_revokeName_reverts_on_reserved_name</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_revokeName_reverts_when_nothing_to_revoke</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setMaxClaimants_enforced</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setMaxClaimants_reverts_for_non_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setMaxClaimants_reverts_out_of_range</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setMaxGrantBatch_enforced</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setMaxGrantBatch_reverts_out_of_range</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setMaxReasonBytes_enforced</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setMaxReasonBytes_reverts_out_of_range</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setOperator_by_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setReserved_clears_pending_claims</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setReserved_release_reverts_when_not_reserved</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setReserved_reserve_and_release</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setReserved_reverts_for_non_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setWindow_reverts_for_zero_duration</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_setWindow_sets_and_emits</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsNameWhitelistFuzz</span><span class="ml-2 text-xs text-gray-500">test/fuzz/whitelist/DotnsNameWhitelistFuzz.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">6/6</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_accept_yields_single_winner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_competing_claims_do_not_collide</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reason_length_bound</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reject_never_reserves</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_requestName_records</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_requestName_reverts_after_window_closes</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsPopControllerTests</span><span class="ml-2 text-xs text-gray-500">test/unit/registrar/DotnsPopController.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">88/88</span>
+<span class="text-sm font-mono text-green-400">93/93</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -605,32 +941,7 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_claimLabelStoreFor_reverts_for_non_gateway</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_claimLabelStore_at_exact_expiry_boundary_belongs_to_user</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_claimLabelStore_deploys_store_and_writes_label_and_chat_key</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_claimLabelStore_emits_settled_and_name_registered</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_claimLabelStore_msg_sender_keyed_other_users_stash_untouched</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_claimLabelStore_with_empty_chat_key_skips_resolver_write</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_claimLabelStore_settles_callers_own_pending_claim</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -665,11 +976,6 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_expirePendingClaim_clears_entry_after_reservation_duration</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_expireReservation_is_permissionless</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
@@ -680,22 +986,12 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_gatewayReserve_pending_claim_lapses_after_minimum_duration</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_gatewayReserve_stashes_pending_claim_when_user_has_no_label_store</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_gatewayReserve_warm_user_after_claim_writes_directly_without_stashing</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_gateway_can_settle_label_store_for_user</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_gatewayReserve_warm_user_after_settle_writes_directly_without_stashing</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -715,7 +1011,27 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_liteNamesOf_and_fullNamesOf_list_by_shape</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_liteNamesOf_pagination_slices_and_clamps</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_multiWaiter_standaloneGuard_rejects_non_head_user</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_nameDetail_and_nameDetailByNode_report_record</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_name_listings_exclude_names_owned_by_others</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -751,6 +1067,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_pop_reservation_of_already_public_minted_name_reverts_at_reserve_time</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_profileOf_reports_store_pending_and_reservation</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -970,22 +1291,7 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_revert_claimLabelStore_when_caller_has_no_pending_claim</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_revert_claimLabelStore_when_pending_claim_has_lapsed</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_revert_expirePendingClaim_when_entry_is_still_live</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_revert_expirePendingClaim_when_user_has_no_pending_claim</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_reservedBaseLabelOf_returns_label_or_empty</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -1015,12 +1321,67 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settlePendingClaims_bounded_settles_up_to_limit</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settlePendingClaims_on_empty_queue_returns_zero</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settle_after_reservation_duration_still_writes_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settle_at_exact_expiry_boundary_writes_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settle_deploys_store_and_writes_label_and_chat_key</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settle_deploys_store_when_user_has_none</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settle_emits_settled_and_name_registered</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settle_is_keyed_by_user_arg_other_stash_untouched</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settle_on_expiry_by_third_party_writes_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_settle_with_empty_chat_key_skips_resolver_write</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_split_gateway_flow_mints_lite_then_reserves_base</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_user_claimLabelStore_fallback_still_settles_after_gateway_mint</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_third_party_settles_pending_claim_into_user_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_user_settles_own_pending_claim_after_gateway_mint</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -1038,22 +1399,12 @@
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
 </tr></thead><tbody>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_claimLabelStore_settles_label_and_chat_key_exactly</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">testFuzz_gatewayReserve_cold_user_stashes_label_and_chat_key_exactly</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">testFuzz_isReservedForClaim_tracks_duration_boundary</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">testFuzz_pendingClaim_expiry_boundary_admits_or_lapses</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -1084,6 +1435,16 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">testFuzz_reserveLiteName_overloads_equivalent</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_settle_settles_label_and_chat_key_exactly</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_settle_writes_label_regardless_of_age</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -2216,7 +2577,7 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_lapsed_pending_claim_is_swept_without_deploying_store</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_lapsed_pending_claim_settles_and_deploys_store</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -2236,7 +2597,7 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_reserve_expire_reserve_cycle_for_same_user</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_reserve_settle_reserve_cycle_for_same_user</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
