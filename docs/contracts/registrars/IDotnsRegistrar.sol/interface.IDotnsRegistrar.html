@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/de477fd6ea620fce19a81b39cf6996e8734930d3/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/0d63eae492fa53413608da34babb59601cf6ff37/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -195,12 +195,24 @@ security-contact: admin@parity.io</p>
 <h3 id="available"><a class="header" href="#available">available</a></h3>
 <p>Returns whether a registration call may proceed for <code>id</code>.</p>
 <p>Signals two distinct paths to the controller. Returns <code>true</code> when the owner slot is
-empty (a fresh @custom:function register call may mint) AND when the current owner is
-the configured escrow (the controller must then route through</p>
-<p><strong>Note:</strong>
-function: IDotnsNameEscrow.reclaim instead of @custom:function register, because
-<code>register</code> calls <code>_mint</code> which rejects existing tokens). All other holders return
-<code>false</code>. The controller distinguishes the two <code>true</code> cases via @custom:function exists.</p>
+empty (a fresh @custom:function register call may mint) OR when the current owner is
+the configured escrow and the released position's redeem window has elapsed (the
+controller must then route through @custom:function IDotnsNameEscrow.reclaim instead of</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: register, because <code>register</code> calls <code>_mint</code> which rejects existing
+tokens). All other holders return <code>false</code>. The controller distinguishes the two <code>true</code>
+cases via @custom:function exists.
+Escrow custody inside the redeem window returns <code>false</code>: that window belongs to the
+previous holder, who may still @custom:function IDotnsNameEscrow.redeem the name, and
+reclaim would revert until it elapses. Clients wanting the exact moment a released name
+becomes registrable should read <code>redeemableUntil</code> from</p>
+</li>
+<li>
+<p>function: IDotnsNameEscrow.getReleasePosition.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function available(uint256 id) external view returns (bool isAvailable);
 </code></pre>
 <h3 id="register"><a class="header" href="#register">register</a></h3>
