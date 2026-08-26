@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/c91818c590942b0ba16f7b9093c8fa0ff730aeed/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/ff0925008ff1f9d624c563754122289f6a47667f/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns Name Escrow Interface</p>
 <p>Escrows refundable deposits for registered names and manages the release lifecycle.</p>
@@ -318,7 +318,7 @@ Release stamps two independent clocks. <code>withdrawAvailableAt</code> (release
 opens the deposit withdrawal; <code>redeemableUntil</code> (release + <code>redeemWindow</code>) closes the
 holder's exclusive redeem phase and opens permissionless reclaim. Both are snapshots
 so later policy changes never move an in-flight position. A release attempted while
-<code>redeemWindow</code> is unseeded triggers @custom:reverts InvalidRedeemWindow.</p>
+<code>redeemWindow</code> is unseeded triggers @custom:reverts RedeemWindowNotConfigured.</p>
 <pre><code class="language-solidity">function release(uint256 tokenId) external;
 </code></pre>
 <h3 id="withdraw"><a class="header" href="#withdraw">withdraw</a></h3>
@@ -730,12 +730,15 @@ deposit stays locked, so no value event accompanies this.</p>
 <tr><td><code>maxAllowed</code></td><td><code>uint256</code></td><td>Upper bound enforced by the contract.</td></tr>
 </tbody></table>
 </div>
-<h3 id="invalidredeemwindow"><a class="header" href="#invalidredeemwindow">InvalidRedeemWindow</a></h3>
+<h3 id="redeemwindownotconfigured"><a class="header" href="#redeemwindownotconfigured">RedeemWindowNotConfigured</a></h3>
 <p>Thrown by <code>release</code> when the redeem window has never been seeded.</p>
-<p>Fails the release closed rather than collapsing the holder's exclusive redeem phase to
-zero length, which would hand the name to whoever is watching the moment it is
-released. Reachable only on a proxy upgraded without seeding the window.</p>
-<pre><code class="language-solidity">error InvalidRedeemWindow();
+<p>A configuration fault rather than a bad argument: the caller supplied nothing, and the
+deployment is missing a policy value. Fails the release closed rather than collapsing
+the holder's exclusive redeem phase to zero length, which would hand the name to
+whoever is watching the moment it is released. Cleared by calling</p>
+<p><strong>Note:</strong>
+function: updateRedeemWindow.</p>
+<pre><code class="language-solidity">error RedeemWindowNotConfigured();
 </code></pre>
 <h3 id="redeemwindowtooshort"><a class="header" href="#redeemwindowtooshort">RedeemWindowTooShort</a></h3>
 <p>Thrown when the supplied redeem window is below the contract's configured lower

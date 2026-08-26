@@ -237,7 +237,7 @@ This open source code is provided for research, experimentation, and developer e
 <p>Releasing a name starts two independent clocks, and the distinction between them is what makes a released name both recoverable and recyclable.</p>
 <div class="table-wrapper"><table><thead><tr><th>Clock</th><th>Length</th><th>What it gates</th></tr></thead><tbody>
 <tr><td><code>withdrawAvailableAt</code></td><td>release + <code>cooldown</code> (15 minutes at launch, ≤ 1 hour)</td><td>When the holder may credit the deposit to themselves via <code>withdraw</code></td></tr>
-<tr><td><code>redeemableUntil</code></td><td>release + <code>redeemWindow</code> (1 day at launch, ≤ 30 days)</td><td>When the holder's exclusive claim on the name ends and <code>reclaim</code> opens to anyone</td></tr>
+<tr><td><code>redeemableUntil</code></td><td>release + <code>redeemWindow</code> (1 day at launch, governance may set 1 to 30 days)</td><td>When the holder's exclusive claim on the name ends and <code>reclaim</code> opens to anyone</td></tr>
 </tbody></table>
 </div>
 <p>Both are snapshotted at release time, so a governance change never changes the clocks on a name already released. <code>redeemWindow</code> is tuned through <code>updateRedeemWindow</code> under the same gate as the upgrade authority.</p>
