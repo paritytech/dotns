@@ -1,0 +1,72 @@
+name: Genesis Build Smoke
+
+# Runs the release-time genesis build on PRs, with the same secrets and the same command,
+# so a bad secret or a broken pipeline fails here instead of on master when a release is
+# cut. The extractor's unit tests and `bash -n` cannot catch either — v0.5.6-rc1 died on a
+# key `cast` could not decode, after every PR check had passed.
+#
+# Skipped on fork PRs: secrets are withheld there.
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "scripts/genesis/**"
+      - "scripts/deploy/**"
+      - "contracts/**"
+      - "**.sol"
+      - "deployments/**"
+      - "foundry.toml"
+      - ".github/workflows/publish-release.yml"
+      - ".github/workflows/publish-prerelease.yml"
+      - ".github/workflows/genesis-build-smoke.yml"
+      - ".github/actions/setup-foundry/action.yml"
+  push:
+    branches: [master]
+    paths:
+      - "scripts/genesis/**"
+      - ".github/workflows/genesis-build-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: genesis-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  genesis-build-smoke:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-foundry
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # The same secrets and command as the release step. The parity check inside the
+      # script runs for real: with the real factory key the addresses must equal the
+      # committed manifest, so nothing is skipped or stubbed.
+      - name: Build the genesis exactly as a release does
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+          FACTORY_DEPLOYER_KEY: ${{ secrets.FACTORY_DEPLOYER_KEY }}
+          DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
+          DOTNS_TLD: test
+        run: bash scripts/genesis/build-genesis.sh release
+
+      - name: Assert the artifact shape
+        run: |
+          test -s release/dotns-genesis-test.json
+          jq -e '.tld == "test" and (.accounts | length > 0)' release/dotns-genesis-test.json >/dev/null
+          echo "accounts: $(jq '.accounts | length' release/dotns-genesis-test.json)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dotns-genesis-test
+          path: release/dotns-genesis-test.json
