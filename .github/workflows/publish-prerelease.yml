@@ -123,7 +123,6 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
           FACTORY_DEPLOYER_KEY: ${{ secrets.FACTORY_DEPLOYER_KEY }}
           DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
-          DOTNS_ADMIN_MNEMONIC: ${{ secrets.DOTNS_ADMIN_MNEMONIC }}
         run: bash scripts/genesis/build-genesis.sh release
 
       - name: Extract ABIs

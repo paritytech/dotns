@@ -37,23 +37,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOYMENT_FILE="deployments/localhost/31337.json"
 CANONICAL_MANIFEST="deployments/paseo-assethub/420420417.json"
 
-# Who OWNS the contracts in the genesis state (REQUIRED, one of the three below).
+# Who OWNS the contracts in the genesis state: DOTNS_ADMIN_KEY, a raw private key,
+# REQUIRED. No DotNS *address* depends on it — with CREATE3 the addresses are a pure
+# function of the factory — but every ownership and role assignment written into
+# genesis storage does.
 #
-# No DotNS *address* depends on this key — with CREATE3 the addresses are a pure
-# function of the factory (see FACTORY_DEPLOYER_KEY below, which owns only the
-# factory) — but every ownership and role assignment written into genesis storage
-# does: this key ends up owning the registry, the resolvers, the registrar, the
-# store factory and the beacons.
-#
-# Accepted, in order of precedence:
-#   DOTNS_ADMIN_KEY       a raw private key — the admin credential this repo already holds
-#   DOTNS_ADMIN_MNEMONIC  the admin mnemonic; index $DOTNS_ADMIN_INDEX (default 0)
-#
-# Deliberately NOT accepted: DOTNS_MNEMONIC. That is the operational credential the
-# whitelist workflows drive the `dotns` CLI with, not the contract admin, and quietly
-# making it the owner of every contract in a genesis would be a hard mistake to spot.
-# Not DEPLOYER_KEY: that name is dotns-releases' own secret, and accepting it here
-# would make which key owns a published genesis depend on which repo the build ran in.
+# The ONLY accepted credential. No mnemonic, no fallback: with two credentials the
+# build would guess which account owns everything, and nothing downstream would
+# notice a wrong guess — the parity check validates addresses, not owners.
+# Not DOTNS_MNEMONIC (the whitelist workflows' operational credential) and not
+# DEPLOYER_KEY (dotns-releases' own secret) for the same reason.
 ADMIN_KEY="${DOTNS_ADMIN_KEY:-}"
 
 # Single-purpose CREATE3 factory deployer key (REQUIRED). Every DotNS address is
@@ -90,18 +83,12 @@ for tool in forge anvil cast node jq curl; do
     command -v "$tool" >/dev/null 2>&1 || { echo "Error: $tool is not on PATH" >&2; exit 1; }
 done
 
-# Needs cast, so it happens after the check above.
-if [ -z "$ADMIN_KEY" ] && [ -n "${DOTNS_ADMIN_MNEMONIC:-}" ]; then
-    ADMIN_KEY="$(cast wallet private-key --mnemonic "$DOTNS_ADMIN_MNEMONIC" "${DOTNS_ADMIN_INDEX:-0}")"
-    echo "Owner key derived from DOTNS_ADMIN_MNEMONIC, index ${DOTNS_ADMIN_INDEX:-0}."
-fi
-
 if [ -z "$ADMIN_KEY" ]; then
     cat >&2 <<'MSG'
-Error: no owner key. Set DOTNS_ADMIN_KEY or DOTNS_ADMIN_MNEMONIC.
+Error: DOTNS_ADMIN_KEY is required.
 
-Whichever is given becomes the owner of every DotNS contract in the genesis
-state, so this build refuses to fall back to a public dev key.
+It becomes the owner of every DotNS contract in the genesis state, so this
+build refuses to fall back to a public dev key or any other credential.
 MSG
     exit 1
 fi
@@ -115,6 +102,30 @@ deployment and the parity check below would fail anyway.
 MSG
     exit 1
 fi
+
+# ---- Key shape preflight ----
+# `cast` rejects a malformed key with a bare "Failed to decode private key" — no variable
+# name, no shape — and a GitHub secret cannot be read back to inspect. Describe the problem
+# (length, word count) without ever printing the value. Surrounding whitespace is stripped:
+# a pasted trailing newline is the classic way a secret breaks.
+require_hex_key() {
+    local name="$1" raw="${2-}"
+    if printf '%s' "$raw" | tr -d '[:space:]' | grep -Eq '^(0x)?[0-9a-fA-F]{64}$'; then
+        return 0
+    fi
+    local words; words=$(printf '%s' "$raw" | wc -w | tr -d ' ')
+    echo "Error: $name is not a raw private key (need 64 hex chars, 0x optional):" >&2
+    echo "       got ${#raw} char(s), $words word(s)." >&2
+    if [ "$words" -ge 12 ]; then
+        echo "       That shape is a mnemonic. This build takes only a key — derive one with" >&2
+        echo "       \`cast wallet private-key --mnemonic '<...>'\` and store the result." >&2
+    fi
+    exit 1
+}
+require_hex_key DOTNS_ADMIN_KEY "$ADMIN_KEY"
+ADMIN_KEY="$(printf '%s' "$ADMIN_KEY" | tr -d '[:space:]')"
+require_hex_key FACTORY_DEPLOYER_KEY "$FACTORY_DEPLOYER_KEY"
+FACTORY_DEPLOYER_KEY="$(printf '%s' "$FACTORY_DEPLOYER_KEY" | tr -d '[:space:]')"
 
 DEPLOYER_ADDR="$(cast wallet address --private-key "$ADMIN_KEY")"
 export WHITELIST_OPERATOR="${WHITELIST_OPERATOR:-$DEPLOYER_ADDR}"

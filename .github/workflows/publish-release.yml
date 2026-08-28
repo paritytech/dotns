@@ -113,15 +113,13 @@ jobs:
       # contracts, the deploy scripts and the CREATE3 factory key that fixes every address,
       # and the artifact then ships from the same commit as the ABIs beside it.
       #
-      # The owner key is taken from DOTNS_ADMIN_KEY if set, otherwise derived from
-      # DOTNS_ADMIN_MNEMONIC. It ends up owning the registry, resolvers, registrar, store factory
-      # and beacons in the genesis storage, so the script refuses to run without one.
+      # DOTNS_ADMIN_KEY (a raw private key, the only accepted credential) ends up owning the
+      # registry, resolvers, registrar, store factory and beacons in the genesis storage.
       - name: Build pallet-revive genesis
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
           FACTORY_DEPLOYER_KEY: ${{ secrets.FACTORY_DEPLOYER_KEY }}
           DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
-          DOTNS_ADMIN_MNEMONIC: ${{ secrets.DOTNS_ADMIN_MNEMONIC }}
         run: bash scripts/genesis/build-genesis.sh release
 
       - name: Extract ABIs
