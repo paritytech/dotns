@@ -49,6 +49,16 @@ jobs:
         with:
           node-version: "20"
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.6"
+          no-cache: true
+
+      # Not optional: bun's postinstall runs setup.bash, which lands lib/ dependencies on
+      # their pinned SHAs. Without it the build compiles against stale OpenZeppelin and
+      # fails on override/mutability mismatches — the release workflow always runs this.
+      - run: bun install
+
       # The same secrets and command as the release step. The parity check inside the
       # script runs for real: with the real factory key the addresses must equal the
       # committed manifest, so nothing is skipped or stubbed.
