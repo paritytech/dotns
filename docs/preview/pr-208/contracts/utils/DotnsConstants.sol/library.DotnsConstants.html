@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b424f22807ae1ec6922aa972eb0e101fbf8d4b90/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/645b8f210f88c20610f9b89976e1ff84d5ecc413/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Constants</p>
 <p>Protocol-level invariants shared across DotNS contracts.</p>
@@ -215,18 +215,17 @@ alias-accounts pallet on Asset Hub.</p>
 forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant PERSONHOOD_CONTEXT = bytes32("dotns")
 </code></pre>
-<h3 id="rent_price"><a class="header" href="#rent_price">RENT_PRICE</a></h3>
+<h3 id="base_deposit"><a class="header" href="#base_deposit">BASE_DEPOSIT</a></h3>
 <p>Launch deposit passed into the <code>DotnsFlatPricing</code> constructor.</p>
 <p>10 DOT under revive's 18-decimal Asset Hub convention. A new amount is a fresh model
 deployment registered under @custom:constant COST_MODEL, so this constant seeds the
 model rather than being read afterwards. Single source of truth for deploy scripts and
-tests so the seed cannot drift between call sites. Also the base fee of the
-<code>DotnsScarcityPricing</code> candidate.</p>
-<pre><code class="language-solidity">uint256 internal constant RENT_PRICE = 10 ether
+tests so the seed cannot drift between call sites.</p>
+<pre><code class="language-solidity">uint256 internal constant BASE_DEPOSIT = 10 ether
 </code></pre>
 <h3 id="min_price"><a class="header" href="#min_price">MIN_PRICE</a></h3>
 <p>Price floor F passed into the <code>DotnsScarcityPricing</code> candidate's constructor.</p>
-<p>Below <code>RENT_PRICE</code> so that curve falls above nine characters. Seeds the candidate
+<p>Below <code>BASE_DEPOSIT</code> so that curve falls above nine characters. Seeds the candidate
 constructor; a new floor is a fresh model deployment.</p>
 <pre><code class="language-solidity">uint256 internal constant MIN_PRICE = 0.1 ether
 </code></pre>
