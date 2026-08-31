@@ -1,0 +1,137 @@
+{
+  "repository": "https://github.com/paritytech/dotns",
+  "homepage": "https://github.com/paritytech/dotns#readme",
+  "authors": [
+    "Parity Technologies"
+  ],
+  "contracts": [
+    {
+      "name": "DotnsProtocolRegistry",
+      "cdmPackage": "@dotns/protocol-registry",
+      "description": "dotNS protocol-level address registry used by contracts to resolve sibling protocol components at runtime.",
+      "sourcePath": "contracts/registry/DotnsProtocolRegistry.sol",
+      "artifactContract": "DotnsProtocolRegistry",
+      "readme": "DotnsProtocolRegistry.md"
+    },
+    {
+      "name": "Multicall3",
+      "cdmPackage": "@dotns/multicall3",
+      "description": "Generic Multicall3 helper for batching dotNS and other Asset Hub contract reads.",
+      "sourcePath": "contracts/utils/Multicall3.sol",
+      "artifactContract": "Multicall3",
+      "readme": "Multicall3.md"
+    },
+    {
+      "name": "DotnsRegistrar",
+      "cdmPackage": "@dotns/registrar",
+      "description": "ERC721 token of record for .dot names, with controller-gated minting and PopRules-priced, fee-gated transfers.",
+      "sourcePath": "contracts/registrars/DotnsRegistrar.sol",
+      "artifactContract": "DotnsRegistrar",
+      "readme": "DotnsRegistrar.md"
+    },
+    {
+      "name": "DotnsRegistry",
+      "cdmPackage": "@dotns/registry",
+      "description": "Forward dotNS registry for node ownership, resolver selection, and subname records.",
+      "sourcePath": "contracts/registry/DotnsRegistry.sol",
+      "artifactContract": "DotnsRegistry",
+      "readme": "DotnsRegistry.md"
+    },
+    {
+      "name": "DotnsRegistrarController",
+      "cdmPackage": "@dotns/registrar-controller",
+      "description": "Commit-reveal public registration controller for dotNS names.",
+      "sourcePath": "contracts/registrars/DotnsRegistrarController.sol",
+      "artifactContract": "DotnsRegistrarController",
+      "readme": "DotnsRegistrarController.md"
+    },
+    {
+      "name": "DotnsPopController",
+      "cdmPackage": "@dotns/pop-controller",
+      "description": "Gateway-only controller issuing lite- and full-person PoP usernames, with per-label base-name reservation queues.",
+      "sourcePath": "contracts/registrars/DotnsPopController.sol",
+      "artifactContract": "DotnsPopController",
+      "readme": "DotnsPopController.md"
+    },
+    {
+      "name": "RootGatewayDispatcher",
+      "cdmPackage": "@dotns/root-gateway-dispatcher",
+      "description": "Root-authority dispatcher that forwards verified gateway calls into the PoP controller.",
+      "sourcePath": "contracts/registrars/RootGatewayDispatcher.sol",
+      "artifactContract": "RootGatewayDispatcher",
+      "readme": "RootGatewayDispatcher.md"
+    },
+    {
+      "name": "PopRules",
+      "cdmPackage": "@dotns/pop-rules",
+      "description": "Proof-of-Personhood policy and pricing rules for dotNS registration and transfer flows.",
+      "sourcePath": "contracts/pop/PopRules.sol",
+      "artifactContract": "PopRules",
+      "readme": "PopRules.md"
+    },
+    {
+      "name": "DotnsResolver",
+      "cdmPackage": "@dotns/resolver",
+      "description": "Forward resolver mapping each dotNS node to a single address record, writable by the node owner.",
+      "sourcePath": "contracts/resolvers/DotnsResolver.sol",
+      "artifactContract": "DotnsResolver",
+      "readme": "DotnsResolver.md"
+    },
+    {
+      "name": "DotnsReverseResolver",
+      "cdmPackage": "@dotns/reverse-resolver",
+      "description": "Reverse resolver that maps owner accounts back to dotNS names.",
+      "sourcePath": "contracts/resolvers/DotnsReverseResolver.sol",
+      "artifactContract": "DotnsReverseResolver",
+      "readme": "DotnsReverseResolver.md"
+    },
+    {
+      "name": "DotnsContentResolver",
+      "cdmPackage": "@dotns/content-resolver",
+      "description": "Contenthash and text-record resolver for dotNS nodes, with operator-delegated record management.",
+      "sourcePath": "contracts/resolvers/DotnsContentResolver.sol",
+      "artifactContract": "DotnsContentResolver",
+      "readme": "DotnsContentResolver.md"
+    },
+    {
+      "name": "DotnsPopResolver",
+      "cdmPackage": "@dotns/pop-resolver",
+      "description": "Resolver for PoP-issued records: per-node chat keys and bidirectional lite/full username links.",
+      "sourcePath": "contracts/resolvers/DotnsPopResolver.sol",
+      "artifactContract": "DotnsPopResolver",
+      "readme": "DotnsPopResolver.md"
+    },
+    {
+      "name": "DotnsNameEscrow",
+      "cdmPackage": "@dotns/name-escrow",
+      "description": "Escrow contract for dotNS release positions, transfer friction fees, and overpayment accounting.",
+      "sourcePath": "contracts/escrow/DotnsNameEscrow.sol",
+      "artifactContract": "DotnsNameEscrow",
+      "readme": "DotnsNameEscrow.md"
+    },
+    {
+      "name": "StoreFactory",
+      "cdmPackage": "@dotns/store-factory",
+      "description": "Factory deploying each user's permanent LabelStore and UserStore as beacon proxies behind two upgradeable beacons.",
+      "sourcePath": "contracts/store/StoreFactory.sol",
+      "artifactContract": "StoreFactory",
+      "readme": "StoreFactory.md"
+    },
+    {
+      "name": "LabelStoreBeacon",
+      "cdmPackage": "@dotns/label-store-beacon",
+      "description": "Upgradeable beacon that points StoreFactory-created label stores at the current LabelStore implementation.",
+      "sourcePath": "contracts/store/LabelStore.sol",
+      "artifactContract": "UpgradeableBeacon",
+      "readme": "LabelStoreBeacon.md"
+    },
+    {
+      "name": "UserStoreBeacon",
+      "cdmPackage": "@dotns/user-store-beacon",
+      "description": "Upgradeable beacon that points StoreFactory-created user stores at the current UserStore implementation.",
+      "sourcePath": "contracts/store/UserStore.sol",
+      "artifactContract": "UpgradeableBeacon",
+      "readme": "UserStoreBeacon.md"
+    }
+  ]
+}

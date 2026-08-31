@@ -141,6 +141,49 @@ Confirm these keys are present:
 
 Done. ✅
 
+## Step 9 — (Optional) Publish the deployment to the CDM registry
+
+Registering the deployment in the [CDM contract registry](https://github.com/paritytech/contract-dependency-manager)
+lets consumers resolve the current DotNS addresses with `cdm install @dotns/<package>`
+instead of chasing address changes across redeploys.
+
+```bash
+# Generate CDM assets from the manifest you just deployed (needs `forge build` output):
+bun run cdm:generate -- \
+  --deployment deployments/<folder>/<CHAINID>.json \
+  --network <network-name>
+
+# Preview what would be published (no transactions):
+bun run cdm:register -- --metadata .generated/dotns-cdm/metadata.json \
+  --name paseo --dry-run
+
+# Publish (the signer needs funds on Asset Hub and Bulletin storage authorization;
+# CDM_SURI env var also works, preferred in CI):
+bun run cdm:register -- --metadata .generated/dotns-cdm/metadata.json \
+  --name paseo --suri "<mnemonic>"
+```
+
+For networks without a CDM preset, pass explicit endpoints:
+
+```bash
+bun run cdm:register -- --metadata .generated/dotns-cdm/metadata.json \
+  --name custom \
+  --assethub-url wss://... --bulletin-url wss://... \
+  --registry-address 0x... \
+  --suri "$CDM_SURI"
+```
+
+Notes:
+
+- Re-running is safe: contracts whose registered address and metadata already
+  match are skipped, so a partially-failed run can simply be re-run.
+- The first registration of each `@dotns/*` package claims its name for the
+  signing account; use the same account for subsequent redeploys.
+- See `scripts/deploy/cdm/` for how the assets are generated (static descriptors +
+  readmes in the repo, addresses from the manifest, ABIs from `out/**`).
+
+Done. ✅
+
 ## Troubleshooting — the four things that actually go wrong
 
 - **`PRIVATE_KEY is required`** — the keystore account doesn't exist yet. Make

@@ -31,3 +31,6 @@ broadcast/*
 .aider*
 .codeium/
 .gemini/
+
+# Generated CDM registration assets (deployment-specific; see scripts/cdm/)
+.generated/
