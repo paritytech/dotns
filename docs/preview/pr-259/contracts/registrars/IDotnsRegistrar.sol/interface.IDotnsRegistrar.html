@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/7395bef06e046bfe79aef6cebf5b9e5f51ed447c/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/4a4daadaa620e5e69870763a11298c04b6b2f6a2/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -374,8 +374,15 @@ the token is soulbound.</p>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
 <h3 id="nameregistered"><a class="header" href="#nameregistered">NameRegistered</a></h3>
 <p>Emitted when a name is registered.</p>
-<pre><code class="language-solidity">event NameRegistered(uint256 indexed id, address indexed owner);
+<pre><code class="language-solidity">event NameRegistered(uint256 indexed id, address indexed owner, bool soulbound);
 </code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>id</code></td><td><code>uint256</code></td><td>The token id (namehash node) that was minted.</td></tr>
+<tr><td><code>owner</code></td><td><code>address</code></td><td>The address that received the name.</td></tr>
+<tr><td><code>soulbound</code></td><td><code>bool</code></td><td>True when the name is soulbound: PoP-gateway minted and non-transferable. Lets indexers classify registrations without a per-token @custom:function isSoulbound read.</td></tr>
+</tbody></table>
+</div>
 <h3 id="controlleradded"><a class="header" href="#controlleradded">ControllerAdded</a></h3>
 <p>Emitted when a controller is added.</p>
 <p>Typed as the shared baseline @custom:contract IDotnsController so the commit-reveal
