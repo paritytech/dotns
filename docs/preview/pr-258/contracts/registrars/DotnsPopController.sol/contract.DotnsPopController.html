@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/c0c9f8de54a6b1b75c4375e34cacc8de211b3208/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b393fbdeb08f0e7974a58c5ee87b8766583ada86/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -954,7 +954,8 @@ write the slot). The release-then-reserve pair satisfies PopRules' ownership gat
 <p>Internal check enforcing a substrate Root origin.</p>
 <p>Authorises a call when @custom:function SystemUtils.originIsRoot is true, and
 reverts with NotRoot otherwise. <code>msg.sender</code> is deliberately not consulted: a
-Root origin has no account behind it, so reading it traps.</p>
+Root origin has no account behind it, so reading <code>msg.sender</code> traps. The same
+applies to anything reachable from an onlyRoot entrypoint.</p>
 <pre><code class="language-solidity">function _onlyRoot() internal view;
 </code></pre>
 <h3 id="_authorizeupgrade"><a class="header" href="#_authorizeupgrade">_authorizeUpgrade</a></h3>
