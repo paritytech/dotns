@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3ef1650e8cbd5115aa00f712b2ca3741137bf98b/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/818312530cceb9b5963923d4431daefe55a8c62f/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for Dotns</p>
 <p>Proof of personhood interface defining Dotns price calculation, PoP-tier requirements,
@@ -222,7 +222,9 @@ trailing digits both trigger @custom:reverts PopError.</p>
 </div>
 <h3 id="setshortnamesenabled"><a class="header" href="#setshortnamesenabled">setShortNamesEnabled</a></h3>
 <p>Opens or closes the public market for names shorter than nine characters.</p>
-<p>Owner-only; unauthorised callers trigger @custom:reverts OwnableUnauthorizedAccount.
+<p>Restricted to a substrate Root origin; any other caller triggers @custom:reverts
+NotRoot. Short names are otherwise issued through the PoP gateway, so this flag is the
+Root-only lever that additionally admits them on the public paid path.
 While closed, which is the deploy default, @custom:function priceWithCheck and</p>
 <p><strong>Note:</strong>
 function: priceWithoutCheck trigger @custom:reverts PopError for a base length
@@ -621,7 +623,7 @@ unchanged. @custom:reverts PopError when no registry is configured.</p>
 <h3 id="shortnamesenabledupdated"><a class="header" href="#shortnamesenabledupdated">ShortNamesEnabledUpdated</a></h3>
 <p>Emitted when the public market for names shorter than nine characters is opened or
 closed.</p>
-<p>Owner-only setter @custom:function setShortNamesEnabled.</p>
+<p>Set by the Root-gated @custom:function setShortNamesEnabled.</p>
 <pre><code class="language-solidity">event ShortNamesEnabledUpdated(bool enabled);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -648,6 +650,13 @@ closed.</p>
 <tr><td><code>reason</code></td><td><code>string</code></td><td>Human-readable explanation of the failure condition.</td></tr>
 </tbody></table>
 </div>
+<h3 id="notroot"><a class="header" href="#notroot">NotRoot</a></h3>
+<p>Thrown when @custom:function setShortNamesEnabled is called without a substrate
+Root origin.</p>
+<p>Carries no caller parameter: a Root origin has no account to report, and reading
+<code>msg.sender</code> under one traps.</p>
+<pre><code class="language-solidity">error NotRoot();
+</code></pre>
 <h3 id="notregistry"><a class="header" href="#notregistry">NotRegistry</a></h3>
 <p>Thrown when a caller is not an authorised controller on the registrar.</p>
 <pre><code class="language-solidity">error NotRegistry();

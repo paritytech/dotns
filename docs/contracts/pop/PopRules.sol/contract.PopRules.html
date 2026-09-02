@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="poprules"><a class="header" href="#poprules">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3ef1650e8cbd5115aa00f712b2ca3741137bf98b/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/818312530cceb9b5963923d4431daefe55a8c62f/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -244,14 +244,16 @@ registered under <code>DotnsConstants.COST_MODEL</code>, so no price is seeded h
 </div>
 <h3 id="setshortnamesenabled"><a class="header" href="#setshortnamesenabled">setShortNamesEnabled</a></h3>
 <p>Opens or closes the public market for names shorter than nine characters.</p>
-<p>Owner-only; unauthorised callers trigger @custom:reverts OwnableUnauthorizedAccount.
+<p>Restricted to a substrate Root origin; any other caller triggers @custom:reverts
+NotRoot. Short names are otherwise issued through the PoP gateway, so this flag is the
+Root-only lever that additionally admits them on the public paid path.
 While closed, which is the deploy default, @custom:function priceWithCheck and</p>
 <p><strong>Note:</strong>
 function: priceWithoutCheck trigger @custom:reverts PopError for a base length
 below nine, so no public caller buys a short name. The gateway free grant and the
 registrar's registerReserved path do not read this flag. Emits @custom:emits
 ShortNamesEnabledUpdated.</p>
-<pre><code class="language-solidity">function setShortNamesEnabled(bool enabled) external override onlyOwner;
+<pre><code class="language-solidity">function setShortNamesEnabled(bool enabled) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
