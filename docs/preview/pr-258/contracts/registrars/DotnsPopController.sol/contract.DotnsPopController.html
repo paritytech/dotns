@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3c3c9cbbe3251d8176a8ed08d33f38fc97937852/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/f5ad4c81a7e6e7386feab314f2fe115ee89b4997/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -954,8 +954,9 @@ write the slot). The release-then-reserve pair satisfies PopRules' ownership gat
 <p>Internal check enforcing a substrate Root origin.</p>
 <p>Authorises a call when @custom:function SystemUtils.originIsRoot is true, and
 reverts with NotRoot otherwise. <code>msg.sender</code> is deliberately not consulted: a
-Root origin has no account behind it, so reading <code>msg.sender</code> traps. The same
-applies to anything reachable from an onlyRoot entrypoint.
+Root origin has no account behind it, so reading <code>msg.sender</code> traps. That holds
+for this frame and any delegatecall sharing it; a nested call sees the calling
+contract as its sender and reads normally.
 The check also holds for the whole Root transaction rather than the entry frame
 alone, so nothing reachable from an onlyRoot entrypoint may call a
 user-controlled address: such a callee could re-enter a gated function and still
