@@ -35,6 +35,11 @@ abstract contract BaseDeployer is Script {
     ///      deployment address set.
     string internal constant CREATE3_SALT_NAMESPACE = "dotns.create3.v1";
 
+    /// @notice ERC1967 implementation storage slot,
+    ///         `bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)`.
+    bytes32 internal constant ERC1967_IMPLEMENTATION_SLOT =
+        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
     /// @notice Optional in-memory override used by tests and custom scripts.
     address private create3FactoryOverride;
 
@@ -186,13 +191,31 @@ abstract contract BaseDeployer is Script {
         Upgrades.validateImplementation(artefact, opts);
 
         vm.startBroadcast(owner);
-        (address implementation,) =
-            _deployCreate3(artefact, opts.constructorData, _create3Salt(label, "implementation"));
+        // `UUPSUpgradeable` holds `address private immutable __self = address(this)`,
+        // so an implementation's runtime code varies with its address and is matched
+        // by length. `ERC1967Proxy` keeps its implementation in storage rather than
+        // an immutable, so the proxy leg is matched by codehash.
+        (address implementation, bool implementationExisted) = _deployCreate3(
+            artefact, opts.constructorData, _create3Salt(label, "implementation"), true
+        );
         bool proxyExisted;
         (proxy, proxyExisted) = _deployCreate3(
             "ERC1967Proxy.sol:ERC1967Proxy",
             abi.encode(implementation, bytes("")),
-            _create3Salt(label, "proxy")
+            _create3Salt(label, "proxy"),
+            false
+        );
+        // The two legs are deployed together, so a first run finds neither present
+        // and a resumed run finds both. An implementation present without its proxy
+        // is neither, and this run would otherwise point a new proxy at it. Recover
+        // by bumping DOTNS_SALT_VERSION.
+        require(
+            !implementationExisted || proxyExisted,
+            string.concat(
+                label,
+                ": implementation address already occupied while its proxy is absent. ",
+                "Bump DOTNS_SALT_VERSION to deploy at fresh addresses."
+            )
         );
         // Initialise only a freshly deployed proxy; an adopted one (a resumed run)
         // is already initialised, and re-initialising would revert.
@@ -212,6 +235,14 @@ abstract contract BaseDeployer is Script {
             console.log("         on-chain configuration may differ from this run's inputs");
         }
         vm.stopBroadcast();
+        // Confirms the proxy delegates to the implementation this run deployed. Read
+        // from storage rather than through a call, so the answer comes from the slot
+        // itself rather than from the code at that address.
+        require(
+            address(uint160(uint256(vm.load(proxy, ERC1967_IMPLEMENTATION_SLOT))))
+                == implementation,
+            string.concat(label, ": proxy does not delegate to this run's implementation")
+        );
         vm.label(proxy, label);
         logDeployment(label, proxy);
     }
@@ -222,7 +253,29 @@ abstract contract BaseDeployer is Script {
     /// @param artefact Fully-qualified artefact name.
     /// @param constructorData ABI-encoded constructor arguments.
     /// @param label Trace / manifest identifier.
+    /// @param expectImmutables True when the artefact's runtime code carries
+    ///        constructor-set immutables; see `_deployCreate3`.
     /// @return deployed Address of the deployed contract.
+    function _broadcastDeployCreate3(
+        address owner,
+        string memory artefact,
+        bytes memory constructorData,
+        string memory label,
+        bool expectImmutables
+    )
+        internal
+        returns (address deployed)
+    {
+        vm.startBroadcast(owner);
+        (deployed,) = _deployCreate3(
+            artefact, constructorData, _create3Salt(label, "contract"), expectImmutables
+        );
+        vm.stopBroadcast();
+        vm.label(deployed, label);
+        logDeployment(label, deployed);
+    }
+
+    /// @notice Exact-codehash variant, for artefacts without immutables.
     function _broadcastDeployCreate3(
         address owner,
         string memory artefact,
@@ -232,11 +285,7 @@ abstract contract BaseDeployer is Script {
         internal
         returns (address deployed)
     {
-        vm.startBroadcast(owner);
-        (deployed,) = _deployCreate3(artefact, constructorData, _create3Salt(label, "contract"));
-        vm.stopBroadcast();
-        vm.label(deployed, label);
-        logDeployment(label, deployed);
+        return _broadcastDeployCreate3(owner, artefact, constructorData, label, false);
     }
 
     /// @notice Ensures the CREATE3 factory exists and primes it as the in-memory
@@ -351,12 +400,35 @@ abstract contract BaseDeployer is Script {
     }
 
     /// @notice Deploys `artefact` at its CREATE3 address, or adopts that address
-    ///         when it already has code, so a re-run resumes instead of reverting.
-    /// @dev The CREATE3 address is a pure function of the factory and salt, so it
-    ///      is identical whether freshly deployed or adopted. `existed` lets
-    ///      callers skip one-time steps (such as proxy initialisation) on adoption.
+    ///         when it already holds this artefact's code, so a re-run resumes.
+    /// @dev Adoption requires the occupant's runtime code to match the artefact this
+    ///      run would deploy; anything else reverts. A resumed run is bytecode
+    ///      identical and adopts without further input.
+    /// @param expectImmutables True for artefacts whose runtime code carries
+    ///        constructor-set immutables. The compiled artefact leaves those slots
+    ///        zeroed, so the comparison is by length rather than by codehash.
     /// @return deployed The CREATE3 address of the contract.
-    /// @return existed True when the target already had code and was adopted.
+    /// @return existed True when the target already held this artefact's code.
+    function _deployCreate3(
+        string memory artefact,
+        bytes memory constructorData,
+        bytes32 salt,
+        bool expectImmutables
+    )
+        internal
+        returns (address deployed, bool existed)
+    {
+        address predicted = _create3Factory().predict(salt);
+        if (predicted.code.length != 0) {
+            _requireExpectedCode(artefact, predicted, expectImmutables);
+            return (predicted, true);
+        }
+
+        deployed = _create3Factory().deploy(salt, _creationBytecode(artefact, constructorData));
+        require(deployed == predicted, string.concat(artefact, ": CREATE3 deploy failed"));
+    }
+
+    /// @notice Exact-codehash variant, for artefacts without immutables.
     function _deployCreate3(
         string memory artefact,
         bytes memory constructorData,
@@ -365,13 +437,57 @@ abstract contract BaseDeployer is Script {
         internal
         returns (address deployed, bool existed)
     {
-        address predicted = _create3Factory().predict(salt);
-        if (predicted.code.length != 0) {
-            return (predicted, true);
+        return _deployCreate3(artefact, constructorData, salt, false);
+    }
+
+    /// @notice Reverts unless `occupant` holds the runtime code of `artefact`.
+    /// @dev Compares `extcodehash` against the compiled runtime code, or lengths
+    ///      when the artefact carries immutables.
+    function _requireExpectedCode(
+        string memory artefact,
+        address occupant,
+        bool expectImmutables
+    )
+        internal
+        view
+    {
+        bytes memory expected = vm.getDeployedCode(artefact);
+
+        if (expectImmutables) {
+            require(
+                occupant.code.length == expected.length,
+                string.concat(
+                    "Unexpected occupant at CREATE3 address for ",
+                    artefact,
+                    " (",
+                    vm.toString(occupant),
+                    "): runtime code length ",
+                    vm.toString(occupant.code.length),
+                    " does not match the expected ",
+                    vm.toString(expected.length),
+                    ". Refusing to adopt code this run did not deploy."
+                )
+            );
+            return;
         }
 
-        deployed = _create3Factory().deploy(salt, _creationBytecode(artefact, constructorData));
-        require(deployed == predicted, string.concat(artefact, ": CREATE3 deploy failed"));
+        bytes32 expectedHash = keccak256(expected);
+        bytes32 actualHash = occupant.codehash;
+        require(
+            actualHash == expectedHash,
+            string.concat(
+                "Unexpected occupant at CREATE3 address for ",
+                artefact,
+                " (",
+                vm.toString(occupant),
+                "): codehash ",
+                vm.toString(actualHash),
+                " does not match the expected ",
+                vm.toString(expectedHash),
+                ". Refusing to adopt code this run did not deploy. ",
+                "Bump DOTNS_SALT_VERSION to deploy at fresh addresses."
+            )
+        );
     }
 
     function _creationBytecode(
@@ -403,8 +519,22 @@ abstract contract BaseDeployer is Script {
         factory = Create3Factory(payable(factoryAddress));
     }
 
-    function _create3Salt(string memory label, string memory kind) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(CREATE3_SALT_NAMESPACE, ":", label, ":", kind));
+    /// @notice Derives the CREATE3 salt for one manifest label and deploy kind.
+    /// @dev CREATE3 slots are single use, so an address that is already occupied
+    ///      cannot be reused at the same salt. Bumping `DOTNS_SALT_VERSION` moves the
+    ///      whole deployment address set to fresh addresses. Version 1 is the default
+    ///      and contributes nothing to the preimage, so every existing address is
+    ///      unchanged; the bump applies to every label at once.
+    function _create3Salt(string memory label, string memory kind) internal view returns (bytes32) {
+        uint256 version = vm.envOr("DOTNS_SALT_VERSION", uint256(1));
+        if (version == 1) {
+            return keccak256(abi.encodePacked(CREATE3_SALT_NAMESPACE, ":", label, ":", kind));
+        }
+        return keccak256(
+            abi.encodePacked(
+                CREATE3_SALT_NAMESPACE, ":", label, ":", kind, ":", vm.toString(version)
+            )
+        );
     }
 
     function _deploymentPath(

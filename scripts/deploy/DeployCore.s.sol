@@ -60,7 +60,9 @@ contract DeployCore is BaseDeployer {
                 owner,
                 "StoreFactory.sol:StoreFactory",
                 abi.encode(protocolRegistry, owner),
-                "StoreFactory"
+                "StoreFactory",
+                // Beacon addresses are constructor-set immutables in the runtime code.
+                true
             )
         );
         vm.label(address(factory), "StoreFactory");

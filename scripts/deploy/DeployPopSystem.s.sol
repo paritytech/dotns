@@ -93,7 +93,9 @@ contract DeployPopSystem is BaseDeployer {
             owner,
             "RootGatewayDispatcher.sol:RootGatewayDispatcher",
             abi.encode(popController),
-            "RootGatewayDispatcher"
+            "RootGatewayDispatcher",
+            // `TARGET` is a constructor-set immutable in the runtime code.
+            true
         );
     }
 
@@ -113,7 +115,12 @@ contract DeployPopSystem is BaseDeployer {
         returns (address lens)
     {
         lens = _broadcastDeployCreate3(
-            owner, "DotnsPopLens.sol:DotnsPopLens", abi.encode(protocolRegistry), "DotnsPopLens"
+            owner,
+            "DotnsPopLens.sol:DotnsPopLens",
+            abi.encode(protocolRegistry),
+            "DotnsPopLens",
+            // `_protocolRegistry` is a constructor-set immutable in the runtime code.
+            true
         );
     }
 }
