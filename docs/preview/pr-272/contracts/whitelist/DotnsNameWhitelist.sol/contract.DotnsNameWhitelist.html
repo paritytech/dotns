@@ -180,9 +180,9 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnamewhitelist"><a class="header" href="#dotnsnamewhitelist">DotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/11c5d7277c36434b02cc4ee3f14f8b400c53922c/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/4537a71633c39939e278f463d02687459d6d22e7/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
-Initializable, UUPSUpgradeable, <a href="/contracts/access/DotnsRoleManager.sol/abstract.DotnsRoleManager.html">DotnsRoleManager</a>, <a href="/contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></p>
+Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></p>
 <p><strong>Title:</strong>
 DotnsNameWhitelist</p>
 <p>Pre-launch name whitelist. A name is Open until governance reserves it or a claim is
@@ -195,11 +195,11 @@ the submitter, so a relayer or a cross-chain sovereign account can submit on a u
 behalf and the name binds to that user. All state is on-chain and queryable through views;
 no event indexing is required. A name holds at most <code>maxClaimants</code> live claims, which
 bounds the loop that clears them on resolution. Resolving a name deletes its claims,
-refunding their storage deposit, so only reserved or won names persist. Governance is Root
-or the owner. Substrate Root has no address, so the governance gates check
-<code>SystemUtils.originIsRoot</code>, which is true through the proxy's delegatecall frame, before
-reading <code>msg.sender</code>. Operators are signed role holders
-for day-to-day approvals; the public and PoP controllers hold only the <code>consume</code> hook.
+refunding their storage deposit, so only reserved or won names persist. The entire admin
+surface is substrate Root: <code>SystemUtils.originIsRoot</code> is true through the proxy's
+delegatecall frame, and no gate reads <code>msg.sender</code>, so Root's lack of an address is not a
+problem. No signed account grants, revokes, reserves, or retunes a cap; the owner's
+authority is upgrade only. The public and PoP controllers hold only the <code>consume</code> hook.
 Entries are keyed by the node under the active TLD, which the deployment holds immutable
 for the whitelist's lifetime.</p>
 <p><strong>Note:</strong>
@@ -254,14 +254,12 @@ security-contact: admin@parity.io</p>
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlygovernance"><a class="header" href="#onlygovernance">onlyGovernance</a></h3>
-<p>Restricts a call to Root or the owner.</p>
-<p>Checks Root first so <code>msg.sender</code>, which traps under a Root origin, is read only for a
-signed caller.</p>
+<p>Restricts a call to a substrate Root dispatch.</p>
+<p>The whole admin surface is governance-only: no key grants, revokes, reserves, or
+retunes a cap. The owner's authority is deployment and upgrade, not allocation, so no
+signed account can hand out a name. <code>msg.sender</code> is never read here, which is also what
+keeps every gated entry point callable under a Root origin, since Root has no account.</p>
 <pre><code class="language-solidity">modifier onlyGovernance() ;
-</code></pre>
-<h3 id="onlyoperatororgovernance"><a class="header" href="#onlyoperatororgovernance">onlyOperatorOrGovernance</a></h3>
-<p>Restricts a call to Root, the owner, or an operator.</p>
-<pre><code class="language-solidity">modifier onlyOperatorOrGovernance() ;
 </code></pre>
 <h3 id="onlycontroller"><a class="header" href="#onlycontroller">onlyController</a></h3>
 <p>Restricts a call to a registrar controller resolved through the registry.</p>
@@ -283,19 +281,6 @@ protocol registry the node derivation reads the TLD from.</p>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>registry</code></td><td><code>IDotnsProtocolRegistry</code></td><td>Protocol registry all DotNS contracts resolve through.</td></tr>
-</tbody></table>
-</div>
-<h3 id="setoperator"><a class="header" href="#setoperator">setOperator</a></h3>
-<p>Grants or revokes the operator role for <code>account</code>.</p>
-<p>Restricted to Root or the owner. Root has no address, so governance uses this rather
-than the owner-only role-admin path. @custom:emits IAccessControl.RoleGranted on grant
-and @custom:emits IAccessControl.RoleRevoked on revoke.</p>
-<pre><code class="language-solidity">function setOperator(address account, bool enabled) external override onlyGovernance;
-</code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>account</code></td><td><code>address</code></td><td>Address whose operator role is changed.</td></tr>
-<tr><td><code>enabled</code></td><td><code>bool</code></td><td>True to grant, false to revoke.</td></tr>
 </tbody></table>
 </div>
 <h3 id="setmaxclaimants"><a class="header" href="#setmaxclaimants">setMaxClaimants</a></h3>
@@ -373,18 +358,12 @@ existing claim, and fewer than <code>maxClaimants</code> claims on the name.</p>
 </div>
 <h3 id="accept"><a class="header" href="#accept">accept</a></h3>
 <p>Accepts <code>user</code>'s claim as the winner of <code>label</code>.</p>
-<p>Restricted to an operator, the owner, or Root. Requires <code>user</code>'s claim <code>Requested</code>.
+<p>Restricted to a substrate Root dispatch. Requires <code>user</code>'s claim <code>Requested</code>.
 Sets the name <code>Claimed</code> with <code>user</code> the winner and clears every claim on the name, rejecting
 the losers. @custom:reverts NotRequested. @custom:emits NameAccepted for the winner and</p>
 <p><strong>Note:</strong>
 emits: NameRejected for each loser.</p>
-<pre><code class="language-solidity">function accept(
-    string calldata label,
-    address user
-)
-    external
-    override
-    onlyOperatorOrGovernance;
+<pre><code class="language-solidity">function accept(string calldata label, address user) external override onlyGovernance;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -394,16 +373,10 @@ emits: NameRejected for each loser.</p>
 </div>
 <h3 id="reject"><a class="header" href="#reject">reject</a></h3>
 <p>Rejects <code>user</code>'s pending claim on <code>label</code> without resolving the name.</p>
-<p>Restricted to an operator, the owner, or Root. Requires the claim <code>Requested</code>.</p>
+<p>Restricted to a substrate Root dispatch. Requires the claim <code>Requested</code>.</p>
 <p><strong>Note:</strong>
 reverts: NotRequested. @custom:emits NameRejected.</p>
-<pre><code class="language-solidity">function reject(
-    string calldata label,
-    address user
-)
-    external
-    override
-    onlyOperatorOrGovernance;
+<pre><code class="language-solidity">function reject(string calldata label, address user) external override onlyGovernance;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -413,7 +386,7 @@ reverts: NotRequested. @custom:emits NameRejected.</p>
 </div>
 <h3 id="grantname"><a class="header" href="#grantname">grantName</a></h3>
 <p>Grants <code>label</code> to <code>user</code> directly, without a prior claim.</p>
-<p>Restricted to an operator, the owner, or Root. Requires the name Open, <code>user</code> non-zero
+<p>Restricted to a substrate Root dispatch. Requires the name Open, <code>user</code> non-zero
 and a canonical label. Sets the name <code>Claimed</code> with <code>user</code> the winner and clears any pending
 claims. @custom:reverts NameNotOpen, @custom:reverts ZeroUser or</p>
 <p><strong>Notes:</strong></p>
@@ -425,13 +398,7 @@ claims. @custom:reverts NameNotOpen, @custom:reverts ZeroUser or</p>
 <p>emits: NameRejected for each cleared claim.</p>
 </li>
 </ul>
-<pre><code class="language-solidity">function grantName(
-    string calldata label,
-    address user
-)
-    external
-    override
-    onlyOperatorOrGovernance;
+<pre><code class="language-solidity">function grantName(string calldata label, address user) external override onlyGovernance;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -441,17 +408,11 @@ claims. @custom:reverts NameNotOpen, @custom:reverts ZeroUser or</p>
 </div>
 <h3 id="grantnames"><a class="header" href="#grantnames">grantNames</a></h3>
 <p>Grants several labels to one <code>user</code> directly.</p>
-<p>Restricted to an operator, the owner, or Root. Applies @custom:function grantName to
+<p>Restricted to a substrate Root dispatch. Applies @custom:function grantName to
 each, at most <code>maxGrantBatch</code> labels per call.</p>
 <p><strong>Note:</strong>
 reverts: TooManyLabels when <code>labels</code> exceeds the batch cap.</p>
-<pre><code class="language-solidity">function grantNames(
-    string[] calldata labels,
-    address user
-)
-    external
-    override
-    onlyOperatorOrGovernance;
+<pre><code class="language-solidity">function grantNames(string[] calldata labels, address user) external override onlyGovernance;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -461,7 +422,7 @@ reverts: TooManyLabels when <code>labels</code> exceeds the batch cap.</p>
 </div>
 <h3 id="revokename"><a class="header" href="#revokename">revokeName</a></h3>
 <p>Resets <code>label</code> to Open, clearing any winner and claims.</p>
-<p>Restricted to an operator, the owner, or Root. Resolves a Claimed or claim-holding
+<p>Restricted to a substrate Root dispatch. Resolves a Claimed or claim-holding
 name; a Reserved name is released through @custom:function setReserved, not here.</p>
 <p><strong>Notes:</strong></p>
 <ul>
@@ -708,7 +669,7 @@ reverts: BadWindow when <code>duration</code> is zero. @custom:emits WindowSet.<
 <pre><code class="language-solidity">function supportsInterface(bytes4 interfaceId)
     public
     view
-    override(DotnsRoleManager)
+    override(ERC165Upgradeable)
     returns (bool supported);
 </code></pre>
 <h3 id="_grant"><a class="header" href="#_grant">_grant</a></h3>
@@ -785,11 +746,6 @@ reverts: BadWindow when <code>duration</code> is zero. @custom:emits WindowSet.<
 <tr><td><code>open</code></td><td><code>bool</code></td><td>True when the current time is within the window.</td></tr>
 </tbody></table>
 </div>
-<h3 id="_issupportedrole"><a class="header" href="#_issupportedrole">_isSupportedRole</a></h3>
-<p>Returns whether <code>role</code> is recognised by the consuming contract.</p>
-<p>Implemented by each consuming contract so unsupported role identifiers fail closed.</p>
-<pre><code class="language-solidity">function _isSupportedRole(bytes32 role) internal pure override returns (bool supported);
-</code></pre>
 <h3 id="_authorizeupgrade"><a class="header" href="#_authorizeupgrade">_authorizeUpgrade</a></h3>
 <p>Function that should revert when <code>msg.sender</code> is not authorized to upgrade the contract.
 Called by
