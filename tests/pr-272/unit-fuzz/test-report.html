@@ -8,13 +8,13 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">DotNS Test Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-09-03 13:09 UTC | 39 suites</p>
+<p class="text-sm text-gray-500">Generated 2026-09-03 14:05 UTC | 39 suites</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
-<div><p class="text-sm text-gray-500 mb-1">Status</p><p class="text-xl font-bold text-red-400">Failed</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">583</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">575</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-red-400">8</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Status</p><p class="text-xl font-bold text-green-400">All Passed</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">584</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">584</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-gray-500">0</p></div>
 </div></div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
@@ -702,7 +702,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsNameWhitelistTests</span><span class="ml-2 text-xs text-gray-500">test/unit/whitelist/DotnsNameWhitelist.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">52/52</span>
+<span class="text-sm font-mono text-green-400">53/53</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -747,6 +747,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_consume_reverts_for_wrong_registrant</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_every_admin_entry_point_requires_root</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -1971,7 +1976,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsRegistrarControllerTest</span><span class="ml-2 text-xs text-gray-500">test/unit/registrar/DotnsRegistrarController.t.sol</span></div>
-<span class="text-sm font-mono text-red-400">42/46</span>
+<span class="text-sm font-mono text-green-400">47/47</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -1979,6 +1984,11 @@
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
 </tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_a_grant_does_not_admit_a_different_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_available_reverts_for_dotted_label</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
@@ -2011,8 +2021,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_consumed_grant_cannot_mint_again</td>
-<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">next call did not revert as expected</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_controller_supports_no_roles</td>
@@ -2066,8 +2076,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_registerReserved_reverts_when_the_whitelist_is_unconfigured</td>
-<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">next call did not revert as expected</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_register_does_not_overwrite_third_party_reverse_record</td>
@@ -2151,13 +2161,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_revoked_grant_cannot_register_reserved</td>
-<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">NotGovernance()</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_root_also_reverts_when_the_whitelist_is_unconfigured</td>
-<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">next call did not revert as expected</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_root_mints_reserved_without_a_grant_and_leaves_grants_unspent</td>
@@ -2214,7 +2224,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsRegistrarControllerFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/registrar/DotnsRegistrarControllerFuzz.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">11/11</span>
+<span class="text-sm font-mono text-green-400">14/14</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -2228,12 +2238,22 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_a_grant_admits_only_its_beneficiary</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">testFuzz_controller_rejects_every_role</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">testFuzz_grant_is_single_use</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_granted_name_mints_to_the_beneficiary</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -2249,6 +2269,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">testFuzz_register_refunds_overpayment_to_payer_not_owner</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">testFuzz_reserved_mint_leaves_the_reverse_record_untouched</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -3393,7 +3418,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">UserStoreFuzzTest</span><span class="ml-2 text-xs text-gray-500">test/fuzz/store/UserStoreFuzz.t.sol</span></div>
-<span class="text-sm font-mono text-red-400">3/7</span>
+<span class="text-sm font-mono text-green-400">3/3</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -3415,26 +3440,6 @@
 <td class="py-2 px-3 font-mono text-gray-200">testFuzz_setValue_accepts_arbitrary_inputs</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_consumed_grant_cannot_mint_again</td>
-<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">next call did not revert as expected</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_registerReserved_reverts_when_the_whitelist_is_unconfigured</td>
-<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">next call did not revert as expected</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_revoked_grant_cannot_register_reserved</td>
-<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">NotGovernance()</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_root_also_reverts_when_the_whitelist_is_unconfigured</td>
-<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">next call did not revert as expected</td>
 </tr>
 </tbody></table></div>
 </div>
