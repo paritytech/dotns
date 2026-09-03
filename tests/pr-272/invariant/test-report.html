@@ -1,0 +1,429 @@
+<!DOCTYPE html><html lang="en" class="dark"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DotNS Test Report</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class'}</script>
+</head>
+<body class="bg-gray-950 text-gray-300 min-h-screen">
+<div class="max-w-6xl mx-auto px-4 py-8">
+<div class="mb-8">
+<h1 class="text-2xl font-bold text-white mb-1">DotNS Test Report</h1>
+<p class="text-sm text-gray-500">Generated 2026-09-03 12:17 UTC | 10 suites</p>
+</div>
+<div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
+<div><p class="text-sm text-gray-500 mb-1">Status</p><p class="text-xl font-bold text-red-400">Failed</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">56</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">54</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-red-400">2</p></div>
+</div></div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">CostModelVersionInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/pop/CostModelVersionInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">2/2</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_current_pointer_is_coherent</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_registered_versions_price_is_immutable</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsNameEscrowInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/escrow/DotnsNameEscrowInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">11/11</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_claimed_positions_have_zero_amount</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_no_funds_in_controller</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_position_recipient_mirrors_current_nft_holder</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_protocol_fees_match_tracked_inflows</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_reclaimable_positions_are_fundable</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_released_count_consistent</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_released_tokens_are_never_stuck</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_released_tokens_in_escrow_custody</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_reserves_match_positions</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_solvency</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_withdrawn_tokens_are_in_escrow_custody_and_available</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsNameWhitelistInvariant</span><span class="ml-2 text-xs text-gray-500">test/invariant/whitelist/DotnsNameWhitelistInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">3/3</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_active_set_is_consistent</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_claim_bounds</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_winner_iff_claimed</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsNameWhitelistRoleInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/whitelist/DotnsNameWhitelistRoleInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">1/1</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_whitelist_operator_role_matches_ghost_state</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsPopControllerInvariant</span><span class="ml-2 text-xs text-gray-500">test/invariant/registrar/DotnsPopControllerInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">11/11</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_every_minted_tokenId_has_nonempty_label</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_fullClaim_liteLink_are_inverse</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_no_stale_fullClaim</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_no_stale_liteLink</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_one_reservation_per_account_consistent</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_pendingClaimUserCount_matches_enumeration_length</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_pendingClaimUsers_mirrors_pendingClaims_mapping</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_pending_claim_and_label_store_are_mutually_exclusive</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_popRules_head_matches_queue_head_or_zero</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_queue_length_bounded</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_settled_names_written_and_never_stranded</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistrarControllerInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registrar/DotnsRegistrarControllerInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">10/10</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_consumed_commitments_deleted</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_current_owners_have_label_in_store</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_no_stuck_funds</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_ownership_consistency</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_registered_names_unavailable</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_registration_count_consistent</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_reserved_names_have_reverse_resolution</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_store_entries_locked</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_transfer_recipients_have_store_entries</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_value_conservation</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistrarReservedGrantInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registrar/DotnsRegistrarReservedGrantInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-red-400">5/6</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_grants_are_pending_or_minted_never_both</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_minted_names_belong_to_their_beneficiary</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_no_grant_is_spent_twice</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_no_ungranted_mint_succeeds</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_reserved_grant_coverage_is_non_vacuous</td>
+<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
+<td class="py-2 px-3 text-sm text-red-300">failed to set up invariant testing environment: the ungranted path was never exercised: 0 <= 0</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_reserved_path_never_writes_a_reverse_record</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistrarSoulboundInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registrar/DotnsRegistrarSoulboundInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">3/3</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_no_soulbound_transfer_succeeds</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_soulbound_coverage_is_non_vacuous</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_soulbound_owner_never_changes</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">DotnsRegistryInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registry/DotnsRegistryInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-green-400">3/3</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_parent_can_always_reassign_subnodes</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_subnode_owner_authorized</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_subnodes_always_exist</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<div><span class="font-semibold text-white">StoreInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/store/StoreInvariant.t.sol</span></div>
+<span class="text-sm font-mono text-red-400">5/6</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Test</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_at_most_one_store_of_each_type_per_user</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_enumeration_matches_counters</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_factory_owns_both_beacons</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_locked_label_text_never_changes</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_locked_labels_never_unlock</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_reserved_grant_coverage_is_non_vacuous</td>
+<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
+<td class="py-2 px-3 text-sm text-red-300">failed to set up invariant testing environment: the ungranted path was never exercised: 0 <= 0</td>
+</tr>
+</tbody></table></div>
+</div>
+</div></body></html>
