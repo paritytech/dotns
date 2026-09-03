@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnamewhitelist"><a class="header" href="#idotnsnamewhitelist">IDotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/4537a71633c39939e278f463d02687459d6d22e7/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/67c28313d2649b6b90467cba432b157afcd1377f/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsNameWhitelist</p>
 <p>Interface for the pre-launch name whitelist. A name is Open until governance either
@@ -313,8 +313,8 @@ name; a Reserved name is released through @custom:function setReserved, not here
 </div>
 <h3 id="setreserved"><a class="header" href="#setreserved">setReserved</a></h3>
 <p>Reserves or releases <code>label</code>.</p>
-<p>Restricted to Root or the owner. Reserving requires the name Open and clears any
-pending claims, rejecting each; releasing requires it <code>Reserved</code>. @custom:reverts
+<p>Restricted to a substrate Root dispatch. Reserving requires the name Open and clears
+any pending claims, rejecting each; releasing requires it <code>Reserved</code>. @custom:reverts
 NameNotOpen or @custom:reverts NotReserved. @custom:emits NameReserved or @custom:emits
 NameUnreserved. @param label Bare label.</p>
 <pre><code class="language-solidity">function setReserved(string calldata label, bool reserved) external;
@@ -348,9 +348,8 @@ the name to Open. @custom:reverts NotController for any other caller and</p>
 </div>
 <h3 id="setwindow"><a class="header" href="#setwindow">setWindow</a></h3>
 <p>Sets the request window relative to the current time.</p>
-<p>Restricted to Root or the owner. Opens at <code>block.timestamp + startsIn</code> for <code>duration</code>.</p>
-<p><strong>Note:</strong>
-reverts: BadWindow when <code>duration</code> is zero. @custom:emits WindowSet.</p>
+<p>Restricted to a substrate Root dispatch. Opens at <code>block.timestamp + startsIn</code> for
+<code>duration</code>. @custom:reverts BadWindow when <code>duration</code> is zero. @custom:emits WindowSet.</p>
 <pre><code class="language-solidity">function setWindow(uint64 startsIn, uint64 duration) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -361,7 +360,7 @@ reverts: BadWindow when <code>duration</code> is zero. @custom:emits WindowSet.<
 </div>
 <h3 id="setmaxclaimants"><a class="header" href="#setmaxclaimants">setMaxClaimants</a></h3>
 <p>Sets the live-claim cap per name.</p>
-<p>Restricted to Root or the owner. The cap is bounded by
+<p>Restricted to a substrate Root dispatch. The cap is bounded by
 <code>DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT</code>, which bounds the resolution clear-loop.</p>
 <p><strong>Notes:</strong></p>
 <ul>
@@ -381,7 +380,7 @@ reverts: BadWindow when <code>duration</code> is zero. @custom:emits WindowSet.<
 </div>
 <h3 id="setmaxreasonbytes"><a class="header" href="#setmaxreasonbytes">setMaxReasonBytes</a></h3>
 <p>Sets the reason byte cap.</p>
-<p>Restricted to Root or the owner, bounded by
+<p>Restricted to a substrate Root dispatch, bounded by
 <code>DotnsConstants.WHITELIST_MAX_REASON_LIMIT</code>. @custom:reverts MaxReasonBytesOutOfRange when
 <code>newMax</code> is zero or above the ceiling. @custom:emits MaxReasonBytesSet.</p>
 <pre><code class="language-solidity">function setMaxReasonBytes(uint256 newMax) external;
@@ -393,7 +392,7 @@ reverts: BadWindow when <code>duration</code> is zero. @custom:emits WindowSet.<
 </div>
 <h3 id="setmaxgrantbatch"><a class="header" href="#setmaxgrantbatch">setMaxGrantBatch</a></h3>
 <p>Sets the cap on labels per <code>grantNames</code> call.</p>
-<p>Restricted to Root or the owner, bounded by
+<p>Restricted to a substrate Root dispatch, bounded by
 <code>DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT</code>. @custom:reverts MaxGrantBatchOutOfRange
 when <code>newMax</code> is zero or above the ceiling. @custom:emits MaxGrantBatchSet.</p>
 <pre><code class="language-solidity">function setMaxGrantBatch(uint16 newMax) external;
