@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/f91518583e7dbd17bf969d398a5d059cb7bb149d/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/a3fd462314e771f4819edcaace1b0d0403973b67/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -206,11 +206,13 @@ This contract does not import or call <code>IDotnsRegistrarController</code>. Th
 commit-reveal controller is equally unaware of this one. Cross-flow collision handling
 relies on two distinct properties, neither of which requires the two controllers to know
 about each other:
-(1) Lite-person labels (<code>NAMEXX</code>) share the public namespace: they are just DNS labels
-with exactly two trailing digits. First-to-mint wins at the ERC721 layer, so a lite-user
-and a public registrant cannot hold the same flat label simultaneously. Keeping one
-namespace removes the ambiguity downstream tooling (dotli, dweb) would see with a
-separate separator form.
+(1) Lite-person labels (<code>stem.NN</code>) occupy a namespace the public path cannot reach: the
+separator is legal only on a lite label, and the public path rejects it, so no public
+registration can spell one. A digit suffix is not exclusive, but an ordinary label carrying
+one is measured as written and so is simply a different name. The two flows therefore cannot
+contend for the same label. This holds of labels the contracts minted, not of an arbitrary
+string: a subname stored under a digit-only parent reads the same way, which is why
+provenance is published through @custom:function isPopIssued rather than inferred.
 (2) Base-name reservations are synchronised into <code>IPopRules</code>. The head of this
 controller's reservation queue is written through <code>IPopRules.reserveBaseNameForPop</code> on
 every head transition; the slot is cleared through <code>IPopRules.releaseBaseName</code> when the
@@ -300,6 +302,15 @@ function: settlePendingClaims deploys the store and writes the stashed labels. E
 entry's deadline is measured from its own <code>mintedAt</code> against <code>reservationDuration</code>.</p>
 <pre><code class="language-solidity">mapping(address user =&gt; PendingClaim[] queue) internal _pendingClaimQueue
 </code></pre>
+<h3 id="_popissued"><a class="header" href="#_popissued">_popIssued</a></h3>
+<p>Labels this controller minted, keyed by the bare label without the TLD.</p>
+<p>Provenance, not a transfer rule: written once at mint and never cleared, so it
+stays true if a name later becomes transferable. Keyed by the label text rather
+than the node because a reader holding only <code>joseph.42</code> cannot derive the node
+without first deciding whether the separator is part of the label or a subname
+boundary, which is the question it is asking.</p>
+<pre><code class="language-solidity">mapping(string label =&gt; bool issued) internal _popIssued
+</code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in future upgrades.</p>
 <pre><code class="language-solidity">uint256[50] private __gap
@@ -328,12 +339,33 @@ through the same event the setter uses later.</p>
     external
     initializer;
 </code></pre>
+<h3 id="ispopissued"><a class="header" href="#ispopissued">isPopIssued</a></h3>
+<p>Whether this controller minted the whole-label reading of <code>label</code>.</p>
+<p>Keyed by text, so it answers about an interpretation rather than about a node: a
+true answer covers <code>joseph.42</code> taken as one label, and says nothing about a subname
+<code>joseph</code> under <code>42</code>, which renders as the same text. Both can exist at once, so a caller
+holding a node must also check that node is <code>namehash(tldNode, keccak(label))</code> before
+reading this answer as being about what it holds; node identity is what names the
+object. Set at mint and never cleared, so it is unaffected by a name later becoming
+transferable; the soulbound flag is a transfer rule and cannot stand in for it.</p>
+<pre><code class="language-solidity">function isPopIssued(string calldata label) external view override returns (bool issued);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Bare label without the TLD, for example <code>joseph.42</code>.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>issued</code></td><td><code>bool</code></td><td>True when this controller minted <code>label</code>.</td></tr>
+</tbody></table>
+</div>
 <h3 id="reservelitename"><a class="header" href="#reservelitename">reserveLiteName</a></h3>
 <p>Registers a lite-person username on behalf of the supplied
 user without touching the base-name reservation queue.</p>
 <p>Callable only under a substrate Root origin (otherwise @custom:reverts NotRoot). The
-supplied label must satisfy the dotted <code>stem.NN</code> shape and the flattened label must classify
-as PopLite (otherwise @custom:reverts InvalidLiteLabel); a supplied chat
+supplied label must satisfy the <code>stem.NN</code> shape and must classify outside the
+governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel); a supplied chat
 key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code> reverts</p>
 <p><strong>Notes:</strong></p>
 <ul>
@@ -357,8 +389,8 @@ mint @custom:emits LiteNameReserved and @custom:emits PendingClaimStashed, with<
 and optionally enqueues a reservation for a base name they intend to
 claim as a full person later.</p>
 <p>Callable only under a substrate Root origin (otherwise @custom:reverts NotRoot). The
-lite leg validates the dotted <code>stem.NN</code> shape and requires the flattened label to classify
-as PopLite (otherwise @custom:reverts InvalidLiteLabel), and rejects a
+lite leg validates the <code>stem.NN</code> shape and requires the label to classify outside the
+governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel), and rejects a
 supplied chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code>
 (otherwise @custom:reverts InvalidChatKey). On a warm-path mint (user already has a
 <code>LabelStore</code>) it @custom:emits LiteNameReserved and @custom:emits NameRegistered;
@@ -370,8 +402,8 @@ on a cold-path mint it @custom:emits LiteNameReserved and</p>
 </li>
 <li>
 <p>function: settlePendingClaims when the claim settles. The base-name leg only runs
-when <code>reservedBaseLabel</code> is non-empty: it validates the DNS-label shape and requires a
-true base label with no trailing digits (otherwise @custom:reverts InvalidBaseLabel) and
+when <code>reservedBaseLabel</code> is non-empty: it requires a letters-only person label, which is
+therefore also a true base label (otherwise @custom:reverts InvalidBaseLabel), and
 with no owner on the registrar (otherwise @custom:reverts BaseNameAlreadyRegistered),
 since a name that already has an owner could never be claimed. This validation runs
 before both the lite mint and any queue mutation, so an already-registered
@@ -402,7 +434,8 @@ This is the second step of the split
 gateway flow: @custom:function reserveLiteName mints the lite username first, then this
 function reserves the full/base label in a separate transaction so proof-size stays below
 per-call limits. Reverts with @custom:reverts InvalidBaseLabel when the label is empty,
-non-canonical, digit-suffixed, or governance-reserved, and with</p>
+is not lowercase ASCII letters (so a hyphen or any digit rejects it), or is
+governance-reserved, and with</p>
 <p><strong>Note:</strong>
 reverts: BaseNameAlreadyRegistered when the label already has an owner on the
 registrar and so could never be claimed. The caller remains agnostic about
@@ -418,24 +451,27 @@ backend batching; it simply exposes a small retryable primitive.</p>
 <p>Lite-only mint shared by @custom:function reserveLiteName and the lite leg
 of @custom:function reserveBaseName.</p>
 <p>Gateway attestation is the authority for personhood on this path; the on-chain
-precompile is not consulted. The dotted-format check accepts only <code>stem.NN</code>, then
-PopRules classification must place the flattened label outside the governance-reserved
-tier before minting; any non-reserved two-digit lite label is accepted regardless of stem
-length. Takes the @custom:struct LiteRegistration struct directly so both call sites pass
-the same payload shape: the typed entrypoint forwards its own <code>params</code>, the
-<code>reserveBaseName</code> entrypoint forwards <code>params.lite</code>.</p>
+precompile is not consulted. The label is stored in the <code>stem.NN</code> form the gateway sends,
+which is the form People Chain holds, so no normalisation happens here. The shape check
+runs before classification so a malformed label reverts</p>
+<p><strong>Note:</strong>
+reverts: InvalidLiteLabel, which the gateway pallet decodes by selector; letting
+<code>classifyName</code> catch it instead would surface an undecodable PopRules string.
+Takes the @custom:struct LiteRegistration struct directly so both call sites pass the same
+payload shape: the typed entrypoint forwards its own <code>params</code>, the <code>reserveBaseName</code>
+entrypoint forwards <code>params.lite</code>.</p>
 <pre><code class="language-solidity">function _reserveLite(IPopRules rules, LiteRegistration calldata params) internal;
 </code></pre>
 <h3 id="registerbasename"><a class="header" href="#registerbasename">registerBaseName</a></h3>
 <p>Registers a full-person username on behalf of the supplied user.</p>
 <p>Callable only under a substrate Root origin (otherwise @custom:reverts NotRoot). The
-base label must satisfy the DNS-label shape and be a true base label with no trailing digits
+base label must be a letters-only person label, and therefore a true base label,
 (otherwise @custom:reverts InvalidBaseLabel), and the label must not
 classify as governance-reserved (otherwise @custom:reverts InvalidBaseLabel). The
 gateway also defers to PopRules as the single cross-flow authority: when PopRules
-carries a live base-name slot held by another user (stamped by the public commit-reveal
-flow or this controller's prior queue head), the call reverts @custom:reverts NotHolder
-before any queue mutation. Two orthogonal axes drive the state machine. The reservation
+carries a live base-name slot held by another user (this controller's prior queue head,
+or a sibling controller's write), the call reverts @custom:reverts NotHolder before any
+queue mutation. Two orthogonal axes drive the state machine. The reservation
 axis treats the user as claiming if and only if they hold the live head-of-queue
 reservation on the base label: a claim wipes the entire queue, releases the PopRules
 slot, and @custom:emits BaseNameClaimed; a non-claim silently relinquishes any
@@ -448,7 +484,7 @@ rejects a chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code>
 <ul>
 <li>
 <p>reverts: InvalidChatKey). The <code>LiteUsername</code> branch validates the lite label's
-<code>NAMEXX</code> shape (otherwise @custom:reverts InvalidLiteLabel), requires the registrant to
+<code>stem.NN</code> shape (otherwise @custom:reverts InvalidLiteLabel), requires the registrant to
 own the lite token (otherwise @custom:reverts LiteLabelNotOwnedByUser), reads the lite
 node's chat key from the resolver and copies it across; if the lite node carries no chat
 key the inherited value is empty and the full node's chat-key write is silently skipped
@@ -470,11 +506,11 @@ alongside the registration event. On a warm-path mint the event order is</p>
 <p>Permissionlessly removes expired entries from the head of a reservation queue.</p>
 <p>Permissionless on purpose: anyone (typically a UI or a bot) can poke a stale queue
 so the next live head takes over without waiting for the next gateway call. Validates
-the DNS-label shape of <code>reservedBaseLabel</code> (otherwise @custom:reverts InvalidBaseLabel)
+<code>reservedBaseLabel</code> as a letters-only person label (otherwise</p>
+<p><strong>Note:</strong>
+reverts: InvalidBaseLabel)
 and @custom:emits ReservationExpired for every expired entry reaped from the
-head. Only base-shaped labels (no trailing digits) ever key a reservation queue, so a
-lite-shaped label still passes the shape check but resolves to an empty queue and the
-call is a no-op.</p>
+head. A label carrying a digit or a hyphen is not a person label and</p>
 <pre><code class="language-solidity">function expireReservation(string calldata reservedBaseLabel) external override;
 </code></pre>
 <h3 id="relinquishreservation"><a class="header" href="#relinquishreservation">relinquishReservation</a></h3>
@@ -574,7 +610,7 @@ newly deployed) store so the caller threads it through the remaining entries.</p
 </code></pre>
 <h3 id="isreservedforclaim"><a class="header" href="#isreservedforclaim">isReservedForClaim</a></h3>
 <p>Returns whether a label currently has a live reservation at the queue head.</p>
-<p>Validates the DNS-label shape of <code>reservedBaseLabel</code> (otherwise</p>
+<p>Validates <code>reservedBaseLabel</code> as a letters-only person label (otherwise</p>
 <p><strong>Note:</strong>
 reverts: InvalidBaseLabel) before inspecting the queue.</p>
 <pre><code class="language-solidity">function isReservedForClaim(string calldata reservedBaseLabel)
@@ -594,7 +630,7 @@ emits: ReservationDurationSet on success.</p>
 <p>Returns the queue metadata (<code>head</code>, <code>tail</code>) for <code>labelhash</code>.</p>
 <p>Read-only accessor over the per-label reservation queue. <code>head == tail</code> means
 the queue is empty; active entries occupy <code>[head, tail)</code>. Exposed on the interface
-because invariant tests and off-chain consumers (dotli, dweb) use it to enumerate
+because invariant tests and off-chain consumers use it to enumerate
 live queue state without scanning storage.</p>
 <pre><code class="language-solidity">function reservationMeta(bytes32 labelhash)
     external
@@ -824,7 +860,7 @@ flow) can still settle their pending claim without bricking on <code>LabelAlread
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>store</code></td><td><code>address</code></td><td>Owner's <code>LabelStore</code> proxy.</td></tr>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td><code>namehash(labelhash)</code> for the entry.</td></tr>
-<tr><td><code>label</code></td><td><code>string</code></td><td>Bare DNS label (no TLD); the TLD is appended on write.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Bare label without the TLD, which is appended on write. A lite label carries its separator, so this is not always a single DNS label.</td></tr>
 </tbody></table>
 </div>
 <h3 id="_stashpendingclaim"><a class="header" href="#_stashpendingclaim">_stashPendingClaim</a></h3>
@@ -883,14 +919,18 @@ queue shape intact, so no advance or resync is needed.</p>
 <pre><code class="language-solidity">function _removeUserFromQueue(address user) internal;
 </code></pre>
 <h3 id="_validatelitelabel"><a class="header" href="#_validatelitelabel">_validateLiteLabel</a></h3>
-<p>Validates a lite-person <code>NAMEXX</code> label and derives <code>(labelhash, node)</code>.</p>
+<p>Validates a lite-person <code>stem.NN</code> label and derives <code>(labelhash, node)</code>.</p>
+<p>The stem is lowercase letters only, so this rejects a stem carrying a digit or a
+hyphen before any node is derived.</p>
 <pre><code class="language-solidity">function _validateLiteLabel(string memory liteLabel)
     internal
     view
     returns (bytes32 labelhash, bytes32 node);
 </code></pre>
 <h3 id="_validatebaselabel"><a class="header" href="#_validatebaselabel">_validateBaseLabel</a></h3>
-<p>Validates a base (full-person) DNS label and derives <code>(labelhash, node)</code>.</p>
+<p>Validates a base (full-person) label and derives <code>(labelhash, node)</code>.</p>
+<p>Letters only, so this is stricter than a DNS label: a hyphen or an interior digit
+is rejected here even though @custom:function StringUtils.isSingleLabel would admit it.</p>
 <pre><code class="language-solidity">function _validateBaseLabel(string calldata baseLabel)
     internal
     view
@@ -900,12 +940,12 @@ queue shape intact, so no advance or resync is needed.</p>
 <p>Validates a base label as reservable and returns its hashes.</p>
 <p>Shared by both reservation entrypoints so the guard cannot drift between them. Runs
 three checks and reverts on the first failure, before any reservation state is mutated: the
-label must classify outside the governance-reserved tier and be a base name, be a canonical
-single label, and have no owner on the registrar. The last check is the fix for a
-reservation queued over an already-registered name: the queue keys by stem, so such a
-reservation could never be redeemed yet would lock every two-digit variant of the stem for
-the full reservation window. <code>exists</code> (owner set) mirrors exactly what makes the eventual
-claim's mint revert, so a label that passes here is one a claim can still register.</p>
+label must classify outside the governance-reserved tier and be a base name, be a
+letters-only person label, and have no owner on the registrar. The last check is the fix for
+a reservation queued over an already-registered name: the queue keys by stem, so such a
+reservation could never be redeemed yet would hold the stem, and so every lite name built
+on it, for the full reservation window. <code>exists</code> (owner set) mirrors exactly what makes the
+eventual claim's mint revert, so a label that passes here is one a claim can still register.</p>
 <pre><code class="language-solidity">function _validateReservableBaseLabel(
     IPopRules rules,
     string calldata baseLabel

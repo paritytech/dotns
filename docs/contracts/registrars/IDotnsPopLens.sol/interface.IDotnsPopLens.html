@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspoplens"><a class="header" href="#idotnspoplens">IDotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/f91518583e7dbd17bf969d398a5d059cb7bb149d/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/a3fd462314e771f4819edcaace1b0d0403973b67/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopLens</p>
 <p>Read-only view over PoP identity data, composed from the controller, the registrar,
@@ -202,15 +202,22 @@ security-contact: admin@parity.io</p>
 </div>
 <h3 id="litenamesof"><a class="header" href="#litenamesof">liteNamesOf</a></h3>
 <p>Lists the lite-person names currently owned by <code>user</code>.</p>
-<p>Reads the user's <code>LabelStore</code> labels and pending claims, keeps the lite-person
-shaped ones, and re-checks each against <code>registrar.ownerOf</code> so a name transferred away
+<p>Reads the user's <code>LabelStore</code> labels and pending claims, keeps the gateway-issued
+ones carrying a separator, and re-checks each against <code>registrar.ownerOf</code> so a name
+transferred away
 drops out and a name transferred in shows under its current owner. Ordering follows the
 store then the pending queue. An <code>offset</code> past the end returns an empty array rather than
 reverting, and a short return means the slice ended. A gateway name transferred before it
 settles has its label in no store, so it cannot appear here and is reachable only by node
 via @custom:function nameDetailByNode. Gas grows with the account's holdings, so call it
 off-chain. A page holds at most <code>DotnsConstants.MAX_PAGE_SIZE</code> entries, and the pending
-portion covers up to that many staged claims.</p>
+portion covers up to that many staged claims.
+A name is listed only when @custom:function IDotnsPopController.isPopIssued confirms the
+gateway minted it, so a name that merely resembles a lite label is not listed: neither a
+public registration spelled <code>joseph42</code> nor a subname stored as <code>joseph.42</code>. Among issued
+names the separator is what marks a lite one, since provenance covers full-person names
+too. Identities minted before provenance was recorded have none to confirm, so they are
+not listed and are re-issued through the gateway.</p>
 <pre><code class="language-solidity">function liteNamesOf(
     address user,
     uint256 offset,
@@ -234,8 +241,11 @@ portion covers up to that many staged claims.</p>
 </div>
 <h3 id="fullnamesof"><a class="header" href="#fullnamesof">fullNamesOf</a></h3>
 <p>Lists the full-person names currently owned by <code>user</code>.</p>
-<p>Same ownership-verified read as @custom:function liteNamesOf, keeping base-shaped
-labels instead of lite-shaped ones.</p>
+<p>Same ownership-verified read as @custom:function liteNamesOf, and the same
+provenance requirement: a name is listed only when the gateway minted it. It keeps the
+labels without a separator, which is the form the gateway issues a full-person name in.
+A public registration is not an identity and appears in neither listing, so the two
+together cover what the gateway issued rather than everything the account holds.</p>
 <pre><code class="language-solidity">function fullNamesOf(
     address user,
     uint256 offset,
@@ -298,7 +308,7 @@ This overload can populate <code>fullClaim</code> because it holds the label and
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>name</code></td><td><code>string</code></td><td>Bare DNS label (no TLD).</td></tr>
+<tr><td><code>name</code></td><td><code>string</code></td><td>Bare label without the TLD. A lite label carries its separator and resolves here too, since the node is the hash of the whole string.</td></tr>
 </tbody></table>
 </div>
 <p><strong>Returns</strong></p>
