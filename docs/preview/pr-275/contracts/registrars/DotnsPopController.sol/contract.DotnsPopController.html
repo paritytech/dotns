@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/1a7cd0f7be5fd04c13fb6d0f6b82509a985d4f4e/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/43acdc94ec827b30b4e05266082dc9e46d61ab69/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -206,11 +206,13 @@ This contract does not import or call <code>IDotnsRegistrarController</code>. Th
 commit-reveal controller is equally unaware of this one. Cross-flow collision handling
 relies on two distinct properties, neither of which requires the two controllers to know
 about each other:
-(1) Lite-person labels (<code>stem.NN</code>) occupy a namespace the public path cannot reach: a
-separator and a digit suffix are legal only on a lite label, so a lite name has no flat
-spelling for a public registrant to take. The two flows therefore cannot contend for the
-same label at all, and a reader can take a separator as meaning
-exactly one thing.
+(1) Lite-person labels (<code>stem.NN</code>) occupy a namespace the public path cannot reach: the
+separator is legal only on a lite label, and the public path rejects it, so no public
+registration can spell one. A digit suffix is not exclusive, but an ordinary label carrying
+one is measured as written and so is simply a different name. The two flows therefore cannot
+contend for the same label. This holds of labels the contracts minted, not of an arbitrary
+string: a subname stored under a digit-only parent reads the same way, which is why
+provenance is published through @custom:function isPopIssued rather than inferred.
 (2) Base-name reservations are synchronised into <code>IPopRules</code>. The head of this
 controller's reservation queue is written through <code>IPopRules.reserveBaseNameForPop</code> on
 every head transition; the slot is cleared through <code>IPopRules.releaseBaseName</code> when the
@@ -479,7 +481,7 @@ rejects a chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code>
 <ul>
 <li>
 <p>reverts: InvalidChatKey). The <code>LiteUsername</code> branch validates the lite label's
-<code>NAMEXX</code> shape (otherwise @custom:reverts InvalidLiteLabel), requires the registrant to
+<code>stem.NN</code> shape (otherwise @custom:reverts InvalidLiteLabel), requires the registrant to
 own the lite token (otherwise @custom:reverts LiteLabelNotOwnedByUser), reads the lite
 node's chat key from the resolver and copies it across; if the lite node carries no chat
 key the inherited value is empty and the full node's chat-key write is silently skipped
@@ -855,7 +857,7 @@ flow) can still settle their pending claim without bricking on <code>LabelAlread
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>store</code></td><td><code>address</code></td><td>Owner's <code>LabelStore</code> proxy.</td></tr>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td><code>namehash(labelhash)</code> for the entry.</td></tr>
-<tr><td><code>label</code></td><td><code>string</code></td><td>Bare DNS label (no TLD); the TLD is appended on write.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Bare label without the TLD, which is appended on write. A lite label carries its separator, so this is not always a single DNS label.</td></tr>
 </tbody></table>
 </div>
 <h3 id="_stashpendingclaim"><a class="header" href="#_stashpendingclaim">_stashPendingClaim</a></h3>
@@ -914,7 +916,7 @@ queue shape intact, so no advance or resync is needed.</p>
 <pre><code class="language-solidity">function _removeUserFromQueue(address user) internal;
 </code></pre>
 <h3 id="_validatelitelabel"><a class="header" href="#_validatelitelabel">_validateLiteLabel</a></h3>
-<p>Validates a lite-person <code>NAMEXX</code> label and derives <code>(labelhash, node)</code>.</p>
+<p>Validates a lite-person <code>stem.NN</code> label and derives <code>(labelhash, node)</code>.</p>
 <pre><code class="language-solidity">function _validateLiteLabel(string memory liteLabel)
     internal
     view
