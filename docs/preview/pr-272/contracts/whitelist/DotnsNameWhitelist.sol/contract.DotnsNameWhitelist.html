@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnamewhitelist"><a class="header" href="#dotnsnamewhitelist">DotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/484039f83e722408cf1eaad0e398d74bd25d1ecd/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/82027b3d8776fd94e66e8048d1ff14c3e18c9502/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></p>
 <p><strong>Title:</strong>
@@ -264,6 +264,10 @@ keeps every gated entry point callable under a Root origin, since Root has no ac
 <h3 id="onlycontroller"><a class="header" href="#onlycontroller">onlyController</a></h3>
 <p>Restricts a call to a registrar controller resolved through the registry.</p>
 <pre><code class="language-solidity">modifier onlyController() ;
+</code></pre>
+<h3 id="_onlygovernance"><a class="header" href="#_onlygovernance">_onlyGovernance</a></h3>
+<p>Internal check enforcing the substrate Root gate.</p>
+<pre><code class="language-solidity">function _onlyGovernance() internal view;
 </code></pre>
 <h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
 <p><strong>Note:</strong>
