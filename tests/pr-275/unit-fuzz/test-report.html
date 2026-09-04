@@ -8,13 +8,13 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">DotNS Test Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-09-04 13:14 UTC | 41 suites</p>
+<p class="text-sm text-gray-500">Generated 2026-09-04 13:38 UTC | 41 suites</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">Status</p><p class="text-xl font-bold text-red-400">Failed</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">611</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">609</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-red-400">2</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">612</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">608</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-red-400">4</p></div>
 </div></div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
@@ -1023,7 +1023,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsPopControllerTests</span><span class="ml-2 text-xs text-gray-500">test/unit/registrar/DotnsPopController.t.sol</span></div>
-<span class="text-sm font-mono text-red-400">101/102</span>
+<span class="text-sm font-mono text-red-400">100/102</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -1078,8 +1078,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_entry_point_format_rejections</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
+<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
+<td class="py-2 px-3 text-sm text-red-300">Error != expected error: InvalidBaseLabel() != custom error 0x2dfc7d98</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_expireReservation_is_permissionless</td>
@@ -1268,8 +1268,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_registerBaseName_rejects_a_label_that_is_not_letters_only</td>
-<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">Error != expected error: PopError("Name must be a lowercase ASCII DNS label or a lite label") != InvalidBaseLabel()</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_registerBaseName_reverts_for_governance_length_name</td>
@@ -1308,8 +1308,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_registerBaseName_zero_length_label_reverts</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
+<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
+<td class="py-2 px-3 text-sm text-red-300">Error != expected error: InvalidBaseLabel() != custom error 0x2dfc7d98</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_registered_controller_without_root_origin_cannot_enter_pop_flow</td>
@@ -3579,7 +3579,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">WhitelistOperatorFlow</span><span class="ml-2 text-xs text-gray-500">test/intergration/WhitelistOperatorFlow.t.sol</span></div>
-<span class="text-sm font-mono text-red-400">2/3</span>
+<span class="text-sm font-mono text-red-400">2/4</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -3598,9 +3598,14 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_registerBaseName_rejects_a_label_that_is_not_letters_only</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_entry_point_format_rejections</td>
 <td class="py-2 px-3 font-mono text-red-400">FAIL</td>
-<td class="py-2 px-3 text-sm text-red-300">Error != expected error: PopError("Name must be a lowercase ASCII DNS label or a lite label") != InvalidBaseLabel()</td>
+<td class="py-2 px-3 text-sm text-red-300">Error != expected error: InvalidBaseLabel() != custom error 0x2dfc7d98</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_registerBaseName_zero_length_label_reverts</td>
+<td class="py-2 px-3 font-mono text-red-400">FAIL</td>
+<td class="py-2 px-3 text-sm text-red-300">Error != expected error: InvalidBaseLabel() != custom error 0x2dfc7d98</td>
 </tr>
 </tbody></table></div>
 </div>
