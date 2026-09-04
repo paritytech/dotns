@@ -1,0 +1,293 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>IDotnsResolver</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../../favicon.svg">
+        <link rel="shortcut icon" href="../../../favicon.png">
+        <link rel="stylesheet" href="../../../css/variables.css">
+        <link rel="stylesheet" href="../../../css/general.css">
+        <link rel="stylesheet" href="../../../css/chrome.css">
+        <link rel="stylesheet" href="../../../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../../../highlight.css">
+        <link rel="stylesheet" href="../../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../../../book.css">
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../../../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item "><a href="../../../index.html">Home</a></li><li class="chapter-item affix "><li class="part-title">contracts</li><li class="chapter-item "><a href="../../../contracts/deploy/index.html">❱ deploy</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/deploy/Create3Factory.sol/contract.Create3Factory.html">Create3Factory</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/escrow/index.html">❱ escrow</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/escrow/DotnsNameEscrow.sol/contract.DotnsNameEscrow.html">DotnsNameEscrow</a></li><li class="chapter-item "><a href="../../../contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/external/index.html">❱ external</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/external/personhood/index.html">❱ personhood</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/external/personhood/IPersonhood.sol/interface.IPersonhood.html">IPersonhood</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/external/revive/index.html">❱ revive</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/external/revive/ISystem.sol/interface.ISystem.html">ISystem</a></li></ol></li></ol></li><li class="chapter-item "><a href="../../../contracts/pop/index.html">❱ pop</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/pop/DotnsCostModelRegistry.sol/contract.DotnsCostModelRegistry.html">DotnsCostModelRegistry</a></li><li class="chapter-item "><a href="../../../contracts/pop/DotnsFlatPricing.sol/contract.DotnsFlatPricing.html">DotnsFlatPricing</a></li><li class="chapter-item "><a href="../../../contracts/pop/DotnsScarcityPricing.sol/contract.DotnsScarcityPricing.html">DotnsScarcityPricing</a></li><li class="chapter-item "><a href="../../../contracts/pop/IDotnsCostModelRegistry.sol/interface.IDotnsCostModelRegistry.html">IDotnsCostModelRegistry</a></li><li class="chapter-item "><a href="../../../contracts/pop/IDotnsPricing.sol/interface.IDotnsPricing.html">IDotnsPricing</a></li><li class="chapter-item "><a href="../../../contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></li><li class="chapter-item "><a href="../../../contracts/pop/PopRules.sol/contract.PopRules.html">PopRules</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/registrars/index.html">❱ registrars</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/registrars/DotnsPopController.sol/contract.DotnsPopController.html">DotnsPopController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/DotnsPopLens.sol/contract.DotnsPopLens.html">DotnsPopLens</a></li><li class="chapter-item "><a href="../../../contracts/registrars/DotnsRegistrar.sol/contract.DotnsRegistrar.html">DotnsRegistrar</a></li><li class="chapter-item "><a href="../../../contracts/registrars/DotnsRegistrarController.sol/contract.DotnsRegistrarController.html">DotnsRegistrarController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsPopLens.sol/interface.IDotnsPopLens.html">IDotnsPopLens</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/registry/index.html">❱ registry</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/registry/DotnsProtocolRegistry.sol/contract.DotnsProtocolRegistry.html">DotnsProtocolRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/DotnsRegistry.sol/contract.DotnsRegistry.html">DotnsRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></li></ol></li><li class="chapter-item expanded "><a href="../../../contracts/resolvers/index.html">❱ resolvers</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsContentResolver.sol/contract.DotnsContentResolver.html">DotnsContentResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsPopResolver.sol/contract.DotnsPopResolver.html">DotnsPopResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsResolver.sol/contract.DotnsResolver.html">DotnsResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsReverseResolver.sol/contract.DotnsReverseResolver.html">DotnsReverseResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html">IDotnsPopResolver</a></li><li class="chapter-item expanded "><a href="../../../contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html" class="active">IDotnsResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/store/index.html">❱ store</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></li><li class="chapter-item "><a href="../../../contracts/store/ILabelStore.sol/interface.ILabelStore.html">ILabelStore</a></li><li class="chapter-item "><a href="../../../contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></li><li class="chapter-item "><a href="../../../contracts/store/IUserStore.sol/interface.IUserStore.html">IUserStore</a></li><li class="chapter-item "><a href="../../../contracts/store/LabelStore.sol/contract.LabelStore.html">LabelStore</a></li><li class="chapter-item "><a href="../../../contracts/store/StoreFactory.sol/contract.StoreFactory.html">StoreFactory</a></li><li class="chapter-item "><a href="../../../contracts/store/UserStore.sol/contract.UserStore.html">UserStore</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/utils/index.html">❱ utils</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/utils/DotnsConstants.sol/library.DotnsConstants.html">DotnsConstants</a></li><li class="chapter-item "><a href="../../../contracts/utils/LabelUtils.sol/library.LabelUtils.html">LabelUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/Multicall3.sol/contract.Multicall3.html">Multicall3</a></li><li class="chapter-item "><a href="../../../contracts/utils/RegistrationUtils.sol/library.RegistrationUtils.html">RegistrationUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/StoreUtils.sol/library.StoreUtils.html">StoreUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/StringUtils.sol/library.StringUtils.html">StringUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/SystemUtils.sol/library.SystemUtils.html">SystemUtils</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/whitelist/index.html">❱ whitelist</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/whitelist/DotnsNameWhitelist.sol/contract.DotnsNameWhitelist.html">DotnsNameWhitelist</a></li><li class="chapter-item "><a href="../../../contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title"></h1>
+
+                    <div class="right-buttons">
+                        <a href="../../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/paritytech/dotns" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="idotnsresolver"><a class="header" href="#idotnsresolver">IDotnsResolver</a></h1>
+<p><a href="https://github.com/paritytech/dotns/blob/8f89b589f18ce5d799cd202c13e4a4da2625b38c/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
+<p><strong>Title:</strong>
+Dotns Resolver</p>
+<p>Defines forward-resolution address records for DotNS nodes.</p>
+<p>Forward-address records describe where a name points. Authority therefore
+follows node ownership in the forward registry, not a privileged writer.</p>
+<p><strong>Note:</strong>
+security-contact: admin@parity.io</p>
+<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
+<h3 id="setaddress"><a class="header" href="#setaddress">setAddress</a></h3>
+<p>Sets the resolved address for a node.</p>
+<p>The caller must be the current owner of <code>node</code> in the forward registry, otherwise</p>
+<p><strong>Note:</strong>
+reverts: NotAuthorised. Emits @custom:emits AddressSet on every successful
+write.</p>
+<pre><code class="language-solidity">function setAddress(bytes32 node, address value) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node identifier.</td></tr>
+<tr><td><code>value</code></td><td><code>address</code></td><td>The address to associate with the node.</td></tr>
+</tbody></table>
+</div>
+<h3 id="addressof"><a class="header" href="#addressof">addressOf</a></h3>
+<p>Returns the resolved address for a node.</p>
+<pre><code class="language-solidity">function addressOf(bytes32 node) external view returns (address value);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>value</code></td><td><code>address</code></td><td>The resolved address, or zero if unset.</td></tr>
+</tbody></table>
+</div>
+<h2 id="events"><a class="header" href="#events">Events</a></h2>
+<h3 id="addressset"><a class="header" href="#addressset">AddressSet</a></h3>
+<p>Emitted when an address record is updated.</p>
+<pre><code class="language-solidity">event AddressSet(bytes32 indexed node, address value);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node whose address record changed.</td></tr>
+<tr><td><code>value</code></td><td><code>address</code></td><td>The new resolved address.</td></tr>
+</tbody></table>
+</div>
+<h2 id="errors"><a class="header" href="#errors">Errors</a></h2>
+<h3 id="notauthorised"><a class="header" href="#notauthorised">NotAuthorised</a></h3>
+<p>Thrown when a caller is not authorised to modify a node.</p>
+<pre><code class="language-solidity">error NotAuthorised(bytes32 node, address caller);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node being modified.</td></tr>
+<tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
+</tbody></table>
+</div>
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../../contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../../../contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../../contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../../../contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../../elasticlunr.min.js"></script>
+        <script src="../../../mark.min.js"></script>
+        <script src="../../../searcher.js"></script>
+
+        <script src="../../../clipboard.min.js"></script>
+        <script src="../../../highlight.js"></script>
+        <script src="../../../book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../../../solidity.min.js"></script>
+
+
+    </div>
+    </body>
+</html>
