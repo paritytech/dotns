@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/79bcb70ed0419fc0bf51285049acb536abb1d26c/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/378448764f3a351441afeb9d6e86dc9337ab2e86/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
@@ -289,15 +289,14 @@ drip-feed credits cannot reset an existing entry's clock.</p>
 <p>Distinct from <code>cooldown</code>. Inside this window the holder may <code>redeem</code> the name back
 and nobody else may take it (<code>available</code> reports false); once it elapses <code>reclaim</code>
 becomes permissionless and any unwithdrawn deposit is credited to the recipient
-rather than stranded. Appended after the pre-existing variables and paid for out of
-<code>__gap</code>, so the layout of everything above is untouched.</p>
+rather than stranded.</p>
 <pre><code class="language-solidity">uint256 public redeemWindow
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
-<p>Reserved storage space to allow for layout changes in the future. A new variable
-appended above must shrink this array by the same number of slots so the contract's total
-storage footprint stays fixed.</p>
-<pre><code class="language-solidity">uint256[49] private __gap
+<p>Reserved storage space to allow for layout changes in future upgrades. A variable
+appended above must shrink this array by the same number of slots, so an upgrade never
+moves the slots of anything already stored.</p>
+<pre><code class="language-solidity">uint256[50] private __gap
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlycontroller"><a class="header" href="#onlycontroller">onlyController</a></h3>
