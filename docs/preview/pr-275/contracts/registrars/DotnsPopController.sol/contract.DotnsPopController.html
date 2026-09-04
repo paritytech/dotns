@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/378448764f3a351441afeb9d6e86dc9337ab2e86/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/9361f0d93f7eeef54b53c1753e95a088df14ee72/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -340,12 +340,14 @@ through the same event the setter uses later.</p>
     initializer;
 </code></pre>
 <h3 id="ispopissued"><a class="header" href="#ispopissued">isPopIssued</a></h3>
-<p>Whether this controller minted <code>label</code>.</p>
-<p>The signal that separates a person from a subname. <code>joseph.42</code> is one whole label
-when this returns true and a subname path (<code>joseph</code> under <code>42</code>) when it returns false,
-and the string alone cannot tell them apart. Set at mint and never cleared, so it is
-unaffected by a name later becoming transferable; the soulbound flag is a transfer rule
-and cannot stand in for it.</p>
+<p>Whether this controller minted the whole-label reading of <code>label</code>.</p>
+<p>Keyed by text, so it answers about an interpretation rather than about a node: a
+true answer covers <code>joseph.42</code> taken as one label, and says nothing about a subname
+<code>joseph</code> under <code>42</code>, which renders as the same text. Both can exist at once, so a caller
+holding a node must also check that node is <code>namehash(tldNode, keccak(label))</code> before
+reading this answer as being about what it holds; node identity is what names the
+object. Set at mint and never cleared, so it is unaffected by a name later becoming
+transferable; the soulbound flag is a transfer rule and cannot stand in for it.</p>
 <pre><code class="language-solidity">function isPopIssued(string calldata label) external view override returns (bool issued);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -454,7 +456,7 @@ which is the form People Chain holds, so no normalisation happens here. The shap
 runs before classification so a malformed label reverts</p>
 <p><strong>Note:</strong>
 reverts: InvalidLiteLabel, which the gateway pallet decodes by selector; letting
-<code>_validateLiteLabel</code> catch it instead would surface an undecodable PopRules string.
+<code>classifyName</code> catch it instead would surface an undecodable PopRules string.
 Takes the @custom:struct LiteRegistration struct directly so both call sites pass the same
 payload shape: the typed entrypoint forwards its own <code>params</code>, the <code>reserveBaseName</code>
 entrypoint forwards <code>params.lite</code>.</p>
@@ -467,9 +469,9 @@ base label must be a letters-only person label, and therefore a true base label,
 (otherwise @custom:reverts InvalidBaseLabel), and the label must not
 classify as governance-reserved (otherwise @custom:reverts InvalidBaseLabel). The
 gateway also defers to PopRules as the single cross-flow authority: when PopRules
-carries a live base-name slot held by another user (stamped by the public commit-reveal
-flow or this controller's prior queue head), the call reverts @custom:reverts NotHolder
-before any queue mutation. Two orthogonal axes drive the state machine. The reservation
+carries a live base-name slot held by another user (this controller's prior queue head,
+or a sibling controller's write), the call reverts @custom:reverts NotHolder before any
+queue mutation. Two orthogonal axes drive the state machine. The reservation
 axis treats the user as claiming if and only if they hold the live head-of-queue
 reservation on the base label: a claim wipes the entire queue, releases the PopRules
 slot, and @custom:emits BaseNameClaimed; a non-claim silently relinquishes any

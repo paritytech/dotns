@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspoplens"><a class="header" href="#dotnspoplens">DotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/378448764f3a351441afeb9d6e86dc9337ab2e86/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/9361f0d93f7eeef54b53c1753e95a088df14ee72/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsPopLens.sol/interface.IDotnsPopLens.html">IDotnsPopLens</a></p>
 <p><strong>Title:</strong>
@@ -374,17 +374,19 @@ the account's holdings. Never reverts.</p>
 </div>
 <h3 id="_belongstolisting"><a class="header" href="#_belongstolisting">_belongsToListing</a></h3>
 <p>Whether <code>label</code> belongs in the lite listing (<code>wantLite</code>) or the full listing.</p>
-<p>Two questions, two signals. Whether a name is an identity at all is provenance, and
-only the issuer knows it. Characters cannot answer it, and get it wrong in both
-directions: a subname stored as <code>joseph.42</code> reads as a lite label, while a public
-registration spelled <code>joseph42</code> reads as a full-person one. So each listing is gated on</p>
+<p>Two questions, two signals, and a third guard the caller already applied. Whether a
+name is an identity at all is provenance, so each listing is gated on</p>
 <p><strong>Note:</strong>
-function: IDotnsPopController.isPopIssued, or each would admit its own impostor.
-Which kind of identity it is, lite or full, is spelling: the gateway issues a lite name
-with its separator and a full-person name without one, and provenance cannot tell them
-apart because it covers both.
-So the two listings together cover the names the gateway issued, one kind each, rather
-than everything the account holds.</p>
+function: IDotnsPopController.isPopIssued: characters alone would admit a public
+registration spelled <code>joseph42</code>, which reads as a full-person name and is not one. Which
+kind of identity it is, lite or full, is spelling: the gateway issues a lite name with
+its separator and a full-person name without one, and provenance cannot tell them apart
+because it covers both. A subname is excluded before either signal is read: the callers
+keep only nodes the registrar says <code>user</code> owns, and a subname lives in the registry with
+no token behind it. That matters because provenance is keyed by text, so a subname
+rendering as <code>joseph.42</code> would otherwise borrow the answer belonging to the whole label.
+So the two listings together cover the names the gateway issued and <code>user</code> holds, one
+kind each, rather than everything the account holds.</p>
 <pre><code class="language-solidity">function _belongsToListing(string memory label, bool wantLite) internal view returns (bool);
 </code></pre>
 <h3 id="_countnames"><a class="header" href="#_countnames">_countNames</a></h3>
