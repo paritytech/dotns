@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspoplens"><a class="header" href="#idotnspoplens">IDotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/e7378d2385068266057fa0a8f1e0ee4b942e13ec/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/1a7cd0f7be5fd04c13fb6d0f6b82509a985d4f4e/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopLens</p>
 <p>Read-only view over PoP identity data, composed from the controller, the registrar,
@@ -202,8 +202,9 @@ security-contact: admin@parity.io</p>
 </div>
 <h3 id="litenamesof"><a class="header" href="#litenamesof">liteNamesOf</a></h3>
 <p>Lists the lite-person names currently owned by <code>user</code>.</p>
-<p>Reads the user's <code>LabelStore</code> labels and pending claims, keeps the lite-person
-shaped ones, and re-checks each against <code>registrar.ownerOf</code> so a name transferred away
+<p>Reads the user's <code>LabelStore</code> labels and pending claims, keeps the gateway-issued
+ones carrying a separator, and re-checks each against <code>registrar.ownerOf</code> so a name
+transferred away
 drops out and a name transferred in shows under its current owner. Ordering follows the
 store then the pending queue. An <code>offset</code> past the end returns an empty array rather than
 reverting, and a short return means the slice ended. A gateway name transferred before it

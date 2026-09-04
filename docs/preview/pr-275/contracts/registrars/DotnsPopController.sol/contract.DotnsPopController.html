@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/e7378d2385068266057fa0a8f1e0ee4b942e13ec/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/1a7cd0f7be5fd04c13fb6d0f6b82509a985d4f4e/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -209,7 +209,7 @@ about each other:
 (1) Lite-person labels (<code>stem.NN</code>) occupy a namespace the public path cannot reach: a
 separator and a digit suffix are legal only on a lite label, so a lite name has no flat
 spelling for a public registrant to take. The two flows therefore cannot contend for the
-same label at all, and downstream tooling (dotli, dweb) can read a separator as meaning
+same label at all, and a reader can take a separator as meaning
 exactly one thing.
 (2) Base-name reservations are synchronised into <code>IPopRules</code>. The head of this
 controller's reservation queue is written through <code>IPopRules.reserveBaseNameForPop</code> on
@@ -503,9 +503,9 @@ alongside the registration event. On a warm-path mint the event order is</p>
 so the next live head takes over without waiting for the next gateway call. Validates
 the DNS-label shape of <code>reservedBaseLabel</code> (otherwise @custom:reverts InvalidBaseLabel)
 and @custom:emits ReservationExpired for every expired entry reaped from the
-head. Only base-shaped labels (no trailing digits) ever key a reservation queue, so a
-lite-shaped label still passes the shape check but resolves to an empty queue and the
-call is a no-op.</p>
+head. Only labels without trailing digits ever key a reservation queue, so one carrying
+digits passes the shape check but resolves to an empty queue and the call is a no-op. A
+lite label carries a separator and so fails the shape check outright.</p>
 <pre><code class="language-solidity">function expireReservation(string calldata reservedBaseLabel) external override;
 </code></pre>
 <h3 id="relinquishreservation"><a class="header" href="#relinquishreservation">relinquishReservation</a></h3>
@@ -625,7 +625,7 @@ emits: ReservationDurationSet on success.</p>
 <p>Returns the queue metadata (<code>head</code>, <code>tail</code>) for <code>labelhash</code>.</p>
 <p>Read-only accessor over the per-label reservation queue. <code>head == tail</code> means
 the queue is empty; active entries occupy <code>[head, tail)</code>. Exposed on the interface
-because invariant tests and off-chain consumers (dotli, dweb) use it to enumerate
+because invariant tests and off-chain consumers use it to enumerate
 live queue state without scanning storage.</p>
 <pre><code class="language-solidity">function reservationMeta(bytes32 labelhash)
     external

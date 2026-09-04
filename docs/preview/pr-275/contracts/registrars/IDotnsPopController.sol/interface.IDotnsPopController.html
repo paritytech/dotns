@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/e7378d2385068266057fa0a8f1e0ee4b942e13ec/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/1a7cd0f7be5fd04c13fb6d0f6b82509a985d4f4e/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -383,9 +383,9 @@ the call's payload, which Solidity decodes directly.</p>
 so the next live head takes over without waiting for the next gateway call. Validates
 the DNS-label shape of <code>reservedBaseLabel</code> (otherwise @custom:reverts InvalidBaseLabel)
 and @custom:emits ReservationExpired for every expired entry reaped from the
-head. Only base-shaped labels (no trailing digits) ever key a reservation queue, so a
-lite-shaped label still passes the shape check but resolves to an empty queue and the
-call is a no-op.</p>
+head. Only labels without trailing digits ever key a reservation queue, so one carrying
+digits passes the shape check but resolves to an empty queue and the call is a no-op. A
+lite label carries a separator and so fails the shape check outright.</p>
 <pre><code class="language-solidity">function expireReservation(string calldata reservedBaseLabel) external;
 </code></pre>
 <h3 id="relinquishreservation"><a class="header" href="#relinquishreservation">relinquishReservation</a></h3>
@@ -419,7 +419,7 @@ emits: ReservationDurationSet on success.</p>
 <p>Returns the queue metadata (<code>head</code>, <code>tail</code>) for <code>labelhash</code>.</p>
 <p>Read-only accessor over the per-label reservation queue. <code>head == tail</code> means
 the queue is empty; active entries occupy <code>[head, tail)</code>. Exposed on the interface
-because invariant tests and off-chain consumers (dotli, dweb) use it to enumerate
+because invariant tests and off-chain consumers use it to enumerate
 live queue state without scanning storage.</p>
 <pre><code class="language-solidity">function reservationMeta(bytes32 labelhash) external view returns (uint64 head, uint64 tail);
 </code></pre>

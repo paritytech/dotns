@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspoplens"><a class="header" href="#dotnspoplens">DotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/e7378d2385068266057fa0a8f1e0ee4b942e13ec/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/1a7cd0f7be5fd04c13fb6d0f6b82509a985d4f4e/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsPopLens.sol/interface.IDotnsPopLens.html">IDotnsPopLens</a></p>
 <p><strong>Title:</strong>
@@ -221,8 +221,9 @@ security-contact: admin@parity.io</p>
 </div>
 <h3 id="litenamesof"><a class="header" href="#litenamesof">liteNamesOf</a></h3>
 <p>Lists the lite-person names currently owned by <code>user</code>.</p>
-<p>Reads the user's <code>LabelStore</code> labels and pending claims, keeps the lite-person
-shaped ones, and re-checks each against <code>registrar.ownerOf</code> so a name transferred away
+<p>Reads the user's <code>LabelStore</code> labels and pending claims, keeps the gateway-issued
+ones carrying a separator, and re-checks each against <code>registrar.ownerOf</code> so a name
+transferred away
 drops out and a name transferred in shows under its current owner. Ordering follows the
 store then the pending queue. An <code>offset</code> past the end returns an empty array rather than
 reverting, and a short return means the slice ended. A gateway name transferred before it
@@ -371,30 +372,31 @@ the account's holdings. Never reverts.</p>
 <tr><td><code>profile</code></td><td><code>PopProfile</code></td><td>The account summary; see @custom:struct PopProfile.</td></tr>
 </tbody></table>
 </div>
-<h3 id="_matchesshape"><a class="header" href="#_matchesshape">_matchesShape</a></h3>
+<h3 id="_belongstolisting"><a class="header" href="#_belongstolisting">_belongsToListing</a></h3>
 <p>Whether <code>label</code> belongs in the lite listing (<code>wantLite</code>) or the full listing.</p>
 <p>Two questions, two signals. Whether a name is an identity at all is provenance, and
-only the issuer knows it: a subname stored as <code>joseph.42</code> and a public registration
-spelled <code>joseph42</code> both read as lite labels from their characters alone, so</p>
+only the issuer knows it. Characters cannot answer it, and get it wrong in both
+directions: a subname stored as <code>joseph.42</code> reads as a lite label, while a public
+registration spelled <code>joseph42</code> reads as a full-person one. So each listing is gated on</p>
 <p><strong>Note:</strong>
-function: IDotnsPopController.isPopIssued has to confirm the mint. Which kind of
-identity it is, lite or full, is spelling: the gateway issues a lite name with its
-separator and a full-person name without one, and provenance cannot tell them apart
-because it covers both.
-Both listings ask both questions. A name the gateway did not mint is not an identity of
-either kind, so a public registration and a subname appear in neither, and the two
-listings together cover the issued names rather than everything the account holds.</p>
-<pre><code class="language-solidity">function _matchesShape(string memory label, bool wantLite) internal view returns (bool);
+function: IDotnsPopController.isPopIssued, or each would admit its own impostor.
+Which kind of identity it is, lite or full, is spelling: the gateway issues a lite name
+with its separator and a full-person name without one, and provenance cannot tell them
+apart because it covers both.
+So the two listings together cover the names the gateway issued, one kind each, rather
+than everything the account holds.</p>
+<pre><code class="language-solidity">function _belongsToListing(string memory label, bool wantLite) internal view returns (bool);
 </code></pre>
 <h3 id="_countnames"><a class="header" href="#_countnames">_countNames</a></h3>
-<p>Counts the names currently owned by <code>user</code> that match the requested shape.</p>
+<p>Counts the names currently owned by <code>user</code> that belong to the requested listing.</p>
 <p>Walks the user's <code>LabelStore</code> (settled names) then their pending claims, keeping only
-shape matches still owned by <code>user</code> on the registrar. A pending entry already written into
-the store by a sibling flow is skipped so it is not counted twice.</p>
+entries that belong to the listing and are still owned by <code>user</code> on the registrar. A pending
+entry already written into the store by a sibling flow is skipped so it is not counted
+twice.</p>
 <pre><code class="language-solidity">function _countNames(address user, bool wantLite) internal view returns (uint256 count);
 </code></pre>
 <h3 id="_pagenames"><a class="header" href="#_pagenames">_pageNames</a></h3>
-<p>Returns a page of <code>user</code>'s owned names matching the requested shape.</p>
+<p>Returns a page of <code>user</code>'s owned names belonging to the requested listing.</p>
 <p>Same ownership-verified walk as @custom:function _countNames, in the same order
 (store then pending), skipping the first <code>offset</code> matches and returning up to <code>limit</code>
 entries. <code>limit</code> is clamped to <code>DotnsConstants.MAX_PAGE_SIZE</code> to bound the memory and the
