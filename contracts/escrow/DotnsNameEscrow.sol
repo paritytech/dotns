@@ -358,9 +358,14 @@ contract DotnsNameEscrow is
         require(!position.released, AlreadyReleased(tokenId));
 
         // Position recipient mirrors the current NFT holder (rebound on every transfer), so the
-        // holder gate collapses to a single equality check. Approved operators cannot release on
-        // behalf of the holder because the recipient field is keyed to the holder, not to any
-        // approval set; this keeps the deposit refund flow tied to the on-chain owner.
+        // holder gate collapses to a single equality check. This blocks an approved operator from
+        // releasing while the holder still owns the name, but it is not a guarantee that the
+        // deposit stays with the original depositor: an operator authorised for transfer can move
+        // the name to itself, which rebinds the recipient to the new holder (see
+        // @custom:function chargeTransferFee), and then release as that holder. The deposit is
+        // bound to the name, so whoever legitimately takes custody takes the deposit with it; that
+        // is the accepted consequence of a blanket transfer approval, not a property this gate
+        // defends.
         require(
             msg.sender == currentOwner && msg.sender == position.recipient,
             NotRefundRecipient(msg.sender, tokenId)

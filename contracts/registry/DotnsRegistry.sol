@@ -32,6 +32,13 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice Protocol-level address registry for all DotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
+    /// @notice Registry-native record-management delegation, disjoint from the registrar's
+    ///         transfer-operator set.
+    /// @dev An operator here may manage records for every node the granter owns. This is a
+    ///      separate, opt-in grant from the ERC-721 `setApprovalForAll` a seller signs to a
+    ///      marketplace: that approval delegates transfer only and confers no record authority.
+    mapping(address account => mapping(address operator => bool approved)) private _operators;
+
     uint256[50] private __gap;
 
     /// @notice Restricts access to the current owner of `node`.
@@ -120,10 +127,12 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         require(registrar.ownerOf(uint256(node)) == newOwner, NotAuthorised());
 
-        // The resolver pointer is unconditionally reset to the default reverse resolver on every
-        // call so a prior owner's resolver cannot follow the name into the new holder's hands on
-        // reclaim from escrow. Owner remains the zero sentinel so reads delegate to the
-        // registrar's ERC-721 holder.
+        // The resolver pointer is reset to the default reverse resolver on every call to this
+        // function, which the controller drives on registration and on reclaim from escrow, so a
+        // prior owner's resolver cannot follow the name across that recycle. This does not cover a
+        // secondary-market ERC-721 `transferFrom`: that path does not call the registry, so a name
+        // sold directly carries the seller's resolver pointer until the buyer overwrites it.
+        // Owner remains the zero sentinel so reads delegate to the registrar's ERC-721 holder.
         records[node] = Record({
             owner: address(0),
             resolver: protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER),
@@ -254,9 +263,13 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     }
 
     /// @notice Canonical authorisation rule for a node, parameterised by `account`.
-    /// @dev Honours the sentinel-zero pattern: if the registry has no explicit owner, fall back
-    ///      to the registrar's ERC-721 owner / approved / operator-for-all chain. This is the
-    ///      single source of truth `_authorised` and `isAuthorised` both delegate to.
+    /// @dev Honours the sentinel-zero pattern: a non-zero stored owner is a subnode's explicit
+    ///      owner; the zero sentinel defers to the registrar's ERC-721 holder. In both cases the
+    ///      owner may delegate record management to an operator via the registry's own
+    ///      @custom:function setApprovalForAll. Record authority never reads the registrar's
+    ///      transfer-operator set: the approval a seller grants a marketplace to move a name
+    ///      confers transfer only, not the power to repoint resolvers or mint subnodes. This is
+    ///      the single source of truth `_authorised` and `isAuthorised` both delegate to.
     function _isAuthorised(bytes32 node, address account) internal view returns (bool) {
         Record storage record = records[node];
 
@@ -265,19 +278,33 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         // subnode path saves one slot read.
         address storedOwner = record.owner;
         if (storedOwner != address(0)) {
-            return storedOwner == account;
+            return storedOwner == account || _operators[storedOwner][account];
         }
 
         if (!record.exists) return false;
 
-        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
-        uint256 tokenId = uint256(node);
-        address tokenOwner = registrar.ownerOf(tokenId);
-        if (account == tokenOwner) return true;
-        // Operator-for-all is the common marketplace / escrow delegation path; check it before
-        // the single-token approval so the common case terminates on one STATICCALL.
-        if (registrar.isApprovedForAll(tokenOwner, account)) return true;
-        return registrar.getApproved(tokenId) == account;
+        address tokenOwner =
+            IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR)).ownerOf(uint256(node));
+        return account == tokenOwner || _operators[tokenOwner][account];
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    function setApprovalForAll(address operator, bool approved) external override {
+        _operators[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    function isApprovedForAll(
+        address account,
+        address operator
+    )
+        external
+        view
+        override
+        returns (bool approved)
+    {
+        approved = _operators[account][operator];
     }
 
     /// @notice Internal check for registrar-authorised controller privileges.

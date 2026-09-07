@@ -40,6 +40,12 @@ interface IDotnsRegistry {
     /// @notice Emitted when a resolver is set or updated.
     event NewResolver(bytes32 indexed node, address resolver);
 
+    /// @notice Emitted when an account grants or revokes registry-wide record-management authority.
+    /// @param account The granter delegating management of its nodes.
+    /// @param operator The delegate whose authority changed.
+    /// @param approved True when granted, false when revoked.
+    event ApprovalForAll(address indexed account, address indexed operator, bool approved);
+
     /// @notice Thrown when an invalid (zero) address is provided.
     error NotAllowed();
 
@@ -110,20 +116,44 @@ interface IDotnsRegistry {
     ///      registration and on every reclaim from escrow: each call rewrites
     ///      `records[node].resolver` to the protocol-registered default reverse resolver so a
     ///      prior owner's resolver pointer (and the records keyed under it) cannot be inherited
-    ///      by the next holder. Stores `owner = address(0)` as a sentinel so reads delegate to
-    ///      `IDotnsRegistrar.ownerOf` and ERC-721 transfers remain authoritative. Emits
-    ///      @custom:emits NodeTransferred on success.
+    ///      by the next holder across that recycle. This reset is scoped to this function: a
+    ///      secondary-market ERC-721 `transferFrom` does not call the registry, so a name sold
+    ///      directly retains the seller's resolver pointer until the buyer overwrites it. Stores
+    ///      `owner = address(0)` as a sentinel so reads delegate to `IDotnsRegistrar.ownerOf` and
+    ///      ERC-721 transfers remain authoritative. Emits @custom:emits NodeTransferred on success.
     function setOwner(bytes32 node, address newOwner) external;
 
     /// @notice Sets or clears the resolver for a node.
-    /// @dev Callable only by the current node owner, otherwise @custom:reverts NotAuthorised.
-    ///      For tokenised nodes, authorisation falls back to ERC-721 owner / approved /
-    ///      operator-for-all via the registrar. The registry does not validate
-    ///      `resolverAddr` against any interface or code presence; off-chain consumers must
-    ///      verify resolver shape before trusting reads. Emits @custom:emits NewResolver on
-    ///      success.
+    /// @dev Authorised through @custom:function isAuthorised, otherwise
+    ///      @custom:reverts NotAuthorised: the node owner, or an operator the owner delegated
+    ///      via @custom:function setApprovalForAll. A registrar transfer approval does not
+    ///      authorise this. The registry does not validate `resolverAddr` against any interface
+    ///      or code presence; off-chain consumers must verify resolver shape before trusting
+    ///      reads. Emits @custom:emits NewResolver on success.
     /// @param resolverAddr Resolver contract address (zero clears).
     function setResolver(bytes32 node, address resolverAddr) external;
+
+    /// @notice Grants or revokes registry-wide record-management authority for the caller's nodes.
+    /// @dev The delegation the registry's own authorisation consults, kept deliberately separate
+    ///      from the registrar's ERC-721 `setApprovalForAll`: that approval delegates transfer of
+    ///      the name, this one delegates management of its records. A marketplace approved to sell
+    ///      a name gains no authority here. Emits @custom:emits ApprovalForAll.
+    /// @param operator Address being granted or revoked record-management authority.
+    /// @param approved True to grant, false to revoke.
+    function setApprovalForAll(address operator, bool approved) external;
+
+    /// @notice Returns whether `operator` may manage records for every node `account` owns.
+    /// @param account The node owner whose delegation is queried.
+    /// @param operator The candidate record manager.
+    /// @return approved True when `account` has granted `operator` via
+    ///         @custom:function setApprovalForAll.
+    function isApprovedForAll(
+        address account,
+        address operator
+    )
+        external
+        view
+        returns (bool approved);
 
     /// @notice Returns the owner of a node.
     /// @dev For tokenised nodes the stored owner is the zero sentinel; the implementation falls
@@ -137,12 +167,14 @@ interface IDotnsRegistry {
     function recordExists(bytes32 node) external view returns (bool);
 
     /// @notice Returns whether `account` is authorised to manage `node`.
-    /// @dev For subnodes, authority is the explicit stored owner. For tokenised nodes it is the
-    ///      ERC-721 owner, an address approved for the token, or an operator approved for all of
-    ///      the owner's tokens via the registrar. This is the canonical authorisation check the
-    ///      registry enforces on owner-gated entry points; sibling contracts may consult it so a
-    ///      single registrar-level approval delegates management across the protocol. Returns
-    ///      false for a node that does not exist.
+    /// @dev For subnodes, authority is the explicit stored owner; for tokenised nodes it is the
+    ///      ERC-721 owner. In both cases the owner may delegate management to an operator through
+    ///      the registry's own @custom:function setApprovalForAll. Authority never reads the
+    ///      registrar's transfer-approval set, so approving a marketplace to move a name confers
+    ///      no management authority. This is the canonical authorisation check the registry
+    ///      enforces on owner-gated entry points, and the single indirection sibling contracts
+    ///      consult so record-management delegation lives in one place. Returns false for a node
+    ///      that does not exist.
     /// @param node Node identifier.
     /// @param account Address whose authority is being checked.
     /// @return authorisedFlag True when `account` may manage `node`.

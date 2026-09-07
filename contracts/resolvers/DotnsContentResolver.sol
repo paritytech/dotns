@@ -118,11 +118,12 @@ contract DotnsContentResolver is
     /// @notice Ensures the caller may write records for `node`.
     /// @dev Authority is granted to the node owner, to a resolver-local operator the owner has
     ///      approved for all of their records, or to any address the registry deems authorised
-    ///      for the node. Delegating through the registry means a single registrar-level
-    ///      approval (ERC-721 owner / approved / operator-for-all) also confers record-write
-    ///      authority, while the resolver-local operator mapping remains a narrower record-only
-    ///      delegation that grants no power over ownership or transfers. The cheap owner and
-    ///      local-operator checks run before the cross-contract registry call.
+    ///      for the node. Registry authority is the node owner or an operator the owner delegated
+    ///      through the registry's own @custom:function setApprovalForAll; it does not read the
+    ///      registrar's transfer-approval set, so a marketplace approved to move the name gains no
+    ///      record-write authority here. The resolver-local operator mapping is a further,
+    ///      narrower record-only delegation that grants no power over ownership or transfers. The
+    ///      cheap owner and local-operator checks run before the cross-contract registry call.
     /// @param node Node identifier.
     function _requireNodeOwnerOrOperator(bytes32 node) internal view {
         IDotnsRegistry _registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
