@@ -5,14 +5,15 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 
 import {IDotnsStore} from "./IDotnsStore.sol";
 import {ILabelStore} from "./ILabelStore.sol";
-import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
+import {StoreAuth} from "../utils/StoreAuth.sol";
 
 /// @title LabelStore
 /// @notice Permanent per-user DotNS label store.
 /// @dev One instance per user, deployed as a `BeaconProxy` by `StoreFactory` during registration.
 ///      Bound to its user forever: `_owner` and `_protocolRegistry` are set once at `initialize`
-///      and never mutate. Writes are gated to addresses currently registered in
-///      `DotnsProtocolRegistry` (`isRegisteredAddress`); every labelhash is single-write and
+///      and never mutate. Writes are gated to the registrar, an authorised controller or the
+///      registry, rather than to anything the protocol registry happens to hold
+///      (@custom:function StoreAuth.isStoreWriter); every labelhash is single-write and
 ///      permanently locked on first use.
 /// @dev Labels-only by invariant: this store holds registration records only. Every other
 ///      per-name category (reverse, content, forward address, chat key, lite link) lives on a
@@ -43,7 +44,8 @@ contract LabelStore is Initializable, ILabelStore {
     // forge-lint: disable-next-line(mixed-case-variable)
     uint256[50] private __gap;
 
-    /// @notice Restricts writes to protocol-registered addresses only.
+    /// @notice Restricts writes to the protocol components named in @custom:function
+    /// StoreAuth.isStoreWriter.
     modifier onlyAuthorisedProtocol() {
         _onlyAuthorisedProtocol();
         _;
@@ -176,9 +178,6 @@ contract LabelStore is Initializable, ILabelStore {
 
     /// @notice Internal authorisation check deferred from the `onlyAuthorisedProtocol` modifier.
     function _onlyAuthorisedProtocol() internal view {
-        require(
-            IDotnsProtocolRegistry(_protocolRegistry).isRegisteredAddress(msg.sender),
-            NotAuthorised(msg.sender)
-        );
+        require(StoreAuth.isStoreWriter(_protocolRegistry, msg.sender), NotAuthorised(msg.sender));
     }
 }

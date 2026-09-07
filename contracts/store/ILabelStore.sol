@@ -6,7 +6,7 @@ import {IDotnsStore} from "./IDotnsStore.sol";
 /// @title ILabelStore
 /// @notice Interface for the per-user DotNS label store.
 /// @dev The `LabelStore` is the protocol-managed half of the per-user storage pair:
-///      write-only by addresses registered in the protocol registry, read-only by
+///      write-only by the registrar, an authorised controller or the registry, read-only by
 ///      everyone else, and permanently locked per `labelhash` on first write. It
 ///      holds registration records only; every other per-name category (reverse,
 ///      content, forward address, chat key, lite link) lives on a dedicated
@@ -19,8 +19,10 @@ interface ILabelStore is IDotnsStore {
     /// @param label The stored label string (typically the full name, e.g. "alice.dot").
     event LabelStored(address indexed owner, bytes32 indexed labelhash, string label);
 
-    /// @notice Thrown when a caller that is not currently protocol-registered attempts a write.
-    /// @param caller The msg.sender that failed the `isRegisteredAddress` check.
+    /// @notice Thrown when a caller that is not a write-bearing protocol component attempts a
+    /// write.
+    /// @param caller The msg.sender that failed the @custom:function StoreAuth.isStoreWriter
+    /// check.
     error NotAuthorised(address caller);
 
     /// @notice Thrown when `initialize` is called with a zero user address.
@@ -50,7 +52,7 @@ interface ILabelStore is IDotnsStore {
     function initialize(address user_, address protocolRegistry_) external;
 
     /// @notice Records a label under `labelhash` and locks the slot permanently.
-    /// @dev Gated to addresses currently registered in the protocol registry, otherwise
+    /// @dev Gated to the components named in @custom:function StoreAuth.isStoreWriter, otherwise
     ///      @custom:reverts NotAuthorised. `labelhash` must be non-zero, otherwise
     ///      @custom:reverts InvalidLabel. The slot must not already hold an entry, otherwise
     ///      @custom:reverts LabelAlreadyExists; the write is permanent so any second call

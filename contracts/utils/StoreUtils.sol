@@ -14,7 +14,7 @@ library StoreUtils {
     /// @notice Returns the `LabelStore` for `user`, deploying one via the factory if absent.
     /// @dev Deploy-on-demand: a user's store is created on their first protocol write so
     ///      unused accounts never pay the deployment cost. The deploy path is gated by the
-    ///      factory, so callers that are not the factory owner and not protocol-registered
+    ///      factory, so callers that are not the factory owner and not a store writer
     ///      @custom:reverts NotAuthorised when a deployment is required.
     /// @param factory The store factory.
     /// @param user The user whose label store is being resolved.
@@ -34,7 +34,7 @@ library StoreUtils {
     ///      than a revert, so retried protocol flows (e.g. an ERC721 transfer back to a prior
     ///      owner) pass through without failing on the existing lock. Inherits the factory's
     ///      writer authorisation: callers that are not the factory owner and not
-    ///      protocol-registered @custom:reverts NotAuthorised when the user has no store yet.
+    ///      a store writer @custom:reverts NotAuthorised when the user has no store yet.
     /// @param factory The store factory.
     /// @param user The label store owner.
     /// @param labelhash The labelhash key.

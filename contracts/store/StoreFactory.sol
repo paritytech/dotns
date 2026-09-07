@@ -12,11 +12,12 @@ import {IUserStore} from "./IUserStore.sol";
 import {LabelStore} from "./LabelStore.sol";
 import {UserStore} from "./UserStore.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
+import {StoreAuth} from "../utils/StoreAuth.sol";
 
 /// @title StoreFactory
 /// @notice Factory for the two per-user DotNS store types, sharing one factory contract and two
 /// beacons. @dev Each user may acquire AT MOST two stores, ever:
-///      - a `LabelStore`, deployed via `deployLabelStoreFor` by a protocol-registered caller
+///      - a `LabelStore`, deployed via `deployLabelStoreFor` by the owner or a store writer
 ///        during registration; and
 ///      - a `UserStore`, claimed via `claimUserStore` by the user themselves.
 ///      Both are `BeaconProxy` instances pointing at their respective `UpgradeableBeacon`.
@@ -52,7 +53,8 @@ contract StoreFactory is Ownable, IStoreFactory {
     /// @dev Insertion-order list of every `UserStore` proxy ever claimed. Append-only.
     address[] private _userStoreList;
 
-    /// @notice Restricts `deployLabelStoreFor` to the owner or any protocol-registered caller.
+    /// @notice Restricts `deployLabelStoreFor` to the owner or a component named in
+    /// @custom:function StoreAuth.isStoreWriter.
     modifier onlyOwnerOrProtocol() {
         _onlyOwnerOrProtocol();
         _;
@@ -192,10 +194,7 @@ contract StoreFactory is Ownable, IStoreFactory {
     /// @notice Internal authorisation check deferred from the `onlyOwnerOrProtocol` modifier.
     function _onlyOwnerOrProtocol() internal view {
         if (msg.sender == owner()) return;
-        require(
-            IDotnsProtocolRegistry(protocolRegistry).isRegisteredAddress(msg.sender),
-            NotAuthorised(msg.sender)
-        );
+        require(StoreAuth.isStoreWriter(protocolRegistry, msg.sender), NotAuthorised(msg.sender));
     }
 
     /// @notice Shared pagination helper used by `getLabelStores` and `getUserStores`.
