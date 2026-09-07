@@ -404,9 +404,7 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         return string(buffer);
     }
 
-    // -------------------------------------------------------------------------------------------
     // Reserved registration: grant-gated, relayer-submittable, single use, reverse-record silent.
-    // -------------------------------------------------------------------------------------------
 
     /// @notice Without a grant naming the owner, no submitter can drive a reserved mint.
     function testFuzz_reserved_mint_requires_a_grant(uint256 salt, address submitter) public {

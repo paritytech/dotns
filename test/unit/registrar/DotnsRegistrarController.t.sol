@@ -974,9 +974,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(label)), nameOwner);
     }
 
-    // -------------------------------------------------------------------------------------------
     // Reserved path: Root authority, single use, relayer submission, unconfigured whitelist.
-    // -------------------------------------------------------------------------------------------
 
     /// @dev Root is the second accepted authority and needs no grant. It must also leave any live
     /// grant unspent, so governance minting does not silently consume someone else's entitlement.
@@ -1095,9 +1093,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(nameLabel)), ed);
     }
 
-    // -------------------------------------------------------------------------------------------
     // Regression: the paid path's governance-reserved rejection is unchanged by the grant gate.
-    // -------------------------------------------------------------------------------------------
 
     /// @dev A reserved-tier label (base length five or fewer) is refused on the paid path whoever
     /// pays. The cross-payer branch distinguishes a governance-reserved label from a stem held by
