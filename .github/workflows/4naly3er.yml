@@ -163,7 +163,7 @@ jobs:
               existingDetails[section] = `<details>\n<summary><strong>${section}</strong></summary>\n\n${details}\n\n[View full report](${reportUrl}) | [View logs](https://github.com/${repoFull}/actions/runs/${runId})\n\n</details>`;
             } else { delete existingDetails[section]; }
 
-            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Gas Report', 'Coverage', 'Documentation', 'Format & Lint', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Gas Report', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
             const sortedKeys = Object.keys(rows).sort((a, b) => (order.indexOf(a) === -1 ? 999 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 999 : order.indexOf(b)));
             let table = `| Check | Result |\n|:------|:-------|\n`;
             for (const key of sortedKeys) table += `| ${key} | ${rows[key]} |\n`;

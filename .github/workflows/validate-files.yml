@@ -1,60 +1,50 @@
-name: Format & Lint
+name: File Validation
 
+# Repo-wide counterpart to the pre-commit hook: the hook validates only the
+# files a commit stages (for speed), so this job runs the same checks over every
+# tracked file on a pull request, catching anything introduced with --no-verify
+# or a hook-bypassing client. The checks themselves live in
+# scripts/shell/validate-files.sh, shared with the hook so the two never drift.
 on:
   pull_request:
-    paths: ['src/**', 'script/**', 'test/**', '**.sol']
+    branches: [master]
 
 permissions:
   contents: read
   pull-requests: write
   issues: write
 
+concurrency:
+  group: file-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  check:
+  validate:
+    name: File Validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: ./.github/actions/setup-foundry
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-          no-cache: true
-      - run: bun install
 
-      - name: Check formatting
-        id: format
+      - name: Validate tracked files
         continue-on-error: true
-        env:
-          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-        run: forge fmt --check > format.log 2>&1 || echo "FORMAT_FAILED=true" >> "$GITHUB_ENV"
-
-      - name: Build contracts
-        id: build
-        continue-on-error: true
-        env:
-          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-        run: forge build --sizes > build.log 2>&1 || echo "BUILD_FAILED=true" >> "$GITHUB_ENV"
+        run: |
+          git ls-files -z | scripts/shell/validate-files.sh > validate.log 2>&1 \
+            || echo "VALIDATION_FAILED=true" >> "$GITHUB_ENV"
 
       - name: Prepare result
         id: run
         if: always()
         run: |
-          if [ "${FORMAT_FAILED:-}" = "true" ] && [ "${BUILD_FAILED:-}" = "true" ]; then
-            echo "result=Failed - Formatting and build errors" >> "$GITHUB_OUTPUT"
-          elif [ "${FORMAT_FAILED:-}" = "true" ]; then
-            echo "result=Failed - Formatting errors found" >> "$GITHUB_OUTPUT"
-          elif [ "${BUILD_FAILED:-}" = "true" ]; then
-            echo "result=Failed - Build errors" >> "$GITHUB_OUTPUT"
+          if [ "${VALIDATION_FAILED:-}" = "true" ]; then
+            echo "result=Failed - File validation errors found" >> "$GITHUB_OUTPUT"
           else
-            echo "result=Passed - Code formatted correctly" >> "$GITHUB_OUTPUT"
+            echo "result=Passed - All tracked files valid" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: lint-logs
+          name: file-validation-logs
           path: '*.log'
           retention-days: 7
 
@@ -62,7 +52,7 @@ jobs:
         if: always()
         uses: actions/github-script@v7
         env:
-          SECTION: Format & Lint
+          SECTION: File Validation
           RESULT: ${{ steps.run.outputs.result }}
         with:
           script: |
@@ -84,12 +74,12 @@ jobs:
 
             let rows = {};
             let detailsSection = '';
-            
+
             if (existing?.body) {
               const parts = existing.body.split(detailsMarker);
               const tableSection = parts[0] || '';
               if (parts[1]) detailsSection = `\n${detailsMarker}${parts[1]}`;
-              
+
               const lines = tableSection.split('\n');
               for (const line of lines) {
                 const match = line.match(/^\| ([^|]+) \| ([^|]+) \|$/);
@@ -104,7 +94,7 @@ jobs:
 
             rows[section] = result;
 
-            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Gas Report', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
             const sortedKeys = Object.keys(rows).sort((a, b) => {
               const ai = order.indexOf(a), bi = order.indexOf(b);
               return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
@@ -121,7 +111,7 @@ jobs:
             // to the summary table only when the cumulative body would overflow.
             const MAX_BODY = 65000;
             if (body.length > MAX_BODY) {
-              body = `${marker}\n## CI Summary\n\n${table}\n\n_Per-section details omitted: combined body exceeded the ${MAX_BODY}-char comment limit. Follow the **View Report** links above for each section's full output._`;
+              body = `${marker}\n## CI Summary\n\n${table}\n\n_Per-section details omitted: combined body exceeded the ${MAX_BODY}-char comment limit._`;
             }
 
             if (existing) {
@@ -130,6 +120,6 @@ jobs:
               await github.rest.issues.createComment({ owner, repo, issue_number, body });
             }
 
-      - name: Fail if checks failed
-        if: env.FORMAT_FAILED == 'true' || env.BUILD_FAILED == 'true'
+      - name: Fail if validation failed
+        if: env.VALIDATION_FAILED == 'true'
         run: exit 1
