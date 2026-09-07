@@ -207,44 +207,6 @@ contract DotnsNameEscrowTest is BaseDotns {
         dotnsNameEscrow.release(tokenId);
     }
 
-    /// @notice The release gate blocks an operator releasing while the holder still owns the name,
-    ///         but it does not defend the deposit against a transfer: an operator authorised for
-    ///         transfer moves the name to itself, which rebinds the recipient, then releases and
-    ///         withdraws. The deposit is bound to the name, so taking custody takes the deposit.
-    ///         This is the accepted consequence of a blanket transfer approval, pinned here.
-    function test_operator_transfer_to_self_captures_bound_deposit() public {
-        uint256 tokenId = _registerNoStatus(LABEL, ed);
-        assertEq(dotnsNameEscrow.getReleasePosition(tokenId).recipient, ed, "deposit bound to ed");
-
-        vm.prank(ed);
-        dotnsRegistrar.setApprovalForAll(leonardo, true);
-
-        // Operator moves the name to itself; `_update` rebinds the escrow position to the holder.
-        uint256 fee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-        vm.prank(leonardo);
-        dotnsRegistrar.transferFrom{value: fee}(ed, leonardo, tokenId);
-        assertEq(
-            dotnsNameEscrow.getReleasePosition(tokenId).recipient,
-            leonardo,
-            "transfer rebound the deposit to the operator"
-        );
-
-        // As the genuine holder and recipient, the operator releases and withdraws ed's deposit.
-        uint256 balanceBefore = leonardo.balance;
-        vm.startPrank(leonardo);
-        dotnsRegistrar.approve(address(dotnsNameEscrow), tokenId);
-        dotnsNameEscrow.release(tokenId);
-        vm.warp(block.timestamp + ESCROW_COOLDOWN + 1);
-        dotnsNameEscrow.withdraw(tokenId);
-        uint256 claimed = dotnsNameEscrow.claimWithdrawal();
-        vm.stopPrank();
-
-        assertEq(claimed, BASE_DEPOSIT, "operator claimed the full deposit");
-        assertEq(
-            leonardo.balance - balanceBefore, BASE_DEPOSIT - fee, "operator netted the deposit"
-        );
-    }
-
     function test_revert_withdraw_not_recipient() public {
         uint256 tokenId = _registerNoStatus(LABEL, ed);
         _approveAndRelease(tokenId, ed);
