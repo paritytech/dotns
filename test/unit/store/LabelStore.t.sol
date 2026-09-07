@@ -186,6 +186,34 @@ contract LabelStoreTests is BaseDotns {
         assertEq(labels[0], LABEL_B);
     }
 
+    /// @notice The factory's gate accepts the same writers as the store's, so both entrypoints
+    /// are covered on the accept side rather than only on the reject side.
+    function test_deployLabelStoreFor_accepts_every_write_bearing_component() public {
+        address[3] memory writers =
+            [address(dotnsRegistrar), address(dotnsRegistrarController), address(dotnsRegistry)];
+        address[3] memory users = [ed, leonardo, tiago];
+
+        for (uint256 i; i < writers.length; ++i) {
+            vm.prank(writers[i]);
+            address store = storeFactory.deployLabelStoreFor(users[i]);
+            assertEq(ILabelStore(store).owner(), users[i], "a write-bearing component was refused");
+        }
+    }
+
+    /// @notice A registry key pointing at a codeless address fails closed. The controller lookup
+    /// is a high-level call, so the compiler's code-size check reverts rather than reading a
+    /// bare `false` and silently widening or narrowing the writer set.
+    function test_storeLabel_reverts_when_the_registrar_key_has_no_code() public {
+        ILabelStore store = _freshLabelStore(ed);
+
+        vm.prank(owner);
+        protocolRegistry.set(DotnsConstants.REGISTRAR, makeAddr("noCodeRegistrar"));
+
+        vm.prank(address(dotnsRegistrarController));
+        vm.expectRevert();
+        store.storeLabel(LABELHASH_A, LABEL_A);
+    }
+
     /// @notice Each protocol component that legitimately writes a label may do so: the registrar
     /// on a mint or transfer, the registrar controller on a public registration, the PoP
     /// controller on a gateway name, and the registry on a subname.

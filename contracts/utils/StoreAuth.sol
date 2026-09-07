@@ -20,6 +20,9 @@ import {DotnsConstants} from "./DotnsConstants.sol";
 ///      @custom:function IDotnsRegistrar.controllers rather than from a registry key so that a
 ///      controller added through `addController` can write the labels it mints, without a second
 ///      registration step or a beacon upgrade of every deployed store.
+/// @dev A writer is admitted for every store rather than scoped to the names it issues, which
+///      rests on the controller set being trusted: a controller can mint any name outright, so
+///      letting it write that name's label is no wider than the authority it already holds.
 /// @custom:security-contact admin@parity.io
 library StoreAuth {
     /// @notice Whether `caller` is a protocol component allowed to act on a user's store.
