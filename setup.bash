@@ -106,7 +106,9 @@ install_git_hooks(){
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "Installing git hooks..."
     git config core.hooksPath .githooks
-    chmod +x .githooks/pre-commit scripts/shell/pre-commit.sh
+    chmod +x .githooks/pre-commit .githooks/pre-push \
+      scripts/shell/pre-commit.sh scripts/shell/pre-push.sh \
+      scripts/shell/validate-files.sh
     echo "  ✓ core.hooksPath=.githooks"
   fi
 }
