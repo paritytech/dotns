@@ -268,8 +268,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     ///      owner may delegate record management to an operator via the registry's own
     ///      @custom:function setApprovalForAll. Record authority never reads the registrar's
     ///      transfer-operator set: the approval a seller grants a marketplace to move a name
-    ///      confers transfer only, not the power to repoint resolvers or mint subnodes. This is
-    ///      the single source of truth `_authorised` and `isAuthorised` both delegate to.
+    ///      delegates transfer of the name and leaves its resolver and subnodes to the owner. This
+    ///      is the single source of truth `_authorised` and `isAuthorised` both delegate to.
     function _isAuthorised(bytes32 node, address account) internal view returns (bool) {
         Record storage record = records[node];
 
