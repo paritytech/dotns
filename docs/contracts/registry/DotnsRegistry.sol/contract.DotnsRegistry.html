@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/a3fd462314e771f4819edcaace1b0d0403973b67/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/740a852abe184bf0e3e7b6b8e6137e56c0862d74/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -200,6 +200,14 @@ security-contact: admin@parity.io</p>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
 <p>Protocol-level address registry for all DotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
+</code></pre>
+<h3 id="_operators"><a class="header" href="#_operators">_operators</a></h3>
+<p>Registry-native record-management delegation, disjoint from the registrar's
+transfer-operator set.</p>
+<p>An operator here may manage records for every node the granter owns. This is a
+separate, opt-in grant from the ERC-721 <code>setApprovalForAll</code> a seller signs to a
+marketplace: that approval delegates transfer only and confers no record authority.</p>
+<pre><code class="language-solidity">mapping(address account =&gt; mapping(address operator =&gt; bool approved)) private _operators
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <pre><code class="language-solidity">uint256[50] private __gap
@@ -253,30 +261,27 @@ reverts: NotAuthorised. The new owner address must be non-zero, otherwise</p>
 <p>Restricted to the registrar's controllers, otherwise @custom:reverts NotAuthorised.
 <code>newOwner</code> must be non-zero (otherwise @custom:reverts NotAllowed) and must match
 the ERC-721 owner reported by the registrar (otherwise</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: NotAuthorised). The function is callable both on a fresh
+<p><strong>Note:</strong>
+reverts: NotAuthorised). The function is callable both on a fresh
 registration and on every reclaim from escrow: each call rewrites
 <code>records[node].resolver</code> to the protocol-registered default reverse resolver so a
 prior owner's resolver pointer (and the records keyed under it) cannot be inherited
-by the next holder. Stores <code>owner = address(0)</code> as a sentinel so reads delegate to
-<code>IDotnsRegistrar.ownerOf</code> and ERC-721 transfers remain authoritative. Emits</p>
-</li>
-<li>
-<p>emits: NodeTransferred on success.</p>
-</li>
-</ul>
+by the next holder across that recycle. This reset is scoped to this function: a
+secondary-market ERC-721 <code>transferFrom</code> does not call the registry, so a name sold
+directly retains the seller's resolver pointer until the buyer overwrites it. Stores
+<code>owner = address(0)</code> as a sentinel so reads delegate to <code>IDotnsRegistrar.ownerOf</code> and
+ERC-721 transfers remain authoritative. Emits @custom:emits NodeTransferred on success.</p>
 <pre><code class="language-solidity">function setOwner(bytes32 node, address newOwner) external override onlyRegistrarController;
 </code></pre>
 <h3 id="setresolver"><a class="header" href="#setresolver">setResolver</a></h3>
 <p>Sets or clears the resolver for a node.</p>
-<p>Callable only by the current node owner, otherwise @custom:reverts NotAuthorised.
-For tokenised nodes, authorisation falls back to ERC-721 owner / approved /
-operator-for-all via the registrar. The registry does not validate
-<code>resolverAddr</code> against any interface or code presence; off-chain consumers must
-verify resolver shape before trusting reads. Emits @custom:emits NewResolver on
-success.</p>
+<p>Authorised through @custom:function isAuthorised, otherwise</p>
+<p><strong>Note:</strong>
+reverts: NotAuthorised: the node owner, or an operator the owner delegated
+via @custom:function setApprovalForAll. A registrar transfer approval does not
+authorise this. The registry does not validate <code>resolverAddr</code> against any interface
+or code presence; off-chain consumers must verify resolver shape before trusting
+reads. Emits @custom:emits NewResolver on success.</p>
 <pre><code class="language-solidity">function setResolver(bytes32 node, address newResolver) external override authorised(node);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -317,12 +322,14 @@ back to <code>IDotnsRegistrar.ownerOf(uint256(node))</code>.</p>
 </code></pre>
 <h3 id="isauthorised"><a class="header" href="#isauthorised">isAuthorised</a></h3>
 <p>Returns whether <code>account</code> is authorised to manage <code>node</code>.</p>
-<p>For subnodes, authority is the explicit stored owner. For tokenised nodes it is the
-ERC-721 owner, an address approved for the token, or an operator approved for all of
-the owner's tokens via the registrar. This is the canonical authorisation check the
-registry enforces on owner-gated entry points; sibling contracts may consult it so a
-single registrar-level approval delegates management across the protocol. Returns
-false for a node that does not exist.</p>
+<p>For subnodes, authority is the explicit stored owner; for tokenised nodes it is the
+ERC-721 owner. In both cases the owner may delegate management to an operator through
+the registry's own @custom:function setApprovalForAll. Authority never reads the
+registrar's transfer-approval set, so approving a marketplace to move a name confers
+no management authority. This is the canonical authorisation check the registry
+enforces on owner-gated entry points, and the single indirection sibling contracts
+consult so record-management delegation lives in one place. Returns false for a node
+that does not exist.</p>
 <pre><code class="language-solidity">function isAuthorised(
     bytes32 node,
     address account
@@ -368,11 +375,54 @@ Reads the TLD node from the protocol registry, so it is a view rather than pure.
 </code></pre>
 <h3 id="_isauthorised"><a class="header" href="#_isauthorised">_isAuthorised</a></h3>
 <p>Canonical authorisation rule for a node, parameterised by <code>account</code>.</p>
-<p>Honours the sentinel-zero pattern: if the registry has no explicit owner, fall back
-to the registrar's ERC-721 owner / approved / operator-for-all chain. This is the
-single source of truth <code>_authorised</code> and <code>isAuthorised</code> both delegate to.</p>
+<p>Honours the sentinel-zero pattern: a non-zero stored owner is a subnode's explicit
+owner; the zero sentinel defers to the registrar's ERC-721 holder. In both cases the
+owner may delegate record management to an operator via the registry's own</p>
+<p><strong>Note:</strong>
+function: setApprovalForAll. Record authority never reads the registrar's
+transfer-operator set: the approval a seller grants a marketplace to move a name
+delegates transfer of the name and leaves its resolver and subnodes to the owner. This
+is the single source of truth <code>_authorised</code> and <code>isAuthorised</code> both delegate to.</p>
 <pre><code class="language-solidity">function _isAuthorised(bytes32 node, address account) internal view returns (bool);
 </code></pre>
+<h3 id="setapprovalforall"><a class="header" href="#setapprovalforall">setApprovalForAll</a></h3>
+<p>Grants or revokes registry-wide record-management authority for the caller's nodes.</p>
+<p>The delegation the registry's own authorisation consults, kept deliberately separate
+from the registrar's ERC-721 <code>setApprovalForAll</code>: that approval delegates transfer of
+the name, this one delegates management of its records. A marketplace approved to sell
+a name gains no authority here. Emits @custom:emits ApprovalForAll.</p>
+<pre><code class="language-solidity">function setApprovalForAll(address operator, bool approved) external override;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>operator</code></td><td><code>address</code></td><td>Address being granted or revoked record-management authority.</td></tr>
+<tr><td><code>approved</code></td><td><code>bool</code></td><td>True to grant, false to revoke.</td></tr>
+</tbody></table>
+</div>
+<h3 id="isapprovedforall"><a class="header" href="#isapprovedforall">isApprovedForAll</a></h3>
+<p>Returns whether <code>operator</code> may manage records for every node <code>account</code> owns.</p>
+<p><strong>Note:</strong>
+function: setApprovalForAll.</p>
+<pre><code class="language-solidity">function isApprovedForAll(
+    address account,
+    address operator
+)
+    external
+    view
+    override
+    returns (bool approved);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>account</code></td><td><code>address</code></td><td>The node owner whose delegation is queried.</td></tr>
+<tr><td><code>operator</code></td><td><code>address</code></td><td>The candidate record manager.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>approved</code></td><td><code>bool</code></td><td>True when <code>account</code> has granted <code>operator</code> via</td></tr>
+</tbody></table>
+</div>
 <h3 id="_onlyregistrarcontroller"><a class="header" href="#_onlyregistrarcontroller">_onlyRegistrarController</a></h3>
 <p>Internal check for registrar-authorised controller privileges.</p>
 <p>The registry trusts every controller the registrar trusts. Routing controller
