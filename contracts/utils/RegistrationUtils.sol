@@ -58,9 +58,9 @@ library RegistrationUtils {
     /// @dev Callable by any authorised controller. Emits no events; each controller
     ///      emits its own flow-level event after this returns, so behavioural drift
     ///      between flows stays contained at the emission layer rather than at the
-    ///      underlying state-transition layer. Store authorisation is handled by the
-    ///      protocol registry (`isRegisteredAddress`) on every write, so no per-store
-    ///      allowlist bookkeeping is needed here.
+    ///      underlying state-transition layer. Store authorisation is resolved against the
+    ///      protocol registry on every write (@custom:function StoreAuth.isStoreWriter), so no
+    ///      per-store allowlist bookkeeping is needed here.
     /// @dev The registrar writes the `LabelStore` entry directly inside `register`
     ///      so this helper deliberately does not call `StoreUtils.writeLabel`.
     ///      Doing it twice would deploy or touch the store on every flow and

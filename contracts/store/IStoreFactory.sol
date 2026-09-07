@@ -63,8 +63,9 @@ interface IStoreFactory {
     function protocolRegistry() external view returns (address registry);
 
     /// @notice Deploys a `LabelStore` beacon-proxy bound to `user`.
-    /// @dev Callable by the factory owner or any address currently registered in the protocol
-    ///      registry; any other caller @custom:reverts NotAuthorised. `user` must be non-zero,
+    /// @dev Callable by the factory owner or a component named in
+    ///      @custom:function StoreAuth.isStoreWriter; any other caller
+    ///      @custom:reverts NotAuthorised. `user` must be non-zero,
     ///      otherwise @custom:reverts InvalidUser. The user must not already have a
     ///      `LabelStore`, otherwise @custom:reverts AlreadyDeployed. After deployment the
     ///      freshly initialised proxy must report `user` as its owner, otherwise
