@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="storeauth"><a class="header" href="#storeauth">StoreAuth</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/7dcad2b4a00eaa76003a5518dce81f292f98df26/contracts/utils/StoreAuth.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/e456b3fdbfff20eb17bb15c5d31319cdff1b024c/contracts/utils/StoreAuth.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 StoreAuth</p>
 <p>Decides which protocol components may act on a user's store.</p>
@@ -193,6 +193,9 @@ forwarder is the sharpest case: it makes the call anyone asks it to, and the sto
 the forwarder as its caller.</p>
 <p>Authority is instead the registrar, the registry, and whatever the registrar currently
 accepts as a controller. Controllers are read from</p>
+<p>A writer is admitted for every store rather than scoped to the names it issues, which
+rests on the controller set being trusted: a controller can mint any name outright, so
+letting it write that name's label is no wider than the authority it already holds.</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
