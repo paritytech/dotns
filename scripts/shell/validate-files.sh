@@ -18,8 +18,9 @@ set -euo pipefail
 # shellcheck source=scripts/shell/lib-hook-env.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib-hook-env.sh"
 
-ROOT="$(git rev-parse --show-toplevel)"
-cd "$ROOT"
+# Paths are validated relative to the current directory, so the caller sets it:
+# CI runs from the repository root, and the pre-commit hook runs from a temp tree
+# holding the staged (index) content, so the check sees exactly what is committed.
 
 validation_errors="$(mktemp)"
 validation_detail="$(mktemp)"
@@ -187,7 +188,13 @@ for file in "${files[@]:-}"; do
   esac
 done
 
-if command -v actionlint > /dev/null 2>&1; then
+# actionlint resolves the project from the surrounding git repository, so it only
+# runs on a real work tree (CI, or a manual repo-root invocation). The pre-commit
+# hook validates staged content from a temp tree that is not a repository, where
+# the per-file YAML parse above still checks each workflow's syntax and actionlint
+# defers to the File Validation CI job.
+if [ -d .github/workflows ] && command -v actionlint > /dev/null 2>&1 \
+  && git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
   run_validation ".github/workflows" "GitHub Actions validation" actionlint
 fi
 
