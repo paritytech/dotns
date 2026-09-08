@@ -71,6 +71,19 @@ abstract contract UpgradeBase is BaseDeployer {
         console.log("  unchanged:", _unchangedCount);
     }
 
+    /// @notice `_upgradeProxy` for a release that adds no new configuration value.
+    function _upgradeProxy(
+        address owner,
+        address protocolRegistry,
+        bytes32 key,
+        string memory artefact,
+        string memory label
+    )
+        internal
+    {
+        _upgradeProxy(owner, protocolRegistry, key, artefact, label, bytes(""));
+    }
+
     /// @notice Points one registry-resolved proxy at a freshly deployed implementation.
     /// @dev A key the registry does not hold is skipped rather than treated as an error, so a
     ///      stage also runs against a deployment predating that contract's introduction.
@@ -79,12 +92,20 @@ abstract contract UpgradeBase is BaseDeployer {
     /// @param key Registry key, or `bytes32(0)` for the registry itself.
     /// @param artefact Fully-qualified artefact name of the new implementation.
     /// @param label Bare contract name, used for logging and as the reference name.
+    /// @param postUpgradeCall Calldata delegatecalled from the proxy in the same transaction as
+    ///        the swap, or empty. An upgrade that adds a governance-tunable storage value must
+    ///        seed it here: a bare swap leaves the new slot at zero, and a proxy running an
+    ///        unseeded policy value is a live misconfiguration rather than a pending chore. See
+    ///        `DEPLOYMENTS.md` -> "Upgrading a proxy that gained a new configuration value".
+    ///        `upgradeToAndCall` delegatecalls from the proxy context, so `msg.sender` is
+    ///        preserved and an `onlyOwner` setter is callable as part of the upgrade.
     function _upgradeProxy(
         address owner,
         address protocolRegistry,
         bytes32 key,
         string memory artefact,
-        string memory label
+        string memory label,
+        bytes memory postUpgradeCall
     )
         internal
     {
@@ -113,10 +134,13 @@ abstract contract UpgradeBase is BaseDeployer {
             return;
         }
 
-        IUUPS(proxy).upgradeToAndCall(implementation, bytes(""));
+        IUUPS(proxy).upgradeToAndCall(implementation, postUpgradeCall);
         vm.stopBroadcast();
 
         console.log("  upgraded  %s", label);
+        if (postUpgradeCall.length != 0) {
+            console.log("            seeded with a post-upgrade call");
+        }
         console.log("            proxy          ", proxy);
         console.log("            was            ", current);
         console.log("            now            ", implementation);
