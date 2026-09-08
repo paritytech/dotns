@@ -3,12 +3,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {
-    ERC165Upgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {DotnsRoleManagerOld} from "../access/DotnsRoleManagerOld.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
@@ -17,9 +12,8 @@ import {IDotnsReverseResolver} from "../resolvers/IDotnsReverseResolver.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
 import {IDotnsCostModelRegistry} from "../pop/IDotnsCostModelRegistry.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
-import {IDotnsRegistrarController} from "./IDotnsRegistrarController.sol";
+import {IDotnsRegistrarControllerOld} from "./IDotnsRegistrarControllerOld.sol";
 import {IDotnsNameEscrow} from "../escrow/IDotnsNameEscrow.sol";
-import {IDotnsNameWhitelist} from "../whitelist/IDotnsNameWhitelist.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
@@ -27,49 +21,37 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
-import {SystemUtils} from "../utils/SystemUtils.sol";
 
-/// @title Dotns Registrar Controller
+/// @title Dotns Registrar Controller Old
 /// @notice Allocates top-level labels using a commit reveal scheme.
-/// @dev Orchestrates allocation, PoP validation, pricing enforcement, forward registry
-/// wiring, default reverse resolution, and immutable store writing.
+/// @dev Pre-upgrade snapshot the layout diff compares the current implementation against.
+/// Orchestrates allocation, PoP validation, pricing enforcement, forward registry wiring, default
+/// reverse resolution, and immutable store writing.
 ///
 /// Tokenisation: the minted ERC721 tokenId is `uint256(node)`, where
 /// `node = namehash(tldNode, labelhash)`. The registry stores a sentinel owner
 /// (`address(0)`) for tokenised nodes and derives ownership from the ERC721 registrar for
 /// authorisation.
+/// @dev PR-scoped. This snapshot is deleted before merge with the paired upgrade slice per the
+/// upgrade-PR workflow in CONTRIBUTING.md.
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistrarController is
+contract DotnsRegistrarControllerOld is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
-    ERC165Upgradeable,
+    DotnsRoleManagerOld,
     ReentrancyGuardTransient,
-    IDotnsRegistrarController
+    IDotnsRegistrarControllerOld
 {
     using StringUtils for *;
     using StoreUtils for IStoreFactory;
 
-    /// @notice One role's membership and its admin role.
-    /// @dev Member of the reserved AccessControl namespace, unused because gating is Root only.
-    /// @param hasRole Whether an account holds the role.
-    /// @param adminRole Admin role that manages the role.
-    struct RoleData {
-        mapping(address account => bool) hasRole;
-        bytes32 adminRole;
-    }
-
-    /// @notice Reserved OpenZeppelin access-control namespace held at its ERC-7201 slot.
-    /// @dev Declared and left unused so the namespace stays present in the layout. Its slot derives
-    ///      from the label, disjoint from the sequential slots below, so it consumes none of them.
-    /// @param _roles Role data keyed by role identifier.
-    /// @custom:storage-location erc7201:openzeppelin.storage.AccessControl
-    struct AccessControlStorage {
-        mapping(bytes32 role => RoleData) _roles;
-    }
-
     /// @notice Upper bound for commitment validity to cap storage griefing risk.
     uint256 public constant MAX_ALLOWED_COMMITMENT_AGE = 7 days;
+
+    /// @notice Role identifier gating whitelist operators for the reserved pipeline.
+    /// @dev Declared locally so the snapshot compiles once the shared identifier is retired from
+    ///      `DotnsConstants`; a constant occupies no storage slot, so the layout is unaffected.
+    bytes32 private constant WHITELIST_OPERATOR_ROLE = keccak256("DOTNS_WHITELIST_OPERATOR_ROLE");
 
     /// @notice Minimum age a commitment must reach before reveal.
     uint256 public minCommitmentAge;
@@ -87,17 +69,30 @@ contract DotnsRegistrarController is
     ///      from this stamp.
     mapping(bytes32 hash => uint256 version) public committedPricingVersion;
 
-    /// @dev Reserved slot held so the sequential storage layout stays fixed across the in-place
-    ///      upgrade. Unused: name eligibility lives in @custom:contract DotnsNameWhitelist.
-    /// @custom:oz-renamed-from whiteList
-    mapping(address account => bool retained) private __whiteListSlot;
+    /// @notice Whitelist for addresses allowed to call `registerReserved`.
+    mapping(address user => bool isWhiteListed) public whiteList;
 
     /// @notice Protocol-level address registry for all DotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
-    /// @dev Reserved storage space to allow for layout changes in the future. The retained
-    ///      whitelist slot above holds one slot, so the gap holds 49 to keep the footprint fixed.
+    /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[49] private __gap;
+
+    /// @notice Restricts calls to whitelisted addresses or the owner.
+    /// @dev Used to gate `registerReserved`, which allows registering reserved names without
+    /// PoP checks or payment. Necessary so the owner (or a whitelisted operator) can seed
+    /// reserved names on behalf of users who are already known and verified and do not need
+    /// PoP checks.
+    modifier onlyWhiteListedOrOwner() {
+        _onlyWhiteListedOrOwner();
+        _;
+    }
+
+    /// @notice Restricts calls to the owner or a whitelist operator role holder.
+    modifier onlyWhitelistOperatorOrOwner() {
+        _checkRoleOrOwner(WHITELIST_OPERATOR_ROLE);
+        _;
+    }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -122,8 +117,8 @@ contract DotnsRegistrarController is
         external
         initializer
     {
-        __ERC165_init();
         __Ownable_init(msg.sender);
+        _dotnsRoleManagerInit();
 
         require(minAge > 0, MinCommitmentAgeZero());
         require(maxAge > minAge, MaxCommitmentAgeTooLow());
@@ -135,7 +130,7 @@ contract DotnsRegistrarController is
         maxCommitmentAge = maxAge;
     }
 
-    /// @inheritdoc IDotnsRegistrarController
+    /// @inheritdoc IDotnsRegistrarControllerOld
     function available(string calldata label) public view override returns (bool) {
         bytes32 node;
         (, node) = _validatedLabelNode(label);
@@ -143,7 +138,7 @@ contract DotnsRegistrarController is
         return registrar.available(uint256(node));
     }
 
-    /// @inheritdoc IDotnsRegistrarController
+    /// @inheritdoc IDotnsRegistrarControllerOld
     function makeCommitment(Registration calldata registration)
         public
         pure
@@ -162,7 +157,7 @@ contract DotnsRegistrarController is
         );
     }
 
-    /// @inheritdoc IDotnsRegistrarController
+    /// @inheritdoc IDotnsRegistrarControllerOld
     function commit(bytes32 commitment) external override {
         uint256 prior = commitments[commitment];
         require(
@@ -184,7 +179,7 @@ contract DotnsRegistrarController is
                 .currentVersion();
     }
 
-    /// @inheritdoc IDotnsRegistrarController
+    /// @inheritdoc IDotnsRegistrarControllerOld
     function register(Registration calldata registration) external payable override nonReentrant {
         (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
             _requireAvailableLabel(registration.label);
@@ -199,10 +194,11 @@ contract DotnsRegistrarController is
         string memory stem = rules.stripDigits(registration.label);
         bool stemCanonical = stem.isSingleLabelMemory();
         // Reclaim hands the name back from a prior occupant who may hold a sibling-controller's
-        // stem reservation, which is garbage once the name moves on, so clear it. Non-reclaim
-        // paths intentionally leave an existing reservation in place: the slot belongs to the
-        // sibling controller that wrote it (e.g. the PoP queue head stamp), and clearing it from
-        // here would brick that controller's release and advance paths.
+        // stem reservation; clear it so the new registrant's stem reserve starts fresh. Non-reclaim
+        // paths intentionally leave an existing same-owner reservation in place so a sibling
+        // controller (e.g. the PoP queue head stamp) retains the slot's `controller` field through
+        // the refresh in `_writeReservation`. Replacing the slot from this controller would brick
+        // the sibling's release/advance paths.
         if (stemCanonical && isReclaim) {
             (address reservationOwner,) = rules.getBaseNameReservation(stem);
             address expectedOwner =
@@ -266,6 +262,13 @@ contract DotnsRegistrarController is
 
         _settleEscrow(escrow, tokenId, registration.owner, isDirect, totalCharged);
 
+        if (
+            priced.status == IPopRules.PopStatus.PopLite
+                && priced.userStatus == IPopRules.PopStatus.PopLite && stemCanonical
+        ) {
+            rules.reserveBaseName(stem, registration.owner);
+        }
+
         if (msg.value > totalCharged) {
             uint256 refund = msg.value - totalCharged;
             (bool ok,) = payable(msg.sender).call{value: refund}("");
@@ -309,53 +312,47 @@ contract DotnsRegistrarController is
         }
     }
 
-    /// @inheritdoc IDotnsRegistrarController
-    function registerReserved(Registration calldata registration) external override nonReentrant {
-        // Read Root once, up front. Everything below must stay callable under a substrate Root
-        // origin, which has no account, so no branch may read `msg.sender`: the grant is checked
-        // against `registration.owner`, the commitment is keyed on its own hash, and the mint
-        // targets the owner.
-        bool isRoot = SystemUtils.originIsRoot();
-        IDotnsNameWhitelist whitelist;
-        if (!isRoot) {
-            whitelist = _nameWhitelist();
-            require(
-                whitelist.isGrantedTo(registration.label, registration.owner),
-                NameNotGranted(registration.label, registration.owner)
-            );
-        }
+    /// @inheritdoc IDotnsRegistrarControllerOld
+    function isWhiteListed(address who) external view override returns (bool) {
+        return whiteList[who];
+    }
 
+    /// @inheritdoc IDotnsRegistrarControllerOld
+    function whiteListAddress(
+        address who,
+        bool whiteListStatus
+    )
+        external
+        override
+        onlyWhitelistOperatorOrOwner
+    {
+        whiteList[who] = whiteListStatus;
+        emit WhiteListed(who, whiteListStatus);
+    }
+
+    /// @inheritdoc IDotnsRegistrarControllerOld
+    function registerReserved(Registration calldata registration)
+        external
+        override
+        onlyWhiteListedOrOwner
+        nonReentrant
+    {
         (, bytes32 labelhash, bytes32 node) = _requireAvailableLabel(registration.label);
         _consumeCommitment(registration);
 
-        // Spend the grant before minting so a grant in the wrong state fails before any name is
-        // issued. Root skips it: a governance mint must not consume a grant held by someone else.
-        //
-        // A consequence worth knowing: if Root mints a label that is `Claimed` or `Reserved` on
-        // the whitelist, that record survives the mint. The beneficiary's own `registerReserved`
-        // then fails `NameNotAvailable`, and the node stays in the whitelist's active set until
-        // governance calls `revokeName`. Nothing is lost, but the grant is stranded.
-        if (!isRoot) {
-            whitelist.consume(registration.label, registration.owner);
-        }
-
-        // No reverse record. `setReverseName` overwrites unconditionally, and the gate above lets
-        // anyone submit for the beneficiary, so writing here would let a third party relabel
-        // another address. The owner claims their own record through `claimReverseRecord`, which
-        // checks ownership and writes only their own key.
-        _completeRegistration(
-            registration, labelhash, node, 0, false, IDotnsReverseResolver(address(0)), false
-        );
+        IDotnsReverseResolver reverse =
+            IDotnsReverseResolver(protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER));
+        _completeRegistration(registration, labelhash, node, 0, true, reverse, false);
     }
 
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC165Upgradeable, IERC165)
+        override(DotnsRoleManagerOld, IERC165)
         returns (bool)
     {
-        return interfaceId == type(IDotnsRegistrarController).interfaceId
+        return interfaceId == type(IDotnsRegistrarControllerOld).interfaceId
             || super.supportsInterface(interfaceId);
     }
 
@@ -470,11 +467,13 @@ contract DotnsRegistrarController is
         versionString = "1.0.0";
     }
 
-    /// @notice Returns the configured name whitelist from the protocol registry.
-    function _nameWhitelist() internal view returns (IDotnsNameWhitelist whitelist) {
-        address configured = protocolRegistry.get(DotnsConstants.NAME_WHITELIST);
-        require(configured != address(0), WhitelistNotConfigured());
-        whitelist = IDotnsNameWhitelist(configured);
+    /// @notice Internal check enforcing whitelist-or-owner access.
+    function _onlyWhiteListedOrOwner() internal view {
+        require(whiteList[msg.sender] || msg.sender == owner(), NotWhiteListedOrOwner(msg.sender));
+    }
+
+    function _isSupportedRole(bytes32 role) internal view override returns (bool supported) {
+        return role == WHITELIST_OPERATOR_ROLE;
     }
 
     /// @inheritdoc UUPSUpgradeable

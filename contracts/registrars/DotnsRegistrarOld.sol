@@ -10,7 +10,7 @@ import {
     ERC721Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 
-import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
+import {IDotnsRegistrarOld} from "./IDotnsRegistrarOld.sol";
 import {IDotnsController} from "./IDotnsController.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 
@@ -25,18 +25,17 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title Dotns Registrar
 /// @notice ERC721-backed registrar implementing permanent name ownership.
-/// @dev Deliberately policy-free on pricing, reservations, and PoP gating; those live in the
-/// controllers and @custom:contract IPopRules. The registrar owns transferability itself: publicly
-/// registered names transfer freely, while names minted through the PoP gateway are soulbound and
-/// revert on transfer. The `_update` hook enforces both the soulbound gate and the fee-on-transfer
-/// settlement that consults the escrow.
+/// @dev Deliberately policy-free. Transfers are supported to allow ownership changes without
+/// registry hooks, and the registrar itself does not encode pricing, reservations, or PoP
+/// gating; those live in the controllers and @custom:contract IPopRules. The fee-on-transfer hook
+/// in `_update` is a thin enforcement layer that consults the escrow.
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistrar is
+contract DotnsRegistrarOld is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
     ERC721Upgradeable,
-    IDotnsRegistrar
+    IDotnsRegistrarOld
 {
     using StoreUtils for IStoreFactory;
     using StringUtils for *;
@@ -54,17 +53,8 @@ contract DotnsRegistrar is
     /// without storing individual references.
     IDotnsProtocolRegistry public protocolRegistry;
 
-    /// @notice Marks a token as soulbound: minted through the PoP gateway and non-transferable.
-    /// @dev Set at mint by @custom:function register when the caller is the address registered
-    /// under `DotnsConstants.POP_CONTROLLER`. Write-once and never cleared: a name's soulbound
-    /// state is fixed at registration. Read by the `_update` transfer gate and by
-    /// @custom:function quoteTransferFee.
-    mapping(uint256 tokenId => bool soulbound) private _soulbound;
-
-    /// @dev Reserved storage space to allow for layout changes in the future. `_soulbound` occupies
-    /// one reserved slot, so the gap holds 49 slots and the contract keeps a fixed 51-slot
-    /// footprint.
-    uint256[49] private __gap;
+    /// @dev Reserved storage space to allow for layout changes in the future.
+    uint256[50] private __gap;
 
     /// @notice Restricts function access to authorised controllers.
     modifier onlyController() {
@@ -96,19 +86,19 @@ contract DotnsRegistrar is
         protocolRegistry = registry;
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function addController(IDotnsController controller) external onlyOwner {
         controllers[controller] = true;
         emit ControllerAdded(controller);
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function removeController(IDotnsController controller) external onlyOwner {
         controllers[controller] = false;
         emit ControllerRemoved(controller);
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function available(uint256 id) public view override returns (bool isAvailable) {
         address holder = _ownerOf(id);
         if (holder == address(0)) return true;
@@ -123,7 +113,7 @@ contract DotnsRegistrar is
         return IDotnsNameEscrow(payable(escrow)).isReclaimable(id);
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function register(
         uint256 id,
         address owner,
@@ -146,24 +136,18 @@ contract DotnsRegistrar is
         // cannot brick the token by reverting on a malformed stem.
         require(bytes(label).length == 0 || label.isSingleLabel(), InvalidLabel());
         _mint(owner, id);
-        // Provenance is verified here rather than trusted from a caller-supplied flag: only the
-        // canonical PoP controller mints soulbound names, so a compromised or buggy peer controller
-        // cannot lock a public name and the PoP controller cannot mint an unlocked one. Written
-        // only on the true branch to leave the public path free of a redundant zero write.
-        bool soulbound = msg.sender == protocolRegistry.get(DotnsConstants.POP_CONTROLLER);
-        if (soulbound) _soulbound[id] = true;
         if (bytes(label).length != 0) _writeOwnerLabel(owner, id, label);
-        emit NameRegistered(id, owner, soulbound);
+        emit NameRegistered(id, owner);
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function labelOf(uint256 tokenId) external view override returns (string memory) {
         address holder = _ownerOf(tokenId);
         if (holder == address(0)) return "";
         return LabelUtils.stripTld(protocolRegistry.tld(), _readLabel(tokenId, holder));
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function quoteTransferFee(
         uint256 tokenId,
         address to
@@ -174,16 +158,12 @@ contract DotnsRegistrar is
         returns (uint256 requiredFee)
     {
         require(to != address(0), ERC721InvalidReceiver(address(0)));
-        // A soulbound name cannot be transferred, so it has no transfer price. Revert rather than
-        // return zero: a zero here would read as "transferable, no fee" to integrators while any
-        // real transfer reverts in `_update`.
-        require(!_soulbound[tokenId], NameSoulbound(tokenId));
 
         address from = ownerOf(tokenId);
         (,, requiredFee) = _quoteTransferFee(from, to, tokenId);
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function transferFrom(
         address from,
         address to,
@@ -191,12 +171,12 @@ contract DotnsRegistrar is
     )
         public
         payable
-        override(ERC721Upgradeable, IDotnsRegistrar)
+        override(ERC721Upgradeable, IDotnsRegistrarOld)
     {
         super.transferFrom(from, to, tokenId);
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function safeTransferFrom(
         address from,
         address to,
@@ -204,12 +184,12 @@ contract DotnsRegistrar is
     )
         public
         payable
-        override(ERC721Upgradeable, IDotnsRegistrar)
+        override(ERC721Upgradeable, IDotnsRegistrarOld)
     {
         super.safeTransferFrom(from, to, tokenId, "");
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function safeTransferFrom(
         address from,
         address to,
@@ -218,7 +198,7 @@ contract DotnsRegistrar is
     )
         public
         payable
-        override(ERC721Upgradeable, IDotnsRegistrar)
+        override(ERC721Upgradeable, IDotnsRegistrarOld)
     {
         super.safeTransferFrom(from, to, tokenId, data);
     }
@@ -229,14 +209,9 @@ contract DotnsRegistrar is
         versionString = "1.0.0";
     }
 
-    /// @inheritdoc IDotnsRegistrar
+    /// @inheritdoc IDotnsRegistrarOld
     function exists(uint256 tokenId) external view override returns (bool tokenExists) {
         tokenExists = _exists(tokenId);
-    }
-
-    /// @inheritdoc IDotnsRegistrar
-    function isSoulbound(uint256 tokenId) external view override returns (bool soulbound) {
-        soulbound = _soulbound[tokenId];
     }
 
     /// @notice Checks whether a token ID exists.
@@ -261,25 +236,10 @@ contract DotnsRegistrar is
     {
         from = super._update(to, tokenId, auth);
 
-        // Mints carry no economic event and must not be blocked: the soulbound flag is written
-        // after `_mint`, so a mint reaches here before the flag exists. Reject any attached value
-        // because nothing forwards it onward (no `receive`, no rescue path).
-        if (from == address(0)) {
-            require(msg.value == 0, UnexpectedValue());
-            return from;
-        }
-
-        // Soulbound names are non-transferable, including a move to the sender's own address, which
-        // keeps this in step with @custom:function quoteTransferFee and the interface contract. It
-        // reverts rather than returning, unwinding the ownership move `super._update` has already
-        // made, and sits before any escrow or store lookup so a soulbound token is rejected even
-        // when the escrow is unconfigured, blocking every custody move including release into
-        // escrow.
-        require(!_soulbound[tokenId], NameSoulbound(tokenId));
-
-        // Self-transfers of a transferable name carry no economic event. Reject attached value for
-        // the same trapped-funds reason as the mint path above.
-        if (from == to) {
+        // Mints and self-transfers carry no economic event. Reject any attached value on those
+        // paths because nothing forwards it onward, which would otherwise trap the funds in this
+        // contract permanently (no `receive`, no rescue path).
+        if (from == address(0) || from == to) {
             require(msg.value == 0, UnexpectedValue());
             return from;
         }
@@ -342,10 +302,9 @@ contract DotnsRegistrar is
     {
         string memory fullName = _readLabelFor(factory, tokenId, from);
         if (bytes(fullName).length == 0) {
-            // Defensive: the sender holds no label entry for the token. Gateway mints reach this
-            // only at mint time, and a gateway name is soulbound so it never transfers; a public
-            // name always carries a label. Nothing to mirror, so do not deploy a recipient store;
-            // downstream writes are demand-deploy through `StoreUtils.ensureLabelStore`.
+            // Sender has no label entry for the token (typical of gateway-cold PoP mints).
+            // Nothing to mirror, so do not deploy a recipient store; downstream writes are
+            // demand-deploy through `StoreUtils.ensureLabelStore`.
             return;
         }
         factory.writeLabel(to, bytes32(tokenId), fullName);
@@ -454,8 +413,7 @@ contract DotnsRegistrar is
 
         string memory fullName = _readLabelFor(factory, tokenId, from);
         // No label means there is no label-derived price to charge against; treat as a zero-fee
-        // move. This is defensive: a gateway name is soulbound and reverts before reaching here,
-        // and a public name always carries a label, so no reachable transfer hits this branch.
+        // move (typical of gateway-cold PoP mints that have not yet claimed a `LabelStore`).
         if (bytes(fullName).length == 0) return (0, 0);
         // A stored full name always carries the registry TLD suffix, so an empty strip means the
         // name is malformed for this registry (a wrong or missing suffix); fail loudly rather than

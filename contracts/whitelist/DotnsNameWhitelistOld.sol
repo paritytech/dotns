@@ -3,15 +3,10 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {
-    ERC165Upgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {IDotnsNameWhitelist} from "./IDotnsNameWhitelist.sol";
+import {DotnsRoleManagerOld} from "../access/DotnsRoleManagerOld.sol";
+import {IDotnsNameWhitelistOld} from "./IDotnsNameWhitelistOld.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
@@ -29,42 +24,28 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 ///      behalf and the name binds to that user. All state is on-chain and queryable through views;
 ///      no event indexing is required. A name holds at most `maxClaimants` live claims, which
 ///      bounds the loop that clears them on resolution. Resolving a name deletes its claims,
-///      refunding their storage deposit, so only reserved or won names persist. The entire admin
-///      surface is substrate Root: `SystemUtils.originIsRoot` is true through the proxy's
-///      delegatecall frame, and no gate reads `msg.sender`, so Root's lack of an address is not a
-///      problem. No signed account grants, revokes, reserves, or retunes a cap; the owner's
-///      authority is upgrade only. The public and PoP controllers hold only the `consume` hook.
+///      refunding their storage deposit, so only reserved or won names persist. Governance is Root
+///      or the owner. Substrate Root has no address, so the governance gates check
+///      `SystemUtils.originIsRoot`, which is true through the proxy's delegatecall frame, before
+///      reading `msg.sender`. Operators are signed role holders
+///      for day-to-day approvals; the public and PoP controllers hold only the `consume` hook.
 ///      Entries are keyed by the node under the active TLD, which the deployment holds immutable
 ///      for the whitelist's lifetime.
 /// @custom:security-contact admin@parity.io
-contract DotnsNameWhitelist is
+contract DotnsNameWhitelistOld is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
-    ERC165Upgradeable,
-    IDotnsNameWhitelist
+    DotnsRoleManagerOld,
+    IDotnsNameWhitelistOld
 {
     using StringUtils for string;
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-    /// @notice One role's membership and its admin role.
-    /// @dev Member of the reserved AccessControl namespace, unused because gating is Root only.
-    /// @param hasRole Whether an account holds the role.
-    /// @param adminRole Admin role that manages the role.
-    struct RoleData {
-        mapping(address account => bool) hasRole;
-        bytes32 adminRole;
-    }
-
-    /// @notice Reserved OpenZeppelin access-control namespace held at its ERC-7201 slot.
-    /// @dev Declared and left unused so the namespace stays present in the layout. Its slot derives
-    ///      from the label, disjoint from the sequential slots below, so it consumes none of them.
-    /// @param _roles Role data keyed by role identifier.
-    /// @custom:storage-location erc7201:openzeppelin.storage.AccessControl
-    struct AccessControlStorage {
-        mapping(bytes32 role => RoleData) _roles;
-    }
+    /// @notice Operator role identifier this snapshot recognises for its operational gates.
+    /// @dev Pinned here so the snapshot compiles against the current `DotnsConstants`, which no
+    ///      longer declares the role. The value matches the identifier the deployed proxy stored.
+    bytes32 private constant WHITELIST_OPERATOR_ROLE = keccak256("DOTNS_WHITELIST_OPERATOR_ROLE");
 
     /// @notice Protocol-level address registry for all DotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
@@ -102,13 +83,21 @@ contract DotnsNameWhitelist is
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
 
-    /// @notice Restricts a call to a substrate Root dispatch.
-    /// @dev The whole admin surface is governance-only: no key grants, revokes, reserves, or
-    ///      retunes a cap. The owner's authority is deployment and upgrade, not allocation, so no
-    ///      signed account can hand out a name. `msg.sender` is never read here, which is also what
-    ///      keeps every gated entry point callable under a Root origin, since Root has no account.
+    /// @notice Restricts a call to Root or the owner.
+    /// @dev Checks Root first so `msg.sender`, which traps under a Root origin, is read only for a
+    ///      signed caller.
     modifier onlyGovernance() {
-        _onlyGovernance();
+        if (!SystemUtils.originIsRoot()) {
+            _checkOwner();
+        }
+        _;
+    }
+
+    /// @notice Restricts a call to Root, the owner, or an operator.
+    modifier onlyOperatorOrGovernance() {
+        if (!SystemUtils.originIsRoot()) {
+            _checkRoleOrOwner(WHITELIST_OPERATOR_ROLE);
+        }
         _;
     }
 
@@ -120,11 +109,6 @@ contract DotnsNameWhitelist is
             NotController(msg.sender)
         );
         _;
-    }
-
-    /// @notice Internal check enforcing the substrate Root gate.
-    function _onlyGovernance() internal view {
-        require(SystemUtils.originIsRoot(), NotGovernance());
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -140,13 +124,19 @@ contract DotnsNameWhitelist is
     function initialize(IDotnsProtocolRegistry registry) external initializer {
         __ERC165_init();
         __Ownable_init(msg.sender);
+        _dotnsRoleManagerInit();
         protocolRegistry = registry;
         maxClaimants = DotnsConstants.WHITELIST_DEFAULT_MAX_CLAIMANTS;
         maxGrantBatch = DotnsConstants.WHITELIST_DEFAULT_MAX_GRANT_BATCH;
         maxReasonBytes = DotnsConstants.WHITELIST_DEFAULT_MAX_REASON_BYTES;
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
+    function setOperator(address account, bool enabled) external override onlyGovernance {
+        _setRole(WHITELIST_OPERATOR_ROLE, account, enabled);
+    }
+
+    /// @inheritdoc IDotnsNameWhitelistOld
     function setMaxClaimants(uint16 newMax) external override onlyGovernance {
         require(
             newMax > 0 && newMax <= DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT,
@@ -156,7 +146,7 @@ contract DotnsNameWhitelist is
         emit MaxClaimantsSet(newMax);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function setMaxReasonBytes(uint256 newMax) external override onlyGovernance {
         require(
             newMax > 0 && newMax <= DotnsConstants.WHITELIST_MAX_REASON_LIMIT,
@@ -166,7 +156,7 @@ contract DotnsNameWhitelist is
         emit MaxReasonBytesSet(newMax);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function setMaxGrantBatch(uint16 newMax) external override onlyGovernance {
         require(
             newMax > 0 && newMax <= DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT,
@@ -176,7 +166,7 @@ contract DotnsNameWhitelist is
         emit MaxGrantBatchSet(newMax);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function requestName(
         string calldata label,
         string calldata reason,
@@ -207,16 +197,30 @@ contract DotnsNameWhitelist is
         emit NameRequested(node, user, label, reason);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
-    function accept(string calldata label, address user) external override onlyGovernance {
+    /// @inheritdoc IDotnsNameWhitelistOld
+    function accept(
+        string calldata label,
+        address user
+    )
+        external
+        override
+        onlyOperatorOrGovernance
+    {
         bytes32 node = _nodeOf(label);
         require(_claims[node][user].status == ClaimStatus.Requested, NotRequested(node, user));
         emit NameAccepted(node, user, label);
         _settle(node, user, label);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
-    function reject(string calldata label, address user) external override onlyGovernance {
+    /// @inheritdoc IDotnsNameWhitelistOld
+    function reject(
+        string calldata label,
+        address user
+    )
+        external
+        override
+        onlyOperatorOrGovernance
+    {
         bytes32 node = _nodeOf(label);
         Claim storage claim = _claims[node][user];
         require(claim.status == ClaimStatus.Requested, NotRequested(node, user));
@@ -233,20 +237,34 @@ contract DotnsNameWhitelist is
         _deactivate(node);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
-    function grantName(string calldata label, address user) external override onlyGovernance {
+    /// @inheritdoc IDotnsNameWhitelistOld
+    function grantName(
+        string calldata label,
+        address user
+    )
+        external
+        override
+        onlyOperatorOrGovernance
+    {
         _grant(label, user);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
-    function grantNames(string[] calldata labels, address user) external override onlyGovernance {
+    /// @inheritdoc IDotnsNameWhitelistOld
+    function grantNames(
+        string[] calldata labels,
+        address user
+    )
+        external
+        override
+        onlyOperatorOrGovernance
+    {
         require(labels.length <= maxGrantBatch, TooManyLabels());
         for (uint256 i = 0; i < labels.length; i++) {
             _grant(labels[i], user);
         }
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function revokeName(string calldata label) external override onlyGovernance {
         bytes32 node = _nodeOf(label);
         NameRecord storage record = _names[node];
@@ -262,7 +280,7 @@ contract DotnsNameWhitelist is
         _deactivate(node);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function setReserved(string calldata label, bool reserved) external override onlyGovernance {
         require(label.isSingleLabel(), InvalidLabel());
         bytes32 node = _nodeOf(label);
@@ -283,7 +301,7 @@ contract DotnsNameWhitelist is
         }
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function consume(string calldata label, address registrant) external override onlyController {
         bytes32 node = _nodeOf(label);
         NameRecord storage record = _names[node];
@@ -297,7 +315,7 @@ contract DotnsNameWhitelist is
         _deactivate(node);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function setWindow(uint64 startsIn, uint64 duration) external override onlyGovernance {
         require(duration > 0, BadWindow());
         uint64 openAt = uint64(block.timestamp) + startsIn;
@@ -307,23 +325,23 @@ contract DotnsNameWhitelist is
         emit WindowSet(openAt, closeAt);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function statusOf(string calldata label) external view override returns (NameStatus status) {
         return _names[_nodeOf(label)].status;
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function isReserved(string calldata label) external view override returns (bool reserved) {
         return _names[_nodeOf(label)].status == NameStatus.Reserved;
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function granteeOf(string calldata label) external view override returns (address winner) {
         NameRecord storage record = _names[_nodeOf(label)];
         return record.status == NameStatus.Claimed ? record.winner : address(0);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function isGrantedTo(
         string calldata label,
         address account
@@ -338,7 +356,7 @@ contract DotnsNameWhitelist is
             account != address(0) && record.status == NameStatus.Claimed && record.winner == account;
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function claimOf(
         string calldata label,
         address user
@@ -351,12 +369,12 @@ contract DotnsNameWhitelist is
         return _claims[_nodeOf(label)][user];
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function claimantCount(string calldata label) external view override returns (uint256 count) {
         return _claimants[_nodeOf(label)].length();
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function claims(
         string calldata label,
         uint256 offset,
@@ -381,12 +399,12 @@ contract DotnsNameWhitelist is
         }
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function nameCount() external view override returns (uint256 count) {
         return _activeNodes.length();
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function names(
         uint256 offset,
         uint256 limit
@@ -412,24 +430,24 @@ contract DotnsNameWhitelist is
         }
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function window() external view override returns (uint64 openAt, uint64 closeAt) {
         return (_requestOpen, _requestClose);
     }
 
-    /// @inheritdoc IDotnsNameWhitelist
+    /// @inheritdoc IDotnsNameWhitelistOld
     function isWindowOpen() external view override returns (bool open) {
         return _isWindowOpen();
     }
 
-    /// @inheritdoc ERC165Upgradeable
+    /// @inheritdoc DotnsRoleManagerOld
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC165Upgradeable)
+        override(DotnsRoleManagerOld)
         returns (bool supported)
     {
-        return interfaceId == type(IDotnsNameWhitelist).interfaceId
+        return interfaceId == type(IDotnsNameWhitelistOld).interfaceId
             || super.supportsInterface(interfaceId);
     }
 
@@ -505,6 +523,11 @@ contract DotnsNameWhitelist is
     /// @return open True when the current time is within the window.
     function _isWindowOpen() internal view returns (bool open) {
         return block.timestamp >= _requestOpen && block.timestamp < _requestClose;
+    }
+
+    /// @inheritdoc DotnsRoleManagerOld
+    function _isSupportedRole(bytes32 role) internal pure override returns (bool supported) {
+        return role == WHITELIST_OPERATOR_ROLE;
     }
 
     /// @inheritdoc UUPSUpgradeable
