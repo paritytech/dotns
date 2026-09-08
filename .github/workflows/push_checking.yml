@@ -48,6 +48,9 @@ jobs:
           - id: invariant
             label: Contract Tests (Invariant)
             forge_args: --match-contract Invariant --no-match-path 'test/fork/**'
+          - id: fork
+            label: Upgrade Fork Tests
+            forge_args: --match-path 'test/fork/**'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,11 +81,11 @@ jobs:
 
       - run: bun install
 
-      # Only the unit-fuzz job needs the fork adapter, and only when fork tests
-      # actually exist in the tree. Fork tests are PR-scoped, so `test/fork/` is
-      # empty on master and `hashFiles` returns '' (step skipped, no docker build).
+      # Only the fork shard needs the adapter, and only when fork tests actually
+      # exist in the tree. Fork tests are PR-scoped, so `test/fork/` is empty on
+      # master and `hashFiles` returns '' (step skipped, no docker build).
       - name: Start revive-eth-rpc (paseo_local fork target)
-        if: matrix.kind.id == 'unit-fuzz' && hashFiles('test/fork/**') != ''
+        if: matrix.kind.id == 'fork' && hashFiles('test/fork/**') != ''
         run: |
           docker compose up -d --build
           bash scripts/shell/wait-for-eth-rpc.sh
@@ -96,6 +99,14 @@ jobs:
           FOUNDRY_INVARIANT_GAS_REPORT_SAMPLES: "1000"
         run: |
           set +e
+          # The fork shard is scheduled on every PR but only has work when an
+          # upgrade PR ships fork tests. With none in the tree it reports Skipped
+          # so the CI Summary row is truthful rather than a hollow pass.
+          if [ "${{ matrix.kind.id }}" = "fork" ] && [ -z "$(ls test/fork/*.t.sol 2>/dev/null)" ]; then
+            echo "result=Skipped - no fork tests in tree" >> "$GITHUB_OUTPUT"
+            echo "has_details=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Remove any prior build-info before `forge build` so the JSON the OZ
           # validator (vm.ffi inside upgrade tests) reads is the complete one
           # this build emits. Defence-in-depth: on a fresh `ubuntu-latest`
@@ -122,18 +133,8 @@ jobs:
             exit 1
           fi
 
-      # Fork tests run against the revive-eth-rpc adapter started above, only
-      # when present. The preceding `forge build` already produced full build-info
-      # for the OZ upgrade validator, so this reuses it.
-      - name: Run fork tests
-        if: matrix.kind.id == 'unit-fuzz' && hashFiles('test/fork/**') != ''
-        env:
-          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
-          FOUNDRY_PROFILE: "ci"
-        run: forge test -vv --match-path 'test/fork/**'
-
       - name: Tear down revive-eth-rpc
-        if: always() && matrix.kind.id == 'unit-fuzz' && hashFiles('test/fork/**') != ''
+        if: always() && matrix.kind.id == 'fork' && hashFiles('test/fork/**') != ''
         run: docker compose down --volumes --remove-orphans
 
       - name: Stage matrix-kind output for the aggregator
@@ -267,7 +268,7 @@ jobs:
               }
             }
 
-            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Gas Report', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Upgrade Fork Tests', 'Gas Report', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
             const sortedKeys = Object.keys(rows).sort((a, b) => (order.indexOf(a) === -1 ? 999 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 999 : order.indexOf(b)));
             let table = `| Check | Result |\n|:------|:-------|\n`;
             for (const key of sortedKeys) table += `| ${key} | ${rows[key]} |\n`;
