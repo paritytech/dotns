@@ -185,8 +185,6 @@ An upgrade that adds a governance-tunable storage value must seed it in the **sa
 
 UUPS supports this directly: `upgradeToAndCall` performs the post-upgrade call as a delegatecall from the proxy context, so `msg.sender` is preserved and an `onlyOwner` setter is callable as part of the upgrade.
 
-The [upgrade pipeline](#upgrade-pipeline) takes that call per contract, so a seeded upgrade is a pipeline run rather than a hand-sent transaction. The worked example below is the shape of the call to pass, and remains the way to upgrade a single proxy on its own.
-
 ### DotnsNameEscrow: `redeemWindow`
 
 The escrow's redeem window is the period after a `release` in which only the previous holder may act — they alone may `redeem` the name back, and `available` reports `false` so nobody wastes a commitment on it. Once it elapses, `reclaim` is permissionless. It is a separate value from `cooldown` and defaults to `ESCROW_REDEEM_WINDOW` (1 day) on a fresh deploy.
@@ -253,73 +251,6 @@ The fresh-deploy pipeline is split across five stages:
 | Wire deployments | scripts/deploy/WireDeployments.s.sol | Authorisation and registry wire-up plus end-to-end verification. This stage does not deploy proxies. |
 
 Each stage is a separate forge script invocation and therefore a separate EVM simulation. This keeps OpenZeppelin's upgrade-safety validator from accumulating enough simulated state to exhaust the EVM during validation.
-
-## Upgrade pipeline
-
-The deploy pipeline above cannot change a chain that already runs DotNS. Every address is a CREATE3 address, so where a contract is already present `_deployCreate3` finds the slot occupied and returns the occupant instead of deploying. Re-running a deploy therefore reports success, writes a manifest that reproduces the canonical address set, and changes nothing on chain; the only signal is a `WARNING: adopted existing proxy` line in the run log. Use the upgrade pipeline for a live network, and the deploy pipeline only for an empty one.
-
-The upgrade pipeline deploys new implementations and re-points the existing proxies, so every address and all state survive:
-
-| Stage | Script | Purpose |
-| --- | --- | --- |
-| Upgrade core | scripts/deploy/UpgradeCore.s.sol | Protocol registry, registrar, reverse resolver, and forward registry, plus both store implementations through the factory's beacons. |
-| Upgrade records | scripts/deploy/UpgradeRecords.s.sol | Forward resolver, content resolver, and PopRules. |
-| Upgrade policy | scripts/deploy/UpgradePolicy.s.sol | Name escrow, name whitelist, and commit-reveal controller. |
-| Upgrade Pop system | scripts/deploy/UpgradePopSystem.s.sol | Proof-of-Personhood controller and resolver. |
-| Verify upgrade | scripts/deploy/UpgradeVerify.s.sol | Read-only check that the upgraded graph is whole. This stage sends nothing. |
-
-Each stage is a separate forge script invocation, so OpenZeppelin's upgrade-safety validator starts from a clean process every time. Validating every contract in one run accumulates the multi-MB artefact reads until the simulation exhausts `memory_limit` and aborts part-way through with `MemoryOOG`, having already upgraded some of the graph. The registry is upgraded first because every later stage resolves its targets through it.
-
-Proxies are resolved from `DotnsProtocolRegistry` rather than a manifest, so a run targets whatever the chain actually wires up. A registry key the deployment does not hold is skipped rather than failing, and a contract whose implementation codehash already matches is reported as unchanged, so a re-run is safe and cheap.
-
-Simulate first. A dry run exercises the real proxies, the real owner and the real storage, and reports exactly which contracts would move, without sending anything:
-
-```bash
-export DOTNS_PROTOCOL_REGISTRY=0xD19e3D0C97CF501125a04A97405e3e6592fa846E
-export OWNER=$(cast call "$DOTNS_PROTOCOL_REGISTRY" 'owner()(address)' --rpc-url "$RPC_URL")
-
-for stage in UpgradeCore UpgradeRecords UpgradePolicy UpgradePopSystem UpgradeVerify; do
-  forge script "scripts/deploy/${stage}.s.sol:${stage}" \
-    --rpc-url "$RPC_URL" --sender "$OWNER"
-done
-```
-
-`--sender` is required, not cosmetic. Every proxy gates `_authorizeUpgrade` on `onlyOwner`, and `UpgradeVerify` compares each `owner()` against the caller, so without it the run reports failures that only reflect Foundry's default sender.
-
-Then apply. The four upgrade stages broadcast; `UpgradeVerify` sends nothing and is run as a dry run afterwards:
-
-```bash
-export DOTNS_UPGRADE_REFERENCE_DIR=previous-builds/build-info-<deployed-release>
-
-for stage in UpgradeCore UpgradeRecords UpgradePolicy UpgradePopSystem; do
-  forge script "scripts/deploy/${stage}.s.sol:${stage}" \
-    --rpc-url "$RPC_URL" --account "$DEPLOYER" --sender "$OWNER" --broadcast
-done
-
-forge script scripts/deploy/UpgradeVerify.s.sol:UpgradeVerify \
-  --rpc-url "$RPC_URL" --sender "$OWNER"
-```
-
-### What the upgrade pipeline does not cover
-
-`StoreFactory` is not upgradeable. It is a plain `Ownable` contract holding both store beacons as immutables, so a change to the factory's own code needs a fresh deploy, not an upgrade. The same applies to `DotnsPopLens`, `Multicall3`, and the cost-model stack (`DotnsCostModelRegistry`, `DotnsFlatPricing`, `DotnsScarcityPricing`): each is replaced by deploying a new one and re-pointing its registry key, and the store beacons are upgraded through the factory rather than replaced.
-
-An upgrade also leaves no manifest record. A manifest holds one address per contract and no implementation addresses, so an upgrade changes nothing it tracks. The record of what was applied lives with the deployment request that ran it.
-
-### Storage layout is checked only against a reference
-
-Each stage runs `Upgrades.validateImplementation`, which catches the unsafe-pattern class: constructor state, `selfdestruct`, unguarded `delegatecall`, a missing initialiser. It does not compare storage layout against what is deployed, because that needs the deployed release's build info as a reference and a release publishes ABIs rather than build info.
-
-So `DOTNS_UPGRADE_REFERENCE_DIR` is **required to broadcast**: a stage refuses to send without it and says so. A dry run may omit it, because simulating is how you find out what a release would move before you have produced a reference for it.
-
-Point it at a build-info directory produced by building the deployed release:
-
-```bash
-DOTNS_UPGRADE_REFERENCE_DIR=previous-builds/build-info-v0.5.8-rc1 \
-  forge script scripts/deploy/UpgradeCore.s.sol:UpgradeCore --rpc-url "$RPC_URL"
-```
-
-Without it the layout is unverified, so a reordered or removed storage variable would corrupt state rather than revert.
 
 ## Post-deployment verification
 
