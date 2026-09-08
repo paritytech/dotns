@@ -2,6 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {console} from "forge-std/Script.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
@@ -12,6 +13,11 @@ import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolReg
 /// @notice Minimal view of a UUPS proxy: the upgrade entrypoint its owner calls.
 interface IUUPS {
     function upgradeToAndCall(address newImplementation, bytes calldata data) external payable;
+}
+
+/// @notice Minimal view of an `UpgradeableBeacon`: what every proxy behind it currently runs.
+interface IUpgradeableBeacon {
+    function implementation() external view returns (address);
 }
 
 /// @title UpgradeBase
@@ -37,6 +43,13 @@ interface IUUPS {
 /// @custom:security-contact admin@parity.io
 abstract contract UpgradeBase is BaseDeployer {
     /// @dev EIP-1967 implementation slot: `keccak256("eip1967.proxy.implementation") - 1`.
+    /// @notice One immutable range in a contract's runtime code, as the compiler recorded it.
+    /// @dev Field order matches the JSON keys `parseJson` decodes positionally: length, start.
+    struct ImmutableRef {
+        uint256 len;
+        uint256 start;
+    }
+
     bytes32 internal constant IMPLEMENTATION_SLOT =
         0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
@@ -125,9 +138,10 @@ abstract contract UpgradeBase is BaseDeployer {
         address implementation = _deployImplementation(artefact);
         address current = _implementationOf(proxy);
 
-        // Byte-identical code means this contract did not change in the release being applied.
+        // Identical code means this contract did not change in the release being applied.
         // Skipping keeps a re-run cheap and makes the summary say what actually moved.
-        if (current.codehash == implementation.codehash) {
+        if (_comparableCodeHash(current, artefact) == _comparableCodeHash(implementation, artefact))
+        {
             vm.stopBroadcast();
             console.log("  unchanged %s", label);
             ++_unchangedCount;
@@ -147,11 +161,68 @@ abstract contract UpgradeBase is BaseDeployer {
         ++_upgradedCount;
     }
 
+    /// @notice Deploys a store implementation and reports whether the beacon needs rotating.
+    /// @dev Held to the same standard as `_upgradeProxy`, because a rotation rewrites the
+    ///      behaviour of every store on the network at once. `UpgradeableBeacon.upgradeTo`
+    ///      accepts an address whose bytecode is identical to the current one, so without the
+    ///      codehash check a re-run would rotate every store to a fresh copy of the code it
+    ///      already ran and report it as an upgrade.
+    /// @dev Returns rather than calling back into the caller: a function pointer would make the
+    ///      rotation an external call to the script itself, which Foundry records as a broadcast
+    ///      transaction to the script address.
+    /// @param owner Broadcasting account, which must own the factory.
+    /// @param beacon The beacon to inspect.
+    /// @param artefact Fully-qualified artefact name of the new implementation.
+    /// @param label Bare contract name, used for logging and as the reference name.
+    /// @return implementation The freshly deployed implementation, or zero when unchanged.
+    function _prepareBeaconRotation(
+        address owner,
+        address beacon,
+        string memory artefact,
+        string memory label
+    )
+        internal
+        returns (address implementation)
+    {
+        _validate(artefact, label);
+
+        address current = IUpgradeableBeacon(beacon).implementation();
+
+        vm.startBroadcast(owner);
+        implementation = _deployImplementation(artefact);
+        vm.stopBroadcast();
+
+        if (_comparableCodeHash(current, artefact) == _comparableCodeHash(implementation, artefact))
+        {
+            console.log("  unchanged %s (beacon)", label);
+            ++_unchangedCount;
+            return address(0);
+        }
+
+        console.log("  upgraded  %s (beacon)", label);
+        console.log("            beacon         ", beacon);
+        console.log("            was            ", current);
+        console.log("            now            ", implementation);
+        ++_upgradedCount;
+    }
+
     /// @notice Runs the OpenZeppelin checks, with layout comparison when a reference is supplied.
-    function _validate(string memory artefact, string memory label) private {
+    /// @dev Fails closed when broadcasting. `validateImplementation` alone catches unsafe patterns
+    ///      but never compares layout against what is deployed, so a reordered or removed slot
+    ///      would corrupt state rather than revert. A dry run may skip the reference, because
+    ///      simulating is how you find out what a release would move before producing one.
+    function _validate(string memory artefact, string memory label) internal {
         Options memory opts;
         string memory referenceDir = vm.envOr("DOTNS_UPGRADE_REFERENCE_DIR", string(""));
         if (bytes(referenceDir).length == 0) {
+            // Allow-list the contexts that send nothing, so `--resume` and any context added
+            // later fail closed rather than inheriting a broadcast exemption by omission.
+            bool simulating = vm.isContext(VmSafe.ForgeContext.ScriptDryRun)
+                || vm.isContext(VmSafe.ForgeContext.TestGroup);
+            require(
+                simulating,
+                "DOTNS_UPGRADE_REFERENCE_DIR is required outside a dry run: without it storage layout is unchecked"
+            );
             Upgrades.validateImplementation(artefact, opts);
             return;
         }
@@ -177,6 +248,77 @@ abstract contract UpgradeBase is BaseDeployer {
         require(
             implementation != address(0), string.concat(artefact, ": implementation deploy failed")
         );
+    }
+
+    /// @notice Hash of `target`'s runtime code with its immutable regions zeroed, for comparing
+    ///         two deploys of the same contract.
+    /// @dev A plain `codehash` cannot answer "is this the same code": every UUPS implementation
+    ///      inherits `address private immutable __self = address(this)`, so the deploy address is
+    ///      baked into the runtime bytes and two deploys of identical source never match. Every
+    ///      UUPS contract here would therefore always read as changed and be rotated on a re-run,
+    ///      while only the beacon stores, which have no immutables, could ever report unchanged.
+    ///      Masking the immutable ranges the compiler recorded compares logic instead of address.
+    ///      Non-immutable differences, metadata included, still count as changed, so the check
+    ///      errs towards upgrading, never towards skipping an upgrade that was needed.
+    function _comparableCodeHash(
+        address target,
+        string memory artefact
+    )
+        internal
+        view
+        returns (bytes32)
+    {
+        bytes memory runtime = target.code;
+        if (runtime.length == 0) return bytes32(0);
+
+        // Field order is the JSON key order `parseJson` decodes into: "length", then "start".
+        string memory json = vm.readFile(_artefactPath(artefact));
+        string memory root = "$.deployedBytecode.immutableReferences";
+        // A contract with no immutables serialises `immutableReferences` as `{}`, which
+        // `parseJsonKeys` rejects rather than reporting as empty. That is the common case here:
+        // the beacon stores have no immutables at all, so their code compares as-is.
+        string[] memory ids;
+        try vm.parseJsonKeys(json, root) returns (string[] memory keys) {
+            ids = keys;
+        } catch {
+            return keccak256(runtime);
+        }
+
+        for (uint256 i; i < ids.length; ++i) {
+            ImmutableRef[] memory refs = abi.decode(
+                vm.parseJson(json, string.concat(root, '["', ids[i], '"]')), (ImmutableRef[])
+            );
+            for (uint256 j; j < refs.length; ++j) {
+                for (uint256 k; k < refs[j].len; ++k) {
+                    uint256 at = refs[j].start + k;
+                    if (at < runtime.length) runtime[at] = 0;
+                }
+            }
+        }
+        return keccak256(runtime);
+    }
+
+    /// @notice Foundry artefact path for a `File.sol:Contract` identifier.
+    function _artefactPath(string memory artefact) internal view returns (string memory) {
+        bytes memory raw = bytes(artefact);
+        uint256 colon = raw.length;
+        for (uint256 i; i < raw.length; ++i) {
+            if (raw[i] == ":") {
+                colon = i;
+                break;
+            }
+        }
+        require(colon != raw.length, string.concat(artefact, ": expected File.sol:Contract"));
+
+        bytes memory file = new bytes(colon);
+        for (uint256 i; i < colon; ++i) {
+            file[i] = raw[i];
+        }
+        bytes memory name = new bytes(raw.length - colon - 1);
+        for (uint256 i; i < name.length; ++i) {
+            name[i] = raw[colon + 1 + i];
+        }
+        return string.concat(vm.projectRoot(), "/out/", string(file), "/", string(name), ".json");
     }
 
     /// @notice Reads a proxy's current implementation from its EIP-1967 slot.

@@ -272,18 +272,33 @@ Each stage is a separate forge script invocation, so OpenZeppelin's upgrade-safe
 
 Proxies are resolved from `DotnsProtocolRegistry` rather than a manifest, so a run targets whatever the chain actually wires up. A registry key the deployment does not hold is skipped rather than failing, and a contract whose implementation codehash already matches is reported as unchanged, so a re-run is safe and cheap.
 
-Run each stage against the deployment's registry:
+Simulate first. A dry run exercises the real proxies, the real owner and the real storage, and reports exactly which contracts would move, without sending anything:
 
 ```bash
 export DOTNS_PROTOCOL_REGISTRY=0xD19e3D0C97CF501125a04A97405e3e6592fa846E
+export OWNER=$(cast call "$DOTNS_PROTOCOL_REGISTRY" 'owner()(address)' --rpc-url "$RPC_URL")
 
 for stage in UpgradeCore UpgradeRecords UpgradePolicy UpgradePopSystem UpgradeVerify; do
   forge script "scripts/deploy/${stage}.s.sol:${stage}" \
-    --rpc-url "$RPC_URL" --account "$DEPLOYER" --broadcast
+    --rpc-url "$RPC_URL" --sender "$OWNER"
 done
 ```
 
-Drop `--broadcast` to simulate against live chain state without sending anything. Do that first: the simulation exercises the real proxies, the real owner, and the real storage, and reports exactly which contracts would move.
+`--sender` is required, not cosmetic. Every proxy gates `_authorizeUpgrade` on `onlyOwner`, and `UpgradeVerify` compares each `owner()` against the caller, so without it the run reports failures that only reflect Foundry's default sender.
+
+Then apply. The four upgrade stages broadcast; `UpgradeVerify` sends nothing and is run as a dry run afterwards:
+
+```bash
+export DOTNS_UPGRADE_REFERENCE_DIR=previous-builds/build-info-<deployed-release>
+
+for stage in UpgradeCore UpgradeRecords UpgradePolicy UpgradePopSystem; do
+  forge script "scripts/deploy/${stage}.s.sol:${stage}" \
+    --rpc-url "$RPC_URL" --account "$DEPLOYER" --sender "$OWNER" --broadcast
+done
+
+forge script scripts/deploy/UpgradeVerify.s.sol:UpgradeVerify \
+  --rpc-url "$RPC_URL" --sender "$OWNER"
+```
 
 ### What the upgrade pipeline does not cover
 
@@ -291,18 +306,20 @@ Drop `--broadcast` to simulate against live chain state without sending anything
 
 An upgrade also leaves no manifest record. A manifest holds one address per contract and no implementation addresses, so an upgrade changes nothing it tracks. The record of what was applied lives with the deployment request that ran it.
 
-### Storage layout is not checked by default
+### Storage layout is checked only against a reference
 
 Each stage runs `Upgrades.validateImplementation`, which catches the unsafe-pattern class: constructor state, `selfdestruct`, unguarded `delegatecall`, a missing initialiser. It does not compare storage layout against what is deployed, because that needs the deployed release's build info as a reference and a release publishes ABIs rather than build info.
 
-Point `DOTNS_UPGRADE_REFERENCE_DIR` at a build-info directory produced by building the deployed release to turn the comparison on:
+So `DOTNS_UPGRADE_REFERENCE_DIR` is **required to broadcast**: a stage refuses to send without it and says so. A dry run may omit it, because simulating is how you find out what a release would move before you have produced a reference for it.
+
+Point it at a build-info directory produced by building the deployed release:
 
 ```bash
 DOTNS_UPGRADE_REFERENCE_DIR=previous-builds/build-info-v0.5.8-rc1 \
   forge script scripts/deploy/UpgradeCore.s.sol:UpgradeCore --rpc-url "$RPC_URL"
 ```
 
-Without it the layout is unverified, so a reordered or removed storage variable would corrupt state rather than revert. Treat the reference as required for any upgrade that touches a contract's storage.
+Without it the layout is unverified, so a reordered or removed storage variable would corrupt state rather than revert.
 
 ## Post-deployment verification
 

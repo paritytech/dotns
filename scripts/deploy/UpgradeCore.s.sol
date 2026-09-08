@@ -6,8 +6,6 @@ import {UpgradeBase} from "./UpgradeBase.s.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
 import {IStoreFactory} from "../../contracts/store/IStoreFactory.sol";
-import {LabelStore} from "../../contracts/store/LabelStore.sol";
-import {UserStore} from "../../contracts/store/UserStore.sol";
 
 /// @title UpgradeCore
 /// @notice First upgrade stage, mirroring what `DeployCore` deploys: the protocol registry and the
@@ -53,7 +51,11 @@ contract UpgradeCore is UpgradeBase {
         _endUpgrade("UpgradeCore");
     }
 
-    /// @notice Upgrades both store implementations through the factory's beacons.
+    /// @notice Rotates both store beacons, so every deployed store follows the new code.
+    /// @dev `StoreFactory` itself is not upgradeable, so this reaches the stores through the
+    ///      beacons it owns rather than by replacing the factory. The rotation is sent from here
+    ///      rather than from a callback in the base, so the only broadcast calls are to the
+    ///      factory and never to the script address.
     function _upgradeStores(address owner, address registry) private {
         address factoryAddress = IDotnsProtocolRegistry(registry).get(DotnsConstants.STORE_FACTORY);
         if (factoryAddress == address(0)) {
@@ -63,15 +65,20 @@ contract UpgradeCore is UpgradeBase {
 
         IStoreFactory factory = IStoreFactory(factoryAddress);
 
-        vm.startBroadcast(owner);
-        address labelStore = address(new LabelStore());
-        address userStore = address(new UserStore());
-        factory.upgradeLabelStoreImplementation(labelStore);
-        factory.upgradeUserStoreImplementation(userStore);
-        vm.stopBroadcast();
+        address labelStore = _prepareBeaconRotation(
+            owner, factory.labelStoreBeacon(), "LabelStore.sol:LabelStore", "LabelStore"
+        );
+        if (labelStore != address(0)) {
+            vm.broadcast(owner);
+            factory.upgradeLabelStoreImplementation(labelStore);
+        }
 
-        console.log("  upgraded  LabelStore beacon implementation", labelStore);
-        console.log("  upgraded  UserStore beacon implementation ", userStore);
-        _upgradedCount += 2;
+        address userStore = _prepareBeaconRotation(
+            owner, factory.userStoreBeacon(), "UserStore.sol:UserStore", "UserStore"
+        );
+        if (userStore != address(0)) {
+            vm.broadcast(owner);
+            factory.upgradeUserStoreImplementation(userStore);
+        }
     }
 }
