@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   coverage:
-    runs-on: parity-int-ubuntu-xl
+    runs-on: ubuntu-latest
     if: github.event.action != 'closed'
     steps:
       - uses: actions/checkout@v4
@@ -232,7 +232,7 @@ jobs:
             }
 
   cleanup:
-    runs-on: parity-int-ubuntu-xl
+    runs-on: ubuntu-latest
     if: github.event.action == 'closed'
     steps:
       - uses: actions/checkout@v4

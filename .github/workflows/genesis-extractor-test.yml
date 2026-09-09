@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   genesis-extractor-test:
-    runs-on: parity-int-ubuntu-xl
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 

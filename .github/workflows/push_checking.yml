@@ -34,7 +34,7 @@ jobs:
   test:
     if: github.event.action != 'closed'
     name: ${{ matrix.kind.label }}
-    runs-on: parity-int-ubuntu-xl
+    runs-on: ubuntu-latest
     strategy:
       # Each matrix kind runs on its own runner so neither has to hold the
       # other's peak memory. Don't fail-fast: surfacing both shards' results
@@ -165,7 +165,7 @@ jobs:
     if: github.event.action != 'closed' && needs.detect-fork.outputs.has_fork == 'true'
     # The fork job builds the revive ETH-RPC adapter image and runs the upgrade
     # suite, so it is kept off the shared test runner and onto the Parity XL runner.
-    runs-on: parity-int-ubuntu-xl
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -246,7 +246,7 @@ jobs:
     name: Report Test Results
     needs: [test, fork]
     if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
-    runs-on: parity-int-ubuntu-xl
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -368,7 +368,7 @@ jobs:
             else await github.rest.issues.createComment({ owner, repo, issue_number, body });
 
   cleanup:
-    runs-on: parity-int-ubuntu-xl
+    runs-on: ubuntu-latest
     if: github.event.action == 'closed'
     steps:
       - uses: actions/checkout@v4

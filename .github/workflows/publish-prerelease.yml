@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   beta-release:
-    runs-on: parity-int-ubuntu-xl
+    runs-on: ubuntu-latest
     # Baked into the genesis registry, so it decides which networks the artifact suits.
     # Job-level: five steps name the file derived from it and must not disagree.
     env:
