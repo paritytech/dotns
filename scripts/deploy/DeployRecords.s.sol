@@ -82,9 +82,7 @@ contract DeployRecords is BaseDeployer {
             owner,
             "DotnsFlatPricing.sol:DotnsFlatPricing",
             abi.encode(DotnsConstants.BASE_DEPOSIT),
-            "DotnsFlatPricing",
-            // `deposit` is a constructor-set immutable in the runtime code.
-            true
+            "DotnsFlatPricing"
         );
         registry = _broadcastDeployCreate3(
             owner,

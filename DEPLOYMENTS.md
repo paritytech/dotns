@@ -361,6 +361,27 @@ Two other manifest entries are not CREATE3-derived: `LabelStoreBeacon` and `User
 
 The one address that is not CREATE3-derived is the CREATE3 factory itself: it bootstraps the scheme, so it cannot deploy itself. The first deploy stage deploys it directly and records it on the protocol registry under the `CREATE3_FACTORY` key; every later stage resolves it from there rather than from an environment variable. Because every other address is derived from the factory's address, the factory must sit at the same address on each chain for the rest of the set to match. Deploy it as the deployer's first transaction on a fresh account (or through a deterministic singleton deployer) so its nonce-derived address is identical across chains.
 
+### Occupied addresses, and what a resume will adopt
+
+A CREATE3 address can already hold code when the pipeline reaches it. Either the run is a resume and that code is its own earlier deployment, or someone else put it there: `Create3Factory.deploy` is permissionless and the salts above are a pure function of public constants, so any dotNS address can be occupied in advance by anyone who reads them off a live deployment.
+
+The pipeline adopts an occupant only when its runtime code is what this run would have deployed, and fails the whole stage otherwise. It never adopts on faith, and it never silently writes a foreign contract into the protocol registry or the manifest.
+
+Matching works in two steps, in `BaseDeployer._requireExpectedCode`:
+
+- An exact codehash match against the artefact is accepted immediately. This covers every contract without constructor-set immutables, `ERC1967Proxy` included.
+- Otherwise the artefact carries immutables, whose values are baked into runtime code, so no fixed codehash exists to compare against. The pipeline deploys the artefact twice locally, with this run's constructor arguments, and compares the occupant against those references. Bytes that agree across both references are what those arguments produce and must match. Bytes that differ between them are address-derived and vary on every honest deploy, so they are skipped.
+
+The reference copies are throwaway and are deployed with broadcasting paused, so they are never sent as transactions.
+
+That second step is what rejects a genuine artefact deployed against someone else's constructor arguments: a real `StoreFactory` pointed at an attacker's protocol registry has the right length and shape, and differs only in the values its constructor wrote.
+
+**What this cannot check.** Immutables whose values are address-derived are indistinguishable between an honest deploy and any other, because they legitimately differ every time. `StoreFactory` is the case that matters: it deploys its own beacons, so `labelStoreBeacon` and `userStoreBeacon` differ on every deploy and are skipped by the comparison. Its `protocolRegistry` and owner, which are constructor arguments, are checked. If you adopt a `StoreFactory` you did not just deploy, confirm its beacons point at the store implementations you expect rather than relying on the bytecode check.
+
+**Recovering a burned address.** An occupant that fails the check cannot be evicted: CREATE3 slots are single use. Set `DOTNS_SALT_VERSION` to a value above `1` to move the whole set onto fresh addresses; the salt then gains a `:<version>` suffix. This is a recovery lever, not routine configuration, and every address moves together.
+
+**A note for anyone adding an initialiser.** Proxies are initialised inside the `ERC1967Proxy` constructor, so there is no window in which a deployed proxy is uninitialised. One consequence is easy to trip over: the owner is now an explicit argument rather than the caller, so an initialiser must not call its own `onlyOwner` setters, which would reject the deployer mid-initialisation. Because the initialiser runs during construction, such a revert surfaces as CREATE3's opaque `DeploymentFailed()` rather than the underlying error. Seed values through internal helpers instead.
+
 ### Keeping the factory address stable across chain resets
 
 The "first transaction on a fresh account" rule only holds while the deployer key stays pristine. In practice the same key also runs upgrades and other operations, so on a chain reset it is no longer at nonce 0 when the pipeline runs, the factory lands at a new address, and every downstream address shifts with it. Because only the factory is nonce-sensitive, the fix is to isolate just the factory onto a single-purpose key and have the pipeline reuse it.

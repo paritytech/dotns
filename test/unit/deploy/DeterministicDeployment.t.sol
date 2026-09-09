@@ -38,6 +38,79 @@ contract DeterministicDeploymentTest is Test {
         factory = Create3Factory(payable(deployer.bootstrapCreate3Factory(owner)));
     }
 
+    /// @notice The #260 property: an occupied CREATE3 address holding code this run would not
+    ///         have deployed is a hard failure, not an adoption.
+    /// @dev Squatting is free. `Create3Factory.deploy` is permissionless and the salts are a
+    ///      pure function of public constants, so anyone can occupy a dotNS address in advance.
+    ///      Adopting it would wire a foreign contract into the protocol registry and record it
+    ///      in the manifest as ours, and the CREATE3 slot can never be reclaimed.
+    function test_foreignOccupantIsRejectedRatherThanAdopted() public {
+        bytes32 salt = deployer.create3Salt("Multicall3", "contract");
+
+        vm.prank(owner);
+        factory.deploy(salt, type(Squatter).creationCode);
+
+        vm.expectRevert();
+        deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", "", "Multicall3");
+    }
+
+    /// @notice The same rejection applies to an artefact carrying constructor-set immutables,
+    ///         which is the case the check cannot answer by codehash alone.
+    /// @dev `StoreFactory` bakes its beacon addresses into runtime code, so two honest deploys
+    ///      differ. The check masks the immutable ranges rather than comparing lengths: a length
+    ///      comparison accepts any occupant padded to the same size.
+    function test_foreignOccupantIsRejectedForAnImmutableCarryingArtefact() public {
+        bytes32 salt = deployer.create3Salt("StoreFactory", "contract");
+
+        vm.prank(owner);
+        factory.deploy(salt, type(Squatter).creationCode);
+
+        address protocolRegistry = deployer.predictCreate3("DotnsProtocolRegistry", "proxy");
+        vm.expectRevert();
+        deployer.deployCreate3(
+            owner,
+            "StoreFactory.sol:StoreFactory",
+            abi.encode(protocolRegistry, owner),
+            "StoreFactory"
+        );
+    }
+
+    /// @notice A real `StoreFactory` deployed against an attacker's constructor arguments is
+    ///         rejected, not adopted.
+    /// @dev The case bytecode comparison alone cannot answer. The occupant is the genuine
+    ///      artefact, so its length and shape match; only the values its constructor baked in
+    ///      differ. Comparing against a reference built with this run's arguments catches it,
+    ///      while the beacons `StoreFactory` deploys itself vary on every honest deploy and are
+    ///      necessarily skipped.
+    function test_sameArtefactWithForeignConstructorArgsIsRejected() public {
+        address attacker = makeAddr("attacker");
+        address realRegistry = deployer.predictCreate3("DotnsProtocolRegistry", "proxy");
+        address foreignRegistry = address(new DotnsProtocolRegistry());
+
+        bytes32 salt = deployer.create3Salt("StoreFactory", "contract");
+        vm.prank(attacker);
+        factory.deploy(
+            salt,
+            abi.encodePacked(type(StoreFactory).creationCode, abi.encode(foreignRegistry, attacker))
+        );
+
+        vm.expectRevert();
+        deployer.deployCreate3(
+            owner, "StoreFactory.sol:StoreFactory", abi.encode(realRegistry, owner), "StoreFactory"
+        );
+    }
+
+    /// @notice A resumed run still adopts its own earlier deployment. Guards the other direction:
+    ///         a check strict enough to reject a squat must not reject the honest resume, or
+    ///         every interrupted run would need a salt bump to recover.
+    function test_resumeAdoptsThisRunsOwnDeployment() public {
+        address first = deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", "", "Multicall3");
+        address second =
+            deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", "", "Multicall3");
+
+        assertEq(second, first, "a resumed run did not adopt its own deployment");
+    }
+
     function test_coreDeploymentAddressesStayTheSameAcrossChainIds() public {
         uint256 baseline = vm.snapshotState();
 
@@ -304,5 +377,15 @@ contract DeterministicDeploymentTest is Test {
         assertEq(DotnsProtocolRegistry(addr.protocolRegistry).owner(), owner, "registry owner");
         assertEq(DotnsRegistrar(addr.registrar).owner(), owner, "registrar owner");
         assertEq(StoreFactory(addr.storeFactory).owner(), owner, "factory owner");
+    }
+}
+
+/// @notice Arbitrary code standing at a dotNS CREATE3 address. Represents anything an attacker
+///         might park there; the pipeline must refuse it whatever it is.
+contract Squatter {
+    address public immutable OWNER = msg.sender;
+
+    function hello() external pure returns (uint256) {
+        return 42;
     }
 }

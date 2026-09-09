@@ -88,12 +88,7 @@ contract DeployPopSystem is BaseDeployer {
         returns (address lens)
     {
         lens = _broadcastDeployCreate3(
-            owner,
-            "DotnsPopLens.sol:DotnsPopLens",
-            abi.encode(protocolRegistry),
-            "DotnsPopLens",
-            // `_protocolRegistry` is a constructor-set immutable in the runtime code.
-            true
+            owner, "DotnsPopLens.sol:DotnsPopLens", abi.encode(protocolRegistry), "DotnsPopLens"
         );
     }
 }

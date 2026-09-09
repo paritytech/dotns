@@ -37,6 +37,11 @@ abstract contract BaseDeployer is Script {
 
     /// @notice ERC1967 implementation storage slot,
     ///         `bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)`.
+
+    /// @notice Broadcaster of the deploy currently in progress, or zero outside a broadcast.
+    /// @dev Read by @custom:function _deployReference so comparison copies are not broadcast.
+    address private _activeBroadcaster;
+
     bytes32 internal constant ERC1967_IMPLEMENTATION_SLOT =
         0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
@@ -191,19 +196,17 @@ abstract contract BaseDeployer is Script {
         Upgrades.validateImplementation(artefact, opts);
 
         vm.startBroadcast(owner);
-        // `UUPSUpgradeable` holds `address private immutable __self = address(this)`,
-        // so an implementation's runtime code varies with its address and is matched
-        // by length. `ERC1967Proxy` keeps its implementation in storage rather than
-        // an immutable, so the proxy leg is matched by codehash.
-        (address implementation, bool implementationExisted) = _deployCreate3(
-            artefact, opts.constructorData, _create3Salt(label, "implementation"), true
-        );
+        _activeBroadcaster = owner;
+        // `UUPSUpgradeable` holds `address private immutable __self = address(this)`, so an
+        // implementation's runtime code varies with its address. Both legs are matched with the
+        // immutable ranges masked, which handles that without weakening the check.
+        (address implementation, bool implementationExisted) =
+            _deployCreate3(artefact, opts.constructorData, _create3Salt(label, "implementation"));
         bool proxyExisted;
         (proxy, proxyExisted) = _deployCreate3(
             "ERC1967Proxy.sol:ERC1967Proxy",
             abi.encode(implementation, initialiserCalldata),
-            _create3Salt(label, "proxy"),
-            false
+            _create3Salt(label, "proxy")
         );
         // The two legs are deployed together, so a first run finds neither present
         // and a resumed run finds both. An implementation present without its proxy
@@ -227,6 +230,7 @@ abstract contract BaseDeployer is Script {
             console.log("WARNING: adopted existing proxy, initialiser skipped for", label);
             console.log("         on-chain configuration may differ from this run's inputs");
         }
+        _activeBroadcaster = address(0);
         vm.stopBroadcast();
         // Confirms the proxy delegates to the implementation this run deployed. Read
         // from storage rather than through a call, so the answer comes from the slot
@@ -246,29 +250,7 @@ abstract contract BaseDeployer is Script {
     /// @param artefact Fully-qualified artefact name.
     /// @param constructorData ABI-encoded constructor arguments.
     /// @param label Trace / manifest identifier.
-    /// @param expectImmutables True when the artefact's runtime code carries
-    ///        constructor-set immutables; see `_deployCreate3`.
     /// @return deployed Address of the deployed contract.
-    function _broadcastDeployCreate3(
-        address owner,
-        string memory artefact,
-        bytes memory constructorData,
-        string memory label,
-        bool expectImmutables
-    )
-        internal
-        returns (address deployed)
-    {
-        vm.startBroadcast(owner);
-        (deployed,) = _deployCreate3(
-            artefact, constructorData, _create3Salt(label, "contract"), expectImmutables
-        );
-        vm.stopBroadcast();
-        vm.label(deployed, label);
-        logDeployment(label, deployed);
-    }
-
-    /// @notice Exact-codehash variant, for artefacts without immutables.
     function _broadcastDeployCreate3(
         address owner,
         string memory artefact,
@@ -278,7 +260,13 @@ abstract contract BaseDeployer is Script {
         internal
         returns (address deployed)
     {
-        return _broadcastDeployCreate3(owner, artefact, constructorData, label, false);
+        vm.startBroadcast(owner);
+        _activeBroadcaster = owner;
+        (deployed,) = _deployCreate3(artefact, constructorData, _create3Salt(label, "contract"));
+        _activeBroadcaster = address(0);
+        vm.stopBroadcast();
+        vm.label(deployed, label);
+        logDeployment(label, deployed);
     }
 
     /// @notice Ensures the CREATE3 factory exists and primes it as the in-memory
@@ -327,7 +315,9 @@ abstract contract BaseDeployer is Script {
     /// @return factory Address of the freshly deployed CREATE3 factory.
     function _bootstrapCreate3Factory(address owner) internal returns (address factory) {
         vm.startBroadcast(owner);
+        _activeBroadcaster = owner;
         factory = address(new Create3Factory());
+        _activeBroadcaster = address(0);
         vm.stopBroadcast();
         console.log("WARNING: minted a nonce-derived CREATE3 factory at", factory);
         console.log(
@@ -366,7 +356,9 @@ abstract contract BaseDeployer is Script {
         internal
     {
         vm.startBroadcast(owner);
+        _activeBroadcaster = owner;
         IDotnsProtocolRegistry(protocolRegistry).set(DotnsConstants.CREATE3_FACTORY, factory);
+        _activeBroadcaster = address(0);
         vm.stopBroadcast();
     }
 
@@ -397,31 +389,8 @@ abstract contract BaseDeployer is Script {
     /// @dev Adoption requires the occupant's runtime code to match the artefact this
     ///      run would deploy; anything else reverts. A resumed run is bytecode
     ///      identical and adopts without further input.
-    /// @param expectImmutables True for artefacts whose runtime code carries
-    ///        constructor-set immutables. The compiled artefact leaves those slots
-    ///        zeroed, so the comparison is by length rather than by codehash.
     /// @return deployed The CREATE3 address of the contract.
     /// @return existed True when the target already held this artefact's code.
-    function _deployCreate3(
-        string memory artefact,
-        bytes memory constructorData,
-        bytes32 salt,
-        bool expectImmutables
-    )
-        internal
-        returns (address deployed, bool existed)
-    {
-        address predicted = _create3Factory().predict(salt);
-        if (predicted.code.length != 0) {
-            _requireExpectedCode(artefact, predicted, expectImmutables);
-            return (predicted, true);
-        }
-
-        deployed = _create3Factory().deploy(salt, _creationBytecode(artefact, constructorData));
-        require(deployed == predicted, string.concat(artefact, ": CREATE3 deploy failed"));
-    }
-
-    /// @notice Exact-codehash variant, for artefacts without immutables.
     function _deployCreate3(
         string memory artefact,
         bytes memory constructorData,
@@ -430,57 +399,100 @@ abstract contract BaseDeployer is Script {
         internal
         returns (address deployed, bool existed)
     {
-        return _deployCreate3(artefact, constructorData, salt, false);
-    }
-
-    /// @notice Reverts unless `occupant` holds the runtime code of `artefact`.
-    /// @dev Compares `extcodehash` against the compiled runtime code, or lengths
-    ///      when the artefact carries immutables.
-    function _requireExpectedCode(
-        string memory artefact,
-        address occupant,
-        bool expectImmutables
-    )
-        internal
-        view
-    {
-        bytes memory expected = vm.getDeployedCode(artefact);
-
-        if (expectImmutables) {
-            require(
-                occupant.code.length == expected.length,
-                string.concat(
-                    "Unexpected occupant at CREATE3 address for ",
-                    artefact,
-                    " (",
-                    vm.toString(occupant),
-                    "): runtime code length ",
-                    vm.toString(occupant.code.length),
-                    " does not match the expected ",
-                    vm.toString(expected.length),
-                    ". Refusing to adopt code this run did not deploy."
-                )
-            );
-            return;
+        address predicted = _create3Factory().predict(salt);
+        if (predicted.code.length != 0) {
+            _requireExpectedCode(artefact, constructorData, predicted);
+            return (predicted, true);
         }
 
-        bytes32 expectedHash = keccak256(expected);
-        bytes32 actualHash = occupant.codehash;
+        deployed = _create3Factory().deploy(salt, _creationBytecode(artefact, constructorData));
+        require(deployed == predicted, string.concat(artefact, ": CREATE3 deploy failed"));
+    }
+
+    /// @notice Reverts unless `occupant` holds the code this run would deploy for `artefact`.
+    /// @dev Adoption is the dangerous path: a CREATE3 address can be occupied in advance by
+    ///      anyone, since the factory is permissionless and the salts derive from public
+    ///      constants. Exact codehash settles artefacts without immutables. Artefacts with
+    ///      immutables have no fixed codehash, so they are compared against local reference
+    ///      deploys built with this run's constructor arguments; see the comment in the body for
+    ///      what that can and cannot assert.
+    /// @param artefact Fully-qualified artefact name (`File.sol:Contract`).
+    /// @param constructorData ABI-encoded constructor arguments this run would deploy with.
+    /// @param occupant Address already holding code at the predicted CREATE3 address.
+    function _requireExpectedCode(
+        string memory artefact,
+        bytes memory constructorData,
+        address occupant
+    )
+        internal
+    {
+        bytes memory occupantCode = occupant.code;
+
+        // Artefacts without immutables match exactly, which covers `ERC1967Proxy` and every
+        // plain contract. Taking this path first keeps the reference deploys below off the
+        // common case, and in particular never re-runs a proxy's initialiser.
+        if (keccak256(occupantCode) == keccak256(vm.getDeployedCode(artefact))) return;
+
+        // An artefact carrying immutables cannot be compared by codehash: its constructor bakes
+        // values into the runtime code. Deploying the artefact twice, here, with this run's
+        // constructor arguments separates the two kinds. Bytes that agree across both references
+        // are what these arguments produce, and the occupant must match them: that is what
+        // catches a real artefact deployed against an attacker's arguments. Bytes that differ
+        // between the references are address-derived (`UUPSUpgradeable.__self`, or a beacon the
+        // constructor deploys itself) and vary on every honest deploy, so they cannot be
+        // asserted on and are skipped.
+        bytes memory creationCode = _creationBytecode(artefact, constructorData);
+        bytes memory first = _deployReference(creationCode).code;
+        bytes memory second = _deployReference(creationCode).code;
+
         require(
-            actualHash == expectedHash,
+            occupantCode.length == first.length,
             string.concat(
                 "Unexpected occupant at CREATE3 address for ",
                 artefact,
                 " (",
                 vm.toString(occupant),
-                "): codehash ",
-                vm.toString(actualHash),
+                "): runtime code length ",
+                vm.toString(occupantCode.length),
                 " does not match the expected ",
-                vm.toString(expectedHash),
-                ". Refusing to adopt code this run did not deploy. ",
-                "Bump DOTNS_SALT_VERSION to deploy at fresh addresses."
+                vm.toString(first.length),
+                ". Refusing to adopt code this run did not deploy."
             )
         );
+
+        for (uint256 i; i < first.length; ++i) {
+            if (first[i] != second[i]) continue;
+            require(
+                occupantCode[i] == first[i],
+                string.concat(
+                    "Unexpected occupant at CREATE3 address for ",
+                    artefact,
+                    " (",
+                    vm.toString(occupant),
+                    "): runtime code differs at byte ",
+                    vm.toString(i),
+                    " from the artefact this run would deploy with these constructor arguments. ",
+                    "Refusing to adopt code this run did not deploy."
+                )
+            );
+        }
+    }
+
+    /// @notice Deploys a throwaway copy of `creationCode` for comparison, outside any broadcast.
+    /// @dev These copies exist only to be read back, so they must not be broadcast as real
+    ///      transactions. The active broadcaster is paused around the deploy and restored after.
+    /// @param creationCode Full creation bytecode including constructor arguments.
+    /// @return copyAddress Address of the throwaway copy.
+    function _deployReference(bytes memory creationCode) private returns (address copyAddress) {
+        address broadcaster = _activeBroadcaster;
+        if (broadcaster != address(0)) vm.stopBroadcast();
+
+        assembly ("memory-safe") {
+            copyAddress := create(0, add(creationCode, 0x20), mload(creationCode))
+        }
+
+        if (broadcaster != address(0)) vm.startBroadcast(broadcaster);
+        require(copyAddress != address(0), "reference deploy failed");
     }
 
     function _creationBytecode(

@@ -69,6 +69,10 @@ contract DeterministicDeploymentHarness is BaseDeployer {
         return _broadcastDeployCreate3(owner, artefact, constructorData, label);
     }
 
+    function create3Salt(string memory label, string memory kind) external view returns (bytes32) {
+        return _create3Salt(label, kind);
+    }
+
     function predictCreate3(
         string memory label,
         string memory kind

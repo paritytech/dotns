@@ -50,10 +50,12 @@ interface IDotnsProtocolRegistry {
     function remove(bytes32 key) external;
 
     /// @notice Returns true iff `addr` is currently registered under at least one well-known key.
-    /// @dev O(1) refcount-backed lookup. Canonical peer-trust check consumed by `LabelStore`
-    ///      writes and `StoreFactory` deploys; only addresses governance has actively
-    ///      registered return true. Treats `address(0)` as never registered regardless of
-    ///      refcount.
+    /// @dev O(1) refcount-backed lookup answering discovery, not authority: it reports that
+    ///      governance listed an address, not that the address may act. Store writes and
+    ///      `StoreFactory` deploys are gated on the specific components in
+    ///      @custom:function StoreAuth.isStoreWriter, not on this, precisely so that listing a
+    ///      contract for discovery does not confer write authority. Treats `address(0)` as never
+    ///      registered regardless of refcount.
     function isRegisteredAddress(address addr) external view returns (bool registered);
 
     /// @notice Returns the namehash of the network's TLD node.
