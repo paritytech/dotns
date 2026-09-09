@@ -34,6 +34,7 @@ import {DotnsNameEscrow} from "../../contracts/escrow/DotnsNameEscrow.sol";
 import {DotnsNameWhitelist} from "../../contracts/whitelist/DotnsNameWhitelist.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {LabelUtils} from "../../contracts/utils/LabelUtils.sol";
+import {StringUtils} from "../../contracts/utils/StringUtils.sol";
 import {ISystem} from "../../contracts/external/revive/ISystem.sol";
 import {IPersonhood} from "../../contracts/external/personhood/IPersonhood.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
@@ -411,6 +412,19 @@ abstract contract BaseDotns is Test {
     /// @return node The node identifier under the suite's TLD.
     function _nodeOf(string memory label) internal pure returns (bytes32 node) {
         node = LabelUtils.namehashUnder(_tldNode(), LabelUtils.labelhashMemory(label));
+    }
+
+    /// @notice Computes the hierarchical subnode for a lite label `<stem>.<suffix>`.
+    /// @dev A lite username is `stem` beneath the numeric container `suffix.tld`, so its node is
+    ///      `namehash(namehash(tldNode, keccak(suffix)), keccak(stem))`, not a hash of the whole
+    ///      label. Mirrors @custom:function DotnsPopController._liteSubnode.
+    /// @param liteLabel Lite label, e.g. `michael.01`.
+    /// @return node The subnode identifier.
+    function _liteNodeOf(string memory liteLabel) internal pure returns (bytes32 node) {
+        (string memory stem, string memory suffix) = StringUtils.splitLiteLabel(liteLabel);
+        bytes32 parentNode =
+            LabelUtils.namehashUnder(_tldNode(), LabelUtils.labelhashMemory(suffix));
+        node = LabelUtils.namehashUnder(parentNode, LabelUtils.labelhashMemory(stem));
     }
 
     /// @notice Returns a valid 65-byte chat key seeded with `seed`.

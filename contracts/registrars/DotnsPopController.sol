@@ -22,19 +22,21 @@ import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {ILabelStore} from "../store/ILabelStore.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
+import {SubnodeUtils} from "../utils/SubnodeUtils.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title DotnsPopController
 /// @notice Dedicated PoP controller orchestrating lite-person and full-person username
-/// issuance on behalf of the PoP gateway pallet.
+/// issuance on behalf of the PoP gateway.
 /// @dev Lives behind its own UUPS proxy with its own storage. Registered on `DotnsRegistrar`
 /// via `addController`, which is how multiple controllers coexist on the same registrar
 /// without interfering with each other.
 ///
 /// Enforcement:
-/// Personhood is attested off-chain by the gateway pallet before the call reaches this
+/// Personhood is attested off-chain by the gateway before the call reaches this
 /// contract, so the on-chain personhood precompile is not re-queried on the gateway path.
 /// Every base-label mint path still calls @custom:function IPopRules.classifyName to reject
 /// governance-reserved labels (@custom:reverts InvalidBaseLabel on the base path,
@@ -118,7 +120,7 @@ contract DotnsPopController is
     mapping(bytes32 labelhash => string baseLabel) internal _reservedBaseLabel;
 
     /// @notice Duration (in seconds) after which a reservation entry is considered expired.
-    /// @dev Mirrors `pallet_resources::UsernameReservationDuration`. Configurable by
+    /// @dev Sets the reservation duration, configurable by
     /// governance via `setReservationDuration`.
     uint64 public override reservationDuration;
 
@@ -128,8 +130,8 @@ contract DotnsPopController is
     EnumerableSet.AddressSet private _pendingClaimUsers;
 
     /// @notice Per-user pile of deferred names awaiting a `LabelStore`.
-    /// @dev The Root gateway origin cannot deploy a `LabelStore` (contract creation is forbidden
-    /// from Root), so deferred names accumulate here until a signed-origin
+    /// @dev The mint origin cannot deploy a `LabelStore`, so deferred names accumulate here until a
+    /// signed-origin
     /// @custom:function settlePendingClaims deploys the store and writes the stashed labels. Each
     /// entry's deadline is measured from its own `mintedAt` against `reservationDuration`.
     mapping(address user => PendingClaim[] queue) internal _pendingClaimQueue;
@@ -145,7 +147,7 @@ contract DotnsPopController is
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
     uint256[50] private __gap;
 
-    /// @notice Restricts calls to a substrate Root origin.
+    /// @notice Restricts calls to a Root origin.
     modifier onlyRoot() {
         _onlyRoot();
         _;
@@ -221,9 +223,9 @@ contract DotnsPopController is
     /// of @custom:function reserveBaseName.
     /// @dev Gateway attestation is the authority for personhood on this path; the on-chain
     /// precompile is not consulted. The label is stored in the `stem.NN` form the gateway sends,
-    /// which is the form People Chain holds, so no normalisation happens here. The shape check
+    /// which is the canonical form of the name, so no normalisation happens here. The shape check
     /// runs before classification so a malformed label reverts
-    /// @custom:reverts InvalidLiteLabel, which the gateway pallet decodes by selector; letting
+    /// @custom:reverts InvalidLiteLabel, which the gateway decodes by selector; letting
     /// `classifyName` catch it instead would surface an undecodable PopRules string.
     /// Takes the @custom:struct LiteRegistration struct directly so both call sites pass the same
     /// payload shape: the typed entrypoint forwards its own `params`, the `reserveBaseName`
@@ -299,10 +301,10 @@ contract DotnsPopController is
         if (link.kind == LinkKind.LiteUsername) {
             require(link.liteLabel.isLitePersonLabel(), InvalidLiteLabel());
             (liteLabelhash, liteNode) = _validateLiteLabel(link.liteLabel);
-            IDotnsRegistrar registrar = _registrar();
+            // A lite username is a subnode, so its owner lives in the registry record rather than
+            // the registrar's ERC-721 ledger.
             require(
-                registrar.exists(uint256(liteNode)) && registrar.ownerOf(uint256(liteNode)) == user,
-                LiteLabelNotOwnedByUser(user, liteLabelhash)
+                _registry().owner(liteNode) == user, LiteLabelNotOwnedByUser(user, liteLabelhash)
             );
             chatKeyToPersist = _popResolver().chatKey(liteNode);
         } else {
@@ -402,7 +404,11 @@ contract DotnsPopController is
         returns (address)
     {
         bytes32 labelhash = LabelUtils.labelhashMemory(label);
-        bytes32 node = LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash);
+        // A lite label settled its ownership as a subnode, so its store entry keys the same
+        // hierarchical node; a full label keys the second-level node under the TLD.
+        bytes32 node = label.isLitePersonLabelMemory()
+            ? _liteSubnode(label)
+            : LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash);
         if (store == address(0)) {
             store = factory.deployLabelStoreFor(user);
         }
@@ -563,8 +569,8 @@ contract DotnsPopController is
     /// @dev The mint + forward-registry pair is delegated to
     /// @custom:function RegistrationUtils.registerAndStore so this flow and the public
     /// commit-reveal flow share exactly one implementation of that sequence. The label is
-    /// passed empty so the registrar does not deploy a `LabelStore`; substrate Root cannot
-    /// run the `LabelStore` constructor under `pallet-revive`. PoP-flow per-name records
+    /// passed empty so the registrar does not deploy a `LabelStore`; the mint origin cannot
+    /// run the `LabelStore` constructor. PoP-flow per-name records
     /// (chat key, lite link) are persisted eagerly on @custom:contract IDotnsPopResolver
     /// here, before the label is written, so the resolver carries the full identity record
     /// from mint time regardless of whether the owner already has a `LabelStore`. The Store
@@ -584,15 +590,35 @@ contract DotnsPopController is
     {
         _popIssued[label] = true;
 
-        RegistrationUtils.registerAndStore(
-            RegistrationUtils.RegistrationContext({
-                protocolRegistry: protocolRegistry,
-                user: user,
-                label: "",
-                labelhash: labelhash,
-                node: node
-            })
-        );
+        // A lite username is a subname under its numeric container, so it takes the subnode path
+        // and never mints a token. A full-person name is a tokenised second-level registration and
+        // keeps the shared token triad untouched. `persist` is false because the store write is
+        // deferred to the pending-claim queue below and the user syncs it later.
+        if (label.isLitePersonLabelMemory()) {
+            // A lite name is issued once. Its subnode already existing means a duplicate issuance,
+            // which would rehome the identity and overwrite its records, so it is rejected.
+            require(!_registry().recordExists(node), LiteNameAlreadyIssued());
+            (string memory stem, string memory suffix) = label.splitLiteLabel();
+            SubnodeUtils.registerSubname(
+                SubnodeUtils.SubnameContext({
+                    protocolRegistry: protocolRegistry,
+                    parentLabel: suffix,
+                    subLabel: stem,
+                    owner: user,
+                    persist: false
+                })
+            );
+        } else {
+            RegistrationUtils.registerAndStore(
+                RegistrationUtils.RegistrationContext({
+                    protocolRegistry: protocolRegistry,
+                    user: user,
+                    label: "",
+                    labelhash: labelhash,
+                    node: node
+                })
+            );
+        }
 
         if (chatKeyBytes.length != 0 || liteLabelhash != bytes32(0)) {
             IDotnsPopResolver resolver = _popResolver();
@@ -629,7 +655,7 @@ contract DotnsPopController is
     }
 
     /// @notice Appends a deferred binding for `user` and adds them to the enumeration set.
-    /// @dev The Root gateway origin cannot deploy the user's `LabelStore`, so deferred names pile
+    /// @dev The mint origin cannot deploy the user's `LabelStore`, so deferred names pile
     /// up in `_pendingClaimQueue` until a signed-origin @custom:function settlePendingClaims
     /// writes them. Adding the user to the set is idempotent, so repeat stashes keep a single
     /// enumeration entry. Emits @custom:emits PendingClaimStashed.
@@ -763,7 +789,10 @@ contract DotnsPopController is
 
     /// @notice Validates a lite-person `stem.NN` label and derives `(labelhash, node)`.
     /// @dev The stem is lowercase letters only, so this rejects a stem carrying a digit or a
-    /// hyphen before any node is derived.
+    /// hyphen before any node is derived. `node` is the hierarchical subnode `stem` under the
+    /// numeric container `NN`, the node a resolver reaches by walking the dotted name, and
+    /// `labelhash` stays the keccak of the whole label so it is a stable text identifier for events
+    /// and the reservation queue.
     function _validateLiteLabel(string memory liteLabel)
         internal
         view
@@ -771,7 +800,19 @@ contract DotnsPopController is
     {
         require(liteLabel.isLitePersonLabelMemory(), InvalidLiteLabel());
         labelhash = LabelUtils.labelhashMemory(liteLabel);
-        node = LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash);
+        node = _liteSubnode(liteLabel);
+    }
+
+    /// @notice Derives the hierarchical subnode for a lite label `<stem>.<suffix>`.
+    /// @dev Splits at the separator and walks `suffix.tld` then `stem` under it, so a lite name
+    /// resolves as `stem` beneath its numeric container rather than as a hash of the whole label.
+    /// Shared by @custom:function _validateLiteLabel and pending-claim settlement so every lite
+    /// consumer agrees on one node.
+    /// @param liteLabel Lite label held in memory, e.g. `alice.01`.
+    /// @return subnode Namehash of `stem` under `suffix.tld`.
+    function _liteSubnode(string memory liteLabel) internal view returns (bytes32 subnode) {
+        (string memory stem, string memory suffix) = liteLabel.splitLiteLabel();
+        subnode = SubnodeUtils.subnodeOf(protocolRegistry.tldNode(), suffix, stem);
     }
 
     /// @notice Validates a base (full-person) label and derives `(labelhash, node)`.
@@ -782,7 +823,7 @@ contract DotnsPopController is
         view
         returns (bytes32 labelhash, bytes32 node)
     {
-        // Letters only, matching `BaseLabel::is_valid_person` in the gateway pallet: a
+        // Letters only, matching the gateway's full-person label rule: a
         // full-person label is a name a person chose, so it admits no digits and no hyphens.
         // Classification does not cover this on its own, since a suffixed label with nine or
         // more characters lands on NoStatus and would otherwise pass.
@@ -846,6 +887,11 @@ contract DotnsPopController is
         return IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
     }
 
+    /// @notice Resolves the registry via the protocol registry.
+    function _registry() internal view returns (IDotnsRegistry) {
+        return IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
+    }
+
     /// @notice Writes the new head of the queue into PopRules so the public commit-reveal flow
     /// rejects registrations of this base name for anyone other than `newHead`.
     /// @dev Callers guarantee `newHead` is non-zero (the queue holds a live entry) and that
@@ -869,7 +915,7 @@ contract DotnsPopController is
         delete _reservedBaseLabel[labelhash];
     }
 
-    /// @notice Internal check enforcing a substrate Root origin.
+    /// @notice Internal check enforcing a Root origin.
     /// @dev Authorises a call when @custom:function SystemUtils.originIsRoot is true, and
     ///      reverts with NotRoot otherwise. `msg.sender` is deliberately not consulted: a
     ///      Root origin has no account behind it, so reading `msg.sender` traps. That holds

@@ -37,7 +37,7 @@ contract DotnsPopControllerInvariant is BaseDotns {
         );
         targetContract(address(handler));
 
-        bytes4[] memory selectors = new bytes4[](12);
+        bytes4[] memory selectors = new bytes4[](11);
         selectors[0] = handler.reserve.selector;
         selectors[1] = handler.relinquish.selector;
         selectors[2] = handler.expire.selector;
@@ -49,7 +49,6 @@ contract DotnsPopControllerInvariant is BaseDotns {
         selectors[8] = handler.publicRegister.selector;
         selectors[9] = handler.attemptTransfer.selector;
         selectors[10] = handler.createSubname.selector;
-        selectors[11] = handler.createRivalSubname.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
 
         _seedCoverage();
@@ -74,8 +73,6 @@ contract DotnsPopControllerInvariant is BaseDotns {
         handler.publicRegister(1, 1);
         handler.attemptTransfer(handler.mintedLiteTokenCount(), 0);
 
-        handler.createRivalSubname(0, 0);
-
         // Sub-labels come from a seed and most are not valid DNS labels, so walk seeds until
         // one is accepted under a full-person parent.
         for (uint256 seed; seed < 64 && handler.subnodeCreatedCount() == 0; ++seed) {
@@ -91,38 +88,12 @@ contract DotnsPopControllerInvariant is BaseDotns {
         assertGt(handler.publicLabelCount(), 0, "campaign took no label publicly");
         assertGt(handler.transferSuccessCount(), 0, "campaign moved no name");
         assertGt(handler.subnodeCreatedCount(), 0, "campaign created no subname");
-        assertGt(handler.rivalSubnodeCount(), 0, "campaign built no rival hierarchy");
     }
 
-    /// @notice The two readings of a lite name's text stay distinct, and the text-keyed signal
-    ///         answers for the whole-label one.
-    /// @dev `michael.01` is one label to the gateway and `michael` under `01` to the registry,
-    ///      and both render as the same text. `isPopIssued` is keyed by that text, so a true
-    ///      answer proves the whole-label reading was issued and says nothing about the rival
-    ///      standing beside it: the two coexist here, which is exactly why the node is what
-    ///      names the object. The first assertion pins that the nodes never converge; the
-    ///      soulbound flag is node-keyed, so it does discriminate between them, and is asserted
-    ///      in both directions.
-    function invariant_rival_hierarchy_never_passes_for_a_person() public view {
-        uint256 n = handler.rivalSubnodeCount();
-        for (uint256 i = 0; i < n; i++) {
-            string memory text = handler.rivalTexts(i);
-            bytes32 rival = handler.rivalSubnodes(i);
-            bytes32 person = _nodeOf(text);
-
-            assertTrue(rival != person, "rival hierarchy reached the person's node");
-            assertTrue(dotnsPopController.isPopIssued(text), "person lost their provenance");
-            assertTrue(dotnsRegistrar.isSoulbound(uint256(person)), "person's name is unlocked");
-            assertFalse(dotnsRegistrar.isSoulbound(uint256(rival)), "rival reads as gateway-minted");
-        }
-    }
-
-    /// @notice A subname never lands on a name the gateway issued.
-    /// @dev The two readings of `joseph.42`, one whole label or `joseph` beneath `42`, are what
-    ///      the separated form has to keep apart. The registry derives a parent's node by
-    ///      splitting the path on the separator, so a lite name's own node is unreachable as a
-    ///      parent and no subname can be created under one at all; the second assertion pins
-    ///      that, and the first pins that no subnode collides with an issued name either way.
+    /// @notice A user-created subname never collides with a name the gateway issued.
+    /// @dev A gateway full-person name is a second-level node and a gateway lite name is a subname
+    ///      of its numeric container; a subname a user builds under a name they own must land on
+    ///      neither, or a user could reach a gateway-issued node.
     function invariant_subnames_never_reach_a_gateway_node() public view {
         uint256 subnodeCount = handler.subnodeCreatedCount();
         uint256 gatewayCount = handler.gatewayLabelCount();
@@ -130,14 +101,10 @@ contract DotnsPopControllerInvariant is BaseDotns {
         for (uint256 i = 0; i < subnodeCount; i++) {
             bytes32 subnode = handler.subnodesCreated(i);
             for (uint256 j = 0; j < gatewayCount; j++) {
-                assertTrue(
-                    subnode != _nodeOf(handler.gatewayLabelsSeen(j)),
-                    "subnode collided with a gateway name"
-                );
+                string memory label = handler.gatewayLabelsSeen(j);
+                bytes32 gatewayNode = _carriesSeparator(label) ? _liteNodeOf(label) : _nodeOf(label);
+                assertTrue(subnode != gatewayNode, "subnode collided with a gateway name");
             }
-            assertFalse(
-                _carriesSeparator(handler.subnameParents(i)), "subname created under a lite name"
-            );
         }
     }
 
@@ -181,7 +148,15 @@ contract DotnsPopControllerInvariant is BaseDotns {
         for (uint256 i = 0; i < gatewayCount; i++) {
             string memory label = handler.gatewayLabelsSeen(i);
             assertFalse(handler.isPublicLabel(label), "gateway label taken publicly");
-            assertTrue(dotnsRegistrar.isSoulbound(uint256(_nodeOf(label))), "gateway name free");
+            if (_carriesSeparator(label)) {
+                // A lite name is a subname owned in the registry, non-transferable because there is
+                // no token behind it, not through the soulbound flag.
+                bytes32 node = _liteNodeOf(label);
+                assertTrue(dotnsRegistry.owner(node) != address(0), "gateway lite name unowned");
+                assertFalse(dotnsRegistrar.exists(uint256(node)), "gateway lite name is a token");
+            } else {
+                assertTrue(dotnsRegistrar.isSoulbound(uint256(_nodeOf(label))), "gateway name free");
+            }
         }
     }
 

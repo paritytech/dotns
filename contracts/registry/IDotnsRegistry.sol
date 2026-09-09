@@ -12,11 +12,15 @@ interface IDotnsRegistry {
     /// @param subLabel Human readable subnode label e.g "alice".
     /// @param parentLabel Canonical parent name without the TLD suffix e.g. bob or child.bob.
     /// @param owner Address to assign as owner of the created subnode.
+    /// @param persist Whether to index the subnode into the owner's `LabelStore`, deploying it on
+    ///        demand. When false the ownership and resolver record is still written, but the store
+    ///        is left untouched and the caller writes the label into the store separately.
     struct SubnodeRecord {
         bytes32 parentNode;
         string subLabel;
         string parentLabel;
         address owner;
+        bool persist;
     }
 
     /// @notice Record describing the state of a node.
@@ -83,8 +87,10 @@ interface IDotnsRegistry {
     ///      contracts are keyed by node and are not cleared by this function; downstream
     ///      consumers should gate resolver reads on current ownership). Indexes the subnode
     ///      under the new owner's `LabelStore` keyed by the namehashed `subnode` so off-chain
-    ///      consumers can enumerate names per address. Emits @custom:emits NewOwner on each
-    ///      successful assignment.
+    ///      consumers can enumerate names per address. Indexing into the owner's `LabelStore` is
+    ///      governed by `record.persist` (see @custom:struct SubnodeRecord); the ownership and
+    ///      resolver record is written either way. Emits @custom:emits NewOwner on each successful
+    ///      assignment.
     function setSubnodeOwner(SubnodeRecord calldata record) external returns (bytes32 subnode);
 
     /// @notice Sets the resolver for an existing subnode.

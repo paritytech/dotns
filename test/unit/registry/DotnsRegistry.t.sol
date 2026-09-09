@@ -53,7 +53,11 @@ contract DotnsRegistryTests is BaseDotns {
         vm.expectRevert(IDotnsRegistry.InvalidLabel.selector);
         dotnsRegistry.setSubnodeOwner(
             IDotnsRegistry.SubnodeRecord({
-                parentNode: parentNode, subLabel: "ali.ce", parentLabel: parentLabel, owner: ed
+                parentNode: parentNode,
+                subLabel: "ali.ce",
+                parentLabel: parentLabel,
+                owner: ed,
+                persist: true
             })
         );
 
@@ -89,7 +93,11 @@ contract DotnsRegistryTests is BaseDotns {
         vm.prank(owner);
         bytes32 subnode = dotnsRegistry.setSubnodeOwner(
             IDotnsRegistry.SubnodeRecord({
-                parentNode: twoDigitNode, subLabel: "michael", parentLabel: "01", owner: ed
+                parentNode: twoDigitNode,
+                subLabel: "michael",
+                parentLabel: "01",
+                owner: ed,
+                persist: true
             })
         );
 
@@ -111,7 +119,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 expectedSubnode = _namehash(parentNode, subLabelHash);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: subLabel,
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.expectEmit(true, true, false, true, address(dotnsRegistry));
@@ -137,7 +149,11 @@ contract DotnsRegistryTests is BaseDotns {
         address newResolver = makeAddr("resolver");
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: subLabel,
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.startPrank(owner);
@@ -164,7 +180,11 @@ contract DotnsRegistryTests is BaseDotns {
         address newResolver = makeAddr("resolver");
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: subLabel,
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.startPrank(owner);
@@ -186,7 +206,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory childRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "child", parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: "child",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.prank(owner);
@@ -194,7 +218,11 @@ contract DotnsRegistryTests is BaseDotns {
 
         string memory nestedParentLabel = string.concat("child.", parentLabel);
         IDotnsRegistry.SubnodeRecord memory leafRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: childNode, subLabel: "leaf", parentLabel: nestedParentLabel, owner: tiago
+            parentNode: childNode,
+            subLabel: "leaf",
+            parentLabel: nestedParentLabel,
+            owner: tiago,
+            persist: true
         });
 
         vm.prank(ed);
@@ -217,7 +245,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 expectedChildNode = _namehash(parentNode, childLabelHash);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: childLabel, parentLabel: parentLabel, owner: tiago
+            parentNode: parentNode,
+            subLabel: childLabel,
+            parentLabel: parentLabel,
+            owner: tiago,
+            persist: true
         });
 
         vm.startPrank(ed);
@@ -235,7 +267,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.PopFull);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "docs", parentLabel: "parity", owner: leonardo
+            parentNode: parentNode,
+            subLabel: "docs",
+            parentLabel: "parity",
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -248,7 +284,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "docs.api", parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: "docs.api",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.prank(owner);
@@ -261,7 +301,7 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "", parentLabel: parentLabel, owner: ed
+            parentNode: parentNode, subLabel: "", parentLabel: parentLabel, owner: ed, persist: true
         });
 
         vm.prank(owner);
@@ -274,7 +314,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "Docs", parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: "Docs",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.prank(owner);
@@ -287,7 +331,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "docs", parentLabel: "Parentnode10", owner: ed
+            parentNode: parentNode,
+            subLabel: "docs",
+            parentLabel: "Parentnode10",
+            owner: ed,
+            persist: true
         });
 
         vm.prank(owner);
@@ -300,7 +348,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "blog", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "blog",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -320,7 +372,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "app", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "app",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -344,7 +400,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "docs", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "docs",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -368,7 +428,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "api", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "api",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -386,7 +450,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "mail", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "mail",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -408,7 +476,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "web", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "web",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -436,11 +508,19 @@ contract DotnsRegistryTests is BaseDotns {
         string memory subLabel = "app";
 
         IDotnsRegistry.SubnodeRecord memory recordA = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNodeA, subLabel: subLabel, parentLabel: parentLabelA, owner: ed
+            parentNode: parentNodeA,
+            subLabel: subLabel,
+            parentLabel: parentLabelA,
+            owner: ed,
+            persist: true
         });
 
         IDotnsRegistry.SubnodeRecord memory recordB = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNodeB, subLabel: subLabel, parentLabel: parentLabelB, owner: ed
+            parentNode: parentNodeB,
+            subLabel: subLabel,
+            parentLabel: parentLabelB,
+            owner: ed,
+            persist: true
         });
 
         vm.startPrank(owner);
@@ -457,7 +537,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "api", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "api",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -483,7 +567,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "web", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "web",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -508,7 +596,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "mail", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "mail",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
