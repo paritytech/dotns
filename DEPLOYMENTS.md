@@ -400,6 +400,8 @@ It runs `deploy:factory` (from the dedicated `dotns-factory` key, which asserts 
 
 The whole pipeline is idempotent, so a re-run resumes an interrupted deploy. Each stage adopts any contract already present at its deterministic address and skips re-initialising an adopted proxy, so rerunning the same command deploys only what is missing and leaves everything already deployed untouched. This is the recovery path when the adapter stalls a transaction part way through.
 
+Idempotent is not the same as always succeeding. Both adoption and the final verification compare what is on chain against the artefacts of the release being run, so a chain that has moved away from them fails rather than reporting a clean no-op. Rotating a store implementation through `StoreFactory.upgradeLabelStoreImplementation` is the case to expect: verification then fails on the beacon implementation until the release being run is the one that was rotated to. Re-running a stage against a chain that is ahead of, or diverged from, the checked-out release is therefore not a safe no-op.
+
 The two steps can also be run separately:
 
 ```bash
@@ -456,6 +458,8 @@ If the deploy script fails after importing the key, .env is intentionally left i
 If the deploy script succeeds, .env should be gone. Future runs should use the keystore account and should not require the deployer private key.
 
 If a stage fails part way through, rerun the same command. Each stage adopts any contract already at its deterministic address and skips re-initialising an adopted proxy, so the rerun resumes from where it stopped and deploys only what is missing. Later stages read the deployment manifest for wire-up, so if you edit the manifest by hand keep it consistent with what is actually on chain, or the wire-up can fail.
+
+A failure naming a beacon implementation or an unexpected occupant usually means the chain and the checked-out release disagree rather than that anything is wrong on chain. Check out the release the chain is actually running before rerunning.
 
 ## Addresses
 

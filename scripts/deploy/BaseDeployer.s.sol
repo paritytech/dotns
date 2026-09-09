@@ -45,6 +45,13 @@ abstract contract BaseDeployer is Script {
     bytes32 internal constant ERC1967_IMPLEMENTATION_SLOT =
         0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
+    /// @notice One immutable range in a contract's runtime code, as the compiler recorded it.
+    /// @dev Field order matches the JSON keys `parseJson` decodes positionally: length, start.
+    struct ImmutableRef {
+        uint256 len;
+        uint256 start;
+    }
+
     /// @notice Broadcaster of the deploy currently in progress, or zero outside a broadcast.
     /// @dev Read by @custom:function _deployReference so comparison copies are not broadcast.
     address private _activeBroadcaster;
@@ -517,8 +524,9 @@ abstract contract BaseDeployer is Script {
             )
         );
 
+        bool[] memory skip = _addressDerivedRanges(artefact, first, second);
         for (uint256 i; i < first.length; ++i) {
-            if (first[i] != second[i]) continue;
+            if (skip[i]) continue;
             require(
                 occupantCode[i] == first[i],
                 string.concat(
@@ -533,6 +541,91 @@ abstract contract BaseDeployer is Script {
                 )
             );
         }
+    }
+
+    /// @notice Flags the bytes of an immutable whose value came from the deploy address.
+    /// @dev Whole ranges, never individual bytes. An immutable holding an address is a 32-byte
+    ///      word of which 12 bytes are zero padding and the rest coincide between two unrelated
+    ///      addresses about once every 256 bytes, so deciding byte by byte marks part of an
+    ///      address-derived word as comparable and rejects an honest resume on the first
+    ///      coincidence. The compiler records where each immutable sits; the two references say
+    ///      which of those the deploy address moved.
+    /// @param artefact Fully-qualified artefact name (`File.sol:Contract`).
+    /// @param first Runtime code of the first reference copy.
+    /// @param second Runtime code of the second reference copy.
+    /// @return skip One flag per byte, true where the byte must not be compared.
+    function _addressDerivedRanges(
+        string memory artefact,
+        bytes memory first,
+        bytes memory second
+    )
+        private
+        view
+        returns (bool[] memory skip)
+    {
+        skip = new bool[](first.length);
+
+        string memory json = vm.readFile(_artefactPath(artefact));
+        string memory root = "$.deployedBytecode.immutableReferences";
+
+        // An artefact with no immutables serialises this as `{}`, which `parseJsonKeys` rejects
+        // rather than reporting as empty. Nothing to skip in that case.
+        string[] memory ids;
+        try vm.parseJsonKeys(json, root) returns (string[] memory keys) {
+            ids = keys;
+        } catch {
+            return skip;
+        }
+
+        // Field order is the JSON key order `parseJson` decodes into: "length", then "start".
+        for (uint256 i; i < ids.length; ++i) {
+            ImmutableRef[] memory refs = abi.decode(
+                vm.parseJson(json, string.concat(root, '["', ids[i], '"]')), (ImmutableRef[])
+            );
+            for (uint256 j; j < refs.length; ++j) {
+                uint256 start = refs[j].start;
+                uint256 len = refs[j].len;
+                if (start + len > first.length) continue;
+
+                bool differs;
+                for (uint256 k; k < len; ++k) {
+                    if (first[start + k] != second[start + k]) {
+                        differs = true;
+                        break;
+                    }
+                }
+                if (!differs) continue;
+
+                for (uint256 k; k < len; ++k) {
+                    skip[start + k] = true;
+                }
+            }
+        }
+    }
+
+    /// @notice Foundry artefact path for a `File.sol:Contract` identifier.
+    /// @param artefact Fully-qualified artefact name.
+    /// @return Absolute path to the artefact JSON.
+    function _artefactPath(string memory artefact) internal view returns (string memory) {
+        bytes memory raw = bytes(artefact);
+        uint256 colon = raw.length;
+        for (uint256 i; i < raw.length; ++i) {
+            if (raw[i] == ":") {
+                colon = i;
+                break;
+            }
+        }
+        require(colon != raw.length, string.concat(artefact, ": expected File.sol:Contract"));
+
+        bytes memory file = new bytes(colon);
+        for (uint256 i; i < colon; ++i) {
+            file[i] = raw[i];
+        }
+        bytes memory name = new bytes(raw.length - colon - 1);
+        for (uint256 i; i < name.length; ++i) {
+            name[i] = raw[colon + 1 + i];
+        }
+        return string.concat(vm.projectRoot(), "/out/", string(file), "/", string(name), ".json");
     }
 
     /// @notice Deploys a throwaway copy of `creationCode` for comparison, outside any broadcast.
