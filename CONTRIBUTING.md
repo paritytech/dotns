@@ -271,6 +271,8 @@ Fork tests are upgrade-PR scoped. They live in `test/fork/` for the duration of 
 
 Each fork test forks live Asset Hub state, seeds or reads real on-chain state through the deployed implementation, runs the upgrade script, and asserts that state and every P0 path survive on the new implementation. Assertions exercise the real flows rather than bare mints, so a layout regression in a live slot fails the test. The `Old.sol` snapshot reproduces the layout of the implementation currently deployed on-chain, and the fork test is what confirms it: a snapshot that diverged from the live implementation makes the preserved-state assertions fail.
 
+CI wires this in automatically, so an upgrade PR adds fork tests without touching any workflow. The `push_checking` workflow detects `test/fork/**`: when fork tests are present it brings up the ETH-RPC adapter and runs them on a dedicated job that reports an `Upgrade Fork Tests` row in the CI summary; when the directory is empty that job is skipped and no adapter starts. Locally, run the same suite with `bun run test:fork`.
+
 While a fork test is in flight, skip it with:
 
 ```bash
