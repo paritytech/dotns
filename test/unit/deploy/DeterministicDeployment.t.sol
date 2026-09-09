@@ -94,6 +94,35 @@ contract DeterministicDeploymentTest is Test {
         );
     }
 
+    /// @notice An immutable range the references disagree on is skipped in its entirety.
+    /// @dev Regression for a false rejection that broke a real deploy. An immutable holding an
+    ///      address is a 32-byte word: 12 bytes of zero padding, then 20 address bytes, of which
+    ///      any given one coincides between two unrelated addresses about once in 256. Deciding
+    ///      byte by byte therefore left part of an address-derived word marked comparable, and an
+    ///      honest resume was rejected as a squat on the first coincidence. Roughly a coin flip
+    ///      per run over `StoreFactory`'s address bytes, so the resume test above catches it only
+    ///      sometimes; this pins it.
+    function test_addressDerivedRangeIsSkippedInFull() public view {
+        bytes memory template = vm.getDeployedCode("StoreFactory.sol:StoreFactory");
+        bytes memory first = template;
+        bytes memory second = bytes.concat(template);
+
+        // `StoreFactory`'s first immutable range: 32 bytes at 509. Differ in exactly one byte,
+        // as two addresses sharing every other byte in that word would.
+        uint256 start = 509;
+        uint256 length = 32;
+        second[start + 21] = second[start + 21] == bytes1(0x01) ? bytes1(0x02) : bytes1(0x01);
+
+        bool[] memory skip =
+            deployer.addressDerivedRanges("StoreFactory.sol:StoreFactory", first, second);
+
+        for (uint256 i = start; i < start + length; ++i) {
+            assertTrue(skip[i], "an address-derived range was left partly comparable");
+        }
+        assertFalse(skip[start - 1], "a byte outside the range was skipped");
+        assertFalse(skip[start + length], "a byte outside the range was skipped");
+    }
+
     /// @notice A resumed run adopts its own earlier deployment of an artefact carrying
     ///         immutables. The reject cases below exercise the reference-diff path; this is the
     ///         one that proves it still says yes to an honest resume.

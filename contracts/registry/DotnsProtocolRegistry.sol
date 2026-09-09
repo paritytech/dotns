@@ -52,7 +52,7 @@ contract DotnsProtocolRegistry is
 
     /// @notice Initialises the protocol registry and fixes the network's TLD.
     /// @dev Callable exactly once via `Initializable`, otherwise
-    ///      @custom:reverts InvalidInitialization. Sets the deployer as owner. `tldLabel` is the
+    ///      @custom:reverts InvalidInitialization. Sets `initialOwner` as owner. `tldLabel` is the
     ///      bare label without a dot (e.g. `dot`, `paseo`); it must be a single DNS label,
     ///      otherwise @custom:reverts InvalidTld. The TLD is fixed here because changing it after
     ///      names exist would reroot every node.

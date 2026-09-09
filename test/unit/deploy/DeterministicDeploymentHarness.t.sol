@@ -69,6 +69,18 @@ contract DeterministicDeploymentHarness is BaseDeployer {
         return _broadcastDeployCreate3(owner, artefact, constructorData, label);
     }
 
+    function addressDerivedRanges(
+        string memory artefact,
+        bytes memory first,
+        bytes memory second
+    )
+        external
+        view
+        returns (bool[] memory)
+    {
+        return _addressDerivedRanges(artefact, first, second);
+    }
+
     function create3Salt(string memory label, string memory kind) external view returns (bytes32) {
         return _create3Salt(label, kind);
     }

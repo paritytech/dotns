@@ -524,23 +524,40 @@ abstract contract BaseDeployer is Script {
             )
         );
 
+        // Zero the address-derived ranges in both copies and compare once. Walking the arrays
+        // byte by byte instead costs a `require` per byte over the whole runtime code, and
+        // `require` evaluates its message eagerly, so every one of those iterations built a
+        // string and called `vm.toString` three times. Memory growth is quadratic, and a large
+        // implementation exhausted `memory_limit` before it could finish comparing.
         bool[] memory skip = _addressDerivedRanges(artefact, first, second);
         for (uint256 i; i < first.length; ++i) {
-            if (skip[i]) continue;
-            require(
-                occupantCode[i] == first[i],
-                string.concat(
-                    "Unexpected occupant at CREATE3 address for ",
-                    artefact,
-                    " (",
-                    vm.toString(occupant),
-                    "): runtime code differs at byte ",
-                    vm.toString(i),
-                    " from the artefact this run would deploy with these constructor arguments. ",
-                    "Refusing to adopt code this run did not deploy."
-                )
-            );
+            if (!skip[i]) continue;
+            occupantCode[i] = 0;
+            first[i] = 0;
         }
+        if (keccak256(occupantCode) == keccak256(first)) return;
+
+        // Only now, on the failure path, is it worth naming the offending byte. Both copies have
+        // their skipped ranges zeroed, so the first difference is a real one.
+        uint256 offset;
+        for (uint256 i; i < first.length; ++i) {
+            if (occupantCode[i] != first[i]) {
+                offset = i;
+                break;
+            }
+        }
+        revert(
+            string.concat(
+                "Unexpected occupant at CREATE3 address for ",
+                artefact,
+                " (",
+                vm.toString(occupant),
+                "): runtime code differs at byte ",
+                vm.toString(offset),
+                " from the artefact this run would deploy with these constructor arguments. ",
+                "Refusing to adopt code this run did not deploy."
+            )
+        );
     }
 
     /// @notice Flags the bytes of an immutable whose value came from the deploy address.
@@ -559,7 +576,7 @@ abstract contract BaseDeployer is Script {
         bytes memory first,
         bytes memory second
     )
-        private
+        internal
         view
         returns (bool[] memory skip)
     {
