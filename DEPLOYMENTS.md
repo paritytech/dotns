@@ -62,11 +62,11 @@ paseo_local
 
 ## Multicall3
 
-Fresh deployments include a generic Multicall3 contract. It is deployed for client, indexer, and tooling batching and is not dotNS-specific. The deployment script records it in the manifest as Multicall3 and the wire-up stage publishes it through the protocol registry under the MULTICALL3 key.
+Fresh deployments include a generic Multicall3 contract. It is deployed for client, indexer, and tooling batching and is not dotNS-specific. The deployment script records it in the manifest as Multicall3. It is deliberately **not** published through the protocol registry: registry membership is a trust signal protocol contracts read, and an arbitrary-target call forwarder must never carry it.
 
 This is an arbitrary-target Multicall3 surface, matching the common mds1/multicall3 interface used by wallet and RPC tooling. It is permissionless: anyone can call it. Target contracts still enforce their own permissions and see Multicall3 as the caller during CALL-based write batching. Use it freely for read aggregation; use write aggregation only for flows where the target contract is meant to accept Multicall3 as msg.sender.
 
-Its address is deterministic, not the canonical mds1 singleton. It is deployed through the dotNS CREATE3 factory under the label `Multicall3` (kind `contract`), so it lands at the same address on every chain that shares the same factory (see Deterministic addresses below), and that address is **not** the well-known `0xcA11...` deployment. Consumers must read the Multicall3 address from the protocol registry `MULTICALL3` key or from the deployment manifest, never hardcode `0xcA11...`.
+Its address is deterministic, not the canonical mds1 singleton. It is deployed through the dotNS CREATE3 factory under the label `Multicall3` (kind `contract`), so it lands at the same address on every chain that shares the same factory (see Deterministic addresses below), and that address is **not** the well-known `0xcA11...` deployment. Consumers must read the Multicall3 address from the deployment manifest, never hardcode `0xcA11...`. Deployments made before the `MULTICALL3` key was dropped still carry it in their registry; that entry is retained for compatibility and should not be relied on for new integrations.
 
 ## One-time deployer bootstrap
 
@@ -261,7 +261,7 @@ At minimum, confirm:
 - The protocol registry address is present.
 - The registrar address is present.
 - The public registrar controller address is present.
-- The Multicall3 address is present.
+- The Multicall3 address is present in the manifest. It is not a protocol registry key.
 - The Pop controller address is present.
 - PopRules is present.
 - The forward, reverse, content, and Pop resolvers are present.

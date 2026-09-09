@@ -61,7 +61,7 @@ contract DeterministicDeploymentTest is Test {
     }
 
     function test_predictionsMatchCreate3Deployments() public {
-        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot"));
+        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot"));
         address predicted = deployer.predictCreate3("DotnsProtocolRegistry", "proxy");
 
         address deployed = deployer.deployUups(
@@ -81,7 +81,7 @@ contract DeterministicDeploymentTest is Test {
         address protocolRegistry = deployer.deployUups(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot")),
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot")),
             "DotnsProtocolRegistry"
         );
         deployer.registerCreate3Factory(owner, protocolRegistry, address(factory));
@@ -205,7 +205,7 @@ contract DeterministicDeploymentTest is Test {
     }
 
     function test_reDeployAdoptsProxyWithoutReinitialising() public {
-        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot"));
+        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot"));
         address first = deployer.deployUups(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
@@ -228,7 +228,7 @@ contract DeterministicDeploymentTest is Test {
         return deployer.deployUups(
             deployerAccount,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot")),
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot")),
             "DotnsProtocolRegistry"
         );
     }
@@ -264,7 +264,7 @@ contract DeterministicDeploymentTest is Test {
         addr.protocolRegistry = deployer.deployUups(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot")),
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot")),
             "DotnsProtocolRegistry"
         );
 
@@ -283,21 +283,21 @@ contract DeterministicDeploymentTest is Test {
         addr.registrar = deployer.deployUups(
             owner,
             "DotnsRegistrar.sol:DotnsRegistrar",
-            abi.encodeCall(DotnsRegistrar.initialize, ("Dotns", "Dotns", registry)),
+            abi.encodeCall(DotnsRegistrar.initialize, (owner, "Dotns", "Dotns", registry)),
             "DotnsRegistrar"
         );
 
         addr.reverseResolver = deployer.deployUups(
             owner,
             "DotnsReverseResolver.sol:DotnsReverseResolver",
-            abi.encodeCall(DotnsReverseResolver.initialize, (registry)),
+            abi.encodeCall(DotnsReverseResolver.initialize, (owner, registry)),
             "DotnsReverseResolver"
         );
 
         addr.registry = deployer.deployUups(
             owner,
             "DotnsRegistry.sol:DotnsRegistry",
-            abi.encodeCall(DotnsRegistry.initialize, (registry)),
+            abi.encodeCall(DotnsRegistry.initialize, (owner, registry)),
             "DotnsRegistry"
         );
 

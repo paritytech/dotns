@@ -146,10 +146,12 @@ contract DotnsNameEscrow is
     ///      updateRedeemWindow, which rejects any value below @custom:constant MIN_REDEEM_WINDOW
     ///      (@custom:reverts RedeemWindowTooShort) or above @custom:constant MAX_REDEEM_WINDOW
     ///      (@custom:reverts RedeemWindowTooLong), and emits @custom:emits RedeemWindowUpdated.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol registry used to resolve registrar and controller addresses.
     /// @param cooldownSeconds Delay after release before the deposit withdrawal may be credited.
     /// @param redeemWindowSeconds Period after release in which only the previous holder may act.
     function initialize(
+        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint256 cooldownSeconds,
         uint256 redeemWindowSeconds
@@ -159,7 +161,7 @@ contract DotnsNameEscrow is
     {
         require(address(registry) != address(0), InvalidAsset());
 
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC165_init();
 
         protocolRegistry = registry;

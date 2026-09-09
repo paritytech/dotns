@@ -21,13 +21,13 @@ contract DotnsProtocolRegistryFuzzTest is BaseDotns {
     function test_initialise_reverts_on_empty_tld() public {
         DotnsProtocolRegistry registry = _uninitialisedRegistry();
         vm.expectRevert(IDotnsProtocolRegistry.InvalidTld.selector);
-        registry.initialize("");
+        registry.initialize(owner, "");
     }
 
     function test_initialise_reverts_on_multi_label_tld() public {
         DotnsProtocolRegistry registry = _uninitialisedRegistry();
         vm.expectRevert(IDotnsProtocolRegistry.InvalidTld.selector);
-        registry.initialize("bad.label");
+        registry.initialize(owner, "bad.label");
     }
 
     function testFuzz_isRegisteredAddress_matches_ground_truth(

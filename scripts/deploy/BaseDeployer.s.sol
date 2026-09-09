@@ -201,7 +201,7 @@ abstract contract BaseDeployer is Script {
         bool proxyExisted;
         (proxy, proxyExisted) = _deployCreate3(
             "ERC1967Proxy.sol:ERC1967Proxy",
-            abi.encode(implementation, bytes("")),
+            abi.encode(implementation, initialiserCalldata),
             _create3Salt(label, "proxy"),
             false
         );
@@ -217,16 +217,9 @@ abstract contract BaseDeployer is Script {
                 "Bump DOTNS_SALT_VERSION to deploy at fresh addresses."
             )
         );
-        // Initialise only a freshly deployed proxy; an adopted one (a resumed run)
-        // is already initialised, and re-initialising would revert.
-        if (!proxyExisted && initialiserCalldata.length != 0) {
-            (bool ok, bytes memory ret) = proxy.call(initialiserCalldata);
-            if (!ok) {
-                assembly ("memory-safe") {
-                    revert(add(ret, 32), mload(ret))
-                }
-            }
-        } else if (proxyExisted && initialiserCalldata.length != 0) {
+        // The initialiser ran inside the proxy constructor above, so there is no window
+        // between deployment and initialisation for a third party to claim ownership.
+        if (proxyExisted && initialiserCalldata.length != 0) {
             // The proxy keeps the configuration its first deploy set, so every
             // initialiser argument computed for this run is discarded. Values
             // without a setter (such as the TLD) cannot be corrected afterwards,
