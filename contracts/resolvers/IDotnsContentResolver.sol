@@ -33,8 +33,9 @@ interface IDotnsContentResolver {
     /// @notice Sets the content hash for a node.
     /// @dev The caller must own the node in the DotNS registry or be an approved operator,
     ///      otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an
-    ///      IPFS CID); the resolver stores them as-is and never interprets the payload. Emits
-    ///      @custom:emits ContentHashUpdated on every successful write.
+    ///      IPFS CID); the resolver stores them as-is and never interprets the payload. Every
+    ///      successful write records the current block number for `contenthashUpdatedAtBlock`
+    ///      and emits @custom:emits ContentHashUpdated.
     /// @param node The node whose content hash is being set.
     /// @param hash Opaque content hash bytes.
     function setContenthash(bytes32 node, bytes calldata hash) external;
@@ -43,6 +44,15 @@ interface IDotnsContentResolver {
     /// @param node The node to query.
     /// @return hash The stored content hash bytes, or empty if unset.
     function contenthash(bytes32 node) external view returns (bytes memory hash);
+
+    /// @notice Returns the block in which a node's content hash was last written.
+    /// @dev Recorded by every successful `setContenthash`, so it answers "when did this hash
+    ///      last change" without scanning `ContentHashUpdated` logs. Zero means no write has
+    ///      been recorded: the node's hash was never set, or it was set before this field
+    ///      existed and has not been rewritten since.
+    /// @param node The node to query.
+    /// @return blockNumber Block number of the last `setContenthash`, or zero if none recorded.
+    function contenthashUpdatedAtBlock(bytes32 node) external view returns (uint64 blockNumber);
 
     /// @notice Sets a text record for a node.
     /// @dev The caller must own the node in the DotNS registry or be an approved operator,
