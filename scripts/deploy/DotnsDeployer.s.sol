@@ -466,6 +466,8 @@ contract DotnsDeployer is BaseDeployer {
         _verifyRegistryPointers(deployment);
         _verifyControllerAuthorisation(deployment);
 
+        _verifyStoreImplementations(deployment.storeFactory);
+
         require(DotnsRegistry(deployment.registry).recordExists(bytes32(0)), "Root record missing");
         require(
             IDotnsCostModelRegistry(deployment.costModelRegistry).priceForBaseLength(9)

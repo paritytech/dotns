@@ -4,9 +4,11 @@ pragma solidity ^0.8.34;
 import {Script, console} from "forge-std/Script.sol";
 import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {Create3Factory} from "../../contracts/deploy/Create3Factory.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
+import {IStoreFactory} from "../../contracts/store/IStoreFactory.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {DeploymentNetwork} from "./DeploymentNetwork.sol";
 
@@ -35,15 +37,17 @@ abstract contract BaseDeployer is Script {
     ///      deployment address set.
     string internal constant CREATE3_SALT_NAMESPACE = "dotns.create3.v1";
 
+    /// @notice Artefact backing both store beacons.
+    string internal constant BEACON_ARTEFACT = "UpgradeableBeacon.sol:UpgradeableBeacon";
+
     /// @notice ERC1967 implementation storage slot,
     ///         `bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)`.
+    bytes32 internal constant ERC1967_IMPLEMENTATION_SLOT =
+        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     /// @notice Broadcaster of the deploy currently in progress, or zero outside a broadcast.
     /// @dev Read by @custom:function _deployReference so comparison copies are not broadcast.
     address private _activeBroadcaster;
-
-    bytes32 internal constant ERC1967_IMPLEMENTATION_SLOT =
-        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     /// @notice Optional in-memory override used by tests and custom scripts.
     address private create3FactoryOverride;
@@ -167,6 +171,56 @@ abstract contract BaseDeployer is Script {
     function _requireContract(string memory name, address addr) internal view {
         require(addr != address(0), string.concat(name, ": zero address"));
         require(addr.code.length != 0, string.concat(name, ": no code"));
+    }
+
+    /// @notice The store beacons point at this release's store implementations, and the factory
+    ///         owns them.
+    /// @dev The one thing the CREATE3 occupancy check cannot assert. `StoreFactory` deploys its
+    ///      own beacons, so their addresses are immutables that differ on every honest deploy and
+    ///      are necessarily skipped when an occupant is compared against this run's artefact. An
+    ///      attacker squatting the factory address supplies the real artefact and the real
+    ///      constructor arguments, both public, so the beacons are the only thing left under
+    ///      their control. `LabelStore` and `UserStore` carry no immutables, so their runtime
+    ///      code compares exactly.
+    /// @dev The beacon contracts themselves are pinned by codehash first. Without that, the
+    ///      checks below only prove that whatever sits at those addresses answered `owner()` and
+    ///      `implementation()` the way this stage wanted at verification time; a bespoke contract
+    ///      can do that and return something else afterwards. `UpgradeableBeacon` carries no
+    ///      immutables, so its code compares exactly and the topology cannot be faked.
+    /// @dev Beacon ownership is asserted too. `upgradeLabelStoreImplementation` is `onlyOwner` on
+    ///      the factory and the beacons are constructed as owned by it, so a beacon owned by
+    ///      anything else leaves every store on the network following an implementation the
+    ///      verified owner can never rotate.
+    /// @param storeFactory The deployed store factory.
+    function _verifyStoreImplementations(address storeFactory) internal view {
+        address labelBeacon = IStoreFactory(storeFactory).labelStoreBeacon();
+        address userBeacon = IStoreFactory(storeFactory).userStoreBeacon();
+
+        bytes32 beaconCodehash = keccak256(vm.getDeployedCode(BEACON_ARTEFACT));
+        require(labelBeacon.codehash == beaconCodehash, "LabelStoreBeacon: unexpected beacon code");
+        require(userBeacon.codehash == beaconCodehash, "UserStoreBeacon: unexpected beacon code");
+
+        require(
+            UpgradeableBeacon(labelBeacon).owner() == storeFactory,
+            "LabelStoreBeacon: not owned by the factory"
+        );
+        require(
+            UpgradeableBeacon(userBeacon).owner() == storeFactory,
+            "UserStoreBeacon: not owned by the factory"
+        );
+
+        require(
+            UpgradeableBeacon(labelBeacon).implementation().codehash
+                == keccak256(vm.getDeployedCode("LabelStore.sol:LabelStore")),
+            "LabelStoreBeacon: unexpected implementation"
+        );
+        require(
+            UpgradeableBeacon(userBeacon).implementation().codehash
+                == keccak256(vm.getDeployedCode("UserStore.sol:UserStore")),
+            "UserStoreBeacon: unexpected implementation"
+        );
+
+        console.log("  ok  store beacons and implementations");
     }
 
     /// @notice Deploys a UUPS implementation and ERC1967 proxy through CREATE3
@@ -386,9 +440,12 @@ abstract contract BaseDeployer is Script {
 
     /// @notice Deploys `artefact` at its CREATE3 address, or adopts that address
     ///         when it already holds this artefact's code, so a re-run resumes.
-    /// @dev Adoption requires the occupant's runtime code to match the artefact this
-    ///      run would deploy; anything else reverts. A resumed run is bytecode
-    ///      identical and adopts without further input.
+    /// @dev Adoption requires the occupant's runtime code to match the artefact this run would
+    ///      deploy; anything else reverts. "Match" is not always byte equality: an artefact
+    ///      carrying immutables differs on every honest deploy wherever its constructor wrote an
+    ///      address, so @custom:function _requireExpectedCode compares only the bytes those
+    ///      constructor arguments determine. A resumed run adopts without further input either
+    ///      way.
     /// @return deployed The CREATE3 address of the contract.
     /// @return existed True when the target already held this artefact's code.
     function _deployCreate3(

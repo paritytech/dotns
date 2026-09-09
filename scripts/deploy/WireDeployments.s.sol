@@ -201,6 +201,8 @@ contract WireDeployments is BaseDeployer {
             "PopController: not authorised"
         );
 
+        _verifyStoreImplementations(addr.storeFactory);
+
         console.log("=== Deployment verification complete ===");
     }
 }

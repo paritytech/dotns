@@ -50,8 +50,7 @@ contract DeterministicDeploymentTest is Test {
         vm.prank(owner);
         factory.deploy(salt, type(Squatter).creationCode);
 
-        vm.expectRevert();
-        deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", "", "Multicall3");
+        _assertAdoptionRejected("Multicall3.sol:Multicall3", "", "Multicall3");
     }
 
     /// @notice The same rejection applies to an artefact carrying constructor-set immutables,
@@ -65,13 +64,9 @@ contract DeterministicDeploymentTest is Test {
         vm.prank(owner);
         factory.deploy(salt, type(Squatter).creationCode);
 
-        address protocolRegistry = deployer.predictCreate3("DotnsProtocolRegistry", "proxy");
-        vm.expectRevert();
-        deployer.deployCreate3(
-            owner,
-            "StoreFactory.sol:StoreFactory",
-            abi.encode(protocolRegistry, owner),
-            "StoreFactory"
+        address protocolRegistry = address(new DotnsProtocolRegistry());
+        _assertAdoptionRejected(
+            "StoreFactory.sol:StoreFactory", abi.encode(protocolRegistry, owner), "StoreFactory"
         );
     }
 
@@ -84,7 +79,7 @@ contract DeterministicDeploymentTest is Test {
     ///      necessarily skipped.
     function test_sameArtefactWithForeignConstructorArgsIsRejected() public {
         address attacker = makeAddr("attacker");
-        address realRegistry = deployer.predictCreate3("DotnsProtocolRegistry", "proxy");
+        address realRegistry = address(new DotnsProtocolRegistry());
         address foreignRegistry = address(new DotnsProtocolRegistry());
 
         bytes32 salt = deployer.create3Salt("StoreFactory", "contract");
@@ -94,10 +89,30 @@ contract DeterministicDeploymentTest is Test {
             abi.encodePacked(type(StoreFactory).creationCode, abi.encode(foreignRegistry, attacker))
         );
 
-        vm.expectRevert();
-        deployer.deployCreate3(
-            owner, "StoreFactory.sol:StoreFactory", abi.encode(realRegistry, owner), "StoreFactory"
+        _assertAdoptionRejected(
+            "StoreFactory.sol:StoreFactory", abi.encode(realRegistry, owner), "StoreFactory"
         );
+    }
+
+    /// @notice A resumed run adopts its own earlier deployment of an artefact carrying
+    ///         immutables. The reject cases below exercise the reference-diff path; this is the
+    ///         one that proves it still says yes to an honest resume.
+    /// @dev `StoreFactory` is the demanding case: its constructor deploys fresh beacons every
+    ///      time, so the second run's reference copies differ from the occupant exactly where
+    ///      the comparison must skip. A check that compared those bytes would force a salt bump
+    ///      on every interrupted run.
+    function test_resumeAdoptsAnImmutableCarryingArtefact() public {
+        address protocolRegistry = address(new DotnsProtocolRegistry());
+        bytes memory constructorData = abi.encode(protocolRegistry, owner);
+
+        address first = deployer.deployCreate3(
+            owner, "StoreFactory.sol:StoreFactory", constructorData, "StoreFactory"
+        );
+        address second = deployer.deployCreate3(
+            owner, "StoreFactory.sol:StoreFactory", constructorData, "StoreFactory"
+        );
+
+        assertEq(second, first, "an honest resume of an immutable artefact was not adopted");
     }
 
     /// @notice A resumed run still adopts its own earlier deployment. Guards the other direction:
@@ -109,6 +124,52 @@ contract DeterministicDeploymentTest is Test {
             deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", "", "Multicall3");
 
         assertEq(second, first, "a resumed run did not adopt its own deployment");
+    }
+
+    /// @notice Asserts the pipeline refuses to adopt whatever currently occupies the address.
+    /// @dev Checks the reason rather than taking any revert: the occupancy check is one `require`
+    ///      among several in the deploy path, so a bare `expectRevert` would pass just as happily
+    ///      on a broken fixture that reverted for an unrelated reason. The byte offset in the
+    ///      mismatch message shifts with any recompile, so the assertion pins the parts that
+    ///      identify the check instead of the whole string.
+    function _assertAdoptionRejected(
+        string memory artefact,
+        bytes memory constructorData,
+        string memory label
+    )
+        private
+    {
+        try deployer.deployCreate3(owner, artefact, constructorData, label) returns (address) {
+            fail("the occupant was adopted instead of rejected");
+        } catch Error(string memory reason) {
+            assertTrue(
+                _contains(reason, "Refusing to adopt code this run did not deploy."),
+                string.concat("reverted for an unrelated reason: ", reason)
+            );
+            assertTrue(
+                _contains(reason, artefact),
+                string.concat("revert did not name the artefact: ", reason)
+            );
+        }
+    }
+
+    /// @notice True when `haystack` contains `needle`.
+    function _contains(string memory haystack, string memory needle) private pure returns (bool) {
+        bytes memory outer = bytes(haystack);
+        bytes memory inner = bytes(needle);
+        if (inner.length == 0 || inner.length > outer.length) return false;
+
+        for (uint256 i; i <= outer.length - inner.length; ++i) {
+            bool matched = true;
+            for (uint256 j; j < inner.length; ++j) {
+                if (outer[i + j] != inner[j]) {
+                    matched = false;
+                    break;
+                }
+            }
+            if (matched) return true;
+        }
+        return false;
     }
 
     function test_coreDeploymentAddressesStayTheSameAcrossChainIds() public {
