@@ -120,10 +120,12 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         require(registrar.ownerOf(uint256(node)) == newOwner, NotAuthorised());
 
-        // The resolver pointer is unconditionally reset to the default reverse resolver on every
-        // call so a prior owner's resolver cannot follow the name into the new holder's hands on
-        // reclaim from escrow. Owner remains the zero sentinel so reads delegate to the
-        // registrar's ERC-721 holder.
+        // The resolver pointer is reset to the default reverse resolver on every call to this
+        // function, which the controller drives on registration and on reclaim from escrow, so a
+        // prior owner's resolver cannot follow the name across that recycle. This does not cover a
+        // secondary-market ERC-721 `transferFrom`: that path does not call the registry, so a name
+        // sold directly carries the seller's resolver pointer until the buyer overwrites it.
+        // Owner remains the zero sentinel so reads delegate to the registrar's ERC-721 holder.
         records[node] = Record({
             owner: address(0),
             resolver: protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER),

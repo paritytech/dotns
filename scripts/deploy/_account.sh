@@ -25,7 +25,7 @@ ENV_FILE="${ENV_FILE:-.env}"
 # ACCOUNT_PASSWORD and PRIVATE_KEY stay as shell variables and are never
 # exported into child processes (forge and cast receive them as explicit
 # flags). The few variables forge scripts read from the environment
-# (ACCOUNT_NAME here; WHITELIST_OPERATOR, DEPLOYMENT_NETWORK, CREATE3_FACTORY in
+# (ACCOUNT_NAME here; DEPLOYMENT_NETWORK, CREATE3_FACTORY in
 # run.sh) are exported explicitly.
 # Preserve caller-provided account details (for example deployall.sh selecting
 # the factory keystore with its own password and key) so sourcing .env cannot

@@ -40,6 +40,68 @@ contract DotnsRegistryTests is BaseDotns {
         assertEq(dotnsRegistry.resolver(node), resolverAddress);
     }
 
+    /// @notice A separator is never valid in a subname label.
+    /// @dev This is what reserves the dotted-label space to the PoP gateway. Loosen it and a
+    ///      subname could be minted whose label equals a person's, putting two claimants on one
+    ///      node. Both subnode entry points are checked, since either would open the space.
+    function test_subname_label_carrying_a_separator_is_rejected() public {
+        string memory parentLabel = "parentnode01";
+        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+
+        vm.startPrank(owner);
+
+        vm.expectRevert(IDotnsRegistry.InvalidLabel.selector);
+        dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: parentNode, subLabel: "ali.ce", parentLabel: parentLabel, owner: ed
+            })
+        );
+
+        vm.expectRevert(IDotnsRegistry.InvalidLabel.selector);
+        dotnsRegistry.setSubnodeResolver(
+            IDotnsRegistry.SubnodeResolverRecord({
+                parentNode: parentNode,
+                subLabel: "ali.ce",
+                parentLabel: parentLabel,
+                resolver: address(dotnsReverseResolver)
+            })
+        );
+
+        vm.stopPrank();
+    }
+
+    /// @notice A subname under a two-digit name lands on its own node, not on a person's.
+    /// @dev `michael.01` reads two ways: the whole label the gateway mints, and the subname
+    ///      `michael` under `01`. The text alone cannot identify a person, since the node it
+    ///      resolves to depends on which reading you take, and provenance is what tells them
+    ///      apart. No production controller entry point can create the parent: the public and
+    ///      reserved paths require three characters, and both gateway paths are letters only.
+    ///      An owner-authorised controller can still call the registrar directly, which is what
+    ///      the test does to pin what the two readings resolve to.
+    function test_subname_under_a_two_digit_name_does_not_collide_with_a_person() public {
+        bytes32 twoDigitNode = _nodeOf("01");
+
+        vm.startPrank(address(dotnsRegistrarController));
+        dotnsRegistrar.register(uint256(twoDigitNode), owner, "");
+        dotnsRegistry.setOwner(twoDigitNode, owner);
+        vm.stopPrank();
+
+        vm.prank(owner);
+        bytes32 subnode = dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: twoDigitNode, subLabel: "michael", parentLabel: "01", owner: ed
+            })
+        );
+
+        bytes32 personNode = _nodeOf("michael.01");
+        assertTrue(subnode != personNode, "subname node is not the person's node");
+        assertEq(dotnsRegistry.owner(subnode), ed, "subname belongs to its own owner");
+        assertFalse(
+            dotnsPopController.isPopIssued("michael.01"),
+            "no gateway mint, so the text is a subname and not a person"
+        );
+    }
+
     function test_node_owner_creates_subnode_emits_event_and_returns_expected_subnode() public {
         string memory parentLabel = "parentnode01";
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);

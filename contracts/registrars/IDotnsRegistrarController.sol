@@ -19,8 +19,10 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @param owner Beneficiary the registered name is minted to.
     /// @param secret Caller-chosen entropy that hides the registration intent in the commit
     /// hash; revealed verbatim at registration time.
-    /// @param reserved True when the registration flows through the whitelisted reserved
-    /// pipeline (`registerReserved`); false for the standard public flow (`register`).
+    /// @param reserved Opts a direct @custom:function register into a default reverse record, set
+    /// only when the caller registers under their own key and holds no primary yet.
+    /// @custom:function registerReserved does not read this field: that path is gated on a name
+    /// grant and never writes a reverse record.
     /// @param maxPrice Ceiling in wei the caller accepts for this registration; a reveal charged
     /// above it reverts, closing the gap between the price at commit and the price at reveal.
     /// @param pricingVersion Cost-model version the caller committed to; the reveal prices the name
@@ -51,14 +53,16 @@ interface IDotnsRegistrarController is IDotnsController {
         address store
     );
 
-    /// @notice Emitted when an address is added to or removed from the whitelist.
-    event WhiteListed(address indexed who, bool indexed whiteListStatus);
-
     /// @notice Emitted when overpayment is refunded to the payer at registration entry.
     event OverpaymentRefunded(address indexed payer, uint256 amount);
 
-    /// @notice Thrown when the caller is not whitelisted or the owner.
-    error NotWhiteListedOrOwner(address caller);
+    /// @notice Thrown when a reserved registration names a label not granted to its owner.
+    /// @param label The label being registered.
+    /// @param owner The intended owner the grant was checked against.
+    error NameNotGranted(string label, address owner);
+
+    /// @notice Thrown when the protocol registry has no name whitelist configured.
+    error WhitelistNotConfigured();
 
     /// @notice Thrown when an unexpired commitment already exists.
     error UnexpiredCommitmentExists(bytes32 commitment);
@@ -166,25 +170,28 @@ interface IDotnsRegistrarController is IDotnsController {
     /// fallback, and @custom:emits NameRegistered on success.
     function register(Registration calldata registration) external payable;
 
-    /// @notice Registers a name after the commitment delay.
-    /// @dev Whitelisted issuance path used to seed reserved labels at zero base cost: skips the
-    /// PoP price check and the escrow deposit, but reuses the same commit-reveal pipeline so
-    /// the same anti-front-running guarantees apply. Restricted to whitelisted callers and the
-    /// owner (otherwise @custom:reverts NotWhiteListedOrOwner). Validates the label shape
-    /// (otherwise @custom:reverts InvalidLabel) and ERC721 availability (otherwise
-    /// @custom:reverts NameNotAvailable), then consumes the prior commitment, which fails with
-    /// @custom:reverts CommitmentNotFound, @custom:reverts CommitmentTooNew, or
+    /// @notice Registers a granted name after the commitment delay, at zero base cost.
+    /// @dev Grant-backed issuance path: skips the PoP price check and the escrow deposit, but
+    /// reuses the same commit-reveal pipeline so the same anti-front-running guarantees apply.
+    ///
+    /// Authority is either a substrate Root dispatch or a grant naming `registration.owner` on the
+    /// name whitelist registered under `DotnsConstants.NAME_WHITELIST`; anything else
+    /// @custom:reverts NameNotGranted, and an unset registry key
+    /// @custom:reverts WhitelistNotConfigured. The gate reads `registration.owner` rather than the
+    /// caller, so a relayer may submit on the beneficiary's behalf: the name can only mint to the
+    /// granted address, so no caller proof is needed. On the non-Root path the grant is consumed,
+    /// making it single use; a Root dispatch skips consumption so a governance mint does not spend
+    /// a grant held by someone else.
+    ///
+    /// No reverse record is written. `IDotnsReverseResolver.setReverseName` overwrites
+    /// unconditionally and the submitter is not necessarily the beneficiary, so a third party must
+    /// not be able to relabel another address here. The owner sets their own record through
+    /// @custom:function IDotnsReverseResolver.claimReverseRecord, which checks ownership.
+    ///
+    /// Validates the label shape (otherwise @custom:reverts InvalidLabel) and ERC721 availability
+    /// (otherwise @custom:reverts NameNotAvailable), then consumes the prior commitment, which
+    /// fails with @custom:reverts CommitmentNotFound, @custom:reverts CommitmentTooNew, or
     /// @custom:reverts CommitmentTooOld under the same conditions as @custom:function register.
-    /// Emits
-    /// @custom:emits NameRegistered on success.
+    /// Emits @custom:emits NameRegistered on success.
     function registerReserved(Registration calldata registration) external;
-
-    /// @notice Checks if the given address is whitelisted to call `registerReserved`.
-    function isWhiteListed(address who) external view returns (bool isWhiteListed);
-
-    /// @notice Adds or removes an address from the whitelist for `registerReserved`.
-    /// @dev Callable by the owner or an account holding `DotnsConstants.WHITELIST_OPERATOR_ROLE`;
-    /// any other caller reverts with @custom:reverts IDotnsRoleManager.NotRoleOrOwner. Emits
-    /// @custom:emits WhiteListed on success.
-    function whiteListAddress(address who, bool whiteListStatus) external;
 }

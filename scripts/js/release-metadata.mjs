@@ -337,21 +337,6 @@ function verify(args) {
     }
   }
 
-  // The hop the truapi host walks after reading DotnsGateway.DispatcherAddress.
-  const dispatcher = contracts.RootGatewayDispatcher;
-  if (dispatcher) {
-    const target = cast(["call", dispatcher, "TARGET()(address)", "--rpc-url", rpc]);
-    const expected = contracts.DotnsPopController;
-    if (!expected || target.toLowerCase() !== expected.toLowerCase()) {
-      problems.push(
-        `RootGatewayDispatcher.TARGET() is ${target}, manifest DotnsPopController is ${
-          expected ?? "absent"
-        }`,
-      );
-    } else {
-      console.log(`  ok   RootGatewayDispatcher.TARGET() ${target}`);
-    }
-  }
 
   for (const label of UNVERIFIABLE) {
     if (contracts[label]) {

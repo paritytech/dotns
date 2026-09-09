@@ -7,8 +7,7 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 | # | Issue | Type | Resolves when |
 | :- | :---- | :--- | :------------ |
 | 1 | Deferred LabelStore deployment | Runtime | Runtime allows root-origin contract deployment |
-| 2 | Root origin is not propagated through delegatecalls | Runtime | Runtime propagates origin through delegatecalls |
-| 3 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
+| 2 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
 
 ## 1. Deferred LabelStore deployment
 
@@ -22,19 +21,7 @@ Substrate Root cannot deploy a contract on behalf of an account it does not cont
 
 See [README → DotnsPopController](./README.md#early-testnet-quirk-labelstore-deployment).
 
-## 2. Root origin is not propagated through delegatecalls
-
-**Type:** runtime limitation.
-
-The substrate Root origin is not propagated through delegatecalls, so a UUPS implementation running inside its proxy's delegatecall frame cannot observe Root authority directly. Gateway calls therefore route through the non-proxy `RootGatewayDispatcher`, which is the direct callee of the Root runtime origin and forwards to the controller via a regular message call only after the Root check passes.
-
-**Workaround:** the `RootGatewayDispatcher` shim restores a frame in which the Root check is meaningful.
-
-**Resolution:** when the runtime propagates origin through delegatecalls, the controller can verify Root from its own frame and the dispatcher becomes unnecessary.
-
-See [README → RootGatewayDispatcher](./README.md#rootgatewaydispatcher).
-
-## 3. No standalone user-status mapping
+## 2. No standalone user-status mapping
 
 **Type:** current implementation.
 

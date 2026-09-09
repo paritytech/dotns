@@ -33,7 +33,8 @@ contract GhostNft is ERC721 {
 ///         @custom:contract DotnsNameEscrow, plus the pull-payment and solvency guarantees.
 contract DotnsNameEscrowTest is BaseDotns {
     /// @notice Default label used across most tests.
-    /// @dev 14-char label that classifies as NoStatus; the flat deposit equals BASE_DEPOSIT.
+    /// @dev Nine-character stem that classifies as NoStatus; the flat deposit equals
+    ///      BASE_DEPOSIT.
     string internal constant LABEL = "labelnine01";
 
     /// @notice Register `label` for `nameOwner` under the NoStatus PoP tier and return its tokenId.
@@ -415,15 +416,15 @@ contract DotnsNameEscrowTest is BaseDotns {
     }
 
     function test_downgrade_transfer_pays_name_price() public {
-        string memory liteLabel = "lights01";
+        string memory label = "lights01";
 
         _grantPopFull(ed);
         _grantPopLite(leonardo);
 
-        _commitAndRegister(liteLabel, ed, false);
+        _commitAndRegister(label, ed, false);
 
-        uint256 tokenId = _tokenIdForLabel(liteLabel);
-        uint256 ownPrice = popRules.price(liteLabel);
+        uint256 tokenId = _tokenIdForLabel(label);
+        uint256 ownPrice = popRules.price(label);
         uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
 
         assertEq(quotedFee, ownPrice, "downgrade re-prices at the name's own length");
@@ -806,7 +807,9 @@ contract DotnsNameEscrowTest is BaseDotns {
     ///      it, so `max(ownerPrice, friction)` collapses to the owner price. The whole charge
     ///      routes to protocol fees with no refundable deposit.
     function test_cross_payer_downgrade_charges_only_owner_price() public {
-        string memory label = LITE_LABEL_A;
+        // LITE_LABEL_A carries the gateway's separator, which the public path this test drives
+        // rejects, so the label here is a flat one in the same tier.
+        string memory label = "michael01";
 
         _grantPopFull(leonardo);
         _grantPopLite(ed);

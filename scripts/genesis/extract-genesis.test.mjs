@@ -244,7 +244,8 @@ test("findMissingImplementations catches a proxy whose impl never deployed", () 
   // The blind spot this exists for: referencedContracts only follows a pointer whose
   // target already has code, so an implementation that failed to deploy is dropped
   // silently and nothing downstream would notice.
-  const ghost = "0x00000000000000000000000000000000000000dd"; // in no fixture
+  // in no fixture
+  const ghost = "0x00000000000000000000000000000000000000dd";
   const accounts = [
     {
       address: REGISTRY,

@@ -13,7 +13,7 @@
 # Local usage:
 #   1. cp .env.example .env
 #   2. set PRIVATE_KEY and ACCOUNT_PASSWORD in .env (and adjust
-#      ACCOUNT_NAME, WHITELIST_OPERATOR, or RPC_URL if the defaults are
+#      ACCOUNT_NAME or RPC_URL if the defaults are
 #      not what you want)
 #   3. bun run deploy   (or ./scripts/deploy/run.sh)
 #   4. on success, the script deletes .env automatically
@@ -32,8 +32,6 @@
 #                      Defaults to `dotns-deploy`.
 #   ACCOUNT_PASSWORD   Password passed to cast/forge as --password. Prompted
 #                      interactively when not set.
-#   WHITELIST_OPERATOR Address granted whitelist management permission.
-#                      Defaults to the team-wide operator in .env.example.
 #   PRIVATE_KEY        Hex-encoded deployer private key, with or without 0x.
 #                      Required only when ACCOUNT_NAME has not yet been
 #                      imported into the Foundry keystore.
@@ -53,8 +51,6 @@ set -euo pipefail
 . "$(dirname "$0")/_account.sh"
 
 # Pipeline-only default; .env has already been loaded by _account.sh.
-: "${WHITELIST_OPERATOR:=0xd908e5a6c88e9263f8fd0756bd0b77916008bb72}"
-export WHITELIST_OPERATOR
 
 # TLD the protocol registry initialises with. DeployCore reads it through
 # vm.envString("DOTNS_TLD"), so it has to be exported: sourcing .env does not

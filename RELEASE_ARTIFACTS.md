@@ -86,7 +86,7 @@ To check the addresses against a chain:
 bun run deployments:verify --network paseo-assethub --rpc <eth-rpc-url>
 ```
 
-It reads the well-known keys from `DotnsConstants.sol`, resolves each through the protocol registry, and checks that every resolved address is one the manifest records and has code, that every recorded contract is pointed at by some key, and that `RootGatewayDispatcher.TARGET()` is the recorded `DotnsPopController`. The beacons are reported as unverifiable, since nothing in the registry points at them.
+It reads the well-known keys from `DotnsConstants.sol`, resolves each through the protocol registry, and checks that every resolved address is one the manifest records and has code, that every recorded contract is pointed at by some key. The beacons are reported as unverifiable, since nothing in the registry points at them.
 
 It compares the two sides as sets, so it does not check that a given key holds the contract you would expect; that pairing is asserted when a deployment is wired. It reads a committed manifest rather than a published asset, so run it from a checkout at the tag.
 

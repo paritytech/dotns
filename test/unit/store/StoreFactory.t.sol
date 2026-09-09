@@ -53,7 +53,7 @@ contract StoreFactoryTests is BaseDotns {
         assertEq(ILabelStore(store).protocolRegistry(), address(protocolRegistry));
     }
 
-    function test_deployLabelStoreFor_succeeds_for_registered_protocol() public {
+    function test_deployLabelStoreFor_succeeds_for_an_authorised_controller() public {
         vm.prank(address(dotnsRegistrarController));
         address store = storeFactory.deployLabelStoreFor(ed);
         assertEq(storeFactory.getLabelStore(ed), store);

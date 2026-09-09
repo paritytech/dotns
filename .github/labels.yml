@@ -118,13 +118,6 @@
   color: "e99695"
   description: "Related to paritytech/dotns"
 
-- name: "whitelist-request"
-  color: "5319e7"
-  description: "Whitelist address request"
-
-- name: "whitelist-approved"
-  color: "0e8a16"
-  description: "Approved whitelist request"
 - name: "dotns-sdk"
   color: "5319e7"
   description: "DotNS SDK (UI, CLI, libraries)"

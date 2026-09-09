@@ -12,18 +12,26 @@ library StringUtils {
     using Strings for int256;
     using Strings for address;
 
-    /// @notice Minimum number of trailing digits required in a lite-person PoP label
-    ///         suffix.
-    /// @dev Matches `pallet_resources::MIN_LITE_USERNAME_DIGITS` to avoid drift between
-    ///      what People Chain emits and what DotNS accepts.
-    uint256 internal constant MIN_LITE_SUFFIX_DIGITS = 2;
+    /// @notice Number of digits in a lite-person PoP label's suffix.
+    /// @dev The count the gateway emits, and an exact requirement here: the separator sits at a
+    ///      fixed offset from the end, so a one or three digit suffix is rejected. The pallet
+    ///      reads its own constant as a minimum, so widening it there does not widen this.
+    uint256 internal constant LITE_SUFFIX_DIGITS = 2;
 
     /// @notice Maximum number of octets in a single DNS label.
     /// @dev RFC 1035 caps each label at 63 octets. Enforced inside @custom:function _isDnsLabel so
     ///      every public validator (@custom:function isSingleLabel, @custom:function isNamePath,
-    ///      @custom:function isSingleDotLiteLabel, @custom:function isLitePersonLabel) inherits
-    ///      the bound and oversized labels never reach the registrar.
+    ///      @custom:function isLitePersonLabel) inherits the bound and oversized labels never
+    ///      reach the registrar. A lite label bounds its stem rather than the whole string, so
+    ///      it reaches `MAX_DNS_LABEL_OCTETS + LITE_SUFFIX_DIGITS + 1` octets. Its stem is
+    ///      bounded here but checked in @custom:function _isLitePersonLabel, which is stricter
+    ///      on charset than a DNS label: letters only.
     uint256 internal constant MAX_DNS_LABEL_OCTETS = 63;
+
+    /// @notice ASCII full stop separating a lite label's stem from its digit suffix.
+    /// @dev A lite label is the only label shape in DotNS that carries a separator;
+    ///      @custom:function _isDnsLabel rejects it everywhere else.
+    bytes1 internal constant LABEL_SEPARATOR = 0x2e;
 
     /// @notice Computes the character length of a UTF-8 encoded string.
     /// @dev Counts Unicode code points, not bytes. Handles multi-byte UTF-8 sequences:
@@ -71,63 +79,58 @@ library StringUtils {
         return _isDnsLabel(label, 0, label.length);
     }
 
-    /// @notice Removes dot separators from a dotted label.
-    /// @dev Used by the PoP gateway boundary to normalise user-facing
-    ///      `name.path` input into the flat label expected by pricing and minting.
-    /// @param value Candidate dotted label.
-    /// @return stripped Label with all dots removed.
-    function stripDots(string calldata value) internal pure returns (string memory stripped) {
-        bytes calldata raw = bytes(value);
-        uint256 length = raw.length;
-        uint256 outputLength;
-
-        for (uint256 i = 0; i < length; ++i) {
-            if (raw[i] != bytes1(0x2e)) {
-                ++outputLength;
-            }
-        }
-
-        bytes memory cleaned = new bytes(outputLength);
-        uint256 outputIndex;
-        for (uint256 i = 0; i < length; ++i) {
-            bytes1 char = raw[i];
-            if (char == bytes1(0x2e)) continue;
-            cleaned[outputIndex] = char;
-            ++outputIndex;
-        }
-
-        stripped = string(cleaned);
+    /// @notice Validates the lite-person PoP label format: `<stem>.<digits>`.
+    /// @dev A lite-person label is a stem of lowercase ASCII letters, one
+    ///      @custom:constant LABEL_SEPARATOR, then exactly
+    ///      @custom:constant LITE_SUFFIX_DIGITS digits (e.g. `joseph.42`). Letters only,
+    ///      because the stem is the name a person chose and People Chain restricts that to
+    ///      letters. How short a stem may be is policy rather than format, so it is left to the
+    ///      governance-reserved band in @custom:function IPopRules.classifyName.
+    ///      It is the only label shape in DotNS permitted to carry a separator, which is what
+    ///      reserves the dotted space to the gateway. A digit suffix is not exclusive: an
+    ///      ordinary label may end in digits, but it is measured as written and so classifies by
+    ///      its full length.
+    ///      Cross-flow priority is arbitrated on the stem, not on the whole label: a lite
+    ///      label's stem is reserved as a base name through
+    ///      @custom:function IPopRules.reserveBaseNameForPop, so `joseph.42` contends with
+    ///      `joseph`. There is no flat spelling of a lite label for it to contend with.
+    /// @param value Candidate label.
+    /// @return isValid True if `value` is a stem of lowercase ASCII letters followed by a
+    ///         separator and exactly @custom:constant LITE_SUFFIX_DIGITS digits.
+    function isLitePersonLabel(string calldata value) internal pure returns (bool isValid) {
+        return _isLitePersonLabel(bytes(value));
     }
 
-    /// @notice Validates the gateway-facing lite input shape: `stem.suffix`.
-    /// @dev Requires exactly one dot separator. The left segment must be a canonical DNS
-    ///      label and the right segment must be digits-only with exactly
-    ///      @custom:constant MIN_LITE_SUFFIX_DIGITS characters.
-    /// @param value Candidate dotted lite label.
-    /// @return isValid True when `value` matches the gateway lite input shape.
-    function isSingleDotLiteLabel(string calldata value) internal pure returns (bool isValid) {
-        bytes calldata raw = bytes(value);
+    /// @notice Memory-location helper for @custom:function isLitePersonLabel.
+    /// @dev For callers holding the label in memory rather than calldata: the controller reads
+    ///      it back from a struct before deriving the node, and the lens reads it out of a
+    ///      store. Same predicate, different data location.
+    /// @param value Candidate label held in memory.
+    /// @return isValid True if `value` is a stem of lowercase ASCII letters followed by a
+    ///         separator and exactly @custom:constant LITE_SUFFIX_DIGITS digits.
+    function isLitePersonLabelMemory(string memory value) internal pure returns (bool isValid) {
+        return _isLitePersonLabel(bytes(value));
+    }
+
+    function _isLitePersonLabel(bytes memory raw) private pure returns (bool isValid) {
         uint256 length = raw.length;
-        if (length == 0) return false;
+        // One stem letter, the separator, then the digits is the shortest accepted shape. The
+        // stem is not bounded below here: how short a name may be is policy, and PopRules
+        // already holds it as the governance-reserved band. Mirroring People Chain's
+        // `MinUsernameLength` would duplicate that and drift when the runtime changes it.
+        if (length < LITE_SUFFIX_DIGITS + 2) return false;
 
-        uint256 separator = type(uint256).max;
-        for (uint256 i = 0; i < length; ++i) {
-            if (raw[i] != bytes1(0x2e)) continue;
-            if (separator != type(uint256).max) return false;
-            separator = i;
-        }
+        // Fixing the separator's position is what enforces the exact digit count: a third
+        // digit, a missing separator and a trailing separator all land a non-separator byte
+        // here. The letters-only stem then admits no second separator, so exactly one is
+        // possible without scanning for it.
+        uint256 separator = length - LITE_SUFFIX_DIGITS - 1;
+        if (raw[separator] != LABEL_SEPARATOR) return false;
 
-        if (separator == type(uint256).max) return false;
-        if (separator == 0 || separator + 1 >= length) return false;
-
-        bytes memory stem = new bytes(separator);
-        for (uint256 i = 0; i < separator; ++i) {
-            stem[i] = raw[i];
-        }
-        if (!_isDnsLabel(stem, 0, separator)) return false;
-
-        uint256 suffixLength = length - separator - 1;
-        if (suffixLength != MIN_LITE_SUFFIX_DIGITS) return false;
+        // The stem is a name a person chose, so it follows the same letters-only rule as a
+        // full-person label. Uppercase is excluded for the reason it is everywhere else here:
+        // a single name must have a single spelling, and so a single node.
+        if (!_isPersonLabel(raw, 0, separator)) return false;
 
         for (uint256 i = separator + 1; i < length; ++i) {
             bytes1 char = raw[i];
@@ -137,49 +140,37 @@ library StringUtils {
         return true;
     }
 
-    /// @notice Validates the lite-person PoP label format: `<stem><digits>`.
-    /// @dev A lite-person label is a single DNS label whose trailing characters are
-    ///      digits, with at least @custom:constant MIN_LITE_SUFFIX_DIGITS digits at the tail. It
-    /// Mirrors @custom:pallet `pallet_resources::MIN_LITE_USERNAME_DIGITS`. Lite and public
-    /// registrations
-    ///      share the same namespace; the gateway strips any separator before calling
-    ///      so the on-chain label is a flat DNS label (e.g. `alice42`). First-to-mint
-    ///      wins at the ERC721 layer; cross-flow priority on the stripped stem is
-    ///      arbitrated by @custom:function IPopRules.reserveBaseNameForPop. Keeping a single
-    ///      namespace avoids the ambiguity dotli/dweb would otherwise see between
-    ///      `andrew.47` (lite) and `andrew` owning `47` as a subname.
+    /// @notice Validates that `value` is a name a person chose: lowercase ASCII letters only.
+    /// @dev Mirrors `BaseLabel::is_valid_person` on the gateway pallet, which admits no digits
+    ///      and no hyphens, so a label outside this shape cannot have been issued. Stricter
+    ///      than @custom:function isSingleLabel, and it is the same rule
+    ///      @custom:function isLitePersonLabel applies to a lite stem. How short a name may be
+    ///      is policy rather than format, so no floor is applied here.
     /// @param value Candidate label.
-    /// @return isValid True if the label is a DNS label with at least
-    ///         @custom:constant MIN_LITE_SUFFIX_DIGITS  trailing digits.
-    function isLitePersonLabel(string calldata value) internal pure returns (bool isValid) {
-        return _isLitePersonLabel(bytes(value));
+    /// @return isValid True if every octet of `value` is a lowercase ASCII letter.
+    function isPersonLabel(string calldata value) internal pure returns (bool isValid) {
+        bytes memory raw = bytes(value);
+        return _isPersonLabel(raw, 0, raw.length);
     }
 
-    /// @notice Memory-location helper for @custom:function isLitePersonLabel, used by
-    /// controller-side normalisation paths.
-    /// @param value Candidate label held in memory.
-    /// @return isValid True if the label is a DNS label with at least
-    ///         @custom:constant MIN_LITE_SUFFIX_DIGITS trailing digits.
-    function isLitePersonLabelMemory(string memory value) internal pure returns (bool isValid) {
-        return _isLitePersonLabel(bytes(value));
-    }
+    function _isPersonLabel(
+        bytes memory raw,
+        uint256 start,
+        uint256 end
+    )
+        private
+        pure
+        returns (bool isValid)
+    {
+        if (end <= start) return false;
+        if (end - start > MAX_DNS_LABEL_OCTETS) return false;
 
-    function _isLitePersonLabel(bytes memory raw) private pure returns (bool isValid) {
-        uint256 length = raw.length;
-        if (length < MIN_LITE_SUFFIX_DIGITS + 1) return false;
-
-        if (!_isDnsLabel(raw, 0, length)) return false;
-
-        // Count trailing digits from the right; reject if fewer than the minimum.
-        uint256 trailingDigits;
-        for (uint256 i = length; i > 0; --i) {
-            bytes1 char = raw[i - 1];
-            if (char < bytes1(0x30) || char > bytes1(0x39)) break;
-            unchecked {
-                ++trailingDigits;
-            }
+        for (uint256 i = start; i < end; ++i) {
+            bytes1 char = raw[i];
+            if (char < bytes1(0x61) || char > bytes1(0x7a)) return false;
         }
-        return trailingDigits >= MIN_LITE_SUFFIX_DIGITS;
+
+        return true;
     }
 
     /// @notice Validates that `s` is a dot-separated path of canonical DNS labels.

@@ -10,6 +10,7 @@ import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
+import {SystemUtils} from "../utils/SystemUtils.sol";
 import {IPopRules} from "./IPopRules.sol";
 import {IDotnsCostModelRegistry} from "./IDotnsCostModelRegistry.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
@@ -20,15 +21,17 @@ import {IPersonhood} from "../external/personhood/IPersonhood.sol";
 
 /// @title PopRules
 /// @notice Implements DotNS classification, cost-model-driven pricing, and base-name reservations.
-/// @dev Tiers: base lengths <= 5 are governance-reserved, base lengths 6-8 require PopFull
-///      (or PopLite when carrying exactly two trailing digits, for gateway-issued lite names),
-///      base lengths >= 9 are open to any caller as NoStatus when they carry zero or exactly two
-///      trailing digits. A one-digit suffix and more than two trailing digits are invalid.
+/// @dev Tiers are set by base length. Every label is measured as written, except a lite label,
+///      whose separator and allocated digits are not part of the name the candidate chose, so
+///      `joseph.42` measures six and `joseph42` measures eight.
+///      Base lengths <= 5 are governance-reserved, base lengths 6-8 require PopFull, and base
+///      lengths >= 9 are open to any caller as NoStatus. PopLite is the separated form alone: a
+///      digit suffix on an ordinary label says nothing about personhood.
 ///      Every caller pays the same amount for a given base length. The amount comes from the cost
 ///      model registered under `DotnsConstants.COST_MODEL`, which owns the curve; this contract
 ///      passes it only the base length and keeps the classification, reservation, and tier rules.
 ///      Personhood only unlocks the premium band. Base lengths below nine are closed to the public
-///      paid path until governance sets `shortNamesEnabled`; the gateway and registerReserved do
+///      paid path until Root sets `shortNamesEnabled`; the gateway and registerReserved do
 ///      not consult it.
 /// @custom:security-contact admin@parity.io
 contract PopRules is
@@ -40,7 +43,7 @@ contract PopRules is
 {
     using StringUtils for *;
 
-    /// @notice Active reservations keyed by digit-stripped base name.
+    /// @notice Active reservations keyed by stem.
     mapping(string baseName => Reservation reservation) public reservations;
 
     /// @notice Maximum time a base name can be reserved.
@@ -79,7 +82,11 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function setShortNamesEnabled(bool enabled) external override onlyOwner {
+    function setShortNamesEnabled(bool enabled) external override {
+        // Opening the short-name band to the public path is a governance decision, so it is gated
+        // on a substrate Root origin rather than the owner. `msg.sender` is deliberately not read:
+        // a Root origin has no account behind it, so reading it would trap.
+        require(SystemUtils.originIsRoot(), NotRoot());
         shortNamesEnabled = enabled;
         emit ShortNamesEnabledUpdated(enabled);
     }
@@ -91,7 +98,7 @@ contract PopRules is
         override
         returns (PopStatus requirement, string memory message)
     {
-        _requireCanonicalLabel(name);
+        _requireLabel(name);
         (requirement, message,) = _classifyValidatedName(name);
     }
 
@@ -104,7 +111,7 @@ contract PopRules is
         override
         onlyRegistry
     {
-        _requireCanonicalLabel(stem);
+        _requireStem(stem);
         uint256 stemLength = bytes(stem).length;
         require(
             stemLength >= 6 && stemLength <= 8 && _countTrailingDigits(stem) == 0,
@@ -115,7 +122,7 @@ contract PopRules is
 
     /// @inheritdoc IPopRules
     function isBaseName(string calldata baseName) external pure override returns (bool isBase) {
-        _requireCanonicalLabel(baseName);
+        _requireLabel(baseName);
         uint256 digits = _countTrailingDigits(baseName);
         return digits == 0;
     }
@@ -127,7 +134,7 @@ contract PopRules is
         override
         returns (address reservationOwner, uint64 expiryTimestamp)
     {
-        _requireCanonicalLabel(baseName);
+        _requireStem(baseName);
         Reservation memory reserved = reservations[baseName];
         return (reserved.owner, reserved.expires);
     }
@@ -139,7 +146,7 @@ contract PopRules is
         override
         returns (bool isReserved, address reservationOwner, uint64 expiryTimestamp)
     {
-        _requireCanonicalLabel(baseName);
+        _requireStem(baseName);
         Reservation memory reservation = reservations[baseName];
         return (_isLive(reservation), reservation.owner, reservation.expires);
     }
@@ -212,7 +219,7 @@ contract PopRules is
         view
         returns (PriceWithMeta memory metadata)
     {
-        _requireCanonicalLabel(name);
+        _requireLabel(name);
         _enforceReservationRules(name, userAddress);
 
         (PopStatus requiredStatus, string memory classification, uint256 baseLength) =
@@ -247,7 +254,7 @@ contract PopRules is
         view
         returns (PriceWithMeta memory metadata)
     {
-        _requireCanonicalLabel(name);
+        _requireLabel(name);
 
         (PopStatus requiredStatus, string memory classification, uint256 baseLength) =
             _classifyValidatedName(name);
@@ -274,7 +281,7 @@ contract PopRules is
 
     /// @inheritdoc IPopRules
     function price(string calldata name) external view override returns (uint256) {
-        _requireCanonicalLabel(name);
+        _requireLabel(name);
         return _priceValidatedName(_validatedBaseLength(name));
     }
 
@@ -294,7 +301,7 @@ contract PopRules is
         override
         returns (uint256 floor)
     {
-        _requireCanonicalLabel(name);
+        _requireLabel(name);
         if (from == to) return 0;
         (PopStatus required,, uint256 baseLength) = _classifyValidatedName(name);
         uint256 ownPrice = _priceValidatedName(baseLength);
@@ -384,17 +391,26 @@ contract PopRules is
         require(shortNamesEnabled || baseLength >= 9, PopError("Short names are not for sale"));
     }
 
-    /// @notice Validates the digit suffix and returns the base length that pricing and
-    ///         classification both use to place a name in its band.
-    /// @dev A name carries no digit suffix or exactly two digits; any other count triggers
-    ///      @custom:reverts PopError, so a longer suffix cannot slip a name into a shorter band.
+    /// @notice Index one past `name`'s stem: a lite label without its suffix, or the whole of
+    ///         any other label.
+    /// @dev Only a lite label has a suffix to remove. The gateway allocates those two digits to
+    ///      tell apart people who chose the same stem, so removing them recovers what the
+    ///      candidate actually picked. No such allocation stands behind the digits in an
+    ///      ordinary label, where they are part of the name: `web3` is a four-character word,
+    ///      not `web` with a counter.
+    function _stemEnd(string calldata name) private pure returns (uint256 stemEnd) {
+        stemEnd = bytes(name).length;
+        if (!name.isLitePersonLabel()) return stemEnd;
+        return stemEnd - StringUtils.LITE_SUFFIX_DIGITS - 1;
+    }
+
+    /// @notice The base length that pricing and classification both use to place a name in its
+    ///         band, which is the length of the name's stem.
+    /// @dev Every label is measured as written, except a lite label, whose allocated suffix is
+    ///      not part of the name the candidate chose. So `web3` and `blink182` are measured
+    ///      whole and no digit count is privileged or rejected.
     function _validatedBaseLength(string calldata name) internal pure returns (uint256 baseLength) {
-        uint256 trailingDigits = _countTrailingDigits(name);
-        require(
-            trailingDigits == 0 || trailingDigits == 2,
-            PopError("Name must have no digit suffix or exactly 2 digit suffix")
-        );
-        return bytes(name).length - trailingDigits;
+        return _stemEnd(name);
     }
 
     /// @notice Enforces base-name reservation rules.
@@ -435,13 +451,16 @@ contract PopRules is
         }
     }
 
-    /// @notice Strips trailing digits from a name.
+    /// @notice Returns `name`'s stem: a lite label without its allocated suffix, or any other
+    ///         label verbatim.
+    /// @dev The reservation key. Because only a lite label is shortened, `joseph.42` contends
+    ///      with `joseph` while `joseph42` is an unrelated name and contends with nothing.
     /// @param name Domain label.
     function _stripDigits(string calldata name) internal pure returns (string memory baseName) {
         bytes calldata bytesName = bytes(name);
-        uint256 endPosition = bytesName.length - _countTrailingDigits(name);
+        uint256 endPosition = _stemEnd(name);
 
-        // No trailing digits to strip: return the input verbatim and skip the manual copy.
+        // No suffix to strip: return the input verbatim and skip the manual copy.
         if (endPosition == bytesName.length) return name;
 
         bytes memory output = new bytes(endPosition);
@@ -458,25 +477,44 @@ contract PopRules is
         returns (PopStatus requirement, string memory message, uint256 baseLength)
     {
         baseLength = _validatedBaseLength(name);
-        uint256 trailingDigits = bytes(name).length - baseLength;
 
         if (baseLength <= 5) {
             return (PopStatus.Reserved, "Reserved for Governance", baseLength);
         }
 
         if (baseLength >= 6 && baseLength <= 8) {
-            if (trailingDigits == 2) {
+            // PopLite is the gateway's separated form. Digits in an ordinary label say nothing
+            // about personhood, so such a label sits in the band its length earns.
+            if (name.isLitePersonLabel()) {
                 return (PopStatus.PopLite, "Requires Lite personhood verification", baseLength);
             }
             return (PopStatus.PopFull, "Requires Full personhood verification", baseLength);
         }
 
-        // Baselength >= 9 is open to any caller with no suffix or the two-digit lite suffix shape.
+        // Base length >= 9 is open to any caller, and is reached by a lite label whose stem is
+        // nine or more through the gateway.
         return (PopStatus.NoStatus, "Available to all", baseLength);
     }
 
-    function _requireCanonicalLabel(string calldata name) internal pure {
-        require(name.isSingleLabel(), PopError("Name must be lowercase ASCII DNS label"));
+    /// @notice Requires `stem` to be a canonical DNS label, carrying no separator.
+    /// @dev Reservation keys are stems, so a separator here is a caller error rather than a lite
+    ///      name. A digit suffix passes this check, because a DNS label admits digits; the entry
+    ///      points that write a reservation reject one themselves.
+    ///      @custom:function _requireLabel is the guard for full labels.
+    function _requireStem(string calldata stem) internal pure {
+        require(stem.isSingleLabel(), PopError("Name must be lowercase ASCII DNS label"));
+    }
+
+    /// @notice Requires `name` to be a label DotNS can issue: a canonical DNS label, or a lite
+    ///         label carrying its separator.
+    /// @dev The union is the full set of issuable labels, so a near miss such as `alice.4` or
+    ///      `a.b.42` still reverts. @custom:function _requireStem is the stricter guard for
+    ///      reservation keys, which never carry a separator.
+    function _requireLabel(string calldata name) internal pure {
+        require(
+            name.isSingleLabel() || name.isLitePersonLabel(),
+            PopError("Name must be a lowercase ASCII DNS label or a lite label")
+        );
     }
 
     /// @inheritdoc ERC165Upgradeable
@@ -513,7 +551,7 @@ contract PopRules is
         override
         onlyRegistry
     {
-        _requireCanonicalLabel(stem);
+        _requireStem(stem);
         require(
             _countTrailingDigits(stem) == 0,
             PopError("Reservation stem must have no trailing digits")
@@ -523,13 +561,13 @@ contract PopRules is
 
     /// @inheritdoc IPopRules
     function stripDigits(string calldata name) external pure override returns (string memory stem) {
-        _requireCanonicalLabel(name);
+        _requireLabel(name);
         return _stripDigits(name);
     }
 
     /// @inheritdoc IPopRules
     function releaseBaseName(string calldata stem) external override onlyRegistry {
-        _requireCanonicalLabel(stem);
+        _requireStem(stem);
         require(
             _countTrailingDigits(stem) == 0,
             PopError("Reservation stem must have no trailing digits")
@@ -558,7 +596,7 @@ contract PopRules is
         override
         onlyRegistry
     {
-        _requireCanonicalLabel(stem);
+        _requireStem(stem);
         require(
             _countTrailingDigits(stem) == 0,
             PopError("Reservation stem must have no trailing digits")

@@ -17,7 +17,7 @@ import {LabelUtils} from "../../contracts/utils/LabelUtils.sol";
 ///         downstream consumer walks starting from the lite username string.
 contract PopLifecycleFlow is BaseDotns {
     /// @notice Lite label fixture. Baselength 7 with 2 trailing digits classifies as PopLite.
-    string internal constant LITE_LABEL = "aliceli01";
+    string internal constant LITE_LABEL = "michael.01";
     /// @notice Full label fixture. Baselength 9 with no trailing digits classifies as PopFull.
     string internal constant FULL_LABEL = "alicefull";
     /// @notice Subname label used for the subnode portion of the flow.
@@ -102,7 +102,7 @@ contract PopLifecycleFlow is BaseDotns {
     function test_cold_gateway_reserve_then_user_settles_pending_claim() public {
         _grantPopFull(ed);
 
-        _gatewayReserveLiteName(
+        _rootReserveLiteName(
             IDotnsPopController.LiteRegistration({
                 liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
@@ -136,7 +136,7 @@ contract PopLifecycleFlow is BaseDotns {
 
     function test_reserve_settle_reserve_cycle_for_same_user() public {
         _grantPopFull(ed);
-        _gatewayReserveLiteName(
+        _rootReserveLiteName(
             IDotnsPopController.LiteRegistration({
                 liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
@@ -157,10 +157,10 @@ contract PopLifecycleFlow is BaseDotns {
             string.concat(LITE_LABEL, protocolRegistry.tld())
         );
 
-        string memory secondLabel = "aliceli02";
+        string memory secondLabel = "michael.02";
         bytes memory secondKey =
             hex"04beefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafedeadbeefcafe";
-        _gatewayReserveLiteName(
+        _rootReserveLiteName(
             IDotnsPopController.LiteRegistration({
                 liteLabel: secondLabel, user: ed, chatKey: secondKey
             })
@@ -179,7 +179,7 @@ contract PopLifecycleFlow is BaseDotns {
 
     function test_gateway_name_with_live_pending_claim_is_soulbound_and_settles_for_owner() public {
         _grantPopFull(ed);
-        _gatewayReserveLiteName(
+        _rootReserveLiteName(
             IDotnsPopController.LiteRegistration({
                 liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
@@ -213,7 +213,7 @@ contract PopLifecycleFlow is BaseDotns {
 
     function test_lapsed_pending_claim_settles_and_deploys_store() public {
         _grantPopFull(ed);
-        _gatewayReserveLiteName(
+        _rootReserveLiteName(
             IDotnsPopController.LiteRegistration({
                 liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
@@ -238,7 +238,7 @@ contract PopLifecycleFlow is BaseDotns {
 
     function test_lite_via_gateway_then_full_via_public_after_upgrade() public {
         _grantPopLite(ed);
-        _gatewayReserveLiteName(
+        _rootReserveLiteName(
             IDotnsPopController.LiteRegistration({
                 liteLabel: LITE_LABEL, user: ed, chatKey: CHAT_KEY
             })
@@ -268,7 +268,7 @@ contract PopLifecycleFlow is BaseDotns {
         // PopFull superset) and the full-person claim.
         _grantPopFull(user);
         _reservePop(user, LITE_LABEL, CHAT_KEY, FULL_LABEL);
-        _gatewayRegisterBaseName(
+        _rootRegisterBaseName(
             IDotnsPopController.FullRegistration({
                 label: FULL_LABEL, user: user, link: _linkWithLite(LITE_LABEL)
             })

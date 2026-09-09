@@ -108,18 +108,28 @@ contract DotnsPopLens is IDotnsPopLens {
     }
 
     /// @notice Whether `label` belongs in the lite listing (`wantLite`) or the full listing.
-    /// @dev A lite-person label is a single label with two trailing digits; a full-person label
-    /// is any other single label. The two sets are disjoint and together cover every single
-    /// label, so one predicate drives both listings.
-    function _matchesShape(string memory label, bool wantLite) internal pure returns (bool) {
-        bool lite = label.isLitePersonLabelMemory();
-        return wantLite ? lite : (!lite && label.isSingleLabelMemory());
+    /// @dev Two questions, two signals, and a third guard the caller already applied. Whether a
+    /// name is an identity at all is provenance, so each listing is gated on
+    /// @custom:function IDotnsPopController.isPopIssued: characters alone would admit a public
+    /// registration spelled `joseph42`, which reads as a full-person name and is not one. Which
+    /// kind of identity it is, lite or full, is spelling: the gateway issues a lite name with
+    /// its separator and a full-person name without one, and provenance cannot tell them apart
+    /// because it covers both. A subname is excluded before either signal is read: the callers
+    /// keep only nodes the registrar says `user` owns, and a subname lives in the registry with
+    /// no token behind it. That matters because provenance is keyed by text, so a subname
+    /// rendering as `joseph.42` would otherwise borrow the answer belonging to the whole label.
+    /// So the two listings together cover the names the gateway issued and `user` holds, one
+    /// kind each, rather than everything the account holds.
+    function _belongsToListing(string memory label, bool wantLite) internal view returns (bool) {
+        if (!_controller().isPopIssued(label)) return false;
+        return wantLite ? label.isLitePersonLabelMemory() : label.isSingleLabelMemory();
     }
 
-    /// @notice Counts the names currently owned by `user` that match the requested shape.
+    /// @notice Counts the names currently owned by `user` that belong to the requested listing.
     /// @dev Walks the user's `LabelStore` (settled names) then their pending claims, keeping only
-    /// shape matches still owned by `user` on the registrar. A pending entry already written into
-    /// the store by a sibling flow is skipped so it is not counted twice.
+    /// entries that belong to the listing and are still owned by `user` on the registrar. A pending
+    /// entry already written into the store by a sibling flow is skipped so it is not counted
+    /// twice.
     function _countNames(address user, bool wantLite) internal view returns (uint256 count) {
         IDotnsRegistrar registrar = _registrar();
         bytes32 tldNode = _protocolRegistry.tldNode();
@@ -131,7 +141,7 @@ contract DotnsPopLens is IDotnsPopLens {
             for (uint256 i; i < stored; ++i) {
                 bytes32 node = labelStore.getLabelhashAt(i);
                 if (!_ownedBy(registrar, node, user)) continue;
-                if (_matchesShape(registrar.labelOf(uint256(node)), wantLite)) ++count;
+                if (_belongsToListing(registrar.labelOf(uint256(node)), wantLite)) ++count;
             }
         }
 
@@ -139,14 +149,14 @@ contract DotnsPopLens is IDotnsPopLens {
         uint256 pending = queue.length;
         for (uint256 j; j < pending; ++j) {
             string memory label = queue[j].label;
-            if (!_matchesShape(label, wantLite)) continue;
+            if (!_belongsToListing(label, wantLite)) continue;
             bytes32 node = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(label));
             if (store != address(0) && ILabelStore(store).isLocked(node)) continue;
             if (_ownedBy(registrar, node, user)) ++count;
         }
     }
 
-    /// @notice Returns a page of `user`'s owned names matching the requested shape.
+    /// @notice Returns a page of `user`'s owned names belonging to the requested listing.
     /// @dev Same ownership-verified walk as @custom:function _countNames, in the same order
     /// (store then pending), skipping the first `offset` matches and returning up to `limit`
     /// entries. `limit` is clamped to `DotnsConstants.MAX_PAGE_SIZE` to bound the memory and the
@@ -179,7 +189,7 @@ contract DotnsPopLens is IDotnsPopLens {
                 bytes32 node = labelStore.getLabelhashAt(i);
                 if (!_ownedBy(registrar, node, user)) continue;
                 string memory label = registrar.labelOf(uint256(node));
-                if (!_matchesShape(label, wantLite)) continue;
+                if (!_belongsToListing(label, wantLite)) continue;
                 if (seen++ < offset) continue;
                 page[filled++] = Name({node: node, label: label, settled: true, deadline: 0});
             }
@@ -190,7 +200,7 @@ contract DotnsPopLens is IDotnsPopLens {
         uint64 duration = _controller().reservationDuration();
         for (uint256 j; j < pending && filled < limit; ++j) {
             string memory label = queue[j].label;
-            if (!_matchesShape(label, wantLite)) continue;
+            if (!_belongsToListing(label, wantLite)) continue;
             bytes32 node = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(label));
             if (store != address(0) && ILabelStore(store).isLocked(node)) continue;
             if (!_ownedBy(registrar, node, user)) continue;

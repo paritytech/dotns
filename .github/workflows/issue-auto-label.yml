@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   label:
-    if: ${{ !contains(github.event.issue.labels.*.name, 'whitelist-request') }}
     runs-on: ubuntu-latest
     steps:
       - name: Extract labels from form body

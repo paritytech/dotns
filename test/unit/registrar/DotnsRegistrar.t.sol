@@ -361,7 +361,8 @@ contract DotnsRegistrarTests is BaseDotns {
     }
 
     function test_initialize_cannot_be_called_twice() public {
-        vm.expectRevert(); // OZ InvalidInitialization
+        // OZ InvalidInitialization
+        vm.expectRevert();
         dotnsRegistrar.initialize(
             "Dotns", "Dotns", IDotnsProtocolRegistry(address(protocolRegistry))
         );

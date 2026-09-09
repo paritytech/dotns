@@ -110,14 +110,13 @@ contract DotnsNameEscrow is
     /// @dev Distinct from `cooldown`. Inside this window the holder may `redeem` the name back
     ///      and nobody else may take it (`available` reports false); once it elapses `reclaim`
     ///      becomes permissionless and any unwithdrawn deposit is credited to the recipient
-    ///      rather than stranded. Appended after the pre-existing variables and paid for out of
-    ///      `__gap`, so the layout of everything above is untouched.
+    ///      rather than stranded.
     uint256 public redeemWindow;
 
-    /// @dev Reserved storage space to allow for layout changes in the future. A new variable
-    /// appended above must shrink this array by the same number of slots so the contract's total
-    /// storage footprint stays fixed.
-    uint256[49] private __gap;
+    /// @dev Reserved storage space to allow for layout changes in future upgrades. A variable
+    /// appended above must shrink this array by the same number of slots, so an upgrade never
+    /// moves the slots of anything already stored.
+    uint256[50] private __gap;
 
     /// @notice Restricts calls to the configured registrar controller.
     modifier onlyController() {

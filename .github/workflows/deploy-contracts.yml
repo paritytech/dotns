@@ -39,7 +39,6 @@ jobs:
       # to DotnsProtocolRegistry.initialize as init calldata, which does not affect
       # any CREATE3 address, so the reproduction still lands the canonical set.
       DOTNS_TLD: dot
-      WHITELIST_OPERATOR: "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955"
       FACTORY_DEPLOYER: "0xd498F7BC5bB3cBdd0068c3deEbbd814b69C3F164"
       CANONICAL: deployments/paseo-assethub/420420417.json
       MANIFEST: deployments/paseo-local/420420420.json
@@ -493,7 +492,7 @@ jobs:
               delete existingDetails[section];
             }
 
-            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Coverage', 'Documentation', 'Format & Lint', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
             const sortedKeys = Object.keys(rows).sort((a, b) => {
               const ai = order.indexOf(a), bi = order.indexOf(b);
               return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);

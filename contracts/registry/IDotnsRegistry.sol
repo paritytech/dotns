@@ -110,8 +110,10 @@ interface IDotnsRegistry {
     ///      registration and on every reclaim from escrow: each call rewrites
     ///      `records[node].resolver` to the protocol-registered default reverse resolver so a
     ///      prior owner's resolver pointer (and the records keyed under it) cannot be inherited
-    ///      by the next holder. Stores `owner = address(0)` as a sentinel so reads delegate to
-    ///      `IDotnsRegistrar.ownerOf` and ERC-721 transfers remain authoritative. Emits
+    ///      by the next holder across that recycle. A secondary-market ERC-721 `transferFrom` does
+    ///      not call the registry, so a name sold directly keeps the seller's resolver pointer
+    ///      until the buyer overwrites it. Stores `owner = address(0)` as a sentinel so reads
+    ///      delegate to `IDotnsRegistrar.ownerOf` and ERC-721 transfers remain authoritative. Emits
     ///      @custom:emits NodeTransferred on success.
     function setOwner(bytes32 node, address newOwner) external;
 

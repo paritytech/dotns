@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {DotnsNameWhitelist} from "../../../contracts/whitelist/DotnsNameWhitelist.sol";
 import {IDotnsNameWhitelist} from "../../../contracts/whitelist/IDotnsNameWhitelist.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
+import {ISystem} from "../../../contracts/external/revive/ISystem.sol";
 
 /// @title WhitelistHandler
 /// @notice Drives the whitelist through its lifecycle for the invariant suite, cycling a fixed
@@ -56,8 +57,9 @@ contract WhitelistHandler is Test {
             return;
         }
         address user = WHITELIST.claims(label, 0, 1)[0].user;
-        vm.prank(OWNER);
+        _asRoot();
         try WHITELIST.accept(label, user) {} catch {}
+        _asSigned();
     }
 
     function reject(uint256 labelSeed) external {
@@ -66,23 +68,27 @@ contract WhitelistHandler is Test {
             return;
         }
         address user = WHITELIST.claims(label, 0, 1)[0].user;
-        vm.prank(OWNER);
+        _asRoot();
         try WHITELIST.reject(label, user) {} catch {}
+        _asSigned();
     }
 
     function grant(uint256 actorSeed, uint256 labelSeed) external {
-        vm.prank(OWNER);
+        _asRoot();
         try WHITELIST.grantName(_label(labelSeed), _actor(actorSeed)) {} catch {}
+        _asSigned();
     }
 
     function revoke(uint256 labelSeed) external {
-        vm.prank(OWNER);
+        _asRoot();
         try WHITELIST.revokeName(_label(labelSeed)) {} catch {}
+        _asSigned();
     }
 
     function setReserved(uint256 labelSeed, bool reserved) external {
-        vm.prank(OWNER);
+        _asRoot();
         try WHITELIST.setReserved(_label(labelSeed), reserved) {} catch {}
+        _asSigned();
     }
 
     function consume(uint256 labelSeed, bool viaPop) external {
@@ -97,8 +103,9 @@ contract WhitelistHandler is Test {
 
     function tuneMaxClaimants(uint256 seed) external {
         uint16 newMax = uint16(1 + (seed % DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT));
-        vm.prank(OWNER);
+        _asRoot();
         try WHITELIST.setMaxClaimants(newMax) {} catch {}
+        _asSigned();
     }
 
     function _actor(uint256 seed) internal view returns (address actor) {
@@ -107,5 +114,28 @@ contract WhitelistHandler is Test {
 
     function _label(uint256 seed) internal view returns (string memory label) {
         return _labels[seed % _labels.length];
+    }
+
+    /// @notice Puts the next call under a substrate Root origin. The whitelist's admin surface is
+    /// Root-only, so every governance action here needs it; a plain prank produces a Signed origin
+    /// and would revert into the catch, leaving the campaign to exercise only the permissionless
+    /// entry points.
+    function _asRoot() internal {
+        _mockOriginIsRoot(true);
+    }
+
+    /// @notice Restores the default. `DotnsRegistrarController.registerReserved` reads
+    /// `originIsRoot` too, and handler state is campaign-scoped, so a sticky `true` would put a
+    /// later reserved registration on the Root branch.
+    function _asSigned() internal {
+        _mockOriginIsRoot(false);
+    }
+
+    function _mockOriginIsRoot(bool returnValue) internal {
+        vm.mockCall(
+            DotnsConstants.REVIVE_SYSTEM,
+            abi.encodeWithSelector(ISystem.originIsRoot.selector),
+            abi.encode(returnValue)
+        );
     }
 }

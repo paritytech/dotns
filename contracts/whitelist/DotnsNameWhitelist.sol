@@ -3,9 +3,14 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC165Upgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {DotnsRoleManager} from "../access/DotnsRoleManager.sol";
 import {IDotnsNameWhitelist} from "./IDotnsNameWhitelist.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
@@ -24,18 +29,19 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 ///      behalf and the name binds to that user. All state is on-chain and queryable through views;
 ///      no event indexing is required. A name holds at most `maxClaimants` live claims, which
 ///      bounds the loop that clears them on resolution. Resolving a name deletes its claims,
-///      refunding their storage deposit, so only reserved or won names persist. Governance is Root
-///      or the owner. Substrate Root has no address, so the governance gates check
-///      `SystemUtils.originIsRoot`, which is true through the proxy's delegatecall frame, before
-///      reading `msg.sender`. Operators are signed role holders
-///      for day-to-day approvals; the public and PoP controllers hold only the `consume` hook.
+///      refunding their storage deposit, so only reserved or won names persist. The entire admin
+///      surface is substrate Root: `SystemUtils.originIsRoot` is true through the proxy's
+///      delegatecall frame, and no gate reads `msg.sender`, so Root's lack of an address is not a
+///      problem. No signed account grants, revokes, reserves, or retunes a cap; the owner's
+///      authority is upgrade only. The public and PoP controllers hold only the `consume` hook.
 ///      Entries are keyed by the node under the active TLD, which the deployment holds immutable
 ///      for the whitelist's lifetime.
 /// @custom:security-contact admin@parity.io
 contract DotnsNameWhitelist is
     Initializable,
     UUPSUpgradeable,
-    DotnsRoleManager,
+    OwnableUpgradeable,
+    ERC165Upgradeable,
     IDotnsNameWhitelist
 {
     using StringUtils for string;
@@ -78,21 +84,13 @@ contract DotnsNameWhitelist is
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
 
-    /// @notice Restricts a call to Root or the owner.
-    /// @dev Checks Root first so `msg.sender`, which traps under a Root origin, is read only for a
-    ///      signed caller.
+    /// @notice Restricts a call to a substrate Root dispatch.
+    /// @dev The whole admin surface is governance-only: no key grants, revokes, reserves, or
+    ///      retunes a cap. The owner's authority is deployment and upgrade, not allocation, so no
+    ///      signed account can hand out a name. `msg.sender` is never read here, which is also what
+    ///      keeps every gated entry point callable under a Root origin, since Root has no account.
     modifier onlyGovernance() {
-        if (!SystemUtils.originIsRoot()) {
-            _checkOwner();
-        }
-        _;
-    }
-
-    /// @notice Restricts a call to Root, the owner, or an operator.
-    modifier onlyOperatorOrGovernance() {
-        if (!SystemUtils.originIsRoot()) {
-            _checkRoleOrOwner(DotnsConstants.WHITELIST_OPERATOR_ROLE);
-        }
+        _onlyGovernance();
         _;
     }
 
@@ -104,6 +102,11 @@ contract DotnsNameWhitelist is
             NotController(msg.sender)
         );
         _;
+    }
+
+    /// @notice Internal check enforcing the substrate Root gate.
+    function _onlyGovernance() internal view {
+        require(SystemUtils.originIsRoot(), NotGovernance());
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -119,16 +122,10 @@ contract DotnsNameWhitelist is
     function initialize(IDotnsProtocolRegistry registry) external initializer {
         __ERC165_init();
         __Ownable_init(msg.sender);
-        _dotnsRoleManagerInit();
         protocolRegistry = registry;
         maxClaimants = DotnsConstants.WHITELIST_DEFAULT_MAX_CLAIMANTS;
         maxGrantBatch = DotnsConstants.WHITELIST_DEFAULT_MAX_GRANT_BATCH;
         maxReasonBytes = DotnsConstants.WHITELIST_DEFAULT_MAX_REASON_BYTES;
-    }
-
-    /// @inheritdoc IDotnsNameWhitelist
-    function setOperator(address account, bool enabled) external override onlyGovernance {
-        _setRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, account, enabled);
     }
 
     /// @inheritdoc IDotnsNameWhitelist
@@ -193,14 +190,7 @@ contract DotnsNameWhitelist is
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function accept(
-        string calldata label,
-        address user
-    )
-        external
-        override
-        onlyOperatorOrGovernance
-    {
+    function accept(string calldata label, address user) external override onlyGovernance {
         bytes32 node = _nodeOf(label);
         require(_claims[node][user].status == ClaimStatus.Requested, NotRequested(node, user));
         emit NameAccepted(node, user, label);
@@ -208,14 +198,7 @@ contract DotnsNameWhitelist is
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function reject(
-        string calldata label,
-        address user
-    )
-        external
-        override
-        onlyOperatorOrGovernance
-    {
+    function reject(string calldata label, address user) external override onlyGovernance {
         bytes32 node = _nodeOf(label);
         Claim storage claim = _claims[node][user];
         require(claim.status == ClaimStatus.Requested, NotRequested(node, user));
@@ -233,26 +216,12 @@ contract DotnsNameWhitelist is
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function grantName(
-        string calldata label,
-        address user
-    )
-        external
-        override
-        onlyOperatorOrGovernance
-    {
+    function grantName(string calldata label, address user) external override onlyGovernance {
         _grant(label, user);
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function grantNames(
-        string[] calldata labels,
-        address user
-    )
-        external
-        override
-        onlyOperatorOrGovernance
-    {
+    function grantNames(string[] calldata labels, address user) external override onlyGovernance {
         require(labels.length <= maxGrantBatch, TooManyLabels());
         for (uint256 i = 0; i < labels.length; i++) {
             _grant(labels[i], user);
@@ -435,11 +404,11 @@ contract DotnsNameWhitelist is
         return _isWindowOpen();
     }
 
-    /// @inheritdoc DotnsRoleManager
+    /// @inheritdoc ERC165Upgradeable
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(DotnsRoleManager)
+        override(ERC165Upgradeable)
         returns (bool supported)
     {
         return interfaceId == type(IDotnsNameWhitelist).interfaceId
@@ -518,11 +487,6 @@ contract DotnsNameWhitelist is
     /// @return open True when the current time is within the window.
     function _isWindowOpen() internal view returns (bool open) {
         return block.timestamp >= _requestOpen && block.timestamp < _requestClose;
-    }
-
-    /// @inheritdoc DotnsRoleManager
-    function _isSupportedRole(bytes32 role) internal pure override returns (bool supported) {
-        return role == DotnsConstants.WHITELIST_OPERATOR_ROLE;
     }
 
     /// @inheritdoc UUPSUpgradeable

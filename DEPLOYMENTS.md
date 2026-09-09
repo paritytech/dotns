@@ -16,7 +16,6 @@ You need:
 - Foundry, including forge and cast.
 - Bun, because the package manifest wraps the deployment runner.
 - A funded deployer key for the target network.
-- A whitelist-operator address to receive whitelist-management permission after deployment.
 
 The deployment runner uses a Foundry keystore account, not a long-lived plaintext private key. A plaintext private key is only needed for the first import of the deployer account into the local Foundry keystore.
 
@@ -84,7 +83,6 @@ Set these fields:
 | ACCOUNT_NAME | optional | Foundry keystore account name. Defaults to dotns-deploy. |
 | ACCOUNT_PASSWORD | yes on first import | Password used to import and unlock the Foundry keystore account. |
 | PRIVATE_KEY | yes on first import | Hex deployer private key. This is imported into the Foundry keystore, then removed from disk when the deploy succeeds. |
-| WHITELIST_OPERATOR | optional | Address granted whitelist-management permission after deployment. Defaults to the team operator in the example file. |
 | RPC_URL | optional | Foundry RPC alias or full RPC URL. Defaults to paseo_local, which means the local adapter. |
 | DEPLOYMENT_NETWORK | optional | Manifest subdirectory under deployments/. Set it to keep networks that share a chain id apart (see [Deployment manifests](#deployment-manifests)). Defaults to the chain-id mapping. |
 
@@ -269,7 +267,6 @@ At minimum, confirm:
 - The forward, reverse, content, and Pop resolvers are present.
 - The escrow address is present.
 - StoreFactory and both store beacons are present.
-- The RootGatewayDispatcher is present on environments that use the root-dispatch path.
 - The escrow's redeem window is non-zero. A zero leaves `release` reverting with `RedeemWindowNotConfigured` for every name on the deployment, so a holder who releases a name by accident has no chance to redeem it back. Any value the setter accepted is already at least `MIN_REDEEM_WINDOW` (1 day), so this check is only ever confirming that the window was configured at all, which is exactly what a proxy upgraded without seeding it would fail.
 
 ```bash
@@ -284,61 +281,59 @@ forge test --match-path 'test/fork/**' -vvvvv
 
 If the deployment was intended to update a public environment, update the address tables in this file from the deployment manifest in the same change that updates the generated deployment JSON.
 
-## Whitelisting
+## Name grants (whitelisting)
 
-The public registrar controller carries a whitelist for `registerReserved`. A whitelisted address can run the reserved registration path, which skips the Proof-of-Personhood pricing gate while still going through the normal commit-reveal and availability checks. See the [README economics section](./README.md#economics) for what whitelisting does and does not grant; this section covers the operator mechanics.
+Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label to one beneficiary address and is single use: `registerReserved` requires a grant naming `registration.owner`, spends it on the mint, and refuses a second attempt. See the [README economics section](./README.md#economics) for what a grant does and does not confer; this section covers the mechanics.
 
-Authority comes in two levels. The owner holds the controller and grants or revokes the whitelist-operator role. A whitelist operator holds `WHITELIST_OPERATOR_ROLE` and can add or remove whitelisted addresses, but cannot grant the role on. A whitelisted address can call `registerReserved`. The role is held on the controller itself, so the owner rotates, grants, or revokes operators at any time without an upgrade. Granting the operator role and whitelisting an address are separate grants.
+**Every admin action on the whitelist is a substrate Root dispatch.** Granting, revoking, accepting, rejecting, reserving, setting the request window and retuning the caps all require it. No signed account can do any of them, the contract owner included: the owner's authority is deployment and upgrade, not allocation. A signed call reverts with `NotGovernance`. There is no operator role and no address allowlist.
 
-`WHITELIST_OPERATOR_ROLE` is a standard access-control role, so any number of addresses can hold it at once. The fresh-deploy pipeline grants it to the single `WHITELIST_OPERATOR` address described in [One-time deployer bootstrap](#one-time-deployer-bootstrap), in `_bootstrapWhitelistOperator` (present in both `scripts/deploy/WireDeployments.s.sol` and `scripts/deploy/DotnsDeployer.s.sol`):
+That is the point of the design. As a security measure, no single key can grant a name; a grant costs a referendum, or on a test network a sudo-dispatched Root call.
 
-```solidity
-DotnsRegistrarController(addr.registrarController)
-    .setRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, whitelistOperator, true);
+Two owner-level routes reach the same outcome and are **not** closed by this. `DotnsProtocolRegistry.set` is `onlyOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. `DotnsRegistrar.addController` is `onlyOwner`, and a controller can mint any available name directly, without the whitelist at all. Treat the guarantee here as covering the whitelist's own admin surface, not the protocol as a whole, until upgrade authority and deploy-time ownership are settled.
+
+The controller carries no roles either. It reads grants and consumes them, so `setRole` on the controller reverts with `UnsupportedRole`.
+
+### Dispatching a grant
+
+The dispatch is a Substrate extrinsic with the contract call nested inside it:
+
+```
+Root origin
+  └─ Revive.call { dest: <DotnsNameWhitelist H160>, value: 0, data: <EVM calldata> }
+       └─ grantName(string,address)
 ```
 
-The `WHITELIST_OPERATOR` env carries one address. To seed more operators in the same deployment, add a `setRole` call per extra address in that helper, each address hardcoded or read from a further env var. The controller handle is `addr.registrarController` in WireDeployments and `deployment.registrarController` in DotnsDeployer:
-
-```solidity
-DotnsRegistrarController(addr.registrarController)
-    .setRole(DotnsConstants.WHITELIST_OPERATOR_ROLE, anotherOperator, true);
-```
-
-After deployment, the owner grants further operators with `setRole`, which is owner-only and so must be broadcast from the owner key. Revoke with `false`:
+`cast` can be used for the innermost layer to encode `data`:
 
 ```bash
-ROLE=$(cast keccak "DOTNS_WHITELIST_OPERATOR_ROLE")
-cast send "$CONTROLLER" "setRole(bytes32,address,bool)" "$ROLE" "$OPERATOR" true \
-  --rpc-url "$RPC_URL" --account "$ACCOUNT_NAME"
+# grant one label to one beneficiary
+cast calldata "grantName(string,address)" "$LABEL" "$ADDRESS"
+
+# grant several labels to one beneficiary, up to maxGrantBatch
+cast calldata "grantNames(string[],address)" '["alpha01","beta02"]' "$ADDRESS"
+
+# release an unspent grant
+cast calldata "revokeName(string)" "$LABEL"
 ```
 
-To grant many operators, loop the same call over the addresses from the owner account:
+Building the `Revive.call` around that hex and dispatching it as Root is done on the Substrate side. Wrap it in `Sudo.sudo` on a test network; put it up as a referendum on a production one. Both produce the same Root origin the contract checks, so the same `data` works either way.
+
+The gas and storage-deposit limits belong to the `Revive.call` extrinsic rather than the contract call. Dry-run the call to size them rather than guessing, as an underestimate fails the whole dispatch.
+
+### Reading state
+
+Both views are open and need no authority:
 
 ```bash
-ROLE=$(cast keccak "DOTNS_WHITELIST_OPERATOR_ROLE")
-for OPERATOR in 0xOperator1 0xOperator2 0xOperator3; do
-  cast send "$CONTROLLER" "setRole(bytes32,address,bool)" "$ROLE" "$OPERATOR" true \
-    --rpc-url "$RPC_URL" --account "$ACCOUNT_NAME"
-done
+cast call "$WHITELIST" "isGrantedTo(string,address)(bool)" "$LABEL" "$ADDRESS"
+cast call "$WHITELIST" "statusOf(string)(uint8)" "$LABEL"
 ```
 
-Whitelisting an address is the day-to-day operation, run by the owner or any operator. The dotNS SDK CLI exposes a whitelist command for this; run it from an account that holds the role (see the [dotns-sdk](https://github.com/paritytech/dotns-sdk) repository). The hosted dotNS app at [dotns.paseo.li](https://dotns.paseo.li) and [dotns.dot.li](https://dotns.dot.li) drives the same flow from its UI; see its docs section, built from the dotns-sdk UI packages. The equivalent direct call is `whiteListAddress(address who, bool whiteListStatus)`, again with `false` to remove:
+A grant that has been spent reads `false`, so `isGrantedTo` also distinguishes an unused grant from a consumed one. `$WHITELIST` is the `DotnsNameWhitelist` address for the target network, read from the protocol registry under the `nameWhitelist` key or taken from the [deployment manifest](#addresses), never hardcoded across networks.
 
-```bash
-cast send "$CONTROLLER" "whiteListAddress(address,bool)" "$ADDRESS" true \
-  --rpc-url "$RPC_URL" --account "$ACCOUNT_NAME"
-```
+### Configuration is Root too
 
-There is no batch entry point, so whitelisting many addresses is one call each. The SDK CLI applies a list in bulk; the dependency-free equivalent loops over the addresses from the role-holding account:
-
-```bash
-for ADDRESS in 0xAddress1 0xAddress2 0xAddress3; do
-  cast send "$CONTROLLER" "whiteListAddress(address,bool)" "$ADDRESS" true \
-    --rpc-url "$RPC_URL" --account "$ACCOUNT_NAME"
-done
-```
-
-Both states are open view calls needing no authority: `isWhiteListed(address)` reports whether an address may call `registerReserved`, and `hasRole(WHITELIST_OPERATOR_ROLE, account)` reports whether an account holds the operator role. `$CONTROLLER` is the `DotnsRegistrarController` address for the target network, read from the protocol registry or taken from the [deployment manifest](#addresses), never hardcoded across networks.
+`setWindow`, `setMaxClaimants`, `setMaxReasonBytes` and `setMaxGrantBatch` are on the same gate, so the deploy cannot configure the whitelist and the values `initialize` sets are what a fresh network starts with. Changing any of them later costs a governance action, so check the defaults in `DotnsConstants` are the ones you want at launch.
 
 ## Deterministic addresses (CREATE3)
 

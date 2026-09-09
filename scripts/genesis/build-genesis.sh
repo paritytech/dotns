@@ -47,9 +47,9 @@ CANONICAL_MANIFEST="deployments/paseo-assethub/420420417.json"
 #   DOTNS_ADMIN_KEY       a raw private key — the admin credential this repo already holds
 #   DOTNS_ADMIN_MNEMONIC  the admin mnemonic; index $DOTNS_ADMIN_INDEX (default 0)
 #
-# Deliberately NOT accepted: DOTNS_MNEMONIC. That is the operational credential the
-# whitelist workflows drive the `dotns` CLI with, not the contract admin, and quietly
-# making it the owner of every contract in a genesis would be a hard mistake to spot.
+# Deliberately NOT accepted: DOTNS_MNEMONIC. That is an operational credential for driving
+# the `dotns` CLI, not the contract admin, and quietly making it the owner of every
+# contract in a genesis would be a hard mistake to spot.
 # Not DEPLOYER_KEY: that name is dotns-releases' own secret, and accepting it here
 # would make which key owns a published genesis depend on which repo the build ran in.
 ADMIN_KEY="${DOTNS_ADMIN_KEY:-}"
@@ -60,10 +60,6 @@ ADMIN_KEY="${DOTNS_ADMIN_KEY:-}"
 # DEPLOYMENTS.md. Deploying the factory from this key as its first transaction is
 # what makes the genesis addresses equal the live ones, which is asserted below.
 FACTORY_DEPLOYER_KEY="${FACTORY_DEPLOYER_KEY:-}"
-
-# WHITELIST_OPERATOR_ROLE recipient, required by the deploy scripts. Manages the
-# public-controller whitelist on the registrar. Defaults to the deployer.
-WHITELIST_OPERATOR="${WHITELIST_OPERATOR:-}"
 
 # TLD the genesis registry initialises with. Required by DeployCore, which reads
 # it to build the registry initialiser and reverts when unset. Validated as a
@@ -115,9 +111,7 @@ MSG
 fi
 
 DEPLOYER_ADDR="$(cast wallet address --private-key "$ADMIN_KEY")"
-export WHITELIST_OPERATOR="${WHITELIST_OPERATOR:-$DEPLOYER_ADDR}"
 echo "Contract owner:      $DEPLOYER_ADDR"
-echo "Whitelist operator:  $WHITELIST_OPERATOR"
 echo "TLD:                 .$DOTNS_TLD"
 echo ""
 

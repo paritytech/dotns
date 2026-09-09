@@ -10,7 +10,9 @@ import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 contract PopRulesFuzzTest is BaseDotns {
     function testFuzz_popfull_user_can_access_poplite(uint256 seed, uint256 length) public {
         length = bound(length, 6, 8);
-        string memory nameLabel = string(abi.encodePacked(_makeAlpha(seed, length), "01"));
+        // PopLite is the gateway's separated form, so the stem carries the separator; `length`
+        // bounds the stem, which is what sets the band.
+        string memory nameLabel = string(abi.encodePacked(_makeAlpha(seed, length), ".01"));
 
         _grantPopFull(ed);
 
@@ -22,6 +24,7 @@ contract PopRulesFuzzTest is BaseDotns {
 
     function testFuzz_popfull_user_can_access_nostatus(uint256 seed, uint256 length) public {
         length = bound(length, 9, 14);
+        // Measured whole, so the suffix only lengthens it and the band stays NoStatus.
         string memory nameLabel = string(abi.encodePacked(_makeAlpha(seed, length), "01"));
 
         _grantPopFull(ed);

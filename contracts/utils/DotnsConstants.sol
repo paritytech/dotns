@@ -14,8 +14,8 @@ library DotnsConstants {
     ///         that opts the precompile in.
     /// @dev Mirrors the upstream `SYSTEM_ADDR` constant in
     ///      `substrate/frame/revive/uapi/sol/ISystem.sol`. Consumed by
-    ///      `DotnsPopController` to authenticate Root-origin dispatches via
-    ///      `ISystem.callerIsRoot()`.
+    ///      `DotnsPopController` and `DotnsNameWhitelist` to authenticate
+    ///      Root-origin dispatches via `ISystem.originIsRoot()`.
     address internal constant REVIVE_SYSTEM = address(0x0900);
 
     /// @notice Address of the Proof-of-Personhood precompile backed by the
@@ -64,11 +64,6 @@ library DotnsConstants {
     /// @dev Shared ceiling for paginated reads: a view clamps its returned array to this figure,
     ///      and callers page through larger sets with `offset`.
     uint256 internal constant MAX_PAGE_SIZE = 200;
-
-    /// @notice Operational role allowed to manage the public controller whitelist.
-    /// @dev Holders can grant or revoke whitelist entries, but cannot upgrade contracts
-    ///      or change protocol configuration.
-    bytes32 internal constant WHITELIST_OPERATOR_ROLE = keccak256("DOTNS_WHITELIST_OPERATOR_ROLE");
 
     /// @notice Default per-name live-claim cap the name whitelist starts with.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_CLAIMANTS_LIMIT`.
@@ -186,23 +181,12 @@ library DotnsConstants {
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant CREATE3_FACTORY = bytes32("create3Factory");
 
-    /// @notice Well-known key for the address authorised to invoke the PoP
-    ///         controller's gated entrypoints.
-    /// @dev Role: substrate Root-origin shim. Resolves to the Root gateway
-    ///      dispatcher deployed against the PoP controller. The dispatcher
-    ///      verifies Root authority through the revive System precompile in
-    ///      its own frame and forwards calldata to the controller via a
-    ///      regular message call; the controller authorises against this
-    ///      registry key, so rotating the dispatcher is a single write on
-    ///      the protocol registry.
-    /// forge-lint: disable-next-line(unsafe-typecast)
-    bytes32 internal constant POP_GATEWAY = bytes32("popGateway");
-
     /// @notice Well-known key for the pre-launch name whitelist that binds a label to the
     ///         one address permitted to register it.
-    /// @dev Role: authority for label-bound registration grants. Both the public and PoP
-    ///      controllers resolve it here and read it at mint time; the whitelist stores the
-    ///      grants, the controllers only read them.
+    /// @dev Role: authority for label-bound registration grants. The public controller resolves
+    ///      it here and reads it on the reserved path, requiring a grant naming the intended owner
+    ///      unless the dispatch is Root, and consuming the grant on a successful mint. The PoP
+    ///      controller does not consult it.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant NAME_WHITELIST = bytes32("nameWhitelist");
 }

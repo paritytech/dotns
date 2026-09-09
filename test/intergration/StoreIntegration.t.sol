@@ -61,7 +61,7 @@ contract StoreIntegrationTest is BaseDotns {
             chatKey[i] = bytes1(uint8(i + 1));
         }
 
-        _gatewayRegisterBaseName(
+        _rootRegisterBaseName(
             IDotnsPopController.FullRegistration({label: base, user: ed, link: _linkFresh(chatKey)})
         );
 

@@ -17,8 +17,10 @@ You need:
 - **Foundry** (`forge` and `cast`).
 - **Bun** (the deploy runner is wrapped by the package manifest).
 - A **funded deployer private key** on the target chain.
-- One **whitelist-operator address** to receive whitelist-management permission
-  after deployment. This account is not an owner and cannot upgrade contracts.
+- A usable **Root dispatch path** on the target chain: sudo, or a governance track that can
+  dispatch `Revive.call`. Every admin action on `DotnsNameWhitelist` needs it, so without one
+  the deployment cannot issue or revoke a single name grant. The deploy itself does not need
+  it; operating the whitelist afterwards does.
 
 Two facts about your target chain:
 
@@ -83,8 +85,6 @@ Set these in `.env`:
 - [ ] `PRIVATE_KEY=0x...` — funded deployer key (first run only; imported into
   the Foundry keystore, then `.env` is auto-deleted on success).
 - [ ] `ACCOUNT_PASSWORD=...` — any password; encrypts the keystore account.
-- [ ] `WHITELIST_OPERATOR=0x...` — the whitelist manager. **Do not leave the
-  default** unless you intend to use the Parity team operator address.
 - [ ] `RPC_URL=paseo_local` — leave as-is; this is the local adapter on :8545.
 
 ## Step 6 — (Sanity) Build and run the non-fork tests
@@ -133,11 +133,23 @@ Confirm these keys are present:
 - [ ] `DotnsContentResolver`
 - [ ] `DotnsPopResolver`
 - [ ] `DotnsNameEscrow`
+- [ ] `DotnsNameWhitelist`
 - [ ] `StoreFactory`
 - [ ] `LabelStoreBeacon`
 - [ ] `UserStoreBeacon`
 - [ ] `Multicall3`
-- [ ] `RootGatewayDispatcher` (only on chains that use the root-dispatch path)
+
+The wiring stage already asserts every protocol-registry binding, so a green deploy means they
+are set. One is worth confirming by hand, because it is the only key whose absence surfaces to
+users rather than to the pipeline: with `nameWhitelist` unset, `registerReserved` reverts
+`WhitelistNotConfigured` for every caller, Root included.
+
+```bash
+cast call "$PROTOCOL_REGISTRY" "get(bytes32)(address)" \
+  "$(cast format-bytes32-string nameWhitelist)" --rpc-url "$RPC_URL"
+```
+
+- [ ] The address returned matches `DotnsNameWhitelist` in the manifest.
 
 Done. ✅
 
