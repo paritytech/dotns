@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
 
     # Shared across steps. ACCOUNT_* is anvil test account 7 (public test keys,
     # never valid on a real network) used to run the pipeline. FACTORY_DEPLOYER is

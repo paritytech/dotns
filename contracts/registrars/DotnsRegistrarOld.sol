@@ -24,6 +24,8 @@ import {IPopRules} from "../pop/IPopRules.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title Dotns Registrar
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice ERC721-backed registrar implementing permanent name ownership.
 /// @dev Deliberately policy-free. Transfers are supported to allow ownership changes without
 /// registry hooks, and the registrar itself does not encode pricing, reservations, or PoP

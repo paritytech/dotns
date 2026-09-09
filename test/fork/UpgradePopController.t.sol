@@ -55,8 +55,18 @@ contract UpgradePopControllerForkTest is Test {
     ///      tier, so the reservation path accepts it as a base name.
     string internal constant BASE_LABEL = "zqxwvutsrq";
 
-    /// @notice A never-issued label, used to prove the new `isPopIssued` surface answers.
+    /// @notice A never-issued label, used to prove the new `isPopIssued` surface answers false.
     string internal constant UNISSUED_LABEL = "neverissued";
+
+    /// @notice A base label registered through the upgraded controller to prove `isPopIssued`
+    ///         answers true once a label is genuinely issued.
+    /// @dev Letters only and long enough to classify outside the governance-reserved tier, so the
+    ///      deployed `PopRules` accepts it as a base name without change. The base path is used
+    ///      rather than the dotted lite path because the live siblings are not upgraded here: the
+    ///      live `PopRules` still rejects the lite separator, so a dotted lite mint reverts before
+    ///      `_popIssued` is written. A base registration exercises the same issuance write through
+    ///      the label form the live classifier already admits.
+    string internal constant ISSUED_BASE_LABEL = "qzwxrvtsplk";
 
     /// @notice Drives the script's upgrade path against the live proxy.
     UpgradePopControllerHarness internal upgrader;
@@ -119,7 +129,8 @@ contract UpgradePopControllerForkTest is Test {
     }
 
     /// @notice The upgrade preserves ownership, sibling wiring, and reservation state on the real
-    ///         proxy, and exposes the new `isPopIssued` surface.
+    ///         proxy, and exposes an `isPopIssued` surface that reports false for an unissued label
+    ///         and true for a label the upgraded controller genuinely issues.
     function test_upgrade_preservesStateAndExposesNewSurface() public {
         // Seed a base-name reservation on the pre-upgrade implementation so its survival across the
         // implementation swap is observable. The deployed code path gates on the gateway address.
@@ -159,6 +170,29 @@ contract UpgradePopControllerForkTest is Test {
         assertFalse(
             popController.isPopIssued(UNISSUED_LABEL),
             "post-upgrade: an unissued label reports false"
+        );
+
+        // Drive a real issuance through the upgraded controller so a concrete label is genuinely
+        // marked issued, then confirm the new surface reports it. The base registration runs under
+        // the mocked Root origin with no chat key and no lite link, against a fresh beneficiary
+        // with no store, so it exercises the real `_popIssued` write and stashes a pending claim
+        // without touching the resolver or deploying a store.
+        assertFalse(
+            popController.isPopIssued(ISSUED_BASE_LABEL),
+            "pre-issue: the base label is not yet issued"
+        );
+        popController.registerBaseName(
+            IDotnsPopController.FullRegistration({
+                label: ISSUED_BASE_LABEL,
+                user: alice,
+                link: IDotnsPopController.Link({
+                    kind: IDotnsPopController.LinkKind.None, liteLabel: "", chatKey: ""
+                })
+            })
+        );
+        assertTrue(
+            popController.isPopIssued(ISSUED_BASE_LABEL),
+            "post-upgrade: a genuinely issued label reports true"
         );
     }
 

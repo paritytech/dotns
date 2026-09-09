@@ -6,6 +6,9 @@ import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 import {BaseDeployer} from "./BaseDeployer.s.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /// @title UpgradeRegistrarController
 /// @notice Upgrades the deployed DotnsRegistrarController proxy to the current implementation.
@@ -51,6 +54,11 @@ contract UpgradeRegistrarController is BaseDeployer {
     /// @param owner Account that owns the proxy and broadcasts the upgrade.
     /// @param proxy Registrar controller proxy address resolved from the manifest.
     function _upgradeRegistrarController(address owner, address proxy) internal {
+        require(
+            owner == OwnableUpgradeable(proxy).owner(),
+            "UpgradeRegistrarController: broadcaster is not the proxy owner"
+        );
+
         Options memory opts;
         opts.referenceContract = REFERENCE_CONTRACT;
 

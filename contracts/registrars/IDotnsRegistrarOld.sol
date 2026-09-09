@@ -5,6 +5,8 @@ import {IERC721} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Up
 import {IDotnsController} from "./IDotnsController.sol";
 
 /// @title Dotns Registrar
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice ERC721-backed ownership for DotNS names with controller-gated registration.
 /// @dev Intentionally minimal and policy-free. Provides ERC721 ownership for registered name
 /// token IDs and controller-gated registration; pricing, PoP enforcement, and flow-specific

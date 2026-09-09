@@ -21,7 +21,7 @@ concurrency:
 jobs:
   validate:
     name: File Validation
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     steps:
       - uses: actions/checkout@v4
 

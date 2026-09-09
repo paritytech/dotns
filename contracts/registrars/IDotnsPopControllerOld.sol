@@ -4,6 +4,8 @@ pragma solidity ^0.8.34;
 import {IDotnsController} from "./IDotnsController.sol";
 
 /// @title IDotnsPopControllerOld
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice Interface for the dedicated PoP controller orchestrating lite-person and full-person
 /// username issuance on behalf of the PoP gateway pallet.
 /// @dev Deliberately disjoint from @custom:contract IDotnsRegistrarController. The two

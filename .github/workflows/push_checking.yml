@@ -34,7 +34,7 @@ jobs:
   test:
     if: github.event.action != 'closed'
     name: ${{ matrix.kind.label }}
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     strategy:
       # Each matrix kind runs on its own runner so neither has to hold the
       # other's peak memory. Don't fail-fast: surfacing both shards' results
@@ -48,9 +48,6 @@ jobs:
           - id: invariant
             label: Contract Tests (Invariant)
             forge_args: --match-contract Invariant --no-match-path 'test/fork/**'
-          - id: fork
-            label: Upgrade Fork Tests
-            forge_args: --match-path 'test/fork/**'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -81,15 +78,6 @@ jobs:
 
       - run: bun install
 
-      # Only the fork shard needs the adapter, and only when fork tests actually
-      # exist in the tree. Fork tests are PR-scoped, so `test/fork/` is empty on
-      # master and `hashFiles` returns '' (step skipped, no docker build).
-      - name: Start revive-eth-rpc (paseo_local fork target)
-        if: matrix.kind.id == 'fork' && hashFiles('test/fork/**') != ''
-        run: |
-          docker compose up -d --build
-          bash scripts/shell/wait-for-eth-rpc.sh
-
       - name: Run tests
         id: run
         env:
@@ -99,14 +87,6 @@ jobs:
           FOUNDRY_INVARIANT_GAS_REPORT_SAMPLES: "1000"
         run: |
           set +e
-          # The fork shard is scheduled on every PR but only has work when an
-          # upgrade PR ships fork tests. With none in the tree it reports Skipped
-          # so the CI Summary row is truthful rather than a hollow pass.
-          if [ "${{ matrix.kind.id }}" = "fork" ] && [ -z "$(ls test/fork/*.t.sol 2>/dev/null)" ]; then
-            echo "result=Skipped - no fork tests in tree" >> "$GITHUB_OUTPUT"
-            echo "has_details=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           # Remove any prior build-info before `forge build` so the JSON the OZ
           # validator (vm.ffi inside upgrade tests) reads is the complete one
           # this build emits. Defence-in-depth: on a fresh `ubuntu-latest`
@@ -132,10 +112,6 @@ jobs:
           if [ "$TEST" -ne 0 ]; then
             exit 1
           fi
-
-      - name: Tear down revive-eth-rpc
-        if: always() && matrix.kind.id == 'fork' && hashFiles('test/fork/**') != ''
-        run: docker compose down --volumes --remove-orphans
 
       - name: Stage matrix-kind output for the aggregator
         if: always()
@@ -164,11 +140,113 @@ jobs:
       - if: steps.run.outputs.result && contains(steps.run.outputs.result, 'Failed')
         run: exit 1
 
+  # Fork tests validate the PR-scoped upgrade scripts against live Paseo Asset Hub
+  # state through the ETH-RPC adapter. They exist only during an upgrade PR, so a
+  # cheap detect job decides whether the heavy fork runner is provisioned at all:
+  # nothing sets up on a PR without `test/fork/**`.
+  detect-fork:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      has_fork: ${{ steps.detect.outputs.has_fork }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        run: |
+          if ls test/fork/*.t.sol > /dev/null 2>&1; then
+            echo "has_fork=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_fork=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  fork:
+    name: Upgrade Fork Tests
+    needs: detect-fork
+    if: github.event.action != 'closed' && needs.detect-fork.outputs.has_fork == 'true'
+    # The fork job builds the revive ETH-RPC adapter image and runs the upgrade
+    # suite, so it is kept off the shared test runner and onto the Parity XL runner.
+    runs-on: parity-int-ubuntu-xl
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-foundry
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.6"
+          no-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: bun-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-
+
+      - run: bun install
+
+      # Reuse the repository's docker compose eth-rpc service as the paseo_local
+      # fork target.
+      - name: Start revive-eth-rpc (paseo_local fork target)
+        run: |
+          docker compose up -d --build
+          bash scripts/shell/wait-for-eth-rpc.sh
+
+      - name: Run fork tests
+        id: fork
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+          FOUNDRY_PROFILE: "ci"
+        run: |
+          set +e
+          # A clean build-info keeps the OZ upgrade validator (vm.ffi) from reading
+          # a partial JSON on a warm self-hosted runner.
+          rm -rf out/build-info
+          forge test -vv --match-path 'test/fork/**' 2>&1 | tee fork.log
+          FORK=${PIPESTATUS[0]}
+          if [ "$FORK" -eq 0 ]; then
+            echo "result=Passed" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=Failed" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$FORK"
+
+      - name: Tear down revive-eth-rpc
+        if: always()
+        run: docker compose down --volumes --remove-orphans
+
+      # Report the outcome as its own CI Summary row through a shard artifact the
+      # report job renders. `always()` so a failed run still uploads the Failed row
+      # and the fork log for the reviewer.
+      - name: Stage upgrade-fork output for the aggregator
+        if: always()
+        run: |
+          mkdir -p forkshard
+          printf 'Upgrade Fork Tests|%s|false\n' \
+            "${{ steps.fork.outputs.result || 'Failed' }}" > forkshard/result.txt
+          [ -f fork.log ] && cp fork.log forkshard/fork.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-shard-fork
+          path: forkshard
+          retention-days: 7
+
   report:
     name: Report Test Results
-    needs: test
+    needs: [test, fork]
     if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     steps:
       - uses: actions/checkout@v4
 
@@ -290,7 +368,7 @@ jobs:
             else await github.rest.issues.createComment({ owner, repo, issue_number, body });
 
   cleanup:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     if: github.event.action == 'closed'
     steps:
       - uses: actions/checkout@v4

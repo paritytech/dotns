@@ -12,7 +12,7 @@ permissions:
 jobs:
   title:
     name: PR Title
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     steps:
       - name: Check PR title
         id: title
@@ -122,7 +122,7 @@ jobs:
 
   labels:
     name: Labels
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     steps:
       - uses: actions/checkout@v4
 

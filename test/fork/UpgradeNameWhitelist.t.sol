@@ -77,14 +77,19 @@ contract UpgradeNameWhitelistForkTest is Test {
         bob = makeAddr("bob");
     }
 
-    /// @notice The upgrade preserves a name reserved before the swap and keeps a post-upgrade
-    ///         governance grant resolving to its winner.
+    /// @notice The upgrade preserves both a name reserved and a governance grant seeded before the
+    ///         swap, and still binds a fresh grant to its winner on the upgraded implementation.
     function test_upgrade_preservesStateAndKeepsGovernanceP0Working() public {
-        // Seed a reservation on the pre-upgrade implementation under a Root origin.
+        // Seed a reservation and a governance grant on the pre-upgrade implementation under a Root
+        // origin, so both a reservation slot and a name record cross the swap.
         _mockRoot(true);
         whitelist.setReserved("forkseedname", true);
+        whitelist.grantName("forkseedgrant", alice);
         _clearRoot();
         assertTrue(whitelist.isReserved("forkseedname"), "pre-upgrade: seed name is reserved");
+        assertEq(
+            whitelist.granteeOf("forkseedgrant"), alice, "pre-upgrade: seed grant binds the winner"
+        );
 
         address proxy = address(whitelist);
         address registryBefore = address(whitelist.protocolRegistry());
@@ -93,22 +98,34 @@ contract UpgradeNameWhitelistForkTest is Test {
 
         assertEq(address(whitelist), proxy, "upgrade keeps the same proxy address");
         assertTrue(whitelist.isReserved("forkseedname"), "post-upgrade: reservation preserved");
+        // The grant seeded on the old implementation still resolves to its winner on the new one,
+        // proving the name record survived the swap rather than the new logic recomputing it.
+        assertEq(
+            whitelist.granteeOf("forkseedgrant"),
+            alice,
+            "post-upgrade: seed grant preserved"
+        );
+        assertTrue(
+            whitelist.isGrantedTo("forkseedgrant", alice),
+            "post-upgrade: seed winner is still granted the name"
+        );
         assertEq(
             address(whitelist.protocolRegistry()),
             registryBefore,
             "post-upgrade: protocol registry pointer preserved"
         );
 
-        // P0: a governance grant still binds a name to its winner on the upgraded implementation.
+        // P0: a fresh governance grant still binds a name to its winner on the upgraded
+        // implementation.
         _mockRoot(true);
-        whitelist.grantName("forkgrantname", alice);
+        whitelist.grantName("forkgrantname", bob);
         _clearRoot();
         assertEq(
-            whitelist.granteeOf("forkgrantname"), alice, "post-upgrade: grant binds the winner"
+            whitelist.granteeOf("forkgrantname"), bob, "post-upgrade: fresh grant binds the winner"
         );
         assertTrue(
-            whitelist.isGrantedTo("forkgrantname", alice),
-            "post-upgrade: winner is granted the name"
+            whitelist.isGrantedTo("forkgrantname", bob),
+            "post-upgrade: fresh winner is granted the name"
         );
     }
 

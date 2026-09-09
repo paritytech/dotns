@@ -27,6 +27,8 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title DotnsPopControllerOld
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice Dedicated PoP controller orchestrating lite-person and full-person username
 /// issuance on behalf of the PoP gateway pallet.
 /// @dev Lives behind its own UUPS proxy with its own storage. Registered on `DotnsRegistrar`

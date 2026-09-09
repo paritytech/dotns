@@ -9,6 +9,7 @@ import {
 import {PopRules} from "../../contracts/pop/PopRules.sol";
 import {IPopRules} from "../../contracts/pop/IPopRules.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
+import {IDotnsRegistrar} from "../../contracts/registrars/IDotnsRegistrar.sol";
 import {IPersonhood} from "../../contracts/external/personhood/IPersonhood.sol";
 import {ISystem} from "../../contracts/external/revive/ISystem.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
@@ -45,6 +46,9 @@ contract UpgradePopRulesForkTest is Test {
 
     /// @notice A plain six-character label that sits in the governed short-name band.
     string internal constant SHORT_LABEL = "aliced";
+
+    /// @notice A six-character stem seeded into the reservation mapping before the upgrade.
+    string internal constant RESERVED_STEM = "alicez";
 
     /// @notice Drives the script's upgrade path against the live proxy.
     UpgradePopRulesHarness internal upgrader;
@@ -86,14 +90,35 @@ contract UpgradePopRulesForkTest is Test {
         );
     }
 
-    /// @notice The upgrade keeps the proxy, the registry pointer, and the classification and
-    ///         pricing reads intact, and installs the Root gate on the short-name lever.
+    /// @notice The upgrade keeps the proxy, the registry pointer, a reservation held in the
+    ///         oracle's own storage, and the classification and pricing reads intact, and installs
+    ///         the Root gate on the short-name lever.
     function test_upgrade_preservesStateAndKeepsPricingWorking() public {
         // Seed representative reads on the pre-upgrade implementation.
         address registryBefore = address(popRules.protocolRegistry());
         uint256 priceBefore = popRules.price(OPEN_LABEL);
         (IPopRules.PopStatus statusBefore, string memory messageBefore) =
             popRules.classifyName(OPEN_LABEL);
+
+        // Seed a live reservation into the oracle's own `reservations` mapping through the
+        // registry-gated `reserveBaseName` on the pre-upgrade implementation. The registrar's
+        // controller check is mocked so a chosen controller clears the gate; the write itself runs
+        // the deployed code and lands in real storage at the mapping's computed slot. The label
+        // derived pricing and classification reads above are identical before and after the swap
+        // whatever the oracle holds, so this reservation is the piece that proves the swap
+        // preserves PopRules' own mutable state rather than merely recomputing from the label.
+        address reservationOwner = makeAddr("reservationOwner");
+        vm.mockCall(
+            protocolRegistry.get(DotnsConstants.REGISTRAR),
+            abi.encodeWithSelector(IDotnsRegistrar.controllers.selector),
+            abi.encode(true)
+        );
+        vm.prank(makeAddr("controller"));
+        popRules.reserveBaseName(RESERVED_STEM, reservationOwner);
+        (bool reservedBefore, address reservedOwnerBefore, uint64 reservedExpiryBefore) =
+            popRules.isBaseNameReserved(RESERVED_STEM);
+        assertTrue(reservedBefore, "reservation live before upgrade");
+        assertEq(reservedOwnerBefore, reservationOwner, "seeded reservation owner");
 
         address proxy = address(popRules);
         upgrader.upgradePopRules(popRulesOwner, proxy);
@@ -103,6 +128,18 @@ contract UpgradePopRulesForkTest is Test {
             address(popRules.protocolRegistry()),
             registryBefore,
             "post-upgrade: protocol registry pointer preserved"
+        );
+
+        // The mapping slot survives the swap: the same stem resolves to the same owner and expiry
+        // when read back through the new implementation.
+        (bool reservedAfter, address reservedOwnerAfter, uint64 reservedExpiryAfter) =
+            popRules.isBaseNameReserved(RESERVED_STEM);
+        assertTrue(reservedAfter, "post-upgrade: reservation still live");
+        assertEq(
+            reservedOwnerAfter, reservedOwnerBefore, "post-upgrade: reservation owner preserved"
+        );
+        assertEq(
+            reservedExpiryAfter, reservedExpiryBefore, "post-upgrade: reservation expiry preserved"
         );
 
         // P0: pricing and classification still answer sensibly, unchanged for a plain open label.

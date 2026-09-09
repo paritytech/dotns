@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   analyze:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     if: github.event.action != 'closed'
     steps:
       - uses: actions/checkout@v4
@@ -184,7 +184,7 @@ jobs:
             else await github.rest.issues.createComment({ owner, repo, issue_number, body });
 
   cleanup:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     if: github.event.action == 'closed'
     steps:
       - uses: actions/checkout@v4

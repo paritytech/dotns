@@ -2,6 +2,8 @@
 pragma solidity ^0.8.34;
 
 /// @title Proof of Personhood Rules for Dotns
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice Proof of personhood interface defining Dotns price calculation, PoP-tier requirements,
 ///         and base-name reservation rules.
 /// @dev Classifies labels into the PoP tier required for registration and exposes reservation

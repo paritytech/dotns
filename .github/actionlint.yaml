@@ -1,0 +1,9 @@
+# actionlint configuration. Declares the self-hosted runner labels this repo
+# dispatches to so actionlint does not flag them as unknown; without this it
+# only knows the GitHub-hosted labels and rejects every `runs-on` that targets
+# the Parity fleet.
+self-hosted-runner:
+  labels:
+    - parity-int-ubuntu
+    - parity-int-ubuntu-l
+    - parity-int-ubuntu-xl

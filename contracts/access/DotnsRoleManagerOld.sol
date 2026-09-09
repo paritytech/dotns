@@ -11,6 +11,8 @@ import {
 import {IDotnsRoleManagerOld} from "./IDotnsRoleManagerOld.sol";
 
 /// @title Dotns Role Manager
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice Shared owner-administered role layer for DotNS contracts with operational roles.
 /// @dev Consuming contracts define their supported role set in @custom:function _isSupportedRole.
 ///      The owner remains the only account that can grant or revoke roles; role holders receive

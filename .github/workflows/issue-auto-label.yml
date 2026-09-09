@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   label:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     steps:
       - name: Extract labels from form body
         id: extract

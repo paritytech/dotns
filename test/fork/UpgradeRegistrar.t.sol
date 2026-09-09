@@ -10,6 +10,7 @@ import {DotnsRegistrar} from "../../contracts/registrars/DotnsRegistrar.sol";
 import {IDotnsRegistrar} from "../../contracts/registrars/IDotnsRegistrar.sol";
 import {IDotnsController} from "../../contracts/registrars/IDotnsController.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
+import {IPersonhood} from "../../contracts/external/personhood/IPersonhood.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {UpgradeRegistrar} from "../../scripts/deploy/UpgradeRegistrar.s.sol";
 
@@ -56,11 +57,21 @@ contract UpgradeRegistrarForkTest is Test {
     /// @notice The deployed PoP controller, impersonated to mint soulbound names.
     address internal popController;
 
+    /// @notice A single label whose base length lands in the PoP-gated band, so its transfer floor
+    ///         is the real `BASE_DEPOSIT` rather than zero.
+    /// @dev Eight lowercase letters classify as a `PopFull` name that an unverified recipient
+    ///      cannot reach, so `quoteTransferFee` prices the move at the name's own deposit.
+    string internal constant SEED_LABEL = "seedname";
+
+    /// @notice A second PoP-gated single label minted after the upgrade to prove real registration
+    ///         still writes a label through the store factory.
+    string internal constant POST_LABEL = "postname";
+
     /// @notice Recipient accounts for the transfer paths.
     address internal alice;
     address internal bob;
 
-    /// @notice Forks Paseo, resolves the live addresses, and guarantees both controllers are set.
+    /// @notice Forks Paseo, resolves the live addresses, and funds the transfer recipients.
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("paseo_local"));
 
@@ -79,13 +90,22 @@ contract UpgradeRegistrarForkTest is Test {
         vm.deal(alice, 100 ether);
         vm.deal(bob, 100 ether);
 
-        // The mint paths call through the registrar's controller set. Re-asserting the two live
-        // controllers is a no-op when they are already registered and keeps the test independent of
-        // the exact wiring state of the fork.
-        vm.startPrank(registrarOwner);
-        registrar.addController(IDotnsController(registrarController));
-        registrar.addController(IDotnsController(popController));
-        vm.stopPrank();
+        // The mint paths run through the live controller set rather than a freshly added one, so
+        // the test reads the wiring the deployment left in place instead of masking it. The upgrade
+        // assertions below prove that wiring survives the implementation swap.
+    }
+
+    /// @notice Mocks the personhood precompile so every account reads as unverified.
+    /// @dev The substrate personhood precompile carries no bytecode on the EVM fork, so a
+    ///      transfer-floor read reverts against live state. Pinning both parties to `NoStatus`
+    ///      keeps the fee math real: a `PopFull` name an unverified recipient cannot reach prices
+    ///      the move at the name's own deposit.
+    function _mockNoPersonhood() internal {
+        vm.mockCall(
+            DotnsConstants.PERSONHOOD,
+            abi.encodeWithSelector(IPersonhood.personhoodStatus.selector),
+            abi.encode(IPersonhood.PersonhoodInfo({status: 0, contextAlias: bytes32(0)}))
+        );
     }
 
     /// @notice The upgrade preserves ownership state on the real proxy and keeps minting and
@@ -93,11 +113,21 @@ contract UpgradeRegistrarForkTest is Test {
     function test_upgrade_preservesStateAndKeepsCoreP0Working() public {
         uint256 seedToken = uint256(keccak256("dotns.fork.upgrade.seed"));
 
-        // Seed ownership on the pre-upgrade implementation. An empty label takes the gateway-cold
-        // mint path, so the seed does not depend on a `LabelStore` deploy.
+        // The seed mint proves the live registrar already accepts its commit-reveal controller, so
+        // the test reads the deployment's wiring rather than a controller it added itself.
+        assertTrue(
+            registrar.controllers(IDotnsController(registrarController)),
+            "pre-upgrade: the live registrar controller is wired"
+        );
+
+        // Seed ownership on the pre-upgrade implementation with a real single label, so `register`
+        // writes the owner's label through the store factory and the token carries a real name.
         vm.prank(registrarController);
-        registrar.register(seedToken, alice, "");
+        registrar.register(seedToken, alice, SEED_LABEL);
         assertEq(registrar.ownerOf(seedToken), alice, "pre-upgrade: alice owns the seed name");
+        assertEq(
+            registrar.labelOf(seedToken), SEED_LABEL, "pre-upgrade: the seed carries its label"
+        );
 
         address proxy = address(registrar);
         address registryBefore = address(registrar.protocolRegistry());
@@ -106,6 +136,9 @@ contract UpgradeRegistrarForkTest is Test {
 
         assertEq(address(registrar), proxy, "upgrade keeps the same proxy address");
         assertEq(registrar.ownerOf(seedToken), alice, "post-upgrade: ownership preserved");
+        assertEq(
+            registrar.labelOf(seedToken), SEED_LABEL, "post-upgrade: the seed label is preserved"
+        );
         assertEq(
             address(registrar.protocolRegistry()),
             registryBefore,
@@ -116,17 +149,39 @@ contract UpgradeRegistrarForkTest is Test {
             "post-upgrade: a name minted before the upgrade is not soulbound"
         );
 
-        // P0: minting still works on the upgraded implementation.
+        // The upgrade preserves the `controllers` mapping: both live controllers stay authorised
+        // across the implementation swap without the test re-adding either.
+        assertTrue(
+            registrar.controllers(IDotnsController(registrarController)),
+            "post-upgrade: the registrar controller mapping survives the swap"
+        );
+        assertTrue(
+            registrar.controllers(IDotnsController(popController)),
+            "post-upgrade: the PoP controller mapping survives the swap"
+        );
+
+        // P0: minting a real single label still works on the upgraded implementation, so the store
+        // write path runs post-swap.
         uint256 postToken = uint256(keccak256("dotns.fork.upgrade.post"));
         vm.prank(registrarController);
-        registrar.register(postToken, bob, "");
+        registrar.register(postToken, bob, POST_LABEL);
         assertEq(registrar.ownerOf(postToken), bob, "post-upgrade: registration still mints");
+        assertEq(
+            registrar.labelOf(postToken), POST_LABEL, "post-upgrade: the mint carries its label"
+        );
 
-        // P0: a public name is still transferable. The empty-label seed carries no transfer floor.
+        // P0: a public name is still transferable through the transfer-floor path. The PoP-gated
+        // seed prices a move to an unverified recipient at its own deposit, so the sender pays a
+        // real fee and the escrow settles it rather than taking the zero-fee early return.
+        _mockNoPersonhood();
         uint256 fee = registrar.quoteTransferFee(seedToken, bob);
+        assertGt(fee, 0, "post-upgrade: a PoP-gated name quotes a real transfer fee");
         vm.prank(alice);
         registrar.transferFrom{value: fee}(alice, bob, seedToken);
         assertEq(registrar.ownerOf(seedToken), bob, "post-upgrade: a public name still transfers");
+        assertEq(
+            registrar.labelOf(seedToken), SEED_LABEL, "post-upgrade: the label follows the transfer"
+        );
     }
 
     /// @notice After the upgrade, a name minted through the PoP controller is soulbound and every
@@ -134,6 +189,14 @@ contract UpgradeRegistrarForkTest is Test {
     function test_upgrade_enablesSoulboundGatingForGatewayMints() public {
         upgrader.upgradeRegistrar(registrarOwner, address(registrar));
 
+        // The PoP controller mints through the live wiring the upgrade preserved.
+        assertTrue(
+            registrar.controllers(IDotnsController(popController)),
+            "post-upgrade: the PoP controller mapping survives the swap"
+        );
+
+        // The gateway-cold path stashes a pending label, so a soulbound mint takes an empty label
+        // and never touches the store.
         uint256 gatewayToken = uint256(keccak256("dotns.fork.upgrade.gateway"));
         vm.prank(popController);
         registrar.register(gatewayToken, alice, "");

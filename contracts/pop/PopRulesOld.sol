@@ -19,6 +19,8 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {IPersonhood} from "../external/personhood/IPersonhood.sol";
 
 /// @title PopRulesOld
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice Implements DotNS classification, cost-model-driven pricing, and base-name reservations.
 /// @dev Tiers: base lengths <= 5 are governance-reserved, base lengths 6-8 require PopFull
 ///      (or PopLite when carrying exactly two trailing digits, for gateway-issued lite names),

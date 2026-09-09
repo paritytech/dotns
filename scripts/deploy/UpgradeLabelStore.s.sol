@@ -6,6 +6,9 @@ import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 import {BaseDeployer} from "./BaseDeployer.s.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IStoreFactory} from "../../contracts/store/IStoreFactory.sol";
 
 /// @title UpgradeLabelStore
@@ -71,6 +74,11 @@ contract UpgradeLabelStore is BaseDeployer {
         internal
         returns (address newImplementation)
     {
+        require(
+            owner == OwnableUpgradeable(factory).owner(),
+            "UpgradeLabelStore: broadcaster is not the store factory owner"
+        );
+
         Options memory opts;
         opts.referenceContract = REFERENCE_CONTRACT;
 

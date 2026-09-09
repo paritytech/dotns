@@ -4,6 +4,8 @@ pragma solidity ^0.8.34;
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 /// @title DotNS Role Manager
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice Shared owner-administered role API for DotNS contracts with operational roles.
 /// @dev Role identifiers are declared in `DotnsConstants`. Ownership remains the source of
 ///      super-user authority: the owner grants and revokes supported roles, while role holders

@@ -14,6 +14,8 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title DotnsNameWhitelist
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice Pre-launch name whitelist. A name is Open until governance reserves it or a claim is
 ///         accepted for it. Several beneficiaries may claim the same Open name, each with a
 ///         reason, and governance accepts one as the winner.

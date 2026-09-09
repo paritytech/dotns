@@ -2,6 +2,8 @@
 pragma solidity ^0.8.34;
 
 /// @title IDotnsNameWhitelist
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice Interface for the pre-launch name whitelist. A name is Open until governance either
 ///         reserves it or a claim is accepted for it. Several beneficiaries may claim the same
 ///         Open name, each with a reason, and governance accepts one as the winner.

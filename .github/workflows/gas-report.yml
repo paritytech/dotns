@@ -34,7 +34,7 @@ jobs:
   generate:
     name: Gas Report (${{ matrix.target.label }})
     if: github.event.action != 'closed'
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     strategy:
       # Each target runs on its own runner so the PR-branch and master-branch
       # gas reports do not have to share one machine's memory budget. The
@@ -167,7 +167,7 @@ jobs:
     name: Gas Report Diff
     needs: generate
     if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     steps:
       - uses: actions/checkout@v4
 
@@ -366,7 +366,7 @@ jobs:
             }
 
   cleanup:
-    runs-on: ubuntu-latest
+    runs-on: parity-int-ubuntu-xl
     if: github.event.action == 'closed'
     steps:
       - uses: actions/checkout@v4
