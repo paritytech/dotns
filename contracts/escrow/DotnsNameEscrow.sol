@@ -165,12 +165,27 @@ contract DotnsNameEscrow is
         __ERC165_init();
 
         protocolRegistry = registry;
-        updateCooldown(cooldownSeconds);
-        updateRedeemWindow(redeemWindowSeconds);
+        _updateCooldown(cooldownSeconds);
+        _updateRedeemWindow(redeemWindowSeconds);
     }
 
     /// @inheritdoc IDotnsNameEscrow
     function updateCooldown(uint256 newCooldown) public override onlyOwner {
+        _updateCooldown(newCooldown);
+    }
+
+    /// @inheritdoc IDotnsNameEscrow
+    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyOwner {
+        _updateRedeemWindow(newRedeemWindow);
+    }
+
+    /// @notice Validates and seeds the cooldown, without an ownership check.
+    /// @dev Split from @custom:function updateCooldown so the initialiser can seed the value:
+    ///      the owner is now an explicit argument rather than the caller, so `onlyOwner` would
+    ///      reject the deployer mid-initialisation. Every caller either is `onlyOwner` or runs
+    ///      inside `initializer`.
+    /// @param newCooldown Delay after release before the deposit withdrawal may be credited.
+    function _updateCooldown(uint256 newCooldown) private {
         require(newCooldown != 0, InvalidCooldown());
         require(newCooldown <= MAX_COOLDOWN, CooldownTooLong(newCooldown, MAX_COOLDOWN));
 
@@ -180,8 +195,11 @@ contract DotnsNameEscrow is
         emit CooldownUpdated(currentCooldown, newCooldown);
     }
 
-    /// @inheritdoc IDotnsNameEscrow
-    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyOwner {
+    /// @notice Validates and seeds the redeem window, without an ownership check.
+    /// @dev Split from @custom:function updateRedeemWindow for the reason given on
+    ///      @custom:function _updateCooldown.
+    /// @param newRedeemWindow Period after release in which only the previous holder may act.
+    function _updateRedeemWindow(uint256 newRedeemWindow) private {
         require(
             newRedeemWindow >= MIN_REDEEM_WINDOW,
             RedeemWindowTooShort(newRedeemWindow, MIN_REDEEM_WINDOW)
