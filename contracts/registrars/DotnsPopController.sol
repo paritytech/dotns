@@ -162,7 +162,9 @@ contract DotnsPopController is
     /// call outside an active initialiser scope reverts with @custom:reverts NotInitializing.
     /// Emits @custom:emits ReservationDurationSet so indexers observe the initial value
     /// through the same event the setter uses later.
+    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
+        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint64 reservationDuration_
     )
@@ -173,7 +175,7 @@ contract DotnsPopController is
             reservationDuration_ >= MIN_RESERVATION_DURATION,
             ReservationDurationTooLow(reservationDuration_)
         );
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
         reservationDuration = reservationDuration_;

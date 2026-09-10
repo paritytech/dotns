@@ -90,7 +90,9 @@ contract DotnsRegistrarController is
     /// @custom:reverts MaxCommitmentAgeTooLow) and must stay within
     /// `MAX_ALLOWED_COMMITMENT_AGE` (otherwise @custom:reverts MaxCommitmentAgeTooHigh) before
     /// wiring the protocol registry.
+    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
+        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint256 minAge,
         uint256 maxAge
@@ -99,7 +101,7 @@ contract DotnsRegistrarController is
         initializer
     {
         __ERC165_init();
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
 
         require(minAge > 0, MinCommitmentAgeZero());
         require(maxAge > minAge, MaxCommitmentAgeTooLow());
@@ -422,7 +424,7 @@ contract DotnsRegistrarController is
             IStoreFactory factory =
                 IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
             string memory fullName = string.concat(registration.label, protocolRegistry.tld());
-            labelStore = factory.writeLabel(registration.owner, node, fullName);
+            labelStore = factory.writeNewLabel(registration.owner, node, fullName);
         }
 
         if (setReverseRecord) {

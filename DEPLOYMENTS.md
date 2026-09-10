@@ -62,11 +62,11 @@ paseo_local
 
 ## Multicall3
 
-Fresh deployments include a generic Multicall3 contract. It is deployed for client, indexer, and tooling batching and is not dotNS-specific. The deployment script records it in the manifest as Multicall3 and the wire-up stage publishes it through the protocol registry under the MULTICALL3 key.
+Fresh deployments include a generic Multicall3 contract. It is deployed for client, indexer, and tooling batching and is not dotNS-specific. The deployment script records it in the manifest as Multicall3. It is deliberately **not** published through the protocol registry: registry membership is a trust signal protocol contracts read, and an arbitrary-target call forwarder must never carry it.
 
 This is an arbitrary-target Multicall3 surface, matching the common mds1/multicall3 interface used by wallet and RPC tooling. It is permissionless: anyone can call it. Target contracts still enforce their own permissions and see Multicall3 as the caller during CALL-based write batching. Use it freely for read aggregation; use write aggregation only for flows where the target contract is meant to accept Multicall3 as msg.sender.
 
-Its address is deterministic, not the canonical mds1 singleton. It is deployed through the dotNS CREATE3 factory under the label `Multicall3` (kind `contract`), so it lands at the same address on every chain that shares the same factory (see Deterministic addresses below), and that address is **not** the well-known `0xcA11...` deployment. Consumers must read the Multicall3 address from the protocol registry `MULTICALL3` key or from the deployment manifest, never hardcode `0xcA11...`.
+Its address is deterministic, not the canonical mds1 singleton. It is deployed through the dotNS CREATE3 factory under the label `Multicall3` (kind `contract`), so it lands at the same address on every chain that shares the same factory (see Deterministic addresses below), and that address is **not** the well-known `0xcA11...` deployment. Consumers must read the Multicall3 address from the deployment manifest, never hardcode `0xcA11...`. Deployments made before the `MULTICALL3` key was dropped still carry it in their registry; that entry is retained for compatibility and should not be relied on for new integrations.
 
 ## One-time deployer bootstrap
 
@@ -261,7 +261,7 @@ At minimum, confirm:
 - The protocol registry address is present.
 - The registrar address is present.
 - The public registrar controller address is present.
-- The Multicall3 address is present.
+- The Multicall3 address is present in the manifest. It is not a protocol registry key.
 - The Pop controller address is present.
 - PopRules is present.
 - The forward, reverse, content, and Pop resolvers are present.
@@ -361,6 +361,31 @@ Two other manifest entries are not CREATE3-derived: `LabelStoreBeacon` and `User
 
 The one address that is not CREATE3-derived is the CREATE3 factory itself: it bootstraps the scheme, so it cannot deploy itself. The first deploy stage deploys it directly and records it on the protocol registry under the `CREATE3_FACTORY` key; every later stage resolves it from there rather than from an environment variable. Because every other address is derived from the factory's address, the factory must sit at the same address on each chain for the rest of the set to match. Deploy it as the deployer's first transaction on a fresh account (or through a deterministic singleton deployer) so its nonce-derived address is identical across chains.
 
+### Occupied addresses, and what a resume will adopt
+
+A CREATE3 address can already hold code when the pipeline reaches it. Either the run is a resume and that code is its own earlier deployment, or someone else put it there: `Create3Factory.deploy` is permissionless and the salts above are a pure function of public constants, so any dotNS address can be occupied in advance by anyone who reads them off a live deployment.
+
+The pipeline adopts an occupant only when its runtime code is what this run would have deployed, and fails the whole stage otherwise. It never adopts on faith, and it never silently writes a foreign contract into the protocol registry or the manifest.
+
+Matching works in two steps, in `BaseDeployer._requireExpectedCode`:
+
+- An exact codehash match against the artefact is accepted immediately. This covers every contract without constructor-set immutables, `ERC1967Proxy` included.
+- Otherwise the artefact carries immutables, whose values are baked into runtime code, so no fixed codehash exists to compare against. The pipeline deploys the artefact twice locally, with this run's constructor arguments, and compares the occupant against those references. Bytes that agree across both references are what those arguments produce and must match. Bytes that differ between them are address-derived and vary on every honest deploy, so they are skipped.
+
+The reference copies are throwaway and are deployed with broadcasting paused, so they are never sent as transactions.
+
+That second step is what rejects a genuine artefact deployed against someone else's constructor arguments: a real `StoreFactory` pointed at an attacker's protocol registry has the right length and shape, and differs only in the values its constructor wrote.
+
+**What the bytecode check cannot cover.** Immutables whose values are address-derived are indistinguishable between an honest deploy and any other, because they legitimately differ every time. `StoreFactory` is the case that matters: it deploys its own beacons, so `labelStoreBeacon` and `userStoreBeacon` differ on every deploy and are skipped by the comparison. Its `protocolRegistry`, which is an immutable set from a constructor argument, is part of that comparison. Its owner is not: `Ownable` keeps that in storage rather than in runtime code, so it is caught by the wire stage's `owner()` assertions instead.
+
+The beacons are checked separately. The verification stage asserts that each beacon's code is the `UpgradeableBeacon` artefact, that the factory owns it, and that its implementation is the `LabelStore` or `UserStore` artefact this release builds. None of the three contracts carries immutables, so each comparison is exact.
+
+The beacon's own code is pinned before the other two are read, because `owner()` and `implementation()` are views: a bespoke contract can answer them correctly once and differently afterwards. Ownership is asserted because `upgradeLabelStoreImplementation` is `onlyOwner` on the factory, so a beacon owned by anything else leaves every store on the network following an implementation the verified owner cannot rotate.
+
+**Recovering a burned address.** An occupant that fails the check cannot be evicted: CREATE3 slots are single use. Set `DOTNS_SALT_VERSION` to a value above `1` to move the whole set onto fresh addresses; the salt then gains a `:<version>` suffix. This is a recovery lever, not routine configuration, and every address moves together.
+
+**A note for anyone adding an initialiser.** Proxies are initialised inside the `ERC1967Proxy` constructor, so there is no window in which a deployed proxy is uninitialised. One consequence is easy to trip over: the owner is now an explicit argument rather than the caller, so an initialiser must not call its own `onlyOwner` setters, which would reject the deployer mid-initialisation. Because the initialiser runs during construction, such a revert surfaces as CREATE3's opaque `DeploymentFailed()` rather than the underlying error. Seed values through internal helpers instead.
+
 ### Keeping the factory address stable across chain resets
 
 The "first transaction on a fresh account" rule only holds while the deployer key stays pristine. In practice the same key also runs upgrades and other operations, so on a chain reset it is no longer at nonce 0 when the pipeline runs, the factory lands at a new address, and every downstream address shifts with it. Because only the factory is nonce-sensitive, the fix is to isolate just the factory onto a single-purpose key and have the pipeline reuse it.
@@ -374,6 +399,8 @@ bun run deploy:all
 It runs `deploy:factory` (from the dedicated `dotns-factory` key, which asserts nonce 0 and lands the factory at its deterministic address), then runs the pipeline with `CREATE3_FACTORY` set to that address so `DeployCore` reuses it. On every fresh chain this reproduces the same address set.
 
 The whole pipeline is idempotent, so a re-run resumes an interrupted deploy. Each stage adopts any contract already present at its deterministic address and skips re-initialising an adopted proxy, so rerunning the same command deploys only what is missing and leaves everything already deployed untouched. This is the recovery path when the adapter stalls a transaction part way through.
+
+Idempotent is not the same as always succeeding. Both adoption and the final verification compare what is on chain against the artefacts of the release being run, so a chain that has moved away from them fails rather than reporting a clean no-op. Rotating a store implementation through `StoreFactory.upgradeLabelStoreImplementation` is the case to expect: verification then fails on the beacon implementation until the release being run is the one that was rotated to. Re-running a stage against a chain that is ahead of, or diverged from, the checked-out release is therefore not a safe no-op.
 
 The two steps can also be run separately:
 
@@ -431,6 +458,8 @@ If the deploy script fails after importing the key, .env is intentionally left i
 If the deploy script succeeds, .env should be gone. Future runs should use the keystore account and should not require the deployer private key.
 
 If a stage fails part way through, rerun the same command. Each stage adopts any contract already at its deterministic address and skips re-initialising an adopted proxy, so the rerun resumes from where it stopped and deploys only what is missing. Later stages read the deployment manifest for wire-up, so if you edit the manifest by hand keep it consistent with what is actually on chain, or the wire-up can fail.
+
+A failure naming a beacon implementation or an unexpected occupant usually means the chain and the checked-out release disagree rather than that anything is wrong on chain. Check out the release the chain is actually running before rerunning.
 
 ## Addresses
 

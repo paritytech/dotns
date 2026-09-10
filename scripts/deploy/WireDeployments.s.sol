@@ -17,6 +17,7 @@ import {DotnsContentResolver} from "../../contracts/resolvers/DotnsContentResolv
 import {DotnsReverseResolver} from "../../contracts/resolvers/DotnsReverseResolver.sol";
 import {DotnsPopResolver} from "../../contracts/resolvers/DotnsPopResolver.sol";
 import {PopRules} from "../../contracts/pop/PopRules.sol";
+import {StoreFactory} from "../../contracts/store/StoreFactory.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 
 /// @title WireDeployments
@@ -42,7 +43,6 @@ contract WireDeployments is BaseDeployer {
         address costModelRegistry;
         address registrarController;
         address protocolRegistry;
-        address multicall3;
         address nameEscrow;
         address nameWhitelist;
         address popResolver;
@@ -78,7 +78,6 @@ contract WireDeployments is BaseDeployer {
         addr.costModelRegistry = _readAddress("DotnsCostModelRegistry");
         addr.registrarController = _readAddress("DotnsRegistrarController");
         addr.protocolRegistry = _readAddress("DotnsProtocolRegistry");
-        addr.multicall3 = _readAddress("Multicall3");
         addr.nameEscrow = _readAddress("DotnsNameEscrow");
         addr.nameWhitelist = _readAddress("DotnsNameWhitelist");
         addr.popResolver = _readAddress("DotnsPopResolver");
@@ -111,7 +110,9 @@ contract WireDeployments is BaseDeployer {
         registry.set(DotnsConstants.STORE_FACTORY, addr.storeFactory);
         registry.set(DotnsConstants.NAME_ESCROW, addr.nameEscrow);
         registry.set(DotnsConstants.NAME_WHITELIST, addr.nameWhitelist);
-        registry.set(DotnsConstants.MULTICALL3, addr.multicall3);
+        // Multicall3 is deliberately not registered. It is a generic call forwarder, not a
+        // protocol component, and registry membership is a trust signal other contracts read.
+        // Consumers take its address from the deployment manifest instead.
         registry.set(DotnsConstants.POP_CONTROLLER, addr.popController);
         registry.set(DotnsConstants.POP_RESOLVER, addr.popResolver);
         registry.set(DotnsConstants.POP_LENS, addr.popLens);
@@ -155,6 +156,11 @@ contract WireDeployments is BaseDeployer {
             DotnsProtocolRegistry(addr.protocolRegistry).owner() == expectedOwner,
             "ProtocolRegistry: wrong owner"
         );
+        // Ownable rather than UUPS, so it sits outside the proxy list above, but it
+        // owns the beacons behind every user store and belongs in the same check.
+        require(
+            StoreFactory(addr.storeFactory).owner() == expectedOwner, "StoreFactory: wrong owner"
+        );
 
         DotnsProtocolRegistry registry = DotnsProtocolRegistry(addr.protocolRegistry);
         require(registry.get(DotnsConstants.REGISTRAR) == addr.registrar, "Key: registrar");
@@ -180,7 +186,6 @@ contract WireDeployments is BaseDeployer {
         require(
             registry.get(DotnsConstants.NAME_WHITELIST) == addr.nameWhitelist, "Key: nameWhitelist"
         );
-        require(registry.get(DotnsConstants.MULTICALL3) == addr.multicall3, "Key: multicall3");
         require(
             registry.get(DotnsConstants.POP_CONTROLLER) == addr.popController, "Key: popController"
         );
@@ -195,6 +200,8 @@ contract WireDeployments is BaseDeployer {
             DotnsRegistrar(addr.registrar).controllers(IDotnsController(addr.popController)),
             "PopController: not authorised"
         );
+
+        _verifyStoreImplementations(addr.storeFactory);
 
         console.log("=== Deployment verification complete ===");
     }

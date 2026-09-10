@@ -13,8 +13,14 @@ interface IDotnsProtocolRegistry {
     /// @notice Emitted when a protocol address is set or updated.
     event AddressUpdated(bytes32 indexed key, address indexed addr);
 
+    /// @notice Emitted when a key is cleared from the registry.
+    event AddressRemoved(bytes32 indexed key, address indexed addr);
+
     /// @notice Thrown when a zero address is provided where one is not allowed.
     error ZeroAddress();
+
+    /// @notice Thrown when clearing a key that holds no address.
+    error KeyNotRegistered();
 
     /// @notice Thrown when the TLD label supplied at initialisation is not a single DNS label.
     error InvalidTld();
@@ -33,11 +39,23 @@ interface IDotnsProtocolRegistry {
     ///      @custom:emits AddressUpdated on each effective change.
     function set(bytes32 key, address addr) external;
 
+    /// @notice Clears the address stored for a given key.
+    /// @dev Owner-restricted, otherwise @custom:reverts OwnableUnauthorizedAccount. The key must
+    ///      hold an address, otherwise @custom:reverts KeyNotRegistered. Decrements the removed
+    ///      address's refcount, so a contract still reachable under another key keeps its
+    ///      registered status. Exists because the registry is a discovery directory that would
+    ///      otherwise only ever grow: a contract retired from the protocol, or one published for
+    ///      lookup that should no longer be listed, has no other way out. Emits
+    ///      @custom:emits AddressRemoved.
+    function remove(bytes32 key) external;
+
     /// @notice Returns true iff `addr` is currently registered under at least one well-known key.
-    /// @dev O(1) refcount-backed lookup. Canonical peer-trust check consumed by `LabelStore`
-    ///      writes and `StoreFactory` deploys; only addresses governance has actively
-    ///      registered return true. Treats `address(0)` as never registered regardless of
-    ///      refcount.
+    /// @dev O(1) refcount-backed lookup answering discovery, not authority: it reports that
+    ///      governance listed an address, not that the address may act. Store writes and
+    ///      `StoreFactory` deploys are gated on the specific components in
+    ///      @custom:function StoreAuth.isStoreWriter, not on this, precisely so that listing a
+    ///      contract for discovery does not confer write authority. Treats `address(0)` as never
+    ///      registered regardless of refcount.
     function isRegisteredAddress(address addr) external view returns (bool registered);
 
     /// @notice Returns the namehash of the network's TLD node.

@@ -74,9 +74,10 @@ contract PopRules is
     /// @dev Runs once behind the proxy; subsequent calls trigger @custom:reverts
     ///      InvalidInitialization via the `initializer` modifier. Amounts come from the cost model
     ///      registered under `DotnsConstants.COST_MODEL`, so no price is seeded here.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(IDotnsProtocolRegistry registry) public initializer {
-        __Ownable_init(msg.sender);
+    function initialize(address initialOwner, IDotnsProtocolRegistry registry) public initializer {
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
     }

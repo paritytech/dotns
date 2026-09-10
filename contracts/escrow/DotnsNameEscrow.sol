@@ -146,10 +146,12 @@ contract DotnsNameEscrow is
     ///      updateRedeemWindow, which rejects any value below @custom:constant MIN_REDEEM_WINDOW
     ///      (@custom:reverts RedeemWindowTooShort) or above @custom:constant MAX_REDEEM_WINDOW
     ///      (@custom:reverts RedeemWindowTooLong), and emits @custom:emits RedeemWindowUpdated.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol registry used to resolve registrar and controller addresses.
     /// @param cooldownSeconds Delay after release before the deposit withdrawal may be credited.
     /// @param redeemWindowSeconds Period after release in which only the previous holder may act.
     function initialize(
+        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint256 cooldownSeconds,
         uint256 redeemWindowSeconds
@@ -159,16 +161,31 @@ contract DotnsNameEscrow is
     {
         require(address(registry) != address(0), InvalidAsset());
 
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC165_init();
 
         protocolRegistry = registry;
-        updateCooldown(cooldownSeconds);
-        updateRedeemWindow(redeemWindowSeconds);
+        _updateCooldown(cooldownSeconds);
+        _updateRedeemWindow(redeemWindowSeconds);
     }
 
     /// @inheritdoc IDotnsNameEscrow
     function updateCooldown(uint256 newCooldown) public override onlyOwner {
+        _updateCooldown(newCooldown);
+    }
+
+    /// @inheritdoc IDotnsNameEscrow
+    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyOwner {
+        _updateRedeemWindow(newRedeemWindow);
+    }
+
+    /// @notice Validates and seeds the cooldown, without an ownership check.
+    /// @dev Split from @custom:function updateCooldown so the initialiser can seed the value:
+    ///      the owner is now an explicit argument rather than the caller, so `onlyOwner` would
+    ///      reject the deployer mid-initialisation. Every caller either is `onlyOwner` or runs
+    ///      inside `initializer`.
+    /// @param newCooldown Delay after release before the deposit withdrawal may be credited.
+    function _updateCooldown(uint256 newCooldown) private {
         require(newCooldown != 0, InvalidCooldown());
         require(newCooldown <= MAX_COOLDOWN, CooldownTooLong(newCooldown, MAX_COOLDOWN));
 
@@ -178,8 +195,11 @@ contract DotnsNameEscrow is
         emit CooldownUpdated(currentCooldown, newCooldown);
     }
 
-    /// @inheritdoc IDotnsNameEscrow
-    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyOwner {
+    /// @notice Validates and seeds the redeem window, without an ownership check.
+    /// @dev Split from @custom:function updateRedeemWindow for the reason given on
+    ///      @custom:function _updateCooldown.
+    /// @param newRedeemWindow Period after release in which only the previous holder may act.
+    function _updateRedeemWindow(uint256 newRedeemWindow) private {
         require(
             newRedeemWindow >= MIN_REDEEM_WINDOW,
             RedeemWindowTooShort(newRedeemWindow, MIN_REDEEM_WINDOW)
