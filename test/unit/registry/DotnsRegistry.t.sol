@@ -136,6 +136,92 @@ contract DotnsRegistryTests is BaseDotns {
         assertEq(dotnsRegistry.resolver(returnedSubnode), address(dotnsReverseResolver));
     }
 
+    /// @notice A `persist: false` subname records ownership and a resolver but writes no store row.
+    /// @dev An authorised store writer indexes the label later, so the registry leaves the store
+    ///      untouched and no store is deployed for the owner here.
+    function test_setSubnodeOwner_persist_false_writes_no_store_row() public {
+        string memory parentLabel = "parentnode07";
+        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+
+        vm.prank(owner);
+        bytes32 subnode = dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: parentNode,
+                subLabel: "alice",
+                parentLabel: parentLabel,
+                owner: ed,
+                persist: false
+            })
+        );
+
+        assertEq(dotnsRegistry.owner(subnode), ed, "ownership recorded");
+        assertEq(
+            dotnsRegistry.resolver(subnode), address(dotnsReverseResolver), "resolver recorded"
+        );
+        assertEq(storeFactory.getLabelStore(ed), address(0), "no store row written");
+    }
+
+    /// @notice A same-owner re-call with `persist: true` does not backfill the store.
+    /// @dev The registry writes the store on creation or on reassignment to a new owner, so a
+    /// repeat call that leaves the owner unchanged is a no-op for the store. Backfilling is done by
+    /// an
+    ///      authorised store writer instead (see the backfill test below), not by re-calling this.
+    function test_setSubnodeOwner_same_owner_recall_does_not_backfill_store() public {
+        string memory parentLabel = "parentnode08";
+        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+
+        IDotnsRegistry.SubnodeRecord memory deferred = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNode,
+            subLabel: "alice",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: false
+        });
+        vm.prank(owner);
+        dotnsRegistry.setSubnodeOwner(deferred);
+
+        // Re-issue the same subname to the same owner, now asking to persist.
+        IDotnsRegistry.SubnodeRecord memory reissue = deferred;
+        reissue.persist = true;
+        vm.prank(owner);
+        dotnsRegistry.setSubnodeOwner(reissue);
+
+        assertEq(storeFactory.getLabelStore(ed), address(0), "same-owner re-call does not backfill");
+    }
+
+    /// @notice A deferred (`persist: false`) subname is backfilled by an authorised store writer.
+    /// @dev The name owner cannot write their own store; the write is gated to protocol store
+    /// writers (the registrar and its controllers). So the deferring writer backfills by deploying
+    /// the
+    ///      owner's store and writing the label as an authorised writer, which is what settlement
+    ///      does. The registry is not re-called.
+    function test_deferred_subname_is_backfilled_by_an_authorised_store_writer() public {
+        string memory parentLabel = "parentnode09";
+        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+
+        vm.prank(owner);
+        bytes32 subnode = dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: parentNode,
+                subLabel: "alice",
+                parentLabel: parentLabel,
+                owner: ed,
+                persist: false
+            })
+        );
+        assertEq(storeFactory.getLabelStore(ed), address(0), "deferred: no store yet");
+
+        // An authorised store writer deploys ed's store and writes the label. ed cannot do this.
+        string memory fullName = string.concat("alice.", parentLabel, protocolRegistry.tld());
+        vm.startPrank(address(dotnsPopController));
+        address store = storeFactory.deployLabelStoreFor(ed);
+        ILabelStore(store).storeLabel(subnode, fullName);
+        vm.stopPrank();
+
+        assertEq(storeFactory.getLabelStore(ed), store, "store deployed for the owner");
+        assertEq(ILabelStore(store).getLabel(subnode), fullName, "deferred label backfilled");
+    }
+
     function test_node_owner_sets_resolver_emits_event_and_persists() public {
         string memory parentLabel = "parentnode03";
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);

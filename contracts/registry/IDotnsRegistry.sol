@@ -14,7 +14,12 @@ interface IDotnsRegistry {
     /// @param owner Address to assign as owner of the created subnode.
     /// @param persist Whether to index the subnode into the owner's `LabelStore`, deploying it on
     ///        demand. When false the ownership and resolver record is still written, but the store
-    ///        is left untouched and the caller writes the label into the store separately.
+    ///        is left untouched. The store write is gated to protocol store writers (the registrar
+    ///        and its controllers), not the name owner, so a deferring writer indexes the label
+    ///        itself by deploying the owner's store and writing to it. The registry writes the
+    /// store only on creation or on a reassignment to a new owner, so a later same-owner re-call
+    ///        with `persist` true does not backfill it; the authorised writer backfills it
+    /// directly.
     struct SubnodeRecord {
         bytes32 parentNode;
         string subLabel;
