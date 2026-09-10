@@ -83,7 +83,7 @@ contract StoreBeaconVerificationTests is Test {
     }
 
     /// @notice An honestly deployed factory passes.
-    function test_acceptsAnHonestlyDeployedFactory() public {
+    function test_accepts_an_honestly_deployed_factory() public {
         StoreFactory factory = new StoreFactory(address(_registry()), owner);
         wire.verifyStoreImplementations(address(factory));
     }
@@ -92,7 +92,7 @@ contract StoreBeaconVerificationTests is Test {
     /// @dev The factory owns its beacons here, so ownership passes and the implementation
     ///      comparison is what fires. This is the attacker's actual position: everything else
     ///      about their factory can be made to look right.
-    function test_rejectsForeignStoreImplementations() public {
+    function test_rejects_foreign_store_implementations() public {
         ForeignImplFactory factory =
             new ForeignImplFactory(address(new ForeignStore()), address(new ForeignStore()));
 
@@ -102,7 +102,7 @@ contract StoreBeaconVerificationTests is Test {
 
     /// @notice A correct label store with a foreign user store is still rejected, so the second
     ///         beacon is not left unchecked once the first passes.
-    function test_rejectsAForeignUserStoreAlone() public {
+    function test_rejects_a_foreign_user_store_alone() public {
         StoreFactory honest = new StoreFactory(address(_registry()), owner);
         address realLabelImpl = UpgradeableBeacon(honest.labelStoreBeacon()).implementation();
 
@@ -115,7 +115,7 @@ contract StoreBeaconVerificationTests is Test {
 
     /// @notice A beacon the factory does not own is rejected: the verified factory owner could
     ///         never rotate the store implementations, and nothing else would show it.
-    function test_rejectsABeaconTheFactoryDoesNotOwn() public {
+    function test_rejects_a_beacon_the_factory_does_not_own() public {
         StoreFactory honest = new StoreFactory(address(_registry()), owner);
         address realLabelImpl = UpgradeableBeacon(honest.labelStoreBeacon()).implementation();
         address realUserImpl = UpgradeableBeacon(honest.userStoreBeacon()).implementation();
@@ -135,7 +135,7 @@ contract StoreBeaconVerificationTests is Test {
     /// @dev Without pinning the beacon's own code, verification proves only what an address said
     ///      at verification time. This one reports the release's implementation and the factory
     ///      as owner, passes both semantic checks, and can be repointed immediately afterwards.
-    function test_rejectsABeaconThatMerelyAnswersTheViews() public {
+    function test_rejects_a_beacon_that_merely_answers_the_views() public {
         StoreFactory honest = new StoreFactory(address(_registry()), owner);
         address realLabelImpl = UpgradeableBeacon(honest.labelStoreBeacon()).implementation();
         address realUserImpl = UpgradeableBeacon(honest.userStoreBeacon()).implementation();

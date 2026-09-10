@@ -38,13 +38,13 @@ contract DeterministicDeploymentTest is Test {
         factory = Create3Factory(payable(deployer.bootstrapCreate3Factory(owner)));
     }
 
-    /// @notice The #260 property: an occupied CREATE3 address holding code this run would not
-    ///         have deployed is a hard failure, not an adoption.
+    /// @notice An occupied CREATE3 address holding code this run would not have deployed is a
+    ///         hard failure, not an adoption.
     /// @dev Squatting is free. `Create3Factory.deploy` is permissionless and the salts are a
     ///      pure function of public constants, so anyone can occupy a dotNS address in advance.
     ///      Adopting it would wire a foreign contract into the protocol registry and record it
     ///      in the manifest as ours, and the CREATE3 slot can never be reclaimed.
-    function test_foreignOccupantIsRejectedRatherThanAdopted() public {
+    function test_foreign_occupant_is_rejected_rather_than_adopted() public {
         bytes32 salt = deployer.create3Salt("Multicall3", "contract");
 
         vm.prank(owner);
@@ -58,7 +58,7 @@ contract DeterministicDeploymentTest is Test {
     /// @dev `StoreFactory` bakes its beacon addresses into runtime code, so two honest deploys
     ///      differ. The check masks the immutable ranges rather than comparing lengths: a length
     ///      comparison accepts any occupant padded to the same size.
-    function test_foreignOccupantIsRejectedForAnImmutableCarryingArtefact() public {
+    function test_foreign_occupant_is_rejected_for_an_immutable_carrying_artefact() public {
         bytes32 salt = deployer.create3Salt("StoreFactory", "contract");
 
         vm.prank(owner);
@@ -77,7 +77,7 @@ contract DeterministicDeploymentTest is Test {
     ///      differ. Comparing against a reference built with this run's arguments catches it,
     ///      while the beacons `StoreFactory` deploys itself vary on every honest deploy and are
     ///      necessarily skipped.
-    function test_sameArtefactWithForeignConstructorArgsIsRejected() public {
+    function test_same_artefact_with_foreign_constructor_args_is_rejected() public {
         address attacker = makeAddr("attacker");
         address realRegistry = address(new DotnsProtocolRegistry());
         address foreignRegistry = address(new DotnsProtocolRegistry());
@@ -102,7 +102,7 @@ contract DeterministicDeploymentTest is Test {
     ///      honest resume was rejected as a squat on the first coincidence. Roughly a coin flip
     ///      per run over `StoreFactory`'s address bytes, so the resume test above catches it only
     ///      sometimes; this pins it.
-    function test_addressDerivedRangeIsSkippedInFull() public view {
+    function test_address_derived_range_is_skipped_in_full() public view {
         bytes memory template = vm.getDeployedCode("StoreFactory.sol:StoreFactory");
         bytes memory first = template;
         bytes memory second = bytes.concat(template);
@@ -130,7 +130,7 @@ contract DeterministicDeploymentTest is Test {
     ///      time, so the second run's reference copies differ from the occupant exactly where
     ///      the comparison must skip. A check that compared those bytes would force a salt bump
     ///      on every interrupted run.
-    function test_resumeAdoptsAnImmutableCarryingArtefact() public {
+    function test_resume_adopts_an_immutable_carrying_artefact() public {
         address protocolRegistry = address(new DotnsProtocolRegistry());
         bytes memory constructorData = abi.encode(protocolRegistry, owner);
 
@@ -147,7 +147,7 @@ contract DeterministicDeploymentTest is Test {
     /// @notice A resumed run still adopts its own earlier deployment. Guards the other direction:
     ///         a check strict enough to reject a squat must not reject the honest resume, or
     ///         every interrupted run would need a salt bump to recover.
-    function test_resumeAdoptsThisRunsOwnDeployment() public {
+    function test_resume_adopts_this_runs_own_deployment() public {
         address first = deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", "", "Multicall3");
         address second =
             deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", "", "Multicall3");
