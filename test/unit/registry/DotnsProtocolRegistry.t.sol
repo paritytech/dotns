@@ -22,7 +22,7 @@ contract DotnsProtocolRegistryTldTests is BaseDotns {
     {
         address proxy = Upgrades.deployUUPSProxy(
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, (tldLabel))
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, tldLabel))
         );
         registry = IDotnsProtocolRegistry(proxy);
     }
