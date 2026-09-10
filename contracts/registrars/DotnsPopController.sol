@@ -599,7 +599,10 @@ contract DotnsPopController is
             // which would rehome the identity and overwrite its records, so it is rejected.
             require(!_registry().recordExists(node), LiteNameAlreadyIssued());
             (string memory stem, string memory suffix) = label.splitLiteLabel();
-            SubnodeUtils.registerSubname(
+            // Take the node from the registry write itself, so the chat-key and store writes below
+            // land on exactly the node the record was created at rather than a separately derived
+            // one that could drift from it.
+            node = SubnodeUtils.registerSubname(
                 SubnodeUtils.SubnameContext({
                     protocolRegistry: protocolRegistry,
                     parentLabel: suffix,
@@ -646,7 +649,8 @@ contract DotnsPopController is
     /// user whose store was pre-populated under the same `node` (e.g. by a sibling protocol
     /// flow) can still settle their pending claim without bricking on `LabelAlreadyExists`.
     /// @param store Owner's `LabelStore` proxy.
-    /// @param node `namehash(labelhash)` for the entry.
+    /// @param node The name's node. A lite label resolves to its stem beneath its numeric
+    /// container, so this is not always `namehash(tldNode, keccak(label))` for the whole label.
     /// @param label Bare label without the TLD, which is appended on write. A lite label
     /// carries its separator, so this is not always a single DNS label.
     function _writeRecord(address store, bytes32 node, string memory label) internal {
@@ -811,8 +815,7 @@ contract DotnsPopController is
     /// @param liteLabel Lite label held in memory, e.g. `alice.01`.
     /// @return subnode Namehash of `stem` under `suffix.tld`.
     function _liteSubnode(string memory liteLabel) internal view returns (bytes32 subnode) {
-        (string memory stem, string memory suffix) = liteLabel.splitLiteLabel();
-        subnode = SubnodeUtils.subnodeOf(protocolRegistry.tldNode(), suffix, stem);
+        subnode = SubnodeUtils.liteSubnodeOf(protocolRegistry.tldNode(), liteLabel);
     }
 
     /// @notice Validates a base (full-person) label and derives `(labelhash, node)`.

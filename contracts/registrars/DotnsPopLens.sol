@@ -85,10 +85,10 @@ contract DotnsPopLens is IDotnsPopLens {
 
     /// @inheritdoc IDotnsPopLens
     function nameDetail(string calldata name) external view override returns (NameDetail memory) {
-        NameDetail memory detail = _detail(_nodeOf(name));
-        // The caller holds the label, so supply it when the name exists but the node alone could
-        // not recover it (a subname). An unknown name keeps its empty label.
-        if (detail.exists && bytes(detail.label).length == 0) detail.label = name;
+        // The caller holds the label, so it is passed in: a pending subname cannot recover its
+        // label from the node alone, and classification must see the label before the detail is
+        // returned.
+        NameDetail memory detail = _detail(_nodeOf(name), name);
         // Holding the label means holding its labelhash, so the lite-to-full link resolves here.
         detail.fullClaim = _popResolver().fullClaim(LabelUtils.labelhash(name));
         return detail;
@@ -96,7 +96,9 @@ contract DotnsPopLens is IDotnsPopLens {
 
     /// @inheritdoc IDotnsPopLens
     function nameDetailByNode(bytes32 node) external view override returns (NameDetail memory) {
-        NameDetail memory detail = _detail(node);
+        // No label is supplied: the node cannot recover a pending subname's label, so it stays
+        // empty.
+        NameDetail memory detail = _detail(node, "");
         // The node cannot be inverted to a labelhash, so `fullClaim` resolves only when the label
         // is independently recoverable (a settled name whose label the registrar returns).
         if (bytes(detail.label).length != 0) {
@@ -145,10 +147,11 @@ contract DotnsPopLens is IDotnsPopLens {
             for (uint256 i; i < stored; ++i) {
                 bytes32 node = labelStore.getLabelhashAt(i);
                 if (!_ownedBy(node, user)) continue;
-                if (_belongsToListing(LabelUtils.stripTld(tld, labelStore.getLabelAt(i)), wantLite))
-                {
-                    ++count;
-                }
+                string memory label = LabelUtils.stripTld(tld, labelStore.getLabelAt(i));
+                // The store keys ownership by node and provenance by text separately; bind them so
+                // a row whose key is not its own text's node is neither counted nor listed.
+                if (node != _nodeOf(label)) continue;
+                if (_belongsToListing(label, wantLite)) ++count;
             }
         }
 
@@ -195,6 +198,9 @@ contract DotnsPopLens is IDotnsPopLens {
                 bytes32 node = labelStore.getLabelhashAt(i);
                 if (!_ownedBy(node, user)) continue;
                 string memory label = LabelUtils.stripTld(tld, labelStore.getLabelAt(i));
+                // Bind the row's node key to its own text, so a row whose key is not its text's
+                // node is neither counted nor listed.
+                if (node != _nodeOf(label)) continue;
                 if (!_belongsToListing(label, wantLite)) continue;
                 if (seen++ < offset) continue;
                 page[filled++] = Name({node: node, label: label, settled: true, deadline: 0});
@@ -234,9 +240,20 @@ contract DotnsPopLens is IDotnsPopLens {
     /// @notice Gathers a name's record from the registrar, PoP resolver, and PopRules.
     /// @dev Reads defensively so an unminted or unsettled name yields zeroed fields instead of
     /// reverting. `fullClaim` is left for the caller because it needs the labelhash, which is
-    /// recoverable from the label string but not from the node alone. `tier` classifies the
-    /// label shape and is skipped for an empty label.
-    function _detail(bytes32 node) internal view returns (NameDetail memory detail) {
+    /// recoverable from the label string but not from the node alone. `tier` classifies the label
+    /// shape, so `knownLabel` supplies the label for a pending subname the node cannot recover,
+    /// letting classification run before the detail is returned; it is ignored when the label is
+    /// otherwise recoverable, and an empty `knownLabel` leaves an unrecoverable label unclassified.
+    /// @param node The name's node.
+    /// @param knownLabel Label the caller already holds, used only when the node cannot recover it.
+    function _detail(
+        bytes32 node,
+        string memory knownLabel
+    )
+        internal
+        view
+        returns (NameDetail memory detail)
+    {
         detail.node = node;
         address owner = _registry().owner(node);
         if (owner != address(0)) {
@@ -247,12 +264,15 @@ contract DotnsPopLens is IDotnsPopLens {
             detail.settled = settled;
             // A tokenised name carries its label on the registrar; a subname does not, so its
             // label is read back from the owner's store once settled. A pending subname has no
-            // recoverable label from the node alone.
+            // recoverable label from the node alone, so it is taken from `knownLabel` when the
+            // caller supplied one.
             if (_registrar().exists(uint256(node))) {
                 detail.label = _registrar().labelOf(uint256(node));
             } else if (settled) {
                 detail.label =
                     LabelUtils.stripTld(_protocolRegistry.tld(), ILabelStore(store).getLabel(node));
+            } else if (bytes(knownLabel).length != 0) {
+                detail.label = knownLabel;
             }
         }
         if (bytes(detail.label).length != 0) {
@@ -303,8 +323,7 @@ contract DotnsPopLens is IDotnsPopLens {
     function _nodeOf(string memory label) internal view returns (bytes32 node) {
         bytes32 tldNode = _protocolRegistry.tldNode();
         if (label.isLitePersonLabelMemory()) {
-            (string memory stem, string memory suffix) = label.splitLiteLabel();
-            return SubnodeUtils.subnodeOf(tldNode, suffix, stem);
+            return SubnodeUtils.liteSubnodeOf(tldNode, label);
         }
         node = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(label));
     }

@@ -349,35 +349,55 @@ contract DotnsPopControllerInvariant is BaseDotns {
         assertEq(page.length, count, "count != enumeration length");
     }
 
-    /// @notice Settlement writes labels and never strands a minted name. Every
-    ///         minted token is either settled, with its label readable in the
-    ///         owner's store, or still staged in the owner's pending queue.
-    ///         Age never drops an entry, so a minted name is never left in
-    ///         neither place.
-    /// @dev The stranded case the old model allowed, a lapsed entry swept out of
-    ///      the queue with nothing written, is now unreachable: settlement always
-    ///      writes the label regardless of the reservation deadline.
+    /// @notice Settlement writes labels and never strands a minted name. A full-person name is a
+    ///         token whose settled label reads back from the registrar; a lite name is a registry
+    ///         subname whose settled label lives in the owner's store. Either is settled or still
+    ///         staged in the owner's pending queue, so a minted name is never left in neither
+    /// place.
+    /// @dev The stranded case the old model allowed, a lapsed entry swept out of the queue with
+    ///      nothing written, is now unreachable: settlement always writes the label regardless of
+    ///      the reservation deadline. A deployed store and a pending claim are mutually exclusive
+    /// in this suite, so a lite name whose owner holds a store has necessarily been settled.
     function invariant_settled_names_written_and_never_stranded() public view {
         uint256 n = handler.mintedLiteTokenCount();
         for (uint256 i = 0; i < n; i++) {
-            uint256 tokenId = handler.mintedLiteTokenIds(i);
-            if (!dotnsRegistrar.exists(tokenId)) continue;
+            uint256 id = handler.mintedLiteTokenIds(i);
 
-            // A settled name reads its label back from the owner's store.
-            if (bytes(dotnsRegistrar.labelOf(tokenId)).length != 0) continue;
-
-            // Otherwise the name must still be staged in its owner's pending queue.
-            address nameOwner = dotnsRegistrar.ownerOf(tokenId);
-            IDotnsPopController.PendingClaim[] memory pending =
-                dotnsPopController.pendingClaims(nameOwner, 0, type(uint256).max);
-            bool staged;
-            for (uint256 j = 0; j < pending.length; j++) {
-                if (_nodeOf(pending[j].label) == bytes32(tokenId)) {
-                    staged = true;
-                    break;
-                }
+            if (dotnsRegistrar.exists(id)) {
+                // Full-person name: a tokenised second-level name. A settled name reads its label
+                // back from the registrar; otherwise it must still be staged in its owner's queue.
+                if (bytes(dotnsRegistrar.labelOf(id)).length != 0) continue;
+                assertTrue(
+                    _stagedInPending(dotnsRegistrar.ownerOf(id), bytes32(id)),
+                    "minted name neither settled nor staged"
+                );
+                continue;
             }
-            assertTrue(staged, "minted name neither settled nor staged");
+
+            // Lite name: a registry subname, not a token. It is owned in the registry, and settled
+            // into the owner's store or still staged in pending. Store and pending are mutually
+            // exclusive here, so a deployed store means the label was written.
+            bytes32 node = bytes32(id);
+            address nameOwner = dotnsRegistry.owner(node);
+            assertTrue(nameOwner != address(0), "lite name lost its registry owner");
+            if (IStoreFactory(address(storeFactory)).getLabelStore(nameOwner) != address(0)) {
+                continue;
+            }
+            assertTrue(_stagedInPending(nameOwner, node), "lite name neither settled nor staged");
+        }
+    }
+
+    /// @notice Whether `owner` holds a pending claim whose label derives to `node`.
+    /// @dev A lite label carries the separator and derives to its subnode; any other label derives
+    ///      to a second-level node under the TLD.
+    function _stagedInPending(address owner, bytes32 node) internal view returns (bool staged) {
+        IDotnsPopController.PendingClaim[] memory pending =
+            dotnsPopController.pendingClaims(owner, 0, type(uint256).max);
+        for (uint256 j = 0; j < pending.length; j++) {
+            bytes32 pendingNode = _carriesSeparator(pending[j].label)
+                ? _liteNodeOf(pending[j].label)
+                : _nodeOf(pending[j].label);
+            if (pendingNode == node) return true;
         }
     }
 }

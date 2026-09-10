@@ -141,7 +141,7 @@ library StringUtils {
     }
 
     /// @notice Validates that `value` is a name a person chose: lowercase ASCII letters only.
-    /// @dev Matches the gateway.s full-person label rule, which admits no digits
+    /// @dev Matches the gateway's full-person label rule, which admits no digits
     ///      and no hyphens, so a label outside this shape cannot have been issued. Stricter
     ///      than @custom:function isSingleLabel, and it is the same rule
     ///      @custom:function isLitePersonLabel applies to a lite stem. How short a name may be

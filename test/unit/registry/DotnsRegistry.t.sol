@@ -74,15 +74,14 @@ contract DotnsRegistryTests is BaseDotns {
         vm.stopPrank();
     }
 
-    /// @notice A subname under a two-digit name lands on its own node, not on a person's.
-    /// @dev `michael.01` reads two ways: the whole label the gateway mints, and the subname
-    ///      `michael` under `01`. The text alone cannot identify a person, since the node it
-    ///      resolves to depends on which reading you take, and provenance is what tells them
-    ///      apart. No production controller entry point can create the parent: the public and
-    ///      reserved paths require three characters, and both gateway paths are letters only.
-    ///      An owner-authorised controller can still call the registrar directly, which is what
-    ///      the test does to pin what the two readings resolve to.
-    function test_subname_under_a_two_digit_name_does_not_collide_with_a_person() public {
+    /// @notice A subname created outside the gateway carries no person provenance.
+    /// @dev The gateway issues a lite name as the subname `michael` under `01` and records it in
+    ///      `_popIssued`. This test creates the same subname directly, without the gateway, and
+    ///      shows it reads back as not `isPopIssued`: provenance, not the name text, is what marks
+    /// a gateway-issued person. No production controller entry point can create the parent here:
+    ///      the public and reserved paths require three characters, and both gateway paths are
+    ///      letters only. An owner-authorised controller calls the registrar directly to set it up.
+    function test_subname_created_outside_the_gateway_has_no_person_provenance() public {
         bytes32 twoDigitNode = _nodeOf("01");
 
         vm.startPrank(address(dotnsRegistrarController));
@@ -101,12 +100,10 @@ contract DotnsRegistryTests is BaseDotns {
             })
         );
 
-        bytes32 personNode = _nodeOf("michael.01");
-        assertTrue(subnode != personNode, "subname node is not the person's node");
         assertEq(dotnsRegistry.owner(subnode), ed, "subname belongs to its own owner");
         assertFalse(
             dotnsPopController.isPopIssued("michael.01"),
-            "no gateway mint, so the text is a subname and not a person"
+            "created outside the gateway, so it carries no person provenance"
         );
     }
 

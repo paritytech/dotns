@@ -5,6 +5,7 @@ import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {LabelUtils} from "./LabelUtils.sol";
+import {StringUtils} from "./StringUtils.sol";
 import {DotnsConstants} from "./DotnsConstants.sol";
 
 /// @title DotNS Subnode Utilities Library
@@ -54,6 +55,27 @@ library SubnodeUtils {
         subnode = LabelUtils.namehashUnder(parentNode, LabelUtils.labelhashMemory(subLabel));
     }
 
+    /// @notice Derives the subnode for a lite label `<stem>.<suffix>`, splitting it on the
+    /// separator first.
+    /// @dev The single place a lite label is turned into a node, shared by the write path and every
+    ///      reader of a lite name so the issuer and its readers agree on where a lite name lives.
+    ///      Callers gate on @custom:function StringUtils.isLitePersonLabelMemory beforehand, so the
+    ///      label is known to carry the separator this splits on.
+    /// @param tldNode The TLD node.
+    /// @param liteLabel Lite label, e.g. `alice.01`.
+    /// @return subnode Namehash of the stem beneath its numeric container beneath the TLD.
+    function liteSubnodeOf(
+        bytes32 tldNode,
+        string memory liteLabel
+    )
+        internal
+        pure
+        returns (bytes32 subnode)
+    {
+        (string memory stem, string memory suffix) = StringUtils.splitLiteLabel(liteLabel);
+        subnode = subnodeOf(tldNode, suffix, stem);
+    }
+
     /// @notice Registers `subLabel` beneath the second-level name `parentLabel`, minting the parent
     ///         if it does not exist yet.
     /// @dev Derives the parent node `parentLabel.tld`; when no name is registered there yet it is
@@ -68,11 +90,10 @@ library SubnodeUtils {
     /// registry: when false the ownership and resolver record is written but the owner's
     /// `LabelStore` is
     ///      not, and the caller writes the label into the store separately.
-    /// @dev The parent is owned by the calling contract's address and is soulbound, so it cannot be
-    ///      moved. A caller that migrates to a new address rather than upgrading in place strands
-    ///      every parent it minted and can no longer register subnames beneath them; the caller
-    /// must upgrade in place, or hold parents under an owner whose address is stable across
-    ///      migrations.
+    /// @dev The parent is owned by the calling contract's address. A caller that migrates to a new
+    ///      address rather than upgrading in place strands every parent it minted and can no longer
+    ///      register subnames beneath them; the caller must upgrade in place, or hold parents under
+    ///      an owner whose address is stable across migrations.
     /// @dev `parentLabel` is a single label registered directly under the TLD, so the parent node
     /// is derived as `namehash(tldNode, keccak(parentLabel))`; deeper parents are out of scope for
     ///      this helper.
@@ -89,20 +110,15 @@ library SubnodeUtils {
         IDotnsRegistry registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
 
         // Mint the parent on first use, owned by the caller, and pass an empty label so no
-        // `LabelStore` is written for it. When it already exists it must both belong to the caller
-        // and be soulbound, otherwise a name someone else registered, or one transferred to the
-        // caller, would be treated as this caller's parent; both are checked locally rather than
-        // assumed from an out-of-contract gate. Subsequent subnames under a parent the caller
-        // already owns skip straight to the subnode write.
+        // `LabelStore` is written for it. When it already exists it must belong to the caller,
+        // otherwise a name someone else registered would be treated as this caller's parent, so the
+        // ownership is checked locally rather than assumed from an out-of-contract gate. Subsequent
+        // subnames under a parent the caller already owns skip straight to the subnode write.
         if (!registrar.exists(uint256(parentNode))) {
             registrar.register(uint256(parentNode), address(this), "");
             registry.setOwner(parentNode, address(this));
         } else {
-            require(
-                registry.owner(parentNode) == address(this)
-                    && registrar.isSoulbound(uint256(parentNode)),
-                IDotnsRegistry.NotAuthorised()
-            );
+            require(registry.owner(parentNode) == address(this), IDotnsRegistry.NotAuthorised());
         }
 
         subnode = registry.setSubnodeOwner(
