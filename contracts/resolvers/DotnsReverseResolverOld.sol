@@ -9,13 +9,11 @@ import {
 import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IDotnsReverseResolver} from "./IDotnsReverseResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
-import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
-import {SubnodeUtils} from "../utils/SubnodeUtils.sol";
-import {StringUtils} from "../utils/StringUtils.sol";
 
 /// @title Dotns Reverse Resolver
 /// @notice Resolves an address to its associated name under the network TLD.
@@ -24,7 +22,7 @@ import {StringUtils} from "../utils/StringUtils.sol";
 ///      Reverse records bind to an EOA rather than a registry node, so authority
 ///      is delegated to the contract that mints names on the user's behalf.
 /// @custom:security-contact admin@parity.io
-contract DotnsReverseResolver is
+contract DotnsReverseResolverOld is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
@@ -73,8 +71,11 @@ contract DotnsReverseResolver is
 
     /// @inheritdoc IDotnsReverseResolver
     function claimReverseRecord(string calldata label) external override {
-        bytes32 node = _nodeOf(label);
-        require(_registry().owner(node) == msg.sender, NotNameOwner(msg.sender, uint256(node)));
+        bytes32 labelhash = LabelUtils.labelhash(label);
+        uint256 tokenId = uint256(LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash));
+
+        IERC721 registrar = IERC721(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        require(registrar.ownerOf(tokenId) == msg.sender, NotNameOwner(msg.sender, tokenId));
 
         string memory fullName = string.concat(label, protocolRegistry.tld());
         reverseNames[msg.sender] = fullName;
@@ -91,28 +92,16 @@ contract DotnsReverseResolver is
         string memory label = LabelUtils.stripTld(protocolRegistry.tld(), stored);
         if (bytes(label).length == 0) return "";
 
-        if (_registry().owner(_nodeOf(label)) != addr) return "";
-        return stored;
-    }
+        bytes32 labelhash = LabelUtils.labelhashMemory(label);
+        uint256 tokenId = uint256(LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash));
 
-    /// @notice Resolves the node a name maps to, whether tokenised or a lite subname.
-    /// @dev A lite name is `stem` beneath its numeric container, so it hashes as a subnode; any
-    ///      other name hashes as a second-level label under the TLD. Ownership of either is read
-    ///      through the registry, which delegates a tokenised name to the registrar and holds a
-    ///      subname directly.
-    /// @param label Bare label without the TLD, e.g. `alice` or `alice.01`.
-    /// @return node The node the name resolves to.
-    function _nodeOf(string memory label) internal view returns (bytes32 node) {
-        bytes32 tldNode = protocolRegistry.tldNode();
-        if (StringUtils.isLitePersonLabelMemory(label)) {
-            return SubnodeUtils.liteSubnodeOf(tldNode, label);
+        IERC721 registrar = IERC721(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        try registrar.ownerOf(tokenId) returns (address currentOwner) {
+            if (currentOwner != addr) return "";
+            return stored;
+        } catch {
+            return "";
         }
-        node = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(label));
-    }
-
-    /// @notice Resolves the registry via the protocol registry.
-    function _registry() internal view returns (IDotnsRegistry) {
-        return IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
     }
 
     /// @inheritdoc ERC165Upgradeable

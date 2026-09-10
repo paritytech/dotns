@@ -60,7 +60,11 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
         bytes32 parentNode = _namehash(dotNode, keccak256(bytes(NAME_POPFULL)));
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "blog", parentLabel: NAME_POPFULL, owner: attacker
+            parentNode: parentNode,
+            subLabel: "blog",
+            parentLabel: NAME_POPFULL,
+            owner: attacker,
+            persist: true
         });
 
         vm.startPrank(attacker);
@@ -77,7 +81,11 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
         bytes32 parentNode = _namehash(dotNode, keccak256(bytes(NAME_POPFULL)));
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "blog", parentLabel: NAME_POPFULL, owner: parentOwner
+            parentNode: parentNode,
+            subLabel: "blog",
+            parentLabel: NAME_POPFULL,
+            owner: parentOwner,
+            persist: true
         });
 
         vm.startPrank(parentOwner);

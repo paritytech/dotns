@@ -14,8 +14,8 @@ library StringUtils {
 
     /// @notice Number of digits in a lite-person PoP label's suffix.
     /// @dev The count the gateway emits, and an exact requirement here: the separator sits at a
-    ///      fixed offset from the end, so a one or three digit suffix is rejected. The pallet
-    ///      reads its own constant as a minimum, so widening it there does not widen this.
+    ///      fixed offset from the end, so a one or three digit suffix is rejected. The gateway
+    /// reads its own minimum, so widening it there does not widen this.
     uint256 internal constant LITE_SUFFIX_DIGITS = 2;
 
     /// @notice Maximum number of octets in a single DNS label.
@@ -83,9 +83,9 @@ library StringUtils {
     /// @dev A lite-person label is a stem of lowercase ASCII letters, one
     ///      @custom:constant LABEL_SEPARATOR, then exactly
     ///      @custom:constant LITE_SUFFIX_DIGITS digits (e.g. `joseph.42`). Letters only,
-    ///      because the stem is the name a person chose and People Chain restricts that to
-    ///      letters. How short a stem may be is policy rather than format, so it is left to the
-    ///      governance-reserved band in @custom:function IPopRules.classifyName.
+    ///      because the stem is the name a person chose, which is restricted to letters. How short
+    /// a stem may be is policy rather than format, so it is left to the governance-reserved band in
+    /// @custom:function IPopRules.classifyName.
     ///      It is the only label shape in DotNS permitted to carry a separator, which is what
     ///      reserves the dotted space to the gateway. A digit suffix is not exclusive: an
     ///      ordinary label may end in digits, but it is measured as written and so classifies by
@@ -116,8 +116,8 @@ library StringUtils {
         uint256 length = raw.length;
         // One stem letter, the separator, then the digits is the shortest accepted shape. The
         // stem is not bounded below here: how short a name may be is policy, and PopRules
-        // already holds it as the governance-reserved band. Mirroring People Chain's
-        // `MinUsernameLength` would duplicate that and drift when the runtime changes it.
+        // already holds it as the governance-reserved band. Enforcing a minimum here would
+        // duplicate the governance-reserved band and drift from it.
         if (length < LITE_SUFFIX_DIGITS + 2) return false;
 
         // Fixing the separator's position is what enforces the exact digit count: a third
@@ -141,7 +141,7 @@ library StringUtils {
     }
 
     /// @notice Validates that `value` is a name a person chose: lowercase ASCII letters only.
-    /// @dev Mirrors `BaseLabel::is_valid_person` on the gateway pallet, which admits no digits
+    /// @dev Matches the gateway's full-person label rule, which admits no digits
     ///      and no hyphens, so a label outside this shape cannot have been issued. Stricter
     ///      than @custom:function isSingleLabel, and it is the same rule
     ///      @custom:function isLitePersonLabel applies to a lite stem. How short a name may be
@@ -171,6 +171,46 @@ library StringUtils {
         }
 
         return true;
+    }
+
+    /// @notice Splits a lite-person label `<stem>.<digits>` into its stem and digit suffix.
+    /// @dev Splits at the first @custom:constant LABEL_SEPARATOR. A lite label carries exactly one
+    ///      separator, so the caller is expected to have run @custom:function
+    /// isLitePersonLabelMemory first; a label with no separator returns the whole input as the stem
+    /// and an empty
+    ///      suffix, which the caller's later label checks reject.
+    /// @param value Lite label held in memory, for example `alice.01`.
+    /// @return stem The label before the separator, for example `alice`.
+    /// @return suffix The digit suffix after the separator, for example `01`.
+    function splitLiteLabel(string memory value)
+        internal
+        pure
+        returns (string memory stem, string memory suffix)
+    {
+        bytes memory raw = bytes(value);
+        uint256 length = raw.length;
+
+        uint256 separator = length;
+        for (uint256 i; i < length; ++i) {
+            if (raw[i] == LABEL_SEPARATOR) {
+                separator = i;
+                break;
+            }
+        }
+
+        bytes memory stemBytes = new bytes(separator);
+        for (uint256 i; i < separator; ++i) {
+            stemBytes[i] = raw[i];
+        }
+
+        uint256 suffixLength = separator == length ? 0 : length - separator - 1;
+        bytes memory suffixBytes = new bytes(suffixLength);
+        for (uint256 i; i < suffixLength; ++i) {
+            suffixBytes[i] = raw[separator + 1 + i];
+        }
+
+        stem = string(stemBytes);
+        suffix = string(suffixBytes);
     }
 
     /// @notice Validates that `s` is a dot-separated path of canonical DNS labels.

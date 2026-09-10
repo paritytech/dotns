@@ -3,38 +3,30 @@ pragma solidity ^0.8.34;
 
 import {IDotnsController} from "./IDotnsController.sol";
 
-/// @title IDotnsPopController
+/// @title IDotnsPopControllerOld
+/// @dev PR-scoped pre-upgrade snapshot. Deleted before merge with its paired upgrade script and
+///      fork test per the upgrade-PR workflow in CONTRIBUTING.md.
 /// @notice Interface for the dedicated PoP controller orchestrating lite-person and full-person
-/// username issuance on behalf of the PoP gateway.
+/// username issuance on behalf of the PoP gateway pallet.
 /// @dev Deliberately disjoint from @custom:contract IDotnsRegistrarController. The two
 /// controllers coexist on @custom:contract DotnsRegistrar via its multi-controller affordance
-/// and neither imports the other. A full-person username collides through the registrar's ERC721
-/// availability check (first-to-mint wins); a lite username is not a token, so it collides through
-/// @custom:function IDotnsRegistry.recordExists at its stem-under-container node
-/// (@custom:reverts LiteNameAlreadyIssued). Reservation queuing for `reservedBaseLabel`
-/// mirrors its live head into PopRules, so a queued stem also blocks the public
-/// commit-reveal flow, which reads that slot when it prices a name.
+/// and neither imports the other. Collision handling reduces to the registrar's ERC721
+/// availability check (first-to-mint wins). Reservation queuing for `reservedBaseLabel` is
+/// an intra-PoP coordination mechanism only; it does not block public registrations.
 ///
 /// Label formats:
 /// Lite-person usernames (first argument to @custom:function reserveBaseName and the
-/// `liteLabel` of a `LinkKind.LiteUsername` link) are a stem of lowercase ASCII letters, a
-/// separator, then exactly two digits (e.g. `joseph.42`) per
-/// @custom:function StringUtils.isLitePersonLabel. The stem is stricter than a DNS label
-/// because the name a person chooses is restricted to letters; a stem short enough to
-/// be governance-reserved is rejected by classification, not by the shape. The label is stored in
-/// the form the gateway sends, which is the canonical form of the name, so nothing here
-/// normalises it.
+/// `liteLabel` of a `LinkKind.LiteUsername` link) are DNS labels with exactly two
+/// trailing digits (e.g. `alice42`) per @custom:function StringUtils.isLitePersonLabel.
+/// The gateway strips any separator before calling so the on-chain label is flat.
 /// Full-person usernames (the `label` of @custom:function registerBaseName and the
-/// optional `reservedBaseLabel` of @custom:function reserveBaseName) are lowercase ASCII
-/// letters only, per @custom:function StringUtils.isPersonLabel (e.g. `alice`). That is the
-/// same rule a lite stem follows and is stricter than a DNS label: no hyphens and no interior
-/// digits, because a full-person name is also a name a person chose. A separator marks a lite
-/// label and is rejected everywhere else, so only the gateway can create a dotted name; a
-/// digit suffix on its own is not exclusive, since a public label may carry one directly.
-/// Cross-flow priority on the base stem is arbitrated by
+/// optional `reservedBaseLabel` of @custom:function reserveBaseName) follow the
+/// DNS-label rules enforced by @custom:function StringUtils.isSingleLabel (e.g.
+/// `alice`). Lite and public registrations share one namespace; first-to-mint wins at
+/// the ERC721 layer. Cross-flow priority on the stripped base stem is arbitrated by
 /// @custom:function IPopRules.reserveBaseNameForPop.
 /// @custom:security-contact admin@parity.io
-interface IDotnsPopController is IDotnsController {
+interface IDotnsPopControllerOld is IDotnsController {
     /// @notice Discriminant for the `Link` union supplied to `registerBaseName`.
     /// @dev Selects the chat-key source for the full-person username. Orthogonal to whether
     /// the registration is a claim or standalone; that is derived from on-chain reservation
@@ -47,7 +39,7 @@ interface IDotnsPopController is IDotnsController {
     }
 
     /// @notice Tagged union selecting the chat-key source for a full-person registration.
-    /// @param liteLabel Lite-person `stem.NN` label (only read when `kind == LiteUsername`).
+    /// @param liteLabel Lite-person `NAMEXX` label (only read when `kind == LiteUsername`).
     /// @param chatKey Chat key bytes (only read when `kind == None`).
     struct Link {
         LinkKind kind;
@@ -90,8 +82,7 @@ interface IDotnsPopController is IDotnsController {
     /// keeps stashing entries until a signed-origin @custom:function settlePendingClaims deploys
     /// the store and settles the entries. Each entry's deadline is measured from its own
     /// `mintedAt` against `reservationDuration`.
-    /// @param label Bare label without the TLD, which is appended at settlement time. A lite
-    /// claim carries its separator, so this is not always a single DNS label.
+    /// @param label Bare DNS label (no TLD); the TLD is appended at settlement time.
     /// @param mintedAt Timestamp of the originating mint.
     struct PendingClaim {
         string label;
@@ -102,7 +93,7 @@ interface IDotnsPopController is IDotnsController {
     /// @dev Single struct so the gateway can ABI-encode one tuple as the cross-chain payload
     /// and the contract decodes it directly out of `msg.data`. All fields are required;
     /// `chatKey` may be empty bytes to skip the resolver write.
-    /// @param liteLabel Lite-person `stem.NN` label being minted.
+    /// @param liteLabel Lite-person `NAMEXX` label being minted.
     /// @param user Beneficiary account on this chain.
     /// @param chatKey Chat-key bytes persisted on the PoP resolver. Empty leaves the slot unset.
     struct LiteRegistration {
@@ -200,12 +191,13 @@ interface IDotnsPopController is IDotnsController {
     /// @param newHead Address now holding the head slot.
     event ReservationHeadAdvanced(bytes32 indexed labelhash, address indexed newHead);
 
-    /// @notice Thrown when a gated entrypoint is reached without a Root origin.
+    /// @notice Thrown when a gated entrypoint is reached without a substrate
+    ///         Root origin.
     /// @dev Carries no caller parameter: a Root origin has no account to report,
     ///      and reading `msg.sender` under one traps.
     error NotRoot();
 
-    /// @notice Thrown when a supplied lite-person label does not match `stem.NN`.
+    /// @notice Thrown when a supplied lite-person label does not match `NAMEXX`.
     error InvalidLiteLabel();
 
     /// @notice Thrown when a supplied base label is not a canonical DNS label.
@@ -214,11 +206,6 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Thrown when a reserved base label already has an owner on the registrar, so the
     /// queued reservation could never be redeemed at mint time.
     error BaseNameAlreadyRegistered();
-
-    /// @notice Thrown when a lite username is issued again while its subname already exists.
-    /// @dev A lite name is issued once; re-issuing it would rehome the identity to a new owner and
-    ///      overwrite its records, so an existing subname is rejected rather than reassigned.
-    error LiteNameAlreadyIssued();
 
     /// @notice Thrown when a supplied chat key is non-empty and not exactly 65 bytes long.
     /// @dev Mirrors the resolver's `InvalidChatKeyLength` so the controller surfaces a
@@ -255,17 +242,17 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Registers a lite-person username on behalf of the supplied user
     /// and optionally enqueues a reservation for a base name they intend to
     /// claim as a full person later.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
-    /// lite leg validates the `stem.NN` shape and requires the label to classify outside the
-    /// governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel), and rejects a
+    /// @dev Callable only under a substrate Root origin (otherwise @custom:reverts NotRoot). The
+    /// lite leg validates the dotted `stem.NN` shape and requires the flattened label to classify
+    /// as PopLite (otherwise @custom:reverts InvalidLiteLabel), and rejects a
     /// supplied chat key whose length is neither zero nor `CHAT_KEY_LENGTH`
     /// (otherwise @custom:reverts InvalidChatKey). On a warm-path mint (user already has a
     /// `LabelStore`) it @custom:emits LiteNameReserved and @custom:emits NameRegistered;
     /// on a cold-path mint it @custom:emits LiteNameReserved and
     /// @custom:emits PendingClaimStashed, with @custom:emits NameRegistered deferred to
     /// @custom:function settlePendingClaims when the claim settles. The base-name leg only runs
-    /// when `reservedBaseLabel` is non-empty: it requires a letters-only person label, which is
-    /// therefore also a true base label (otherwise @custom:reverts InvalidBaseLabel), and
+    /// when `reservedBaseLabel` is non-empty: it validates the DNS-label shape and requires a
+    /// true base label with no trailing digits (otherwise @custom:reverts InvalidBaseLabel) and
     /// with no owner on the registrar (otherwise @custom:reverts BaseNameAlreadyRegistered),
     /// since a name that already has an owner could never be claimed. This validation runs
     /// before both the lite mint and any queue mutation, so an already-registered
@@ -284,13 +271,12 @@ interface IDotnsPopController is IDotnsController {
     function reserveBaseName(BaseReservation calldata params) external;
 
     /// @notice Enqueues only the full/base-name reservation for a user.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot).
+    /// @dev Callable only under a substrate Root origin (otherwise @custom:reverts NotRoot).
     /// This is the second step of the split
     /// gateway flow: @custom:function reserveLiteName mints the lite username first, then this
     /// function reserves the full/base label in a separate transaction so proof-size stays below
     /// per-call limits. Reverts with @custom:reverts InvalidBaseLabel when the label is empty,
-    /// is not lowercase ASCII letters (so a hyphen or any digit rejects it), or is
-    /// governance-reserved, and with
+    /// non-canonical, digit-suffixed, or governance-reserved, and with
     /// @custom:reverts BaseNameAlreadyRegistered when the label already has an owner on the
     /// registrar and so could never be claimed. The caller remains agnostic about
     /// backend batching; it simply exposes a small retryable primitive.
@@ -299,12 +285,11 @@ interface IDotnsPopController is IDotnsController {
 
     /// @notice Registers a lite-person username on behalf of the supplied
     /// user without touching the base-name reservation queue.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
-    /// supplied label must satisfy the `stem.NN` shape and must classify outside the
-    /// governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel); a supplied chat
+    /// @dev Callable only under a substrate Root origin (otherwise @custom:reverts NotRoot). The
+    /// supplied label must satisfy the dotted `stem.NN` shape and the flattened label must classify
+    /// as PopLite (otherwise @custom:reverts InvalidLiteLabel); a supplied chat
     /// key whose length is neither zero nor `CHAT_KEY_LENGTH` reverts
-    /// @custom:reverts InvalidChatKey before mint and resolver writes run. A username that has
-    /// already been issued reverts @custom:reverts LiteNameAlreadyIssued. On a warm-path mint
+    /// @custom:reverts InvalidChatKey before mint and resolver writes run. On a warm-path mint
     /// @custom:emits LiteNameReserved and @custom:emits NameRegistered. On a cold-path
     /// mint @custom:emits LiteNameReserved and @custom:emits PendingClaimStashed, with
     /// @custom:emits NameRegistered deferred to @custom:function settlePendingClaims when the
@@ -313,27 +298,15 @@ interface IDotnsPopController is IDotnsController {
     /// @param params Registration request; see @custom:struct LiteRegistration.
     function reserveLiteName(LiteRegistration calldata params) external;
 
-    /// @notice Whether this controller issued `label` as a PoP identity.
-    /// @dev Keyed by text, so it answers about a name rather than about a node. A lite label is
-    /// issued as a subname (`joseph` beneath its numeric container `42`) and a full-person label as
-    /// a second-level name, so a caller holding a node must check that the node is the one `label`
-    /// resolves to under those rules before reading this answer as being about what it holds; node
-    /// identity is what names the object. Set at mint and never cleared, so it is unaffected by a
-    /// name later becoming transferable; the soulbound flag is a transfer rule and cannot stand in
-    /// for it.
-    /// @param label Bare label without the TLD, for example `joseph.42`.
-    /// @return issued True when this controller issued `label`.
-    function isPopIssued(string calldata label) external view returns (bool issued);
-
     /// @notice Registers a full-person username on behalf of the supplied user.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
-    /// base label must be a letters-only person label, and therefore a true base label,
+    /// @dev Callable only under a substrate Root origin (otherwise @custom:reverts NotRoot). The
+    /// base label must satisfy the DNS-label shape and be a true base label with no trailing digits
     /// (otherwise @custom:reverts InvalidBaseLabel), and the label must not
     /// classify as governance-reserved (otherwise @custom:reverts InvalidBaseLabel). The
     /// gateway also defers to PopRules as the single cross-flow authority: when PopRules
-    /// carries a live base-name slot held by another user (this controller's prior queue head,
-    /// or a sibling controller's write), the call reverts @custom:reverts NotHolder before any
-    /// queue mutation. Two orthogonal axes drive the state machine. The reservation
+    /// carries a live base-name slot held by another user (stamped by the public commit-reveal
+    /// flow or this controller's prior queue head), the call reverts @custom:reverts NotHolder
+    /// before any queue mutation. Two orthogonal axes drive the state machine. The reservation
     /// axis treats the user as claiming if and only if they hold the live head-of-queue
     /// reservation on the base label: a claim wipes the entire queue, releases the PopRules
     /// slot, and @custom:emits BaseNameClaimed; a non-claim silently relinquishes any
@@ -343,7 +316,7 @@ interface IDotnsPopController is IDotnsController {
     /// new entry inherits its key from a prior lite-person username. The fresh-key branch
     /// rejects a chat key whose length is neither zero nor `CHAT_KEY_LENGTH` (otherwise
     /// @custom:reverts InvalidChatKey). The `LiteUsername` branch validates the lite label's
-    /// `stem.NN` shape (otherwise @custom:reverts InvalidLiteLabel), requires the registrant to
+    /// `NAMEXX` shape (otherwise @custom:reverts InvalidLiteLabel), requires the registrant to
     /// own the lite token (otherwise @custom:reverts LiteLabelNotOwnedByUser), reads the lite
     /// node's chat key from the resolver and copies it across; if the lite node carries no chat
     /// key the inherited value is empty and the full node's chat-key write is silently skipped
@@ -362,13 +335,11 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Permissionlessly removes expired entries from the head of a reservation queue.
     /// @dev Permissionless on purpose: anyone (typically a UI or a bot) can poke a stale queue
     /// so the next live head takes over without waiting for the next gateway call. Validates
-    /// `reservedBaseLabel` as a letters-only person label (otherwise
-    /// @custom:reverts InvalidBaseLabel)
+    /// the DNS-label shape of `reservedBaseLabel` (otherwise @custom:reverts InvalidBaseLabel)
     /// and @custom:emits ReservationExpired for every expired entry reaped from the
-    /// head. A label carrying a digit or a hyphen is not a person label and
-    /// @custom:reverts InvalidBaseLabel, as does a lite label, since a separator is not one
-    /// either. Only a letters-only label reaches the queue, and one that was never reserved
-    /// resolves to an empty queue so the call is a no-op.
+    /// head. Only base-shaped labels (no trailing digits) ever key a reservation queue, so a
+    /// lite-shaped label still passes the shape check but resolves to an empty queue and the
+    /// call is a no-op.
     function expireReservation(string calldata reservedBaseLabel) external;
 
     /// @notice Lets the caller voluntarily drop their own active reservation.
@@ -380,7 +351,7 @@ interface IDotnsPopController is IDotnsController {
     function relinquishReservation() external;
 
     /// @notice Returns whether a label currently has a live reservation at the queue head.
-    /// @dev Validates `reservedBaseLabel` as a letters-only person label (otherwise
+    /// @dev Validates the DNS-label shape of `reservedBaseLabel` (otherwise
     /// @custom:reverts InvalidBaseLabel) before inspecting the queue.
     function isReservedForClaim(string calldata reservedBaseLabel)
         external
@@ -395,7 +366,7 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Returns the queue metadata (`head`, `tail`) for `labelhash`.
     /// @dev Read-only accessor over the per-label reservation queue. `head == tail` means
     /// the queue is empty; active entries occupy `[head, tail)`. Exposed on the interface
-    /// because invariant tests and off-chain consumers use it to enumerate
+    /// because invariant tests and off-chain consumers (dotli, dweb) use it to enumerate
     /// live queue state without scanning storage.
     /// @param labelhash Keccak-256 of the base label whose queue is being read.
     /// @return head Index of the live queue head.
@@ -447,7 +418,7 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Settles up to `limit` of a user's pending claims, writing each stashed label into
     /// the user's `LabelStore` and deploying that store when the user has none yet.
     /// @dev Permissionless: any caller may settle any user's claims and bears the full cost,
-    /// including the `LabelStore` storage deposit, which is charged to the
+    /// including the `LabelStore` storage deposit, which `pallet-revive` charges to the
     /// transaction signer. Settlement is never destructive: the name is already minted, so this
     /// only completes the deferred label write. Each settled entry is removed from the queue and
     /// the user leaves the pending-claim enumeration set once their queue empties. At most
