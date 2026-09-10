@@ -180,17 +180,18 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="create3factory"><a class="header" href="#create3factory">Create3Factory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/ac912c7187e07f352347510e7b54e8bbc3f982aa/contracts/deploy/Create3Factory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/4e043d51766675e408b9ade810ede54f8dc6bfee/contracts/deploy/Create3Factory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Dotns CREATE3 Factory</p>
 <p>Permissionless wrapper around Solady's audited CREATE3 library.</p>
 <p>Anyone may call @custom:function deploy. CREATE3 addresses are a pure function of
 <code>(factory_address, salt)</code> — the caller never enters the derivation — so caller-gating
-would not strengthen address determinism. Salt-squatting griefing is in-scope for the
-caller, not the factory: salts in the DotNS namespace (<code>CREATE3_SALT_NAMESPACE</code> in
-<code>BaseDeployer</code>) get bumped end-to-end if a slot is ever found occupied. Keeping the
-factory permissionless removes the cross-chain ownership-coordination burden and lets
-CI keys, ops keys, and recovery flows all coexist without ownership transfers.</p>
+would not strengthen address determinism. Keeping the factory permissionless removes the
+cross-chain ownership-coordination burden and lets CI keys, ops keys, and recovery flows
+all coexist without ownership transfers.
+An occupied salt is handled by the caller. <code>BaseDeployer._deployCreate3</code> adopts an occupied
+address only when the occupant's runtime code is the artefact that run would have deployed,
+and <code>DOTNS_SALT_VERSION</code> moves the DotNS address set to fresh addresses when it is not.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>

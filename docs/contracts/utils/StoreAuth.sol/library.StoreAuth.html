@@ -180,17 +180,14 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="storeauth"><a class="header" href="#storeauth">StoreAuth</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/ac912c7187e07f352347510e7b54e8bbc3f982aa/contracts/utils/StoreAuth.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/4e043d51766675e408b9ade810ede54f8dc6bfee/contracts/utils/StoreAuth.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 StoreAuth</p>
 <p>Decides which protocol components may act on a user's store.</p>
 <p>Registry membership is not authority. <code>DotnsProtocolRegistry</code> is an address book kept so
 consumers can discover the protocol, and <code>isRegisteredAddress</code> answers true for every
 address under every key, including entries that exist only to be found. Using it as the
-gate hands store authority to whatever is registered next, and the registry has no
-delete, so <code>set</code> can only repoint a key rather than clear it. A registered call
-forwarder is the sharpest case: it makes the call anyone asks it to, and the store sees
-the forwarder as its caller.</p>
+gate hands store authority to whatever is registered next, and although</p>
 <p>Authority is instead the registrar, the registry, and whatever the registrar currently
 accepts as a controller. Controllers are read from</p>
 <p>A writer is admitted for every store rather than scoped to the names it issues, which
@@ -198,6 +195,12 @@ rests on the controller set being trusted: a controller can mint any name outrig
 letting it write that name's label is no wider than the authority it already holds.</p>
 <p><strong>Notes:</strong></p>
 <ul>
+<li>
+<p>function: IDotnsProtocolRegistry.remove can now clear a key, a deployment already
+carrying one keeps it until governance acts. A registered call
+forwarder is the sharpest case: it makes the call anyone asks it to, and the store sees
+the forwarder as its caller.</p>
+</li>
 <li>
 <p>function: IDotnsRegistrar.controllers rather than from a registry key so that a
 controller added through <code>addController</code> can write the labels it mints, without a second
