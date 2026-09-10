@@ -50,6 +50,24 @@ contract DotnsRegistrarController is
     using StringUtils for *;
     using StoreUtils for IStoreFactory;
 
+    /// @notice One role's membership and its admin role.
+    /// @dev Member of the reserved AccessControl namespace, unused because gating is Root only.
+    /// @param hasRole Whether an account holds the role.
+    /// @param adminRole Admin role that manages the role.
+    struct RoleData {
+        mapping(address account => bool) hasRole;
+        bytes32 adminRole;
+    }
+
+    /// @notice Reserved OpenZeppelin access-control namespace held at its ERC-7201 slot.
+    /// @dev Declared and left unused so the namespace stays present in the layout. Its slot derives
+    ///      from the label, disjoint from the sequential slots below, so it consumes none of them.
+    /// @param _roles Role data keyed by role identifier.
+    /// @custom:storage-location erc7201:openzeppelin.storage.AccessControl
+    struct AccessControlStorage {
+        mapping(bytes32 role => RoleData) _roles;
+    }
+
     /// @notice Upper bound for commitment validity to cap storage griefing risk.
     uint256 public constant MAX_ALLOWED_COMMITMENT_AGE = 7 days;
 
@@ -69,11 +87,17 @@ contract DotnsRegistrarController is
     ///      from this stamp.
     mapping(bytes32 hash => uint256 version) public committedPricingVersion;
 
+    /// @dev Reserved slot held so the sequential storage layout stays fixed across the in-place
+    ///      upgrade. Unused: name eligibility lives in @custom:contract DotnsNameWhitelist.
+    /// @custom:oz-renamed-from whiteList
+    mapping(address account => bool retained) private __whiteListSlot;
+
     /// @notice Protocol-level address registry for all DotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
-    /// @dev Reserved storage space to allow for layout changes in the future.
-    uint256[50] private __gap;
+    /// @dev Reserved storage space to allow for layout changes in the future. The retained
+    ///      whitelist slot above holds one slot, so the gap holds 49 to keep the footprint fixed.
+    uint256[49] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {

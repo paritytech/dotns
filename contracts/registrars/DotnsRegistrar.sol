@@ -61,8 +61,10 @@ contract DotnsRegistrar is
     /// @custom:function quoteTransferFee.
     mapping(uint256 tokenId => bool soulbound) private _soulbound;
 
-    /// @dev Reserved storage space to allow for layout changes in the future.
-    uint256[50] private __gap;
+    /// @dev Reserved storage space to allow for layout changes in the future. `_soulbound` occupies
+    /// one reserved slot, so the gap holds 49 slots and the contract keeps a fixed 51-slot
+    /// footprint.
+    uint256[49] private __gap;
 
     /// @notice Restricts function access to authorised controllers.
     modifier onlyController() {

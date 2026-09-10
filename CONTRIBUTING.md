@@ -259,15 +259,35 @@ The `Old.sol` convention has a fixed shape. For a contract `Foo.sol` declaring `
 
 **`Old.sol` snapshots are PR-scoped and must never land on `master`.** They exist only for the upgrade PR that introduces them, so CI and local `forge build` can diff the new layout against the pre-upgrade layout. **Before the PR merges, every `Old.sol` (and every matching `I*Old.sol`) must be deleted, along with the `referenceContract` wiring in the upgrade script.** Once the upgrade is live, the "old" layout is the on-chain deployment, not a file in the repository; keeping the snapshot around after merge would create a phantom contract that future diffs would treat as real code. Reviewers should refuse any PR that ships `Old.sol` files to `master`.
 
+### The upgrade script
+
+Each upgraded proxy has one `Upgrade<Name>.s.sol` under `scripts/deploy/`, paired with its fork test. The script resolves the target proxy from the on-disk manifest, runs the layout diff against the `Old.sol` snapshot, and swaps the implementation through `Upgrades.upgradeProxy`. A beacon-backed store rotates its shared beacon through the factory's upgrade entrypoint after `Upgrades.validateUpgrade`, rather than a per-proxy call. The `referenceContract` is always supplied, so the layout diff is mandatory and fails closed; there is no environment switch that turns it off.
+
+The script asserts the broadcaster owns the proxy, or for a beacon the factory that owns it, before the swap, so a wrong signer fails fast with a clear message rather than reverting inside the upgrade call. It passes no initialiser data unless the new implementation adds storage that needs seeding.
+
 ### Fork tests
 
 Fork tests are upgrade-PR scoped. They live in `test/fork/` for the duration of an upgrade PR, paired 1:1 with the upgrade script under `scripts/deploy/`. They run against a local Paseo Asset Hub fork via the ETH-RPC adapter described in the README's deployment note, and they are deleted alongside the upgrade script and the matching `Old.sol` snapshots before merge. Between upgrade PRs the directory is empty.
+
+Each fork test forks live Asset Hub state, seeds or reads real on-chain state through the deployed implementation, runs the upgrade script, and asserts that state and every P0 path survive on the new implementation. Assertions exercise the real flows rather than bare mints, so a layout regression in a live slot fails the test. The `Old.sol` snapshot reproduces the layout of the implementation currently deployed on-chain, and the fork test is what confirms it: a snapshot that diverged from the live implementation makes the preserved-state assertions fail.
+
+CI wires this in automatically, so an upgrade PR adds fork tests without touching any workflow. The `push_checking` workflow detects `test/fork/**`: when fork tests are present it brings up the ETH-RPC adapter and runs them on a dedicated job that reports an `Upgrade Fork Tests` row in the CI summary; when the directory is empty that job is skipped and no adapter starts. Locally, run the same suite with `bun run test:fork`.
 
 While a fork test is in flight, skip it with:
 
 ```bash
 forge test --no-match-path 'test/fork/**'
 ```
+
+### Broadcasting the upgrade
+
+Broadcast one upgrade at a time with `scripts/deploy/upgrade.sh`, which is permanent tooling and stays on `master`:
+
+```bash
+SCRIPT=UpgradeRegistrar ACCOUNT_NAME=<keystore> RPC_URL=<network> ./scripts/deploy/upgrade.sh
+```
+
+It resolves the deployer account and reuses the shared forge flags (`--legacy`, `--slow`, and the gas limit matching the block gas limit), so an upgrade broadcast cannot drift from the deploy pipeline. The simulation is never skipped.
 
 ### Cleanup checklist before merging an upgrade PR
 

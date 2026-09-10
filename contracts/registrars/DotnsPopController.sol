@@ -142,8 +142,9 @@ contract DotnsPopController is
     ///      boundary, which is the question it is asking.
     mapping(string label => bool issued) internal _popIssued;
 
-    /// @dev Reserved storage space to allow for layout changes in future upgrades.
-    uint256[50] private __gap;
+    /// @dev Reserved storage space to allow for layout changes in future upgrades. The
+    ///      `_popIssued` mapping consumes one of the reserved slots, so the gap holds 49.
+    uint256[49] private __gap;
 
     /// @notice Restricts calls to a substrate Root origin.
     modifier onlyRoot() {

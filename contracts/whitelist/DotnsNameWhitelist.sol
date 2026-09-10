@@ -48,6 +48,24 @@ contract DotnsNameWhitelist is
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
+    /// @notice One role's membership and its admin role.
+    /// @dev Member of the reserved AccessControl namespace, unused because gating is Root only.
+    /// @param hasRole Whether an account holds the role.
+    /// @param adminRole Admin role that manages the role.
+    struct RoleData {
+        mapping(address account => bool) hasRole;
+        bytes32 adminRole;
+    }
+
+    /// @notice Reserved OpenZeppelin access-control namespace held at its ERC-7201 slot.
+    /// @dev Declared and left unused so the namespace stays present in the layout. Its slot derives
+    ///      from the label, disjoint from the sequential slots below, so it consumes none of them.
+    /// @param _roles Role data keyed by role identifier.
+    /// @custom:storage-location erc7201:openzeppelin.storage.AccessControl
+    struct AccessControlStorage {
+        mapping(bytes32 role => RoleData) _roles;
+    }
+
     /// @notice Protocol-level address registry for all DotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
