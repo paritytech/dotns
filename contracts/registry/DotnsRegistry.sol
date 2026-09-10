@@ -55,9 +55,16 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @dev Callable exactly once via `Initializable`, otherwise
     ///      @custom:reverts InvalidInitialization. `registry` must be non-zero, otherwise
     ///      @custom:reverts NotAllowed.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(IDotnsProtocolRegistry registry) external initializer {
-        __Ownable_init(msg.sender);
+    function initialize(
+        address initialOwner,
+        IDotnsProtocolRegistry registry
+    )
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
 
         require(address(registry) != address(0), NotAllowed());
         protocolRegistry = registry;
@@ -209,7 +216,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         internal
     {
         IStoreFactory factory = IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
-        factory.writeLabel(storeOwner, node, fullName);
+        factory.writeNewLabel(storeOwner, node, fullName);
     }
 
     /// @notice Computes the namehash of `parentLabel` rooted at the network's TLD node.

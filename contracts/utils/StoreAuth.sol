@@ -11,8 +11,9 @@ import {DotnsConstants} from "./DotnsConstants.sol";
 /// @dev Registry membership is not authority. `DotnsProtocolRegistry` is an address book kept so
 ///      consumers can discover the protocol, and `isRegisteredAddress` answers true for every
 ///      address under every key, including entries that exist only to be found. Using it as the
-///      gate hands store authority to whatever is registered next, and the registry has no
-///      delete, so `set` can only repoint a key rather than clear it. A registered call
+///      gate hands store authority to whatever is registered next, and although
+///      @custom:function IDotnsProtocolRegistry.remove can now clear a key, a deployment already
+///      carrying one keeps it until governance acts. A registered call
 ///      forwarder is the sharpest case: it makes the call anyone asks it to, and the store sees
 ///      the forwarder as its caller.
 /// @dev Authority is instead the registrar, the registry, and whatever the registrar currently

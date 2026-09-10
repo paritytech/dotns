@@ -80,7 +80,9 @@ contract DotnsRegistrar is
     /// proxy; direct calls on the implementation revert with @custom:reverts InvalidInitialization
     /// because `_disableInitializers` runs in the constructor, and any nested call outside an
     /// active initialiser scope reverts with @custom:reverts NotInitializing.
+    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
+        address initialOwner,
         string calldata name,
         string calldata symbol,
         IDotnsProtocolRegistry registry
@@ -89,7 +91,7 @@ contract DotnsRegistrar is
         initializer
     {
         require(address(registry) != address(0), ProtocolRegistryRequired());
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC721_init(name, symbol);
         protocolRegistry = registry;
     }
@@ -401,7 +403,7 @@ contract DotnsRegistrar is
     /// the registry would have already broken every other call site).
     function _writeOwnerLabel(address owner, uint256 tokenId, string calldata label) private {
         _storeFactory()
-            .writeLabel(owner, bytes32(tokenId), string.concat(label, protocolRegistry.tld()));
+            .writeNewLabel(owner, bytes32(tokenId), string.concat(label, protocolRegistry.tld()));
     }
 
     /// @notice Quotes the friction fee required for a transfer.

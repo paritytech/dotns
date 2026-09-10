@@ -249,7 +249,7 @@ On-chain lookup table mapping well-known bytes32 keys (declared in DotnsConstant
 
 Without it, each contract would store direct addresses to every contract it calls. An upgrade that changes one address would require a separate owner transaction for every contract that references it. The protocol registry reduces this to one: update the key in the registry, and every caller picks up the new address on its next call. The indirection also means a governance-driven rotation of, say, the PoP controller does not break any consumer that has already been deployed.
 
-The registered keys include REGISTRAR, CONTROLLER, REGISTRY, REVERSE_RESOLVER, RESOLVER, CONTENT_RESOLVER, POP_RULES, STORE_FACTORY, POP_CONTROLLER, POP_RESOLVER, NAME_ESCROW, and MULTICALL3.
+The registered keys include REGISTRAR, CONTROLLER, REGISTRY, REVERSE_RESOLVER, RESOLVER, CONTENT_RESOLVER, POP_RULES, STORE_FACTORY, POP_CONTROLLER, POP_RESOLVER, and NAME_ESCROW. Multicall3 is not among them: it is a generic call forwarder rather than a protocol component, and registry membership is a trust signal protocol contracts read. Its address comes from the deployment manifest.
 
 ### Multicall3
 

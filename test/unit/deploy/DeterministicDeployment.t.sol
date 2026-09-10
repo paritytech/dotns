@@ -38,6 +38,169 @@ contract DeterministicDeploymentTest is Test {
         factory = Create3Factory(payable(deployer.bootstrapCreate3Factory(owner)));
     }
 
+    /// @notice An occupied CREATE3 address holding code this run would not have deployed is a
+    ///         hard failure, not an adoption.
+    /// @dev Squatting is free. `Create3Factory.deploy` is permissionless and the salts are a
+    ///      pure function of public constants, so anyone can occupy a dotNS address in advance.
+    ///      Adopting it would wire a foreign contract into the protocol registry and record it
+    ///      in the manifest as ours, and the CREATE3 slot can never be reclaimed.
+    function test_foreign_occupant_is_rejected_rather_than_adopted() public {
+        bytes32 salt = deployer.create3Salt("Multicall3", "contract");
+
+        vm.prank(owner);
+        factory.deploy(salt, type(Squatter).creationCode);
+
+        _assertAdoptionRejected("Multicall3.sol:Multicall3", "", "Multicall3");
+    }
+
+    /// @notice The same rejection applies to an artefact carrying constructor-set immutables,
+    ///         which is the case the check cannot answer by codehash alone.
+    /// @dev `StoreFactory` bakes its beacon addresses into runtime code, so two honest deploys
+    ///      differ. The check masks the immutable ranges rather than comparing lengths: a length
+    ///      comparison accepts any occupant padded to the same size.
+    function test_foreign_occupant_is_rejected_for_an_immutable_carrying_artefact() public {
+        bytes32 salt = deployer.create3Salt("StoreFactory", "contract");
+
+        vm.prank(owner);
+        factory.deploy(salt, type(Squatter).creationCode);
+
+        address protocolRegistry = address(new DotnsProtocolRegistry());
+        _assertAdoptionRejected(
+            "StoreFactory.sol:StoreFactory", abi.encode(protocolRegistry, owner), "StoreFactory"
+        );
+    }
+
+    /// @notice A real `StoreFactory` deployed against an attacker's constructor arguments is
+    ///         rejected, not adopted.
+    /// @dev The case bytecode comparison alone cannot answer. The occupant is the genuine
+    ///      artefact, so its length and shape match; only the values its constructor baked in
+    ///      differ. Comparing against a reference built with this run's arguments catches it,
+    ///      while the beacons `StoreFactory` deploys itself vary on every honest deploy and are
+    ///      necessarily skipped.
+    function test_same_artefact_with_foreign_constructor_args_is_rejected() public {
+        address attacker = makeAddr("attacker");
+        address realRegistry = address(new DotnsProtocolRegistry());
+        address foreignRegistry = address(new DotnsProtocolRegistry());
+
+        bytes32 salt = deployer.create3Salt("StoreFactory", "contract");
+        vm.prank(attacker);
+        factory.deploy(
+            salt,
+            abi.encodePacked(type(StoreFactory).creationCode, abi.encode(foreignRegistry, attacker))
+        );
+
+        _assertAdoptionRejected(
+            "StoreFactory.sol:StoreFactory", abi.encode(realRegistry, owner), "StoreFactory"
+        );
+    }
+
+    /// @notice An immutable range the references disagree on is skipped in its entirety.
+    /// @dev Regression for a false rejection that broke a real deploy. An immutable holding an
+    ///      address is a 32-byte word: 12 bytes of zero padding, then 20 address bytes, of which
+    ///      any given one coincides between two unrelated addresses about once in 256. Deciding
+    ///      byte by byte therefore left part of an address-derived word marked comparable, and an
+    ///      honest resume was rejected as a squat on the first coincidence. Roughly a coin flip
+    ///      per run over `StoreFactory`'s address bytes, so the resume test above catches it only
+    ///      sometimes; this pins it.
+    function test_address_derived_range_is_skipped_in_full() public view {
+        bytes memory template = vm.getDeployedCode("StoreFactory.sol:StoreFactory");
+        bytes memory first = template;
+        bytes memory second = bytes.concat(template);
+
+        // `StoreFactory`'s first immutable range: 32 bytes at 509. Differ in exactly one byte,
+        // as two addresses sharing every other byte in that word would.
+        uint256 start = 509;
+        uint256 length = 32;
+        second[start + 21] = second[start + 21] == bytes1(0x01) ? bytes1(0x02) : bytes1(0x01);
+
+        bool[] memory skip =
+            deployer.addressDerivedRanges("StoreFactory.sol:StoreFactory", first, second);
+
+        for (uint256 i = start; i < start + length; ++i) {
+            assertTrue(skip[i], "an address-derived range was left partly comparable");
+        }
+        assertFalse(skip[start - 1], "a byte outside the range was skipped");
+        assertFalse(skip[start + length], "a byte outside the range was skipped");
+    }
+
+    /// @notice A resumed run adopts its own earlier deployment of an artefact carrying
+    ///         immutables. The reject cases below exercise the reference-diff path; this is the
+    ///         one that proves it still says yes to an honest resume.
+    /// @dev `StoreFactory` is the demanding case: its constructor deploys fresh beacons every
+    ///      time, so the second run's reference copies differ from the occupant exactly where
+    ///      the comparison must skip. A check that compared those bytes would force a salt bump
+    ///      on every interrupted run.
+    function test_resume_adopts_an_immutable_carrying_artefact() public {
+        address protocolRegistry = address(new DotnsProtocolRegistry());
+        bytes memory constructorData = abi.encode(protocolRegistry, owner);
+
+        address first = deployer.deployCreate3(
+            owner, "StoreFactory.sol:StoreFactory", constructorData, "StoreFactory"
+        );
+        address second = deployer.deployCreate3(
+            owner, "StoreFactory.sol:StoreFactory", constructorData, "StoreFactory"
+        );
+
+        assertEq(second, first, "an honest resume of an immutable artefact was not adopted");
+    }
+
+    /// @notice A resumed run still adopts its own earlier deployment. Guards the other direction:
+    ///         a check strict enough to reject a squat must not reject the honest resume, or
+    ///         every interrupted run would need a salt bump to recover.
+    function test_resume_adopts_this_runs_own_deployment() public {
+        address first = deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", "", "Multicall3");
+        address second =
+            deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", "", "Multicall3");
+
+        assertEq(second, first, "a resumed run did not adopt its own deployment");
+    }
+
+    /// @notice Asserts the pipeline refuses to adopt whatever currently occupies the address.
+    /// @dev Checks the reason rather than taking any revert: the occupancy check is one `require`
+    ///      among several in the deploy path, so a bare `expectRevert` would pass just as happily
+    ///      on a broken fixture that reverted for an unrelated reason. The byte offset in the
+    ///      mismatch message shifts with any recompile, so the assertion pins the parts that
+    ///      identify the check instead of the whole string.
+    function _assertAdoptionRejected(
+        string memory artefact,
+        bytes memory constructorData,
+        string memory label
+    )
+        private
+    {
+        try deployer.deployCreate3(owner, artefact, constructorData, label) returns (address) {
+            fail("the occupant was adopted instead of rejected");
+        } catch Error(string memory reason) {
+            assertTrue(
+                _contains(reason, "Refusing to adopt code this run did not deploy."),
+                string.concat("reverted for an unrelated reason: ", reason)
+            );
+            assertTrue(
+                _contains(reason, artefact),
+                string.concat("revert did not name the artefact: ", reason)
+            );
+        }
+    }
+
+    /// @notice True when `haystack` contains `needle`.
+    function _contains(string memory haystack, string memory needle) private pure returns (bool) {
+        bytes memory outer = bytes(haystack);
+        bytes memory inner = bytes(needle);
+        if (inner.length == 0 || inner.length > outer.length) return false;
+
+        for (uint256 i; i <= outer.length - inner.length; ++i) {
+            bool matched = true;
+            for (uint256 j; j < inner.length; ++j) {
+                if (outer[i + j] != inner[j]) {
+                    matched = false;
+                    break;
+                }
+            }
+            if (matched) return true;
+        }
+        return false;
+    }
+
     function test_coreDeploymentAddressesStayTheSameAcrossChainIds() public {
         uint256 baseline = vm.snapshotState();
 
@@ -61,7 +224,7 @@ contract DeterministicDeploymentTest is Test {
     }
 
     function test_predictionsMatchCreate3Deployments() public {
-        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot"));
+        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot"));
         address predicted = deployer.predictCreate3("DotnsProtocolRegistry", "proxy");
 
         address deployed = deployer.deployUups(
@@ -81,7 +244,7 @@ contract DeterministicDeploymentTest is Test {
         address protocolRegistry = deployer.deployUups(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot")),
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot")),
             "DotnsProtocolRegistry"
         );
         deployer.registerCreate3Factory(owner, protocolRegistry, address(factory));
@@ -205,7 +368,7 @@ contract DeterministicDeploymentTest is Test {
     }
 
     function test_reDeployAdoptsProxyWithoutReinitialising() public {
-        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot"));
+        bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot"));
         address first = deployer.deployUups(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
@@ -228,7 +391,7 @@ contract DeterministicDeploymentTest is Test {
         return deployer.deployUups(
             deployerAccount,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot")),
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot")),
             "DotnsProtocolRegistry"
         );
     }
@@ -264,7 +427,7 @@ contract DeterministicDeploymentTest is Test {
         addr.protocolRegistry = deployer.deployUups(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, ("dot")),
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot")),
             "DotnsProtocolRegistry"
         );
 
@@ -283,26 +446,36 @@ contract DeterministicDeploymentTest is Test {
         addr.registrar = deployer.deployUups(
             owner,
             "DotnsRegistrar.sol:DotnsRegistrar",
-            abi.encodeCall(DotnsRegistrar.initialize, ("Dotns", "Dotns", registry)),
+            abi.encodeCall(DotnsRegistrar.initialize, (owner, "Dotns", "Dotns", registry)),
             "DotnsRegistrar"
         );
 
         addr.reverseResolver = deployer.deployUups(
             owner,
             "DotnsReverseResolver.sol:DotnsReverseResolver",
-            abi.encodeCall(DotnsReverseResolver.initialize, (registry)),
+            abi.encodeCall(DotnsReverseResolver.initialize, (owner, registry)),
             "DotnsReverseResolver"
         );
 
         addr.registry = deployer.deployUups(
             owner,
             "DotnsRegistry.sol:DotnsRegistry",
-            abi.encodeCall(DotnsRegistry.initialize, (registry)),
+            abi.encodeCall(DotnsRegistry.initialize, (owner, registry)),
             "DotnsRegistry"
         );
 
         assertEq(DotnsProtocolRegistry(addr.protocolRegistry).owner(), owner, "registry owner");
         assertEq(DotnsRegistrar(addr.registrar).owner(), owner, "registrar owner");
         assertEq(StoreFactory(addr.storeFactory).owner(), owner, "factory owner");
+    }
+}
+
+/// @notice Arbitrary code standing at a dotNS CREATE3 address. Represents anything an attacker
+///         might park there; the pipeline must refuse it whatever it is.
+contract Squatter {
+    address public immutable OWNER = msg.sender;
+
+    function hello() external pure returns (uint256) {
+        return 42;
     }
 }

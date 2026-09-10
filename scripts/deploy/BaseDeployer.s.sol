@@ -4,9 +4,11 @@ pragma solidity ^0.8.34;
 import {Script, console} from "forge-std/Script.sol";
 import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {Create3Factory} from "../../contracts/deploy/Create3Factory.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
+import {IStoreFactory} from "../../contracts/store/IStoreFactory.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {DeploymentNetwork} from "./DeploymentNetwork.sol";
 
@@ -34,6 +36,25 @@ abstract contract BaseDeployer is Script {
     ///      chain. Bump this value only when intentionally moving the whole
     ///      deployment address set.
     string internal constant CREATE3_SALT_NAMESPACE = "dotns.create3.v1";
+
+    /// @notice Artefact backing both store beacons.
+    string internal constant BEACON_ARTEFACT = "UpgradeableBeacon.sol:UpgradeableBeacon";
+
+    /// @notice ERC1967 implementation storage slot,
+    ///         `bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)`.
+    bytes32 internal constant ERC1967_IMPLEMENTATION_SLOT =
+        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    /// @notice One immutable range in a contract's runtime code, as the compiler recorded it.
+    /// @dev Field order matches the JSON keys `parseJson` decodes positionally: length, start.
+    struct ImmutableRef {
+        uint256 len;
+        uint256 start;
+    }
+
+    /// @notice Broadcaster of the deploy currently in progress, or zero outside a broadcast.
+    /// @dev Read by @custom:function _deployReference so comparison copies are not broadcast.
+    address private _activeBroadcaster;
 
     /// @notice Optional in-memory override used by tests and custom scripts.
     address private create3FactoryOverride;
@@ -159,6 +180,56 @@ abstract contract BaseDeployer is Script {
         require(addr.code.length != 0, string.concat(name, ": no code"));
     }
 
+    /// @notice The store beacons point at this release's store implementations, and the factory
+    ///         owns them.
+    /// @dev The one thing the CREATE3 occupancy check cannot assert. `StoreFactory` deploys its
+    ///      own beacons, so their addresses are immutables that differ on every honest deploy and
+    ///      are necessarily skipped when an occupant is compared against this run's artefact. An
+    ///      attacker squatting the factory address supplies the real artefact and the real
+    ///      constructor arguments, both public, so the beacons are the only thing left under
+    ///      their control. `LabelStore` and `UserStore` carry no immutables, so their runtime
+    ///      code compares exactly.
+    /// @dev The beacon contracts themselves are pinned by codehash first. Without that, the
+    ///      checks below only prove that whatever sits at those addresses answered `owner()` and
+    ///      `implementation()` the way this stage wanted at verification time; a bespoke contract
+    ///      can do that and return something else afterwards. `UpgradeableBeacon` carries no
+    ///      immutables, so its code compares exactly and the topology cannot be faked.
+    /// @dev Beacon ownership is asserted too. `upgradeLabelStoreImplementation` is `onlyOwner` on
+    ///      the factory and the beacons are constructed as owned by it, so a beacon owned by
+    ///      anything else leaves every store on the network following an implementation the
+    ///      verified owner can never rotate.
+    /// @param storeFactory The deployed store factory.
+    function _verifyStoreImplementations(address storeFactory) internal view {
+        address labelBeacon = IStoreFactory(storeFactory).labelStoreBeacon();
+        address userBeacon = IStoreFactory(storeFactory).userStoreBeacon();
+
+        bytes32 beaconCodehash = keccak256(vm.getDeployedCode(BEACON_ARTEFACT));
+        require(labelBeacon.codehash == beaconCodehash, "LabelStoreBeacon: unexpected beacon code");
+        require(userBeacon.codehash == beaconCodehash, "UserStoreBeacon: unexpected beacon code");
+
+        require(
+            UpgradeableBeacon(labelBeacon).owner() == storeFactory,
+            "LabelStoreBeacon: not owned by the factory"
+        );
+        require(
+            UpgradeableBeacon(userBeacon).owner() == storeFactory,
+            "UserStoreBeacon: not owned by the factory"
+        );
+
+        require(
+            UpgradeableBeacon(labelBeacon).implementation().codehash
+                == keccak256(vm.getDeployedCode("LabelStore.sol:LabelStore")),
+            "LabelStoreBeacon: unexpected implementation"
+        );
+        require(
+            UpgradeableBeacon(userBeacon).implementation().codehash
+                == keccak256(vm.getDeployedCode("UserStore.sol:UserStore")),
+            "UserStoreBeacon: unexpected implementation"
+        );
+
+        console.log("  ok  store beacons and implementations");
+    }
+
     /// @notice Deploys a UUPS implementation and ERC1967 proxy through CREATE3
     ///         inside its own broadcast scope, labels the proxy for trace
     ///         readability, and records it on the manifest.
@@ -186,24 +257,33 @@ abstract contract BaseDeployer is Script {
         Upgrades.validateImplementation(artefact, opts);
 
         vm.startBroadcast(owner);
-        (address implementation,) =
+        _activeBroadcaster = owner;
+        // `UUPSUpgradeable` holds `address private immutable __self = address(this)`, so an
+        // implementation's runtime code varies with its address. Both legs are matched with the
+        // immutable ranges masked, which handles that without weakening the check.
+        (address implementation, bool implementationExisted) =
             _deployCreate3(artefact, opts.constructorData, _create3Salt(label, "implementation"));
         bool proxyExisted;
         (proxy, proxyExisted) = _deployCreate3(
             "ERC1967Proxy.sol:ERC1967Proxy",
-            abi.encode(implementation, bytes("")),
+            abi.encode(implementation, initialiserCalldata),
             _create3Salt(label, "proxy")
         );
-        // Initialise only a freshly deployed proxy; an adopted one (a resumed run)
-        // is already initialised, and re-initialising would revert.
-        if (!proxyExisted && initialiserCalldata.length != 0) {
-            (bool ok, bytes memory ret) = proxy.call(initialiserCalldata);
-            if (!ok) {
-                assembly ("memory-safe") {
-                    revert(add(ret, 32), mload(ret))
-                }
-            }
-        } else if (proxyExisted && initialiserCalldata.length != 0) {
+        // The two legs are deployed together, so a first run finds neither present
+        // and a resumed run finds both. An implementation present without its proxy
+        // is neither, and this run would otherwise point a new proxy at it. Recover
+        // by bumping DOTNS_SALT_VERSION.
+        require(
+            !implementationExisted || proxyExisted,
+            string.concat(
+                label,
+                ": implementation address already occupied while its proxy is absent. ",
+                "Bump DOTNS_SALT_VERSION to deploy at fresh addresses."
+            )
+        );
+        // The initialiser ran inside the proxy constructor above, so there is no window
+        // between deployment and initialisation for a third party to claim ownership.
+        if (proxyExisted && initialiserCalldata.length != 0) {
             // The proxy keeps the configuration its first deploy set, so every
             // initialiser argument computed for this run is discarded. Values
             // without a setter (such as the TLD) cannot be corrected afterwards,
@@ -211,7 +291,16 @@ abstract contract BaseDeployer is Script {
             console.log("WARNING: adopted existing proxy, initialiser skipped for", label);
             console.log("         on-chain configuration may differ from this run's inputs");
         }
+        _activeBroadcaster = address(0);
         vm.stopBroadcast();
+        // Confirms the proxy delegates to the implementation this run deployed. Read
+        // from storage rather than through a call, so the answer comes from the slot
+        // itself rather than from the code at that address.
+        require(
+            address(uint160(uint256(vm.load(proxy, ERC1967_IMPLEMENTATION_SLOT))))
+                == implementation,
+            string.concat(label, ": proxy does not delegate to this run's implementation")
+        );
         vm.label(proxy, label);
         logDeployment(label, proxy);
     }
@@ -233,7 +322,9 @@ abstract contract BaseDeployer is Script {
         returns (address deployed)
     {
         vm.startBroadcast(owner);
+        _activeBroadcaster = owner;
         (deployed,) = _deployCreate3(artefact, constructorData, _create3Salt(label, "contract"));
+        _activeBroadcaster = address(0);
         vm.stopBroadcast();
         vm.label(deployed, label);
         logDeployment(label, deployed);
@@ -285,7 +376,9 @@ abstract contract BaseDeployer is Script {
     /// @return factory Address of the freshly deployed CREATE3 factory.
     function _bootstrapCreate3Factory(address owner) internal returns (address factory) {
         vm.startBroadcast(owner);
+        _activeBroadcaster = owner;
         factory = address(new Create3Factory());
+        _activeBroadcaster = address(0);
         vm.stopBroadcast();
         console.log("WARNING: minted a nonce-derived CREATE3 factory at", factory);
         console.log(
@@ -324,7 +417,9 @@ abstract contract BaseDeployer is Script {
         internal
     {
         vm.startBroadcast(owner);
+        _activeBroadcaster = owner;
         IDotnsProtocolRegistry(protocolRegistry).set(DotnsConstants.CREATE3_FACTORY, factory);
+        _activeBroadcaster = address(0);
         vm.stopBroadcast();
     }
 
@@ -351,12 +446,15 @@ abstract contract BaseDeployer is Script {
     }
 
     /// @notice Deploys `artefact` at its CREATE3 address, or adopts that address
-    ///         when it already has code, so a re-run resumes instead of reverting.
-    /// @dev The CREATE3 address is a pure function of the factory and salt, so it
-    ///      is identical whether freshly deployed or adopted. `existed` lets
-    ///      callers skip one-time steps (such as proxy initialisation) on adoption.
+    ///         when it already holds this artefact's code, so a re-run resumes.
+    /// @dev Adoption requires the occupant's runtime code to match the artefact this run would
+    ///      deploy; anything else reverts. "Match" is not always byte equality: an artefact
+    ///      carrying immutables differs on every honest deploy wherever its constructor wrote an
+    ///      address, so @custom:function _requireExpectedCode compares only the bytes those
+    ///      constructor arguments determine. A resumed run adopts without further input either
+    ///      way.
     /// @return deployed The CREATE3 address of the contract.
-    /// @return existed True when the target already had code and was adopted.
+    /// @return existed True when the target already held this artefact's code.
     function _deployCreate3(
         string memory artefact,
         bytes memory constructorData,
@@ -367,11 +465,201 @@ abstract contract BaseDeployer is Script {
     {
         address predicted = _create3Factory().predict(salt);
         if (predicted.code.length != 0) {
+            _requireExpectedCode(artefact, constructorData, predicted);
             return (predicted, true);
         }
 
         deployed = _create3Factory().deploy(salt, _creationBytecode(artefact, constructorData));
         require(deployed == predicted, string.concat(artefact, ": CREATE3 deploy failed"));
+    }
+
+    /// @notice Reverts unless `occupant` holds the code this run would deploy for `artefact`.
+    /// @dev Adoption is the dangerous path: a CREATE3 address can be occupied in advance by
+    ///      anyone, since the factory is permissionless and the salts derive from public
+    ///      constants. Exact codehash settles artefacts without immutables. Artefacts with
+    ///      immutables have no fixed codehash, so they are compared against local reference
+    ///      deploys built with this run's constructor arguments; see the comment in the body for
+    ///      what that can and cannot assert.
+    /// @param artefact Fully-qualified artefact name (`File.sol:Contract`).
+    /// @param constructorData ABI-encoded constructor arguments this run would deploy with.
+    /// @param occupant Address already holding code at the predicted CREATE3 address.
+    function _requireExpectedCode(
+        string memory artefact,
+        bytes memory constructorData,
+        address occupant
+    )
+        internal
+    {
+        bytes memory occupantCode = occupant.code;
+
+        // Artefacts without immutables match exactly, which covers `ERC1967Proxy` and every
+        // plain contract. Taking this path first keeps the reference deploys below off the
+        // common case, and in particular never re-runs a proxy's initialiser.
+        if (keccak256(occupantCode) == keccak256(vm.getDeployedCode(artefact))) return;
+
+        // An artefact carrying immutables cannot be compared by codehash: its constructor bakes
+        // values into the runtime code. Deploying the artefact twice, here, with this run's
+        // constructor arguments separates the two kinds. Bytes that agree across both references
+        // are what these arguments produce, and the occupant must match them: that is what
+        // catches a real artefact deployed against an attacker's arguments. Bytes that differ
+        // between the references are address-derived (`UUPSUpgradeable.__self`, or a beacon the
+        // constructor deploys itself) and vary on every honest deploy, so they cannot be
+        // asserted on and are skipped.
+        bytes memory creationCode = _creationBytecode(artefact, constructorData);
+        bytes memory first = _deployReference(creationCode).code;
+        bytes memory second = _deployReference(creationCode).code;
+
+        require(
+            occupantCode.length == first.length,
+            string.concat(
+                "Unexpected occupant at CREATE3 address for ",
+                artefact,
+                " (",
+                vm.toString(occupant),
+                "): runtime code length ",
+                vm.toString(occupantCode.length),
+                " does not match the expected ",
+                vm.toString(first.length),
+                ". Refusing to adopt code this run did not deploy."
+            )
+        );
+
+        // Zero the address-derived ranges in both copies and compare once. Walking the arrays
+        // byte by byte instead costs a `require` per byte over the whole runtime code, and
+        // `require` evaluates its message eagerly, so every one of those iterations built a
+        // string and called `vm.toString` three times. Memory growth is quadratic, and a large
+        // implementation exhausted `memory_limit` before it could finish comparing.
+        bool[] memory skip = _addressDerivedRanges(artefact, first, second);
+        for (uint256 i; i < first.length; ++i) {
+            if (!skip[i]) continue;
+            occupantCode[i] = 0;
+            first[i] = 0;
+        }
+        if (keccak256(occupantCode) == keccak256(first)) return;
+
+        // Only now, on the failure path, is it worth naming the offending byte. Both copies have
+        // their skipped ranges zeroed, so the first difference is a real one.
+        uint256 offset;
+        for (uint256 i; i < first.length; ++i) {
+            if (occupantCode[i] != first[i]) {
+                offset = i;
+                break;
+            }
+        }
+        revert(
+            string.concat(
+                "Unexpected occupant at CREATE3 address for ",
+                artefact,
+                " (",
+                vm.toString(occupant),
+                "): runtime code differs at byte ",
+                vm.toString(offset),
+                " from the artefact this run would deploy with these constructor arguments. ",
+                "Refusing to adopt code this run did not deploy."
+            )
+        );
+    }
+
+    /// @notice Flags the bytes of an immutable whose value came from the deploy address.
+    /// @dev Whole ranges, never individual bytes. An immutable holding an address is a 32-byte
+    ///      word of which 12 bytes are zero padding and the rest coincide between two unrelated
+    ///      addresses about once every 256 bytes, so deciding byte by byte marks part of an
+    ///      address-derived word as comparable and rejects an honest resume on the first
+    ///      coincidence. The compiler records where each immutable sits; the two references say
+    ///      which of those the deploy address moved.
+    /// @param artefact Fully-qualified artefact name (`File.sol:Contract`).
+    /// @param first Runtime code of the first reference copy.
+    /// @param second Runtime code of the second reference copy.
+    /// @return skip One flag per byte, true where the byte must not be compared.
+    function _addressDerivedRanges(
+        string memory artefact,
+        bytes memory first,
+        bytes memory second
+    )
+        internal
+        view
+        returns (bool[] memory skip)
+    {
+        skip = new bool[](first.length);
+
+        string memory json = vm.readFile(_artefactPath(artefact));
+        string memory root = "$.deployedBytecode.immutableReferences";
+
+        // An artefact with no immutables serialises this as `{}`, which `parseJsonKeys` rejects
+        // rather than reporting as empty. Nothing to skip in that case.
+        string[] memory ids;
+        try vm.parseJsonKeys(json, root) returns (string[] memory keys) {
+            ids = keys;
+        } catch {
+            return skip;
+        }
+
+        // Field order is the JSON key order `parseJson` decodes into: "length", then "start".
+        for (uint256 i; i < ids.length; ++i) {
+            ImmutableRef[] memory refs = abi.decode(
+                vm.parseJson(json, string.concat(root, '["', ids[i], '"]')), (ImmutableRef[])
+            );
+            for (uint256 j; j < refs.length; ++j) {
+                uint256 start = refs[j].start;
+                uint256 len = refs[j].len;
+                if (start + len > first.length) continue;
+
+                bool differs;
+                for (uint256 k; k < len; ++k) {
+                    if (first[start + k] != second[start + k]) {
+                        differs = true;
+                        break;
+                    }
+                }
+                if (!differs) continue;
+
+                for (uint256 k; k < len; ++k) {
+                    skip[start + k] = true;
+                }
+            }
+        }
+    }
+
+    /// @notice Foundry artefact path for a `File.sol:Contract` identifier.
+    /// @param artefact Fully-qualified artefact name.
+    /// @return Absolute path to the artefact JSON.
+    function _artefactPath(string memory artefact) internal view returns (string memory) {
+        bytes memory raw = bytes(artefact);
+        uint256 colon = raw.length;
+        for (uint256 i; i < raw.length; ++i) {
+            if (raw[i] == ":") {
+                colon = i;
+                break;
+            }
+        }
+        require(colon != raw.length, string.concat(artefact, ": expected File.sol:Contract"));
+
+        bytes memory file = new bytes(colon);
+        for (uint256 i; i < colon; ++i) {
+            file[i] = raw[i];
+        }
+        bytes memory name = new bytes(raw.length - colon - 1);
+        for (uint256 i; i < name.length; ++i) {
+            name[i] = raw[colon + 1 + i];
+        }
+        return string.concat(vm.projectRoot(), "/out/", string(file), "/", string(name), ".json");
+    }
+
+    /// @notice Deploys a throwaway copy of `creationCode` for comparison, outside any broadcast.
+    /// @dev These copies exist only to be read back, so they must not be broadcast as real
+    ///      transactions. The active broadcaster is paused around the deploy and restored after.
+    /// @param creationCode Full creation bytecode including constructor arguments.
+    /// @return copyAddress Address of the throwaway copy.
+    function _deployReference(bytes memory creationCode) private returns (address copyAddress) {
+        address broadcaster = _activeBroadcaster;
+        if (broadcaster != address(0)) vm.stopBroadcast();
+
+        assembly ("memory-safe") {
+            copyAddress := create(0, add(creationCode, 0x20), mload(creationCode))
+        }
+
+        if (broadcaster != address(0)) vm.startBroadcast(broadcaster);
+        require(copyAddress != address(0), "reference deploy failed");
     }
 
     function _creationBytecode(
@@ -403,8 +691,22 @@ abstract contract BaseDeployer is Script {
         factory = Create3Factory(payable(factoryAddress));
     }
 
-    function _create3Salt(string memory label, string memory kind) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(CREATE3_SALT_NAMESPACE, ":", label, ":", kind));
+    /// @notice Derives the CREATE3 salt for one manifest label and deploy kind.
+    /// @dev CREATE3 slots are single use, so an address that is already occupied
+    ///      cannot be reused at the same salt. Bumping `DOTNS_SALT_VERSION` moves the
+    ///      whole deployment address set to fresh addresses. Version 1 is the default
+    ///      and contributes nothing to the preimage, so every existing address is
+    ///      unchanged; the bump applies to every label at once.
+    function _create3Salt(string memory label, string memory kind) internal view returns (bytes32) {
+        uint256 version = vm.envOr("DOTNS_SALT_VERSION", uint256(1));
+        if (version == 1) {
+            return keccak256(abi.encodePacked(CREATE3_SALT_NAMESPACE, ":", label, ":", kind));
+        }
+        return keccak256(
+            abi.encodePacked(
+                CREATE3_SALT_NAMESPACE, ":", label, ":", kind, ":", vm.toString(version)
+            )
+        );
     }
 
     function _deploymentPath(

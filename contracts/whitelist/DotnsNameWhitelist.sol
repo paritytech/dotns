@@ -116,12 +116,19 @@ contract DotnsNameWhitelist is
 
     /// @notice Initialises the whitelist.
     /// @dev Callable once through the UUPS proxy; direct calls on the implementation
-    ///      @custom:reverts InvalidInitialization. Sets the deployer as owner and wires the
+    ///      @custom:reverts InvalidInitialization. Sets `initialOwner` as owner and wires the
     ///      protocol registry the node derivation reads the TLD from.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol registry all DotNS contracts resolve through.
-    function initialize(IDotnsProtocolRegistry registry) external initializer {
+    function initialize(
+        address initialOwner,
+        IDotnsProtocolRegistry registry
+    )
+        external
+        initializer
+    {
         __ERC165_init();
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         protocolRegistry = registry;
         maxClaimants = DotnsConstants.WHITELIST_DEFAULT_MAX_CLAIMANTS;
         maxGrantBatch = DotnsConstants.WHITELIST_DEFAULT_MAX_GRANT_BATCH;
