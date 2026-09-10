@@ -281,7 +281,11 @@ contract BasicDotnsIntegration is BaseDotns {
         returns (bytes32 subnode)
     {
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: subOwner
+            parentNode: parentNode,
+            subLabel: subLabel,
+            parentLabel: parentLabel,
+            owner: subOwner,
+            persist: true
         });
 
         vm.startPrank(parentOwner);

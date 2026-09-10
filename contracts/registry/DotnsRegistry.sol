@@ -106,16 +106,18 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
                 emit NewResolver(subnode, reverseResolver);
             }
 
-            if (newOwner != previousOwner) {
+            if (record.persist && newOwner != previousOwner) {
                 string memory fullName =
                     string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
                 _writeSubnodeToStore(newOwner, subnode, fullName);
             }
         } else {
             records[subnode] = Record({owner: newOwner, resolver: reverseResolver, exists: true});
-            string memory fullName =
-                string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
-            _writeSubnodeToStore(newOwner, subnode, fullName);
+            if (record.persist) {
+                string memory fullName =
+                    string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
+                _writeSubnodeToStore(newOwner, subnode, fullName);
+            }
         }
 
         emit NewOwner(parentNode, labelhash, newOwner);

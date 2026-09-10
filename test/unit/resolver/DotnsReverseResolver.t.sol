@@ -116,6 +116,20 @@ contract DotnsReverseResolverTests is BaseDotns {
         assertEq(dotnsReverseResolver.nameOf(leonardo), string.concat(CLAIM_LABEL, ".dot"));
     }
 
+    /// @notice A lite username owner can claim and reverse-resolve it.
+    /// @dev A lite name is a registry subname, not a token, so the claim reads ownership through
+    /// the registry at the stem-under-container node rather than from the registrar's ERC-721
+    ///      ledger, and the reverse read resolves the same node.
+    function test_claim_and_nameof_for_a_lite_username() public {
+        _grantPopFull(ed);
+        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
+
+        vm.prank(ed);
+        dotnsReverseResolver.claimReverseRecord(LITE_LABEL_A);
+
+        assertEq(dotnsReverseResolver.nameOf(ed), string.concat(LITE_LABEL_A, ".dot"));
+    }
+
     function test_nameof_fails_closed_when_caller_no_longer_owns_stored_name() public {
         // Bypass the registrar's eager-clear path by writing the reverse record
         // for an address that does not own the underlying name. The fail-closed
@@ -136,8 +150,9 @@ contract DotnsReverseResolverTests is BaseDotns {
     }
 
     function test_nameof_fails_closed_for_unminted_label() public {
-        // Stored name points at a label that was never minted; ownerOf reverts
-        // and the read falls back to the empty string via the try/catch arm.
+        // Stored name points at a label that was never minted; the registry has no record for it,
+        // so its owner reads as the zero address and the fail-closed check returns the empty
+        // string.
         vm.prank(address(dotnsRegistrar));
         dotnsReverseResolver.setReverseName(ed, "ghostlabel001.dot");
 

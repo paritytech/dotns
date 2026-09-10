@@ -16,6 +16,7 @@ import {StringUtils} from "../../../contracts/utils/StringUtils.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 import {LabelUtils} from "../../../contracts/utils/LabelUtils.sol";
+import {SubnodeUtils} from "../../../contracts/utils/SubnodeUtils.sol";
 import {ISystem} from "../../../contracts/external/revive/ISystem.sol";
 import {IPersonhood} from "../../../contracts/external/personhood/IPersonhood.sol";
 
@@ -34,7 +35,7 @@ contract PopControllerHandler is Test {
     DotnsRegistrar public immutable REGISTRAR;
     /// @notice Pricing and classification, read to quote a public registration.
     IPopRules public immutable POP_RULES;
-    /// @notice The hierarchical registry, where a subname is the rival reading of a dotted text.
+    /// @notice The hierarchical registry, where a lite name lives as a subname of its container.
     IDotnsRegistry public immutable REGISTRY;
     /// @notice Node hash of the suite's TLD, injected from the deployed protocol registry.
     /// @dev Keeps the handler rooted at the same TLD the protocol under test uses, without a
@@ -102,16 +103,6 @@ contract PopControllerHandler is Test {
     string[] public subnameParents;
     /// @notice Count of subname attempts the registry rejected.
     uint256 public subnameRejectedCount;
-
-    /// @notice Subnodes built as the rival reading of a lite name: its stem under its suffix.
-    /// @dev `michael.01` is one label to the gateway and `michael` beneath `01` here. Both
-    ///      display as the same text, so this is the shape a subname holder would use to pass
-    ///      for a person.
-    bytes32[] public rivalSubnodes;
-    /// @notice The lite label each rival subnode displays as (same index).
-    string[] public rivalTexts;
-    /// @notice Count of rival-hierarchy attempts the registry rejected.
-    uint256 public rivalRejectedCount;
 
     /// @notice Nodes minted through the public path, for the transfer action to move.
     uint256[] public publicTokenIds;
@@ -260,8 +251,9 @@ contract PopControllerHandler is Test {
 
         if (_callReserveBaseName(params)) {
             if (attachReservation) _track(keccak256(bytes(reservedBase)));
-            bytes32 node = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(liteLabel));
-            mintedLiteTokenIds.push(uint256(node));
+            // A lite name is a subname beneath its numeric container, not a token, so record its
+            // subnode rather than the whole-label hash.
+            mintedLiteTokenIds.push(uint256(SubnodeUtils.liteSubnodeOf(TLD_NODE, liteLabel)));
             priorLiteLabels.push(liteLabel);
             _trackGatewayLabel(liteLabel);
             _trackPendingActor(actor);
@@ -291,10 +283,10 @@ contract PopControllerHandler is Test {
             reservedBaseLabel: ""
         });
         if (!_callReserveBaseName(liteParams)) return;
-        // Recorded here rather than after the full leg below: the token exists from this point,
-        // and a full leg that reverts would otherwise leave it outside every invariant's reach.
-        bytes32 liteLabelhash = LabelUtils.labelhashMemory(liteLabel);
-        mintedLiteTokenIds.push(uint256(LabelUtils.namehashUnder(TLD_NODE, liteLabelhash)));
+        // Recorded here rather than after the full leg below: the subname exists from this point,
+        // and a full leg that reverts would otherwise leave it outside every invariant's reach. A
+        // lite name is a subname beneath its numeric container, not a token, so record its subnode.
+        mintedLiteTokenIds.push(uint256(SubnodeUtils.liteSubnodeOf(TLD_NODE, liteLabel)));
         priorLiteLabels.push(liteLabel);
         _trackGatewayLabel(liteLabel);
         _trackPendingActor(actor);
@@ -313,7 +305,7 @@ contract PopControllerHandler is Test {
         if (!_callRegisterBaseName(fullParams)) return;
 
         bytes32 fullNode = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(baseLabel));
-        claimedLiteLabelhashes.push(liteLabelhash);
+        claimedLiteLabelhashes.push(LabelUtils.labelhashMemory(liteLabel));
         claimedFullNodes.push(fullNode);
         mintedLiteTokenIds.push(uint256(fullNode));
         _trackGatewayLabel(baseLabel);
@@ -488,12 +480,10 @@ contract PopControllerHandler is Test {
 
     /// @notice Creates an arbitrary subname under a gateway-issued name.
     /// @dev Interleaves subname creation with gateway mints so no subnode can quietly land on an
-    ///      issued name. A lite parent never gets this far: the registry derives a parent's node
-    ///      by splitting the path on the separator, so `joseph.42` as a parent label resolves to
-    ///      the hierarchy rather than to the node the gateway minted, and the call reverts. The
-    ///      rival reading of a lite name is built by @custom:function createRivalSubname. The
-    ///      subnode owner comes from `publicActors` so a subname never deposits a `LabelStore`
-    ///      on a gateway actor.
+    ///      issued name. A lite parent is skipped: this derives the parent node by hashing the
+    ///      whole label under the TLD, which is not a node the gateway minted for a lite name, so
+    ///      the existence check returns early. The subnode owner comes from `publicActors` so a
+    ///      subname never deposits a `LabelStore` on a gateway actor.
     function createSubname(uint256 parentIndex, uint256 subLabelSeed, uint256 toIndex) external {
         uint256 n = gatewayLabelsSeen.length;
         if (n == 0) return;
@@ -508,7 +498,8 @@ contract PopControllerHandler is Test {
             parentNode: parentNode,
             subLabel: _buildSubLabel(subLabelSeed),
             parentLabel: parentLabel,
-            owner: publicActors[toIndex % publicActors.length]
+            owner: publicActors[toIndex % publicActors.length],
+            persist: true
         });
 
         vm.prank(parentOwner);
@@ -518,75 +509,6 @@ contract PopControllerHandler is Test {
         } catch {
             ++subnameRejectedCount;
         }
-    }
-
-    /// @notice Builds the rival hierarchy for a lite name: its stem as a subname of its suffix.
-    /// @dev The two readings of `michael.01` are a single label and `michael` under `01`, and
-    ///      they display identically once the TLD is appended. The suffix parent is
-    ///      governance-only on every production entry point, so it is minted straight from an
-    ///      authorised controller: the point is to stand the rival hierarchy up and let the
-    ///      invariant show that the two nodes never converge, and that the text-keyed answer
-    ///      belongs to the whole-label reading rather than to whichever object shares its
-    ///      text.
-    function createRivalSubname(uint256 liteIndex, uint256 toIndex) external {
-        uint256 n = priorLiteLabels.length;
-        if (n == 0) return;
-
-        string memory liteLabel = priorLiteLabels[liteIndex % n];
-        (string memory stem, string memory suffix) = _splitLite(liteLabel);
-
-        bytes32 parentNode = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(suffix));
-        address parentOwner = publicActors[toIndex % publicActors.length];
-        if (REGISTRAR.exists(uint256(parentNode))) {
-            parentOwner = REGISTRAR.ownerOf(uint256(parentNode));
-        } else {
-            vm.startPrank(address(PUBLIC_CONTROLLER));
-            REGISTRAR.register(uint256(parentNode), parentOwner, "");
-            REGISTRY.setOwner(parentNode, parentOwner);
-            vm.stopPrank();
-        }
-
-        IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode,
-            subLabel: stem,
-            parentLabel: suffix,
-            owner: publicActors[(toIndex + 1) % publicActors.length]
-        });
-
-        vm.prank(parentOwner);
-        try REGISTRY.setSubnodeOwner(record) returns (bytes32 created) {
-            rivalSubnodes.push(created);
-            rivalTexts.push(liteLabel);
-        } catch {
-            ++rivalRejectedCount;
-        }
-    }
-
-    /// @notice Splits a lite label into its stem and its allocated suffix.
-    function _splitLite(string memory liteLabel)
-        internal
-        pure
-        returns (string memory stem, string memory suffix)
-    {
-        bytes memory raw = bytes(liteLabel);
-        uint256 separator = raw.length - StringUtils.LITE_SUFFIX_DIGITS - 1;
-
-        bytes memory stemBytes = new bytes(separator);
-        for (uint256 i; i < separator; ++i) {
-            stemBytes[i] = raw[i];
-        }
-
-        bytes memory suffixBytes = new bytes(StringUtils.LITE_SUFFIX_DIGITS);
-        for (uint256 i; i < StringUtils.LITE_SUFFIX_DIGITS; ++i) {
-            suffixBytes[i] = raw[separator + 1 + i];
-        }
-
-        return (string(stemBytes), string(suffixBytes));
-    }
-
-    /// @notice Number of rival-hierarchy subnodes created.
-    function rivalSubnodeCount() external view returns (uint256) {
-        return rivalSubnodes.length;
     }
 
     /// @notice Builds a sub-label from an alphabet that includes the separator and digits.
