@@ -14,124 +14,16 @@ DotNS is a naming system for Polkadot. An account can register a .dot name, rece
 
 ![System diagram](./diagrams/system.png)
 
-## How it works
+## Actors
 
-### Actors
-
-| Actor | What they can do |
+| Actor | What they may do |
 | --- | --- |
-| **Anyone with an account** | Register any available name of nine characters or more on the open market, paying a refundable deposit. Own it, transfer it, attach records, create subnames beneath it. |
-| **A personhood-verified person** | Receive a lite-person (`joseph.42`) or full-person (`joseph`) username issued through the PoP gateway, at no cost. These are soulbound and never transfer. |
-| **Root (governance)** | Issue per-name grants, mint a reserved name directly, drive the gateway, and open the short-name band. Root gates every name that skips pricing or personhood. |
-| **The contract owner** | Deploy, upgrade, and wire the protocol registry. Not an allocator by design — but registry and controller authority reach the same outcome, so treat the owner as trusted infrastructure rather than a constrained role. |
+| **Anyone with an account** | Register an available name on the public paid path, within the bands in [Who can register a name](#who-can-register-a-name). Own it, transfer it, attach records, issue subnames beneath it. |
+| **A personhood-verified person** | Receive a lite-person or full-person username issued through the gateway, at no cost. See [DotnsPopController](#dotnspopcontroller). |
+| **Root (governance)** | Gates every name that skips pricing or personhood: issues per-name grants, mints a reserved name directly, drives the gateway, and opens the short-name band. It cannot seize, reassign, or destroy a name anyone already holds — see [What governance controls](#what-governance-controls). |
+| **The contract owner** | Deploys, upgrades, and wires the protocol registry. Not an allocator by design, but `DotnsProtocolRegistry.set` and `DotnsRegistrar.addController` both reach the same outcome, so treat the owner as trusted infrastructure rather than a constrained role. |
 | **Anyone, as upkeep** | Permissionless maintenance: expire a stale reservation, settle another user's deferred label write, submit a granted registration on the beneficiary's behalf. None of these confer any claim on a name. |
 
-### Contract components
-
-Every contract resolves other contracts at call time through **`DotnsProtocolRegistry`**, a keyed address book. Nothing stores a hardcoded contract address, so replacing one component is a single registry write.
-
-- **`DotnsRegistrar`** : the ERC-721. Owning a name means holding its token. Deliberately
-  policy-free: it knows nothing about price, personhood, or reservations.
-- **`DotnsRegistrarController`** : the public commit-reveal path.
-- **`DotnsPopController`** : the personhood gateway path.
-- **`PopRules`** : classification and pricing. Decides which band a label falls in, what it
-  costs, and who is eligible.
-- **`DotnsNameEscrow`** : holds deposits and runs the give-up-a-name lifecycle.
-- **`DotnsNameWhitelist`** : per-name grants for reserved registration.
-- **`DotnsRegistry`** : nodes, subnodes, and resolver pointers.
-- **Resolvers** : the records attached to a name: addresses, text, content hashes, chat keys,
-  reverse names.
-- **`StoreFactory` / `LabelStore`** : one small contract per user holding the readable label
-  strings for the names they own. Only the registrar, the registry, and the registrar's
-  current controllers may write to a store.
-
-A name is hashed into a node before the chain ever sees it, and hashing is one-way: from `joseph.dot` you can always compute the node, but from the node you can never recover the text. Since pricing and eligibility depend on the label's length and shape, the string has to be stored deliberately.
-The `LabelStore` is that record, the only route back from a node to the name it came from.
-
-### Registering a name: the public path
-
-Names are allocated by commit-reveal, so a pending registration cannot be read out of the mempool and front-run.
-
-1. **Check availability.** `registrar.available(id)` is true when nothing holds the name, or
-   when it sits in escrow past its redeem window.
-2. **Commit.** Send `controller.commit(hash)`, where the hash binds the label, the intended
-   owner, and a secret. Nothing about the name is public yet. Wait `minCommitmentAge`.
-3. **Reveal and pay.** Send `controller.register{value: price}(registration)`. The controller
-   validates the label's shape, asks `PopRules` for its tier and price, enforces the
-   personhood requirement if the band has one, and rejects a label whose stem is reserved for
-   someone else.
-4. **What lands in one transaction.** The registrar mints the token to the owner, the label
-   string is written into the owner's `LabelStore`, the deposit is locked into an escrow
-   position, a reverse record is set, and any overpayment is refunded.
-
-The deposit is refundable, not a purchase price: it stays yours, held in escrow for as long as you hold the name.
-
-### Receiving a username: the personhood path
-
-This path is driven by governance rather than by the user, because personhood is established on People Chain and relayed in.
-
-1. Root dispatches `reserveLiteName` or `registerBaseName` on the PoP controller, naming the
-   user. The controller verifies the Root origin itself.
-2. The label must be a person-shaped label: letters only, with `.NN` appended for a lite
-   username. So `john-smith` and `christoph3r` are perfectly good public names but cannot be
-   issued as identities.
-3. The name mints **soulbound** i.e. permanently non-transferable. Public registrations are
-   unaffected.
-4. `popController.isPopIssued(label)` records that dotNS issued this name as an identity.
-   Read it rather than inferring personhood from the shape of a string: `joseph.42` reads as
-   one person to the personhood system and as `joseph` beneath `42` to the hierarchical one,
-   and the characters alone cannot say which.
-5. One deferral to know about: Root cannot deploy a contract on an account's behalf, so the
-   user's `LabelStore` write is stashed and settled later, by anyone, through
-   `claimLabelStore`. See [Known limitations](#known-limitations).
-
-### Reserved names, by grant
-
-Names of five characters or fewer are never sold on the open market. They enter circulation only through a grant.
-
-1. Root calls `whitelist.grantName(label, beneficiary)`, binding one label to one address.
-2. Anyone may then submit `controller.registerReserved` for that pair and the gate reads the
-   intended owner, not the caller, so a relayer can pay the gas. The name still lands with the
-   beneficiary.
-3. The grant is spent by the mint and cannot seed a second registration. The name costs
-   nothing and skips the personhood check.
-
-Root can also mint a reserved name directly, without issuing a grant first.
-
-### Giving a name up, and taking one over
-
-Names are permanent i.e. there is no expiry and no renewal. A name changes hands only by transfer, or by its holder deliberately releasing it. Releasing runs on two clocks:
-
-1. **Release.** The holder approves the escrow and calls `release`. The token moves into
-   escrow custody. Two timers start: Cooldown and Redeem window.
-2. **Cooldown** : a short delay after which the holder may withdraw their deposit.
-3. **Redeem window** : a longer period during which *only* the previous holder may take the
-   name back, with `redeem`. The name reports as unavailable throughout, so nobody can take it
-   out from under them.
-4. **After the window.** `reclaim` becomes permissionless: the next person to register the
-   name gets it, and any deposit the previous holder never withdrew is credited to them rather
-   than stranded.
-
-The redeem window is what makes releasing safe to do. Without it a release would be irreversible the instant it landed.
-
-### Once you hold a name
-
-- **Records.** Attach an address, text entries, or a content hash through the resolvers. A
-  registrar-level approval also confers record-write authority, so one approval is enough for
-  a marketplace or a manager.
-- **Subnames.** `registry.setSubnodeOwner` creates `blog.joseph.dot` beneath your name, with
-  its own owner and its own resolver.
-- **Transfers.** A transfer is re-priced against the name's own length, so moving a
-  short name to an ineligible recipient carries a fee. Deposits follow the name, not the
-  depositor.
-- **Buying on a secondary market.** A direct ERC-721 `transferFrom` does not go through the
-  registry, so the name arrives still pointing at the seller's resolver. Registration and
-  reclaim from escrow both reset that pointer; a private sale does not. A buyer should
-  overwrite the records they care about rather than assume they start clean.
-
-### Reading the system
-
-Every piece of state is on-chain behind public view functions. A client needs a node and the protocol registry address to answer any question: who owns a name, what it resolves to, what it would cost, whether it is available, whether it was issued as an identity.
 
 ## Deployment and operations
 
@@ -209,6 +101,8 @@ Publicly registered names transfer freely and charge the name's own price, but o
 
 Names minted through the PoP gateway are soulbound: they stay bound to the person who earned them and cannot be transferred at all. Any transfer of a gateway-issued name reverts, and quoting a transfer fee for one reverts rather than returning a price. Everything else about the name works normally, so its owner still sets records, issues subnames, and manages the name.
 
+A bare transfer does not reset the name's records. Registration and reclaim from escrow both point the registry record back at the default reverse resolver, but a direct ERC-721 `transferFrom` never calls the registry, so a name sold privately arrives still pointing at the seller's resolver. A buyer should overwrite the records they care about rather than assume they start clean.
+
 ### Versioned pricing
 
 The cost model is chosen by governance and swapped, not upgraded. Registering a new model adds it under a fresh version and points the current version at it; earlier versions stay priceable, so a registration already committed against an earlier version settles at the amount it committed to. A commitment binds the version current when it is made, and the reveal reverts if it is presented at a different version, so a model change between commit and reveal cannot move the amount. Governance can also point the current version back at an earlier registered model.
@@ -247,7 +141,7 @@ Clients that need the exact moment a released name becomes registrable should re
 
 ## Contracts
 
-Two controllers sit on top of a single registrar and a single protocol registry. The registrar holds the ERC721 token per name; the registry holds the forward node => (owner, resolver) mapping and subname hierarchy; the resolvers hold per-name records; the protocol registry is the indirection layer through which every contract resolves its siblings at runtime. Controllers are the entry points: they mint names and drive the side effects. Neither controller imports the other. The layers underneath arbitrate collision handling: ERC721 uniqueness on the registrar, and a single reservation table on PopRules that both flows read through.
+Two controllers sit on top of a single registrar and a single protocol registry. The registrar holds the ERC721 token per name; the registry holds the forward node => (owner, resolver) mapping and subname hierarchy; the resolvers hold per-name records; the protocol registry is the indirection layer through which every contract resolves its siblings at runtime, an address book read on each call rather than a set of sibling addresses fixed in every caller. Controllers are the entry points: they mint names and drive the side effects. Neither controller imports the other. The layers underneath arbitrate collision handling: ERC721 uniqueness on the registrar, and a single reservation table on PopRules that both flows read through.
 
 ### DotnsRegistrarController
 
@@ -381,6 +275,8 @@ For read batching, Multicall3 lets clients collect several results from the same
 Stores are the per-user storage layer. They exist because two query paths the rest of the system needs are not answerable from anywhere else: "what names has this address ever held?" cannot be served by resolvers (keyed per-node) or the registry (live ownership only, no history), and "what user-controlled records does this address publish?" has nowhere on a resolver to live since the data is not bound to any one name. Each address gets at most one of each store, forever, and the factory is the single source of truth for which store belongs to which user.
 
 LabelStore is the protocol-managed half. The registrar and the controller set write a label entry once and the slot is permanently locked. The invariant is labels only: every per-name record category (reverse, content, forward address, chat key, lite link) goes to a dedicated resolver, and the Store stays the durable per-owner registration ledger. Because entries are append-only, transferring a name writes a fresh entry on the recipient and leaves the sender's locked entry in place, so LabelStore doubles as the address's lifetime-of-ownership ledger while the registry continues to answer for live ownership.
+
+The reason a label needs storing at all is that the chain never sees it. A name is hashed into a node before it reaches any contract, and hashing is one-way: from `joseph.dot` you can always compute the node, but from the node you can never recover the text. Since pricing, classification, and the transfer floor all read the label's length and shape, the string has to be kept deliberately. `LabelStore` is that record, and the only route back from a node to the name it came from.
 
 UserStore is the user-claimed half. The bound owner is the only writer and prior values are snapshotted into a per-key history. It exists so that user-controlled records that do not belong to a name have a home that bills the user's own contract rather than polluting a shared resolver. The labels-only invariant is preserved by the split: nothing user-written ever lands on the protocol-managed side.
 
