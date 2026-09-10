@@ -16,6 +16,7 @@ import {StringUtils} from "../../../contracts/utils/StringUtils.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 import {LabelUtils} from "../../../contracts/utils/LabelUtils.sol";
+import {SubnodeUtils} from "../../../contracts/utils/SubnodeUtils.sol";
 import {ISystem} from "../../../contracts/external/revive/ISystem.sol";
 import {IPersonhood} from "../../../contracts/external/personhood/IPersonhood.sol";
 
@@ -250,8 +251,9 @@ contract PopControllerHandler is Test {
 
         if (_callReserveBaseName(params)) {
             if (attachReservation) _track(keccak256(bytes(reservedBase)));
-            bytes32 node = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(liteLabel));
-            mintedLiteTokenIds.push(uint256(node));
+            // A lite name is a subname beneath its numeric container, not a token, so record its
+            // subnode rather than the whole-label hash.
+            mintedLiteTokenIds.push(uint256(SubnodeUtils.liteSubnodeOf(TLD_NODE, liteLabel)));
             priorLiteLabels.push(liteLabel);
             _trackGatewayLabel(liteLabel);
             _trackPendingActor(actor);
@@ -281,10 +283,10 @@ contract PopControllerHandler is Test {
             reservedBaseLabel: ""
         });
         if (!_callReserveBaseName(liteParams)) return;
-        // Recorded here rather than after the full leg below: the token exists from this point,
-        // and a full leg that reverts would otherwise leave it outside every invariant's reach.
-        bytes32 liteLabelhash = LabelUtils.labelhashMemory(liteLabel);
-        mintedLiteTokenIds.push(uint256(LabelUtils.namehashUnder(TLD_NODE, liteLabelhash)));
+        // Recorded here rather than after the full leg below: the subname exists from this point,
+        // and a full leg that reverts would otherwise leave it outside every invariant's reach. A
+        // lite name is a subname beneath its numeric container, not a token, so record its subnode.
+        mintedLiteTokenIds.push(uint256(SubnodeUtils.liteSubnodeOf(TLD_NODE, liteLabel)));
         priorLiteLabels.push(liteLabel);
         _trackGatewayLabel(liteLabel);
         _trackPendingActor(actor);
@@ -303,7 +305,7 @@ contract PopControllerHandler is Test {
         if (!_callRegisterBaseName(fullParams)) return;
 
         bytes32 fullNode = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(baseLabel));
-        claimedLiteLabelhashes.push(liteLabelhash);
+        claimedLiteLabelhashes.push(LabelUtils.labelhashMemory(liteLabel));
         claimedFullNodes.push(fullNode);
         mintedLiteTokenIds.push(uint256(fullNode));
         _trackGatewayLabel(baseLabel);

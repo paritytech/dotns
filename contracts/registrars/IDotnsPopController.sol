@@ -8,8 +8,10 @@ import {IDotnsController} from "./IDotnsController.sol";
 /// username issuance on behalf of the PoP gateway.
 /// @dev Deliberately disjoint from @custom:contract IDotnsRegistrarController. The two
 /// controllers coexist on @custom:contract DotnsRegistrar via its multi-controller affordance
-/// and neither imports the other. Collision handling reduces to the registrar's ERC721
-/// availability check (first-to-mint wins). Reservation queuing for `reservedBaseLabel`
+/// and neither imports the other. A full-person username collides through the registrar's ERC721
+/// availability check (first-to-mint wins); a lite username is not a token, so it collides through
+/// @custom:function IDotnsRegistry.recordExists at its stem-under-container node
+/// (@custom:reverts LiteNameAlreadyIssued). Reservation queuing for `reservedBaseLabel`
 /// mirrors its live head into PopRules, so a queued stem also blocks the public
 /// commit-reveal flow, which reads that slot when it prices a name.
 ///

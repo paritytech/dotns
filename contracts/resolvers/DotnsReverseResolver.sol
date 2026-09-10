@@ -105,8 +105,7 @@ contract DotnsReverseResolver is
     function _nodeOf(string memory label) internal view returns (bytes32 node) {
         bytes32 tldNode = protocolRegistry.tldNode();
         if (StringUtils.isLitePersonLabelMemory(label)) {
-            (string memory stem, string memory suffix) = StringUtils.splitLiteLabel(label);
-            return SubnodeUtils.subnodeOf(tldNode, suffix, stem);
+            return SubnodeUtils.liteSubnodeOf(tldNode, label);
         }
         node = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(label));
     }
