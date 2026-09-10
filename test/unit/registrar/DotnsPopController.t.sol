@@ -29,8 +29,9 @@ contract DotnsPopControllerTests is BaseDotns {
 
         _reservePop(ed, LITE_LABEL_A, chatKey, "");
 
-        bytes32 node = _nodeOf(LITE_LABEL_A);
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), ed);
+        // A lite username is a subnode under its numeric container, not a tokenised name, so its
+        // ownership lives in the registry record rather than the registrar's ERC-721 ledger.
+        bytes32 node = _liteNodeOf(LITE_LABEL_A);
         assertEq(dotnsRegistry.owner(node), ed);
         assertEq(dotnsPopResolver.chatKey(node), chatKey);
     }
@@ -376,7 +377,7 @@ contract DotnsPopControllerTests is BaseDotns {
             IDotnsPopController.FullRegistration({label: "michael", user: tiago, link: link})
         );
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(LITE_LABEL_A))), ed);
+        assertEq(dotnsRegistry.owner(_liteNodeOf(LITE_LABEL_A)), ed);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("michael"))), tiago);
     }
 
@@ -385,7 +386,7 @@ contract DotnsPopControllerTests is BaseDotns {
         _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
         _commitAndRegister("longnamebob01", tiago, true);
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(LITE_LABEL_A))), ed);
+        assertEq(dotnsRegistry.owner(_liteNodeOf(LITE_LABEL_A)), ed);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("longnamebob01"))), tiago);
     }
 
@@ -448,16 +449,14 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("longnamebob01"))), ed);
     }
 
-    function test_second_pop_lite_mint_of_same_label_reverts_at_registrar() public {
+    function test_second_pop_lite_mint_of_same_label_reverts() public {
         _grantPopFull(ed);
         _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "");
 
+        // Re-issuing a lite name is rejected at the controller before any registry write, so a
+        // duplicate dispatch cannot rehome the identity or overwrite its records.
         _grantPopFull(tiago);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsRegistrar.NameNotAvailable.selector, uint256(_nodeOf(LITE_LABEL_A))
-            )
-        );
+        vm.expectRevert(IDotnsPopController.LiteNameAlreadyIssued.selector);
         _rootReserveBaseName(
             IDotnsPopController.BaseReservation({
                 lite: IDotnsPopController.LiteRegistration({
@@ -473,7 +472,7 @@ contract DotnsPopControllerTests is BaseDotns {
     ///      `michael.01` as a parent label resolves to `michael` beneath `01` and never to the
     ///      node the gateway minted. The holder of a lite name therefore has no subname tree,
     ///      and no caller can graft one onto their identity.
-    function test_lite_name_cannot_host_a_subname() public {
+    function test_lite_name_owner_can_host_a_subname() public {
         _grantPopLite(ed);
         _rootReserveLiteName(
             IDotnsPopController.LiteRegistration({
@@ -481,16 +480,19 @@ contract DotnsPopControllerTests is BaseDotns {
             })
         );
 
+        // A lite name is a subname the owner controls, so they can host their own subnames beneath
+        // it, such as a device name `phone.michael.01`.
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: _nodeOf(LITE_LABEL_A),
-            subLabel: "blog",
+            parentNode: _liteNodeOf(LITE_LABEL_A),
+            subLabel: "phone",
             parentLabel: LITE_LABEL_A,
-            owner: ed
+            owner: ed,
+            persist: true
         });
 
         vm.prank(ed);
-        vm.expectRevert(IDotnsRegistry.ParentLabelMismatch.selector);
-        dotnsRegistry.setSubnodeOwner(subnodeRecord);
+        bytes32 subnode = dotnsRegistry.setSubnodeOwner(subnodeRecord);
+        assertEq(dotnsRegistry.owner(subnode), ed);
     }
 
     /// @notice A public registration blocks the gateway from the same label, and leaves no
@@ -564,7 +566,11 @@ contract DotnsPopControllerTests is BaseDotns {
 
         bytes32 parentNode = _nodeOf(BASE_LABEL_A);
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "app", parentLabel: BASE_LABEL_A, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "app",
+            parentLabel: BASE_LABEL_A,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -582,7 +588,11 @@ contract DotnsPopControllerTests is BaseDotns {
 
         bytes32 parentNode = _nodeOf(BASE_LABEL_A);
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "app", parentLabel: BASE_LABEL_A, owner: tiago
+            parentNode: parentNode,
+            subLabel: "app",
+            parentLabel: BASE_LABEL_A,
+            owner: tiago,
+            persist: true
         });
 
         vm.prank(tiago);
@@ -883,7 +893,7 @@ contract DotnsPopControllerTests is BaseDotns {
             })
         );
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("stephen.01"))), fresh);
+        assertEq(dotnsRegistry.owner(_liteNodeOf("stephen.01")), fresh);
     }
 
     function test_reserveLiteName_reverts_for_non_lite_format() public {
@@ -932,7 +942,7 @@ contract DotnsPopControllerTests is BaseDotns {
             })
         );
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("andrewsays.01"))), ed);
+        assertEq(dotnsRegistry.owner(_liteNodeOf("andrewsays.01")), ed);
     }
 
     /// @notice A public registration is not an identity and appears in neither listing.
@@ -1039,11 +1049,14 @@ contract DotnsPopControllerTests is BaseDotns {
             })
         );
 
-        bytes32 wholeLabelNode = _nodeOf("michael.01");
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(wholeLabelNode)), ed);
+        // The name is a subname under its numeric container, owned in the registry record.
+        bytes32 subnamePathNode = _liteNodeOf("michael.01");
+        assertEq(dotnsRegistry.owner(subnamePathNode), ed);
 
-        bytes32 subnamePathNode = _namehash(_nodeOf("01"), keccak256(bytes("michael")));
+        // The whole-label reading is a different node and is never minted as a token.
+        bytes32 wholeLabelNode = _nodeOf("michael.01");
         assertTrue(wholeLabelNode != subnamePathNode, "whole label and subname path differ");
+        assertFalse(dotnsRegistrar.exists(uint256(wholeLabelNode)));
     }
 
     function test_isPopIssued_is_set_at_mint() public {
@@ -1124,7 +1137,7 @@ contract DotnsPopControllerTests is BaseDotns {
             })
         );
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(LITE_LABEL_A))), ed);
+        assertEq(dotnsRegistry.owner(_liteNodeOf(LITE_LABEL_A)), ed);
 
         (bool reserved, address holder) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
         assertTrue(reserved);
@@ -1140,7 +1153,7 @@ contract DotnsPopControllerTests is BaseDotns {
             })
         );
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(LITE_LABEL_A))), ed);
+        assertEq(dotnsRegistry.owner(_liteNodeOf(LITE_LABEL_A)), ed);
         assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(BASE_LABEL_A))));
 
         _rootReserveBaseNameOnly(
@@ -1244,7 +1257,8 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertEq(store, expectedStore);
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_A)), string.concat(LITE_LABEL_A, ".dot")
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
+            string.concat(LITE_LABEL_A, ".dot")
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
@@ -1263,7 +1277,8 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_A)), string.concat(LITE_LABEL_A, ".dot")
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
+            string.concat(LITE_LABEL_A, ".dot")
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
@@ -1283,7 +1298,7 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_A)),
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
             string.concat(LITE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
@@ -1309,7 +1324,8 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_A)), string.concat(LITE_LABEL_A, ".dot")
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
+            string.concat(LITE_LABEL_A, ".dot")
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
@@ -1341,7 +1357,7 @@ contract DotnsPopControllerTests is BaseDotns {
         vm.prank(ed);
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
 
-        bytes32 node = _nodeOf(LITE_LABEL_A);
+        bytes32 node = _liteNodeOf(LITE_LABEL_A);
         assertEq(dotnsPopResolver.chatKey(node), chatKey);
     }
 
@@ -1374,8 +1390,8 @@ contract DotnsPopControllerTests is BaseDotns {
             })
         );
 
-        bytes32 node = _nodeOf(LITE_LABEL_A);
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), ed);
+        bytes32 node = _liteNodeOf(LITE_LABEL_A);
+        assertEq(dotnsRegistry.owner(node), ed);
         assertEq(storeFactory.getLabelStore(ed), address(0));
         // Chat key is now persisted eagerly on the resolver at reserve time, even when
         // the user has no LabelStore yet.
@@ -1403,7 +1419,7 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
 
-        bytes32 node = _nodeOf(LITE_LABEL_A);
+        bytes32 node = _liteNodeOf(LITE_LABEL_A);
         assertEq(
             ILabelStore(store).getLabel(node), string.concat(LITE_LABEL_A, protocolRegistry.tld())
         );
@@ -1510,7 +1526,7 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertEq(store, expectedStore);
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_A)),
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
             string.concat(LITE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
@@ -1536,7 +1552,7 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_A)),
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
             string.concat(LITE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
@@ -1572,11 +1588,11 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_A)),
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
             string.concat(LITE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_B)),
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_B)),
             string.concat(LITE_LABEL_B, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
@@ -1623,7 +1639,7 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_A)),
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
             string.concat(LITE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(
@@ -1704,7 +1720,7 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL_A)),
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
             string.concat(LITE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
@@ -1774,7 +1790,7 @@ contract DotnsPopControllerTests is BaseDotns {
         vm.prank(ed);
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
 
-        bytes32 node = _nodeOf(LITE_LABEL_A);
+        bytes32 node = _liteNodeOf(LITE_LABEL_A);
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
@@ -1803,7 +1819,7 @@ contract DotnsPopControllerTests is BaseDotns {
             })
         );
 
-        bytes32 node = _nodeOf(LITE_LABEL_B);
+        bytes32 node = _liteNodeOf(LITE_LABEL_B);
         assertEq(
             ILabelStore(store).getLabel(node), string.concat(LITE_LABEL_B, protocolRegistry.tld())
         );
@@ -1884,7 +1900,7 @@ contract DotnsPopControllerTests is BaseDotns {
 
         IDotnsPopLens.Name[] memory edLite = dotnsPopLens.liteNamesOf(ed, 0, type(uint256).max);
         assertEq(edLite.length, 1);
-        assertEq(edLite[0].node, _nodeOf(LITE_LABEL_A));
+        assertEq(edLite[0].node, _liteNodeOf(LITE_LABEL_A));
         assertEq(edLite[0].label, LITE_LABEL_A);
         assertTrue(edLite[0].settled);
         assertEq(edLite[0].deadline, 0);
@@ -1901,7 +1917,7 @@ contract DotnsPopControllerTests is BaseDotns {
         IDotnsPopLens.Name[] memory leoLite =
             dotnsPopLens.liteNamesOf(leonardo, 0, type(uint256).max);
         assertEq(leoLite.length, 1);
-        assertEq(leoLite[0].node, _nodeOf(LITE_LABEL_C));
+        assertEq(leoLite[0].node, _liteNodeOf(LITE_LABEL_C));
         assertEq(leoLite[0].label, LITE_LABEL_C);
         assertFalse(leoLite[0].settled);
         assertGt(leoLite[0].deadline, 0);
@@ -1950,12 +1966,12 @@ contract DotnsPopControllerTests is BaseDotns {
 
         IDotnsPopLens.Name[] memory edLite = dotnsPopLens.liteNamesOf(ed, 0, type(uint256).max);
         assertEq(edLite.length, 1);
-        assertFalse(_namesContainNode(edLite, _nodeOf(LITE_LABEL_C)));
+        assertFalse(_namesContainNode(edLite, _liteNodeOf(LITE_LABEL_C)));
 
         IDotnsPopLens.Name[] memory tiagoLite =
             dotnsPopLens.liteNamesOf(tiago, 0, type(uint256).max);
         assertEq(tiagoLite.length, 1);
-        assertFalse(_namesContainNode(tiagoLite, _nodeOf(LITE_LABEL_A)));
+        assertFalse(_namesContainNode(tiagoLite, _liteNodeOf(LITE_LABEL_A)));
     }
 
     function test_nameDetail_and_nameDetailByNode_report_record() public {
@@ -1990,7 +2006,7 @@ contract DotnsPopControllerTests is BaseDotns {
         _grantPopFull(leonardo);
         _reservePop(leonardo, LITE_LABEL_C, _validChatKey(0xbb), "");
         IDotnsPopLens.NameDetail memory coldByNode =
-            dotnsPopLens.nameDetailByNode(_nodeOf(LITE_LABEL_C));
+            dotnsPopLens.nameDetailByNode(_liteNodeOf(LITE_LABEL_C));
         assertTrue(coldByNode.exists);
         assertEq(coldByNode.fullClaim, bytes32(0));
 

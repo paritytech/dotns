@@ -36,7 +36,7 @@ contract DotnsPopControllerFuzz is BaseDotns {
 
         _reservePop(ed, label, "", "");
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(label))), ed);
+        assertEq(dotnsRegistry.owner(_liteNodeOf(label)), ed);
     }
 
     function testFuzz_reserveBaseName_persists_chat_key_exact_bytes(
@@ -54,7 +54,7 @@ contract DotnsPopControllerFuzz is BaseDotns {
         bytes memory chatKey = useKey ? _validChatKey(keySeed) : bytes("");
         _reservePop(ed, label, chatKey, "");
 
-        bytes32 node = _nodeOf(label);
+        bytes32 node = _liteNodeOf(label);
         if (chatKey.length == 0) {
             assertEq(dotnsPopResolver.chatKey(node).length, 0);
         } else {
@@ -164,7 +164,7 @@ contract DotnsPopControllerFuzz is BaseDotns {
         assertEq(storeFactory.getLabelStore(ed), address(0));
         // Chat key is persisted eagerly on the resolver at reserve time, even though
         // the LabelStore write is deferred to settlement on the cold path.
-        bytes32 node = _nodeOf(label);
+        bytes32 node = _liteNodeOf(label);
         assertEq(dotnsPopResolver.chatKey(node), chatKey);
     }
 
@@ -186,7 +186,7 @@ contract DotnsPopControllerFuzz is BaseDotns {
         vm.prank(ed);
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
 
-        bytes32 node = _nodeOf(label);
+        bytes32 node = _liteNodeOf(label);
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(ILabelStore(store).getLabel(node), string.concat(label, protocolRegistry.tld()));
@@ -228,7 +228,7 @@ contract DotnsPopControllerFuzz is BaseDotns {
         assertEq(settledCount, 1);
         assertFalse(moreRemaining);
 
-        bytes32 node = _nodeOf(LITE_LABEL_A);
+        bytes32 node = _liteNodeOf(LITE_LABEL_A);
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
