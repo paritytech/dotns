@@ -16,10 +16,10 @@ import {Multicall3} from "../../contracts/utils/Multicall3.sol";
 /// @notice First stage of the DotNS fresh-deploy pipeline. Bootstraps the
 ///         CREATE3 factory, deploys the protocol registry through it, records
 ///         the factory on the registry, then deploys the foundational
-///         name-ownership layer: the Store factory and three UUPS proxies
-///         (registrar, reverse resolver, forward registry) that all bind to the
-///         protocol registry at init, plus the generic Multicall3 helper for
-///         client and tooling batching.
+///         name-ownership layer: four UUPS proxies (store factory, registrar,
+///         reverse resolver, forward registry) that all bind to the protocol
+///         registry at init, plus the generic Multicall3 helper for client and
+///         tooling batching.
 /// @dev Runs in its own `forge script` process; the OpenZeppelin validator's
 ///      per-call memory never crosses the process boundary into later stages.
 /// @custom:security-contact admin@parity.io
@@ -56,10 +56,10 @@ contract DeployCore is BaseDeployer {
 
     function _deployStoreFactory(address owner, address protocolRegistry) internal {
         StoreFactory factory = StoreFactory(
-            _broadcastDeployCreate3(
+            _broadcastDeployUups(
                 owner,
                 "StoreFactory.sol:StoreFactory",
-                abi.encode(protocolRegistry, owner),
+                abi.encodeCall(StoreFactory.initialize, (owner, protocolRegistry)),
                 "StoreFactory"
             )
         );

@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -24,22 +28,22 @@ import {StoreAuth} from "../utils/StoreAuth.sol";
 ///      The factory owns both beacons so the factory owner can upgrade implementations for
 ///      every proxy atomically. Neither per-user mapping is ever transferred, reassigned, or
 ///      overwritten after the first write; bindings are permanent.
+/// @dev Lives behind its own UUPS proxy. The per-user bindings and both beacon addresses are
+///      proxy storage, so the factory is upgraded in place: the bindings cannot be exported, so
+///      a replacement reached by re-pointing `STORE_FACTORY` would start with an empty directory.
 /// @custom:security-contact admin@parity.io
-contract StoreFactory is Ownable, IStoreFactory {
+contract StoreFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, IStoreFactory {
     /// @notice Beacon backing every `LabelStore` proxy.
     /// @dev Public getter name is interface-constrained by @custom:contract IStoreFactory.
-    // forge-lint: disable-next-line(screaming-snake-case-immutable)
-    address public immutable override labelStoreBeacon;
+    address public override labelStoreBeacon;
 
     /// @notice Beacon backing every `UserStore` proxy.
     /// @dev Public getter name is interface-constrained by @custom:contract IStoreFactory.
-    // forge-lint: disable-next-line(screaming-snake-case-immutable)
-    address public immutable override userStoreBeacon;
+    address public override userStoreBeacon;
 
     /// @notice Protocol registry used to authorise `deployLabelStoreFor` callers.
     /// @dev Public getter name is interface-constrained by @custom:contract IStoreFactory.
-    // forge-lint: disable-next-line(screaming-snake-case-immutable)
-    address public immutable override protocolRegistry;
+    address public override protocolRegistry;
 
     /// @dev user => their permanent `LabelStore`. Set once per user, forever.
     mapping(address user => address store) private _labelStores;
@@ -53,6 +57,9 @@ contract StoreFactory is Ownable, IStoreFactory {
     /// @dev Insertion-order list of every `UserStore` proxy ever claimed. Append-only.
     address[] private _userStoreList;
 
+    /// @dev Reserved storage space to allow for layout changes in future upgrades.
+    uint256[50] private __gap;
+
     /// @notice Restricts `deployLabelStoreFor` to the owner or a component named in
     /// @custom:function StoreAuth.isStoreWriter.
     modifier onlyOwnerOrProtocol() {
@@ -60,22 +67,29 @@ contract StoreFactory is Ownable, IStoreFactory {
         _;
     }
 
-    /// @notice Deploys the factory together with both store implementations and beacons.
-    /// @dev A single `new StoreFactory(protocolRegistry, owner)` call wires everything:
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @notice Initialises the factory together with both store implementations and beacons.
+    /// @dev Callable exactly once via `Initializable`, otherwise
+    ///      @custom:reverts InvalidInitialization. A single initialiser call wires everything:
     ///      - Deploys a fresh `LabelStore` implementation.
     ///      - Deploys a fresh `UserStore` implementation.
-    ///      - Constructs both `UpgradeableBeacon` instances, owned by `address(this)`
-    ///        so `upgrade*Implementation` can delegate to `beacon.upgradeTo`.
-    ///      Keeping the implementation deployments inside the constructor removes a class of
-    ///      operator error: there is no "did I deploy the implementation first?" step and no
-    ///      way to pass the wrong implementation address. `protocolRegistry_` must be
-    ///      non-zero, otherwise @custom:reverts InvalidProtocolRegistry.
-    /// @dev Implementations and beacons are deployed inline so a single factory address fully
-    ///      describes the store topology, removing a class of operator error around mismatched
-    ///      beacons.
+    ///      - Constructs both `UpgradeableBeacon` instances, owned by `address(this)`, which
+    ///        under the proxy is the proxy itself, so `upgrade*Implementation` can delegate to
+    ///        `beacon.upgradeTo` and the beacons outlive any implementation swap.
+    ///      Keeping the implementation deployments here removes a class of operator error:
+    ///      there is no "did I deploy the implementation first?" step and no way to pass the
+    ///      wrong implementation address. `protocolRegistry_` must be non-zero, otherwise
+    ///      @custom:reverts InvalidProtocolRegistry.
+    /// @param initialOwner Account that owns this factory and can upgrade it and the store
+    ///        implementations.
     /// @param protocolRegistry_ The protocol registry for writer auth on label stores.
-    /// @param owner_ Account that owns this factory and can upgrade store implementations.
-    constructor(address protocolRegistry_, address owner_) Ownable(owner_) {
+    function initialize(address initialOwner, address protocolRegistry_) external initializer {
+        __Ownable_init(initialOwner);
+
         require(protocolRegistry_ != address(0), InvalidProtocolRegistry(protocolRegistry_));
         IDotnsProtocolRegistry(protocolRegistry_).isRegisteredAddress(address(0));
 
@@ -190,6 +204,9 @@ contract StoreFactory is Ownable, IStoreFactory {
     function version() external pure virtual returns (string memory versionString) {
         versionString = "1.0.0";
     }
+
+    /// @inheritdoc UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /// @notice Internal authorisation check deferred from the `onlyOwnerOrProtocol` modifier.
     function _onlyOwnerOrProtocol() internal view {

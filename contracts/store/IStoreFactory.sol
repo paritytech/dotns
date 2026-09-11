@@ -35,11 +35,11 @@ interface IStoreFactory {
     /// @param user The invalid user argument.
     error InvalidUser(address user);
 
-    /// @notice Thrown when a zero protocol registry address is supplied to the constructor.
+    /// @notice Thrown when a zero protocol registry address is supplied to the initialiser.
     /// @param protocolRegistry The invalid registry argument.
     error InvalidProtocolRegistry(address protocolRegistry);
 
-    /// @notice Thrown when a zero implementation address is supplied to the constructor or an
+    /// @notice Thrown when a zero implementation address is supplied to a store-implementation
     /// upgrade. @param implementation The invalid implementation argument.
     error InvalidImplementation(address implementation);
 

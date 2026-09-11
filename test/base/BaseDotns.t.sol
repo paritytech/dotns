@@ -228,8 +228,12 @@ abstract contract BaseDotns is Test {
         assertEq(protocolRegistry.tld(), string.concat(".", TLD_LABEL));
         IDotnsProtocolRegistry registry = IDotnsProtocolRegistry(protocolRegistryAddress);
 
-        storeFactory = new StoreFactory(protocolRegistryAddress, owner);
-        vm.label(address(storeFactory), "StoreFactory");
+        address storeFactoryAddress = Upgrades.deployUUPSProxy(
+            "StoreFactory.sol:StoreFactory",
+            abi.encodeCall(StoreFactory.initialize, (owner, protocolRegistryAddress))
+        );
+        storeFactory = StoreFactory(storeFactoryAddress);
+        vm.label(storeFactoryAddress, "StoreFactory");
 
         address dotnsRegistrarAddress = Upgrades.deployUUPSProxy(
             "DotnsRegistrar.sol:DotnsRegistrar",
