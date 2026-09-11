@@ -43,9 +43,14 @@ contract DotnsContentResolver is
     /// @notice Protocol-level address registry for all DotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
+    /// @notice Block number of the last `setContenthash` per node; zero when never recorded.
+    /// @dev Added in 1.1.0, taking one slot from `__gap`. Hashes written by 1.0.0 have no
+    ///      record here and read zero until their next write.
+    mapping(bytes32 node => uint64 blockNumber) private contenthashUpdatedAtBlocks;
+
     /// @dev Reserved storage space to allow for layout changes in the future.
     // forge-lint: disable-next-line(mixed-case-variable)
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -75,12 +80,23 @@ contract DotnsContentResolver is
     function setContenthash(bytes32 node, bytes calldata hash) external override {
         _requireNodeOwnerOrOperator(node);
         contenthashes[node] = hash;
+        contenthashUpdatedAtBlocks[node] = uint64(block.number);
         emit ContentHashUpdated(node, hash);
     }
 
     /// @inheritdoc IDotnsContentResolver
     function contenthash(bytes32 node) external view override returns (bytes memory hash) {
         return contenthashes[node];
+    }
+
+    /// @inheritdoc IDotnsContentResolver
+    function contenthashUpdatedAtBlock(bytes32 node)
+        external
+        view
+        override
+        returns (uint64 blockNumber)
+    {
+        return contenthashUpdatedAtBlocks[node];
     }
 
     /// @inheritdoc IDotnsContentResolver
@@ -144,7 +160,7 @@ contract DotnsContentResolver is
     /// @notice Returns implementation version.
     /// @return versionString Current version string.
     function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+        versionString = "1.1.0";
     }
 
     /// @inheritdoc ERC165Upgradeable
