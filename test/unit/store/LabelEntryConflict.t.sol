@@ -82,9 +82,10 @@ contract LabelEntryConflictTests is BaseDotns {
         assertEq(ILabelStore(store).getLabel(NODE), CANONICAL, "the stored label changed");
     }
 
-    /// @notice The transfer mirror keeps its tolerant behaviour: it must not revert when the
-    ///         recipient already holds an entry, or a transfer back to a prior holder would fail.
-    function test_transfer_path_still_tolerates_an_existing_entry() public {
+    /// @notice The tolerant library variant skips an occupied slot rather than reverting. No
+    ///         production path writes through it since the transfer mirror moved to the
+    ///         conflict-checked variant; this pins the difference between the two.
+    function test_tolerant_write_skips_an_existing_entry() public {
         writer.writeNew(factory, ed, NODE, CANONICAL);
         writer.write(factory, ed, NODE, "something-else");
 

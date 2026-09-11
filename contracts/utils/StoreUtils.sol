@@ -7,8 +7,8 @@ import {IStoreFactory} from "../store/IStoreFactory.sol";
 /// @title DotNS Store Utilities Library
 /// @notice Canonical helpers for protocol writes into per-user `LabelStore` instances.
 /// @dev One auth rule, one write path. Every DotNS consumer (controller, registrar,
-///      registry, PoP controller) funnels label writes through `writeLabel` so
-///      authorisation and deploy-on-first-use semantics are identical across flows.
+///      registry, PoP controller) funnels label writes through `writeNewLabel` so
+///      authorisation, deploy-on-first-use and conflict handling are identical across flows.
 /// @custom:security-contact admin@parity.io
 library StoreUtils {
     /// @notice Thrown when a name being registered already has a different label entry.

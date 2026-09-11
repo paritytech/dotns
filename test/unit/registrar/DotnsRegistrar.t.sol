@@ -9,6 +9,7 @@ import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocol
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {ILabelStore} from "../../../contracts/store/ILabelStore.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
+import {StoreUtils} from "../../../contracts/utils/StoreUtils.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
@@ -21,6 +22,48 @@ import {
 ///         availability tracking, registration, transfer fee gate, label readback,
 ///         upgrade authorisation, and approval surfaces.
 contract DotnsRegistrarTests is BaseDotns {
+    /// @notice A transfer into a recipient whose slot for that name already holds a different
+    ///         string reverts, rather than mirroring nothing and handing over a stranded name.
+    /// @dev Skipping the write would strand the name: `storeLabel` has no delete, so the wrong
+    ///      label stands and every onward transfer reverts. Reverting is the recoverable outcome.
+    function test_transfer_into_a_poisoned_recipient_slot_reverts() public {
+        string memory label = "conflictname";
+        _register(label, ed, IPopRules.PopStatus.NoStatus);
+        uint256 tokenId = _tokenIdForLabel(label);
+
+        // A store writer occupies the recipient's slot for this name with a string that is not the
+        // name, the way a rogue or buggy controller could.
+        vm.prank(owner);
+        address store = storeFactory.deployLabelStoreFor(leonardo);
+        vm.prank(address(dotnsRegistrar));
+        ILabelStore(store).storeLabel(bytes32(tokenId), "not-the-name");
+
+        vm.prank(ed);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                StoreUtils.LabelEntryConflict.selector, store, bytes32(tokenId), "not-the-name"
+            )
+        );
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), ed, "the name stayed with its holder");
+    }
+
+    /// @notice A recipient slot already holding the same name stays a no-op, so a transfer back to
+    ///         a prior holder still passes.
+    function test_transfer_back_to_a_prior_holder_still_passes() public {
+        string memory label = "roundtripname";
+        _register(label, ed, IPopRules.PopStatus.NoStatus);
+        uint256 tokenId = _tokenIdForLabel(label);
+
+        vm.prank(ed);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
+        vm.prank(leonardo);
+        dotnsRegistrar.transferFrom(leonardo, ed, tokenId);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), ed, "the name returned to its prior holder");
+    }
+
     function test_add_controller() public {
         address additionalController = makeAddr("additionalController");
 

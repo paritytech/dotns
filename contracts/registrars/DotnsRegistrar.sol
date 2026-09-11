@@ -289,6 +289,9 @@ contract DotnsRegistrar is
         IDotnsProtocolRegistry registry = protocolRegistry;
         address escrow = registry.get(DotnsConstants.NAME_ESCROW);
         require(escrow != address(0), EscrowNotConfigured());
+        // `release` is the only caller that moves a name into custody, so any other sender is a
+        // deposit the escrow holds no position for.
+        require(to != escrow || msg.sender == escrow, UnsolicitedEscrowDeposit(tokenId));
         IStoreFactory factory = IStoreFactory(registry.get(DotnsConstants.STORE_FACTORY));
 
         bool isEscrowTouching = to == escrow || from == escrow;
@@ -348,7 +351,11 @@ contract DotnsRegistrar is
             // downstream writes are demand-deploy through `StoreUtils.ensureLabelStore`.
             return;
         }
-        factory.writeLabel(to, bytes32(tokenId), fullName);
+        // A slot holding a different string was written by someone else, and `storeLabel` has no
+        // delete, so mirroring nothing would hand over a name `_quoteTransferFeeFor` rejects on
+        // every onward transfer. A matching entry is still a no-op, so a transfer back to a prior
+        // owner passes.
+        factory.writeNewLabel(to, bytes32(tokenId), fullName);
     }
 
     /// @notice Reads the full name (`label.tld`) for `tokenId` from `holder`'s `LabelStore` using
