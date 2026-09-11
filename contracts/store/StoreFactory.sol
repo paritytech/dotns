@@ -80,10 +80,10 @@ contract StoreFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, ISt
     ///      - Constructs both `UpgradeableBeacon` instances, owned by `address(this)`, which
     ///        under the proxy is the proxy itself, so `upgrade*Implementation` can delegate to
     ///        `beacon.upgradeTo` and the beacons outlive any implementation swap.
-    ///      Keeping the implementation deployments here removes a class of operator error:
-    ///      there is no "did I deploy the implementation first?" step and no way to pass the
-    ///      wrong implementation address. `protocolRegistry_` must be non-zero, otherwise
-    ///      @custom:reverts InvalidProtocolRegistry.
+    ///      The implementations are deployed here rather than accepted as parameters, so the call
+    ///      carries no ordering dependency on a prior deploy and exposes no argument through which
+    ///      a mismatched implementation could reach a beacon. `protocolRegistry_` must be
+    ///      non-zero, otherwise @custom:reverts InvalidProtocolRegistry.
     /// @param initialOwner Account that owns this factory and can upgrade it and the store
     ///        implementations.
     /// @param protocolRegistry_ The protocol registry for writer auth on label stores.
