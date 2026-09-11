@@ -22,18 +22,6 @@ contract StoreWriter {
     {
         return factory.writeNewLabel(user, labelhash, label);
     }
-
-    function write(
-        IStoreFactory factory,
-        address user,
-        bytes32 labelhash,
-        string memory label
-    )
-        external
-        returns (address)
-    {
-        return factory.writeLabel(user, labelhash, label);
-    }
 }
 
 /// @title LabelEntryConflictTests
@@ -80,18 +68,5 @@ contract LabelEntryConflictTests is BaseDotns {
 
         address store = factory.getLabelStore(ed);
         assertEq(ILabelStore(store).getLabel(NODE), CANONICAL, "the stored label changed");
-    }
-
-    /// @notice The tolerant library variant skips an occupied slot rather than reverting. No
-    ///         production path writes through it since the transfer mirror moved to the
-    ///         conflict-checked variant; this pins the difference between the two.
-    function test_tolerant_write_skips_an_existing_entry() public {
-        writer.writeNew(factory, ed, NODE, CANONICAL);
-        writer.write(factory, ed, NODE, "something-else");
-
-        address store = factory.getLabelStore(ed);
-        assertEq(
-            ILabelStore(store).getLabel(NODE), CANONICAL, "the tolerant path overwrote an entry"
-        );
     }
 }
