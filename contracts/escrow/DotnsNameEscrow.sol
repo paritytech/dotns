@@ -770,10 +770,9 @@ contract DotnsNameEscrow is
         returns (bytes4 selector)
     {
         require(msg.sender == address(_registrar()), NotAcceptedTransfer(msg.sender));
-        // Only accept transfers that this contract itself initiated via `release`. A holder calling
-        // `registrar.safeTransferFrom(holder, escrow, tokenId)` directly would otherwise land the
-        // NFT in custody with no `released` position, leaving the token (and any prior deposit)
-        // permanently unreachable through `withdraw` / `reclaim`.
+        // Only accept transfers this contract initiated via `release`; custody with no `released`
+        // position leaves the token and any prior deposit unreachable. The registrar enforces the
+        // same rule, which is what covers the plain `transferFrom` spelling this hook never sees.
         require(_positions[tokenId].released, UnsolicitedDeposit(tokenId));
         selector = IERC721Receiver.onERC721Received.selector;
     }

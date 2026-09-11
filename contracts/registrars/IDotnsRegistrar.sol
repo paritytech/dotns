@@ -47,6 +47,15 @@ interface IDotnsRegistrar is IERC721 {
     /// @custom:function quoteTransferFee.
     error NameSoulbound(uint256 tokenId);
 
+    /// @notice Thrown when a name is transferred into escrow custody by anything other than the
+    /// escrow's own release path.
+    /// @dev `redeem` and `reclaim`, the two calls that return a name from custody, gate on the
+    /// release position the escrow records before it moves the name, so custody reached any other
+    /// way has no exit.
+    /// @custom:function IDotnsNameEscrow.onERC721Received refuses such a deposit but does not run
+    /// on a plain `transferFrom`, which is why the gate is enforced here too.
+    error UnsolicitedEscrowDeposit(uint256 tokenId);
+
     /// @notice Emitted when a name is registered.
     /// @param id The token id (namehash node) that was minted.
     /// @param owner The address that received the name.

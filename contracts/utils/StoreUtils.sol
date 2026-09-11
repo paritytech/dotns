@@ -7,8 +7,8 @@ import {IStoreFactory} from "../store/IStoreFactory.sol";
 /// @title DotNS Store Utilities Library
 /// @notice Canonical helpers for protocol writes into per-user `LabelStore` instances.
 /// @dev One auth rule, one write path. Every DotNS consumer (controller, registrar,
-///      registry, PoP controller) funnels label writes through `writeLabel` so
-///      authorisation and deploy-on-first-use semantics are identical across flows.
+///      registry, PoP controller) funnels label writes through `writeNewLabel` so
+///      authorisation, deploy-on-first-use and conflict handling are identical across flows.
 /// @custom:security-contact admin@parity.io
 library StoreUtils {
     /// @notice Thrown when a name being registered already has a different label entry.
@@ -36,13 +36,11 @@ library StoreUtils {
     }
 
     /// @notice Writes `label` for a name being registered, rejecting a conflicting entry.
-    /// @dev Same as @custom:function writeLabel except that an existing entry is only tolerated
-    ///      when it already holds `label`. A registration is the first time the protocol names a
-    ///      node in this user's store, so an entry saying something else was put there by
-    ///      someone else and must not be silently honoured: `storeLabel` is single-write with no
-    ///      delete, so accepting it would leave the name permanently mislabelled and
-    ///      untransferable. Matching entries stay a no-op, which keeps re-registration by a
-    ///      previous holder working.
+    /// @dev An existing entry is tolerated only when it already holds `label`. An entry saying
+    ///      something else was put there by someone else and must not be silently honoured:
+    ///      `storeLabel` is single-write with no delete, so accepting it would leave the name
+    ///      permanently mislabelled and untransferable. Matching entries stay a no-op, which keeps
+    ///      re-registration by a previous holder, and a transfer back to one, working.
     /// @param factory The store factory.
     /// @param user The label store owner.
     /// @param labelhash The labelhash key.
@@ -67,31 +65,5 @@ library StoreUtils {
             return store;
         }
         ILabelStore(store).storeLabel(labelhash, label);
-    }
-
-    /// @notice Writes `label` under `labelhash` for `user`, deploying their `LabelStore` if needed.
-    /// @dev Idempotent on locked entries: once a label is locked the call is a no-op rather
-    ///      than a revert, so retried protocol flows (e.g. an ERC721 transfer back to a prior
-    ///      owner) pass through without failing on the existing lock. Inherits the factory's
-    ///      writer authorisation: callers that are not the factory owner and not
-    ///      a store writer @custom:reverts NotAuthorised when the user has no store yet.
-    /// @param factory The store factory.
-    /// @param user The label store owner.
-    /// @param labelhash The labelhash key.
-    /// @param label The label string (typically the full name, e.g. "alice.dot").
-    /// @return store The resolved or newly deployed store address.
-    function writeLabel(
-        IStoreFactory factory,
-        address user,
-        bytes32 labelhash,
-        string memory label
-    )
-        internal
-        returns (address store)
-    {
-        store = ensureLabelStore(factory, user);
-        if (!ILabelStore(store).isLocked(labelhash)) {
-            ILabelStore(store).storeLabel(labelhash, label);
-        }
     }
 }
