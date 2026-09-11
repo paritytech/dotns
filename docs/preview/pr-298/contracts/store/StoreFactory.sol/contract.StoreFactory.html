@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="storefactory"><a class="header" href="#storefactory">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/857cd238ee0271b003239fccbf389f94bd921bb0/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/051248f8fcb9ffa2b74e48496760f745c2c9ea50/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
@@ -252,28 +252,18 @@ oz-upgrades-unsafe-allow: constructor</p>
 <h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
 <p>Initialises the factory together with both store implementations and beacons.</p>
 <p>Callable exactly once via <code>Initializable</code>, otherwise</p>
-<p><strong>Notes:</strong></p>
+<p><strong>Note:</strong>
+reverts: InvalidInitialization. A single initialiser call wires everything:</p>
 <ul>
-<li>
-<p>reverts: InvalidInitialization. A single initialiser call wires everything:</p>
-</li>
-<li>
-<p>Deploys a fresh <code>LabelStore</code> implementation.</p>
-</li>
-<li>
-<p>Deploys a fresh <code>UserStore</code> implementation.</p>
-</li>
-<li>
-<p>Constructs both <code>UpgradeableBeacon</code> instances, owned by <code>address(this)</code>, which
+<li>Deploys a fresh <code>LabelStore</code> implementation.</li>
+<li>Deploys a fresh <code>UserStore</code> implementation.</li>
+<li>Constructs both <code>UpgradeableBeacon</code> instances, owned by <code>address(this)</code>, which
 under the proxy is the proxy itself, so <code>upgrade*Implementation</code> can delegate to
 <code>beacon.upgradeTo</code> and the beacons outlive any implementation swap.
-Keeping the implementation deployments here removes a class of operator error:
-there is no "did I deploy the implementation first?" step and no way to pass the
-wrong implementation address. <code>protocolRegistry_</code> must be non-zero, otherwise</p>
-</li>
-<li>
-<p>reverts: InvalidProtocolRegistry.</p>
-</li>
+The implementations are deployed here rather than accepted as parameters, so the call
+carries no ordering dependency on a prior deploy and exposes no argument through which
+a mismatched implementation could reach a beacon. <code>protocolRegistry_</code> must be
+non-zero, otherwise @custom:reverts InvalidProtocolRegistry.</li>
 </ul>
 <pre><code class="language-solidity">function initialize(address initialOwner, address protocolRegistry_) external initializer;
 </code></pre>
