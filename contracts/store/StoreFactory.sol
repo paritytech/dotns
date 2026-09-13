@@ -91,6 +91,8 @@ contract StoreFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, ISt
         __Ownable_init(initialOwner);
 
         require(protocolRegistry_ != address(0), InvalidProtocolRegistry(protocolRegistry_));
+        // Probing the registry rejects a wrong address here rather than at the first store deploy,
+        // and is what catches the two address arguments being passed the wrong way round.
         IDotnsProtocolRegistry(protocolRegistry_).isRegisteredAddress(address(0));
 
         protocolRegistry = protocolRegistry_;

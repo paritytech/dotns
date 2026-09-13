@@ -68,6 +68,9 @@ contract DeployCore is BaseDeployer {
         vm.label(factory.userStoreBeacon(), "UserStoreBeacon");
         logDeployment("LabelStoreBeacon", factory.labelStoreBeacon());
         logDeployment("UserStoreBeacon", factory.userStoreBeacon());
+        // Asserted here because this stage can run without the wire stage. Both initialiser
+        // arguments are addresses, so reading the registry back is what catches a transposed pair.
+        _verifyStoreImplementations(address(factory), protocolRegistry);
     }
 
     function _deployMulticall3(address owner) internal {

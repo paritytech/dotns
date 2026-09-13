@@ -40,7 +40,8 @@ interface IStoreFactory {
     error InvalidProtocolRegistry(address protocolRegistry);
 
     /// @notice Thrown when a zero implementation address is supplied to a store-implementation
-    /// upgrade. @param implementation The invalid implementation argument.
+    /// upgrade.
+    /// @param implementation The invalid implementation argument.
     error InvalidImplementation(address implementation);
 
     /// @notice Thrown when an unauthorised address attempts to deploy a label store.

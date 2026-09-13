@@ -86,6 +86,18 @@ contract StoreFactoryTests is BaseDotns {
         assertEq(storeFactory.getLabelStore(ed), store, "binding survived the upgrade");
         assertEq(storeFactory.labelStoreBeacon(), beacon, "beacon survived the upgrade");
         assertEq(storeFactory.protocolRegistry(), address(protocolRegistry));
+
+        // Beacon ownership sits with the proxy, so the upgraded logic must still be able to
+        // rotate the implementation.
+        address labelStoreV2 = address(new LabelStoreV2());
+        vm.prank(owner);
+        storeFactory.upgradeLabelStoreImplementation(labelStoreV2);
+        assertEq(
+            UpgradeableBeacon(beacon).implementation(),
+            labelStoreV2,
+            "the upgraded factory still owns its beacon"
+        );
+        assertEq(LabelStoreV2(store).versionMarker(), "v2", "the live store follows the rotation");
     }
 
     /// @notice Deploys a factory the way the pipeline does, behind its own ERC1967 proxy.
