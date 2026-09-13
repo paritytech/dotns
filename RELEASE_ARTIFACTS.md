@@ -42,7 +42,7 @@ The release surface is decided in `.github/abi-contracts.txt` so a contract reac
 - One entry can serve more than one live network. `paseo-assethub` is the deployment that both previewnet and Paseo Asset Hub Next V2 run, because every network deployed through the shared CREATE3 factory lands on the same addresses. So expect entries named after deployments, not after every chain you might connect to.
 - The names under `contracts` (`DotnsRegistrar`, `PopRules`) do not change, and a name always means the same contract. Your code can depend on that.
 - Addresses are copied from the manifest verbatim, which the deploy pipeline writes EIP-55 checksummed. Compare them case-insensitively rather than relying on the casing.
-- `LabelStoreBeacon` and `UserStoreBeacon` appear when deployed but are not network-stable, because the `StoreFactory` constructor deploys them. Read them from the factory rather than pinning them.
+- `LabelStoreBeacon` and `UserStoreBeacon` appear when deployed but are not network-stable, because the `StoreFactory` initialiser deploys them. Read them from the factory rather than pinning them.
 
 ## `release-manifest.json`
 

@@ -4,6 +4,7 @@ pragma solidity ^0.8.34;
 import {Test} from "forge-std/Test.sol";
 
 import {Create3Factory} from "../../../contracts/deploy/Create3Factory.sol";
+import {DotnsPopLens} from "../../../contracts/registrars/DotnsPopLens.sol";
 import {DotnsRegistrar} from "../../../contracts/registrars/DotnsRegistrar.sol";
 import {DotnsRegistry} from "../../../contracts/registry/DotnsRegistry.sol";
 import {DotnsProtocolRegistry} from "../../../contracts/registry/DotnsProtocolRegistry.sol";
@@ -82,15 +83,14 @@ contract DeterministicDeploymentTest is Test {
         address realRegistry = address(new DotnsProtocolRegistry());
         address foreignRegistry = address(new DotnsProtocolRegistry());
 
-        bytes32 salt = deployer.create3Salt("StoreFactory", "contract");
+        bytes32 salt = deployer.create3Salt("DotnsPopLens", "contract");
         vm.prank(attacker);
         factory.deploy(
-            salt,
-            abi.encodePacked(type(StoreFactory).creationCode, abi.encode(foreignRegistry, attacker))
+            salt, abi.encodePacked(type(DotnsPopLens).creationCode, abi.encode(foreignRegistry))
         );
 
         _assertAdoptionRejected(
-            "StoreFactory.sol:StoreFactory", abi.encode(realRegistry, owner), "StoreFactory"
+            "DotnsPopLens.sol:DotnsPopLens", abi.encode(realRegistry), "DotnsPopLens"
         );
     }
 
@@ -107,9 +107,10 @@ contract DeterministicDeploymentTest is Test {
         bytes memory first = template;
         bytes memory second = bytes.concat(template);
 
-        // `StoreFactory`'s first immutable range: 32 bytes at 509. Differ in exactly one byte,
-        // as two addresses sharing every other byte in that word would.
-        uint256 start = 509;
+        // `StoreFactory`'s first immutable range: 32 bytes at 1882, one of the two sites
+        // `UUPSUpgradeable.__self` is read from. Differ in exactly one byte, as two addresses
+        // sharing every other byte in that word would.
+        uint256 start = 1882;
         uint256 length = 32;
         second[start + 21] = second[start + 21] == bytes1(0x01) ? bytes1(0x02) : bytes1(0x01);
 
@@ -126,20 +127,15 @@ contract DeterministicDeploymentTest is Test {
     /// @notice A resumed run adopts its own earlier deployment of an artefact carrying
     ///         immutables. The reject cases below exercise the reference-diff path; this is the
     ///         one that proves it still says yes to an honest resume.
-    /// @dev `StoreFactory` is the demanding case: its constructor deploys fresh beacons every
-    ///      time, so the second run's reference copies differ from the occupant exactly where
-    ///      the comparison must skip. A check that compared those bytes would force a salt bump
-    ///      on every interrupted run.
+    /// @dev `StoreFactory` is the demanding case: as a UUPS implementation it bakes its own
+    ///      address into `UUPSUpgradeable.__self`, so the second run's reference copies differ
+    ///      from the occupant exactly where the comparison must skip. A check that compared
+    ///      those bytes would force a salt bump on every interrupted run.
     function test_resume_adopts_an_immutable_carrying_artefact() public {
-        address protocolRegistry = address(new DotnsProtocolRegistry());
-        bytes memory constructorData = abi.encode(protocolRegistry, owner);
-
-        address first = deployer.deployCreate3(
-            owner, "StoreFactory.sol:StoreFactory", constructorData, "StoreFactory"
-        );
-        address second = deployer.deployCreate3(
-            owner, "StoreFactory.sol:StoreFactory", constructorData, "StoreFactory"
-        );
+        address first =
+            deployer.deployCreate3(owner, "StoreFactory.sol:StoreFactory", "", "StoreFactory");
+        address second =
+            deployer.deployCreate3(owner, "StoreFactory.sol:StoreFactory", "", "StoreFactory");
 
         assertEq(second, first, "an honest resume of an immutable artefact was not adopted");
     }
@@ -434,10 +430,10 @@ contract DeterministicDeploymentTest is Test {
         addr.multicall3 =
             deployer.deployCreate3(owner, "Multicall3.sol:Multicall3", bytes(""), "Multicall3");
 
-        addr.storeFactory = deployer.deployCreate3(
+        addr.storeFactory = deployer.deployUups(
             owner,
             "StoreFactory.sol:StoreFactory",
-            abi.encode(addr.protocolRegistry, owner),
+            abi.encodeCall(StoreFactory.initialize, (owner, addr.protocolRegistry)),
             "StoreFactory"
         );
 

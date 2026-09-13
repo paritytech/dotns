@@ -180,15 +180,16 @@ abstract contract BaseDeployer is Script {
         require(addr.code.length != 0, string.concat(name, ": no code"));
     }
 
-    /// @notice The store beacons point at this release's store implementations, and the factory
-    ///         owns them.
-    /// @dev The one thing the CREATE3 occupancy check cannot assert. `StoreFactory` deploys its
-    ///      own beacons, so their addresses are immutables that differ on every honest deploy and
-    ///      are necessarily skipped when an occupant is compared against this run's artefact. An
-    ///      attacker squatting the factory address supplies the real artefact and the real
-    ///      constructor arguments, both public, so the beacons are the only thing left under
-    ///      their control. `LabelStore` and `UserStore` carry no immutables, so their runtime
-    ///      code compares exactly.
+    /// @notice The factory points at this release's protocol registry, and the store beacons
+    ///         point at this release's store implementations and are owned by the factory.
+    /// @dev The things the CREATE3 occupancy check cannot assert. `StoreFactory` is a UUPS proxy,
+    ///      and a proxy's runtime code is the same whatever it delegates to and whatever its
+    ///      initialiser wrote, so an occupant compared against this run's artefact matches on
+    ///      code alone. Its configuration lives in proxy storage and has to be read back: the
+    ///      registry pointer here, the owner in the caller's ownership assertions, and the
+    ///      beacons, which the initialiser mints and a squatter therefore chooses.
+    ///      `LabelStore` and `UserStore` carry no immutables, so their runtime code compares
+    ///      exactly.
     /// @dev The beacon contracts themselves are pinned by codehash first. Without that, the
     ///      checks below only prove that whatever sits at those addresses answered `owner()` and
     ///      `implementation()` the way this stage wanted at verification time; a bespoke contract
@@ -199,7 +200,20 @@ abstract contract BaseDeployer is Script {
     ///      anything else leaves every store on the network following an implementation the
     ///      verified owner can never rotate.
     /// @param storeFactory The deployed store factory.
-    function _verifyStoreImplementations(address storeFactory) internal view {
+    /// @param protocolRegistry The protocol registry this run wired, which the factory must
+    ///        already point at.
+    function _verifyStoreImplementations(
+        address storeFactory,
+        address protocolRegistry
+    )
+        internal
+        view
+    {
+        require(
+            IStoreFactory(storeFactory).protocolRegistry() == protocolRegistry,
+            "StoreFactory: wrong protocol registry"
+        );
+
         address labelBeacon = IStoreFactory(storeFactory).labelStoreBeacon();
         address userBeacon = IStoreFactory(storeFactory).userStoreBeacon();
 

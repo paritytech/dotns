@@ -163,10 +163,10 @@ contract DotnsDeployer is BaseDeployer {
         returns (address proxy)
     {
         storeFactory = StoreFactory(
-            _broadcastDeployCreate3(
+            _broadcastDeployUups(
                 owner,
                 "StoreFactory.sol:StoreFactory",
-                abi.encode(protocolRegistryProxy, owner),
+                abi.encodeCall(StoreFactory.initialize, (owner, protocolRegistryProxy)),
                 "StoreFactory"
             )
         );
@@ -466,7 +466,7 @@ contract DotnsDeployer is BaseDeployer {
         _verifyRegistryPointers(deployment);
         _verifyControllerAuthorisation(deployment);
 
-        _verifyStoreImplementations(deployment.storeFactory);
+        _verifyStoreImplementations(deployment.storeFactory, address(protocolRegistry));
 
         require(DotnsRegistry(deployment.registry).recordExists(bytes32(0)), "Root record missing");
         require(
@@ -613,6 +613,8 @@ contract DotnsDeployer is BaseDeployer {
             expected,
             "NameWhitelist: not wired"
         );
+        // StoreFactory's pointer is asserted in `_verifyStoreImplementations`, with the rest of
+        // what has to be read out of its proxy storage.
     }
 
     function _assertPointer(address actual, address expected, string memory label) internal pure {
