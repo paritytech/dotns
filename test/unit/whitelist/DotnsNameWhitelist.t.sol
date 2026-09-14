@@ -36,9 +36,10 @@ contract DotnsNameWhitelistTests is BaseDotns {
         );
         vm.stopPrank();
 
-        // The whitelist's admin surface is Root-only, so the suite runs under a Root origin and
-        // the unauthorised-caller tests flip it back with `_mockOriginIsRoot(false)`.
-        _mockOriginIsRoot(true);
+        // The whitelist's admin surface is governance-only, so the suite runs with the gate open
+        // for this contract and the unauthorised-caller tests close it with
+        // `_actAsGovernance(false)`.
+        _actAsGovernance(true);
         whitelist.setWindow(0, 30 days);
 
         vm.label(address(whitelist), "DotnsNameWhitelist");
@@ -165,7 +166,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
 
     function test_accept_reverts_for_a_signed_caller() public {
         _request(ed, BASE_LABEL_A);
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         vm.prank(tiago);
         whitelist.accept(BASE_LABEL_A, ed);
@@ -226,7 +227,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
     /// method that later lost its gate, which is how the four spot checks below left `reject`,
     /// `grantNames`, `setWindow` and two caps uncovered.
     function test_every_admin_entry_point_requires_root() public {
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
 
         string[] memory batch = new string[](1);
         batch[0] = BASE_LABEL_B;
@@ -326,7 +327,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
     /// @dev Not even the owner revokes: the admin surface is Root-only.
     function test_revokeName_rejects_the_owner() public {
         _grant(ed, BASE_LABEL_A);
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         whitelist.revokeName(BASE_LABEL_A);
     }
@@ -396,7 +397,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
     }
 
     function test_setReserved_reverts_for_a_signed_caller() public {
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         vm.prank(tiago);
         whitelist.setReserved(BASE_LABEL_A, true);
@@ -499,10 +500,10 @@ contract DotnsNameWhitelistTests is BaseDotns {
     }
 
     function test_names_pagination_lists_active() public {
-        vm.startPrank(owner);
+        // No prank: governance is the gateway, and pranking the owner here would imply an owner
+        // authority over the admin surface that does not exist.
         whitelist.grantName(BASE_LABEL_A, ed);
         whitelist.setReserved(BASE_LABEL_B, true);
-        vm.stopPrank();
 
         assertEq(whitelist.nameCount(), 2);
         IDotnsNameWhitelist.NameView[] memory page = whitelist.names(0, 10);
@@ -587,31 +588,73 @@ contract DotnsNameWhitelistTests is BaseDotns {
 
     /// @dev Caps are configuration, and configuration is Root-only too: the owner cannot retune.
     function test_setMaxClaimants_reverts_for_a_signed_caller() public {
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         whitelist.setMaxClaimants(10);
     }
 
-    function test_governance_root_grants_from_any_caller() public {
-        // Root has no address, so the gate admits the call regardless of who submits it.
-        _mockOriginIsRoot(true);
+    /// @notice The admin surface names one caller and rejects every other.
+    /// @dev Regression cover for a confused deputy. If the gate is ever widened to a property of
+    ///      the transaction rather than an address, for example `ISystem.originIsRoot`, these pass
+    ///      for any caller and the whole admin surface belongs to whoever a governance dispatch
+    ///      happens to reach. They are meant to fail loudly if that is attempted.
+    function test_governance_rejects_a_third_party_caller_on_grant() public {
+        _actAsGovernance(true);
+        vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         vm.prank(leonardo);
         whitelist.grantName(BASE_LABEL_A, ed);
-        assertEq(whitelist.granteeOf(BASE_LABEL_A), ed);
     }
 
-    function test_governance_root_reserves_from_any_caller() public {
-        _mockOriginIsRoot(true);
+    function test_governance_rejects_a_third_party_caller_on_reserve() public {
+        _actAsGovernance(true);
+        vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         vm.prank(leonardo);
         whitelist.setReserved(BASE_LABEL_A, true);
-        assertTrue(whitelist.isReserved(BASE_LABEL_A));
     }
 
-    /// @dev Configuration is Root-only as well, so a referendum retunes the caps.
-    function test_governance_root_sets_a_cap_from_any_caller() public {
-        _mockOriginIsRoot(true);
+    function test_governance_rejects_a_third_party_caller_on_a_cap() public {
+        _actAsGovernance(true);
+        vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         vm.prank(leonardo);
         whitelist.setMaxClaimants(7);
-        assertEq(whitelist.maxClaimants(), 7);
+    }
+
+    /// @notice A contract reached during a governance transaction holds no authority.
+    /// @dev The gate is open for this test contract, and the intruder is called from inside the
+    ///      same transaction. It must still be rejected: authority is an address, not a property
+    ///      the whole call stack shares.
+    ///
+    ///      Exercised through a nested call on purpose. A direct call cannot distinguish an
+    ///      address gate from a transaction-scoped one; only an intermediate frame can.
+    function test_governance_rejects_an_intermediate_contract() public {
+        Intruder intruder = new Intruder();
+        _actAsGovernance(true);
+
+        vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
+        intruder.grant(IDotnsNameWhitelist(address(whitelist)), BASE_LABEL_A, ed);
+    }
+
+    /// @notice The gate fails closed when the `ROOT_GATEWAY` key has never been wired.
+    /// @dev An unset key reads as the zero address. Without the explicit non-zero guard a caller
+    ///      of `address(0)` would match it, and a partially wired deployment would sit open.
+    function test_governance_rejects_when_the_gateway_key_is_unset() public {
+        vm.mockCall(
+            address(protocolRegistry),
+            abi.encodeWithSelector(
+                IDotnsProtocolRegistry.get.selector, DotnsConstants.ROOT_GATEWAY
+            ),
+            abi.encode(address(0))
+        );
+        vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
+        whitelist.setMaxClaimants(7);
+    }
+}
+
+/// @notice Stands in for any contract a governance transaction happens to reach.
+/// @dev Holds no DotNS key and is named by nothing. Under a transaction-scoped gate that is
+///      enough to hold the whole admin surface, which is why the gate is an address.
+contract Intruder {
+    function grant(IDotnsNameWhitelist whitelist, string memory label, address user) external {
+        whitelist.grantName(label, user);
     }
 }
