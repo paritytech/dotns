@@ -14,8 +14,9 @@ library DotnsConstants {
     ///         that opts the precompile in.
     /// @dev Mirrors the upstream `SYSTEM_ADDR` constant in
     ///      `substrate/frame/revive/uapi/sol/ISystem.sol`. Consumed by
-    ///      `DotnsPopController` and `DotnsNameWhitelist` to authenticate
-    ///      Root-origin dispatches via `ISystem.originIsRoot()`.
+    ///      `DotnsRootGateway`, and only by it, to authenticate a direct Root
+    ///      dispatch via `ISystem.callerIsRoot()`. Every other contract
+    ///      authorises on the gateway's address under `ROOT_GATEWAY`.
     address internal constant REVIVE_SYSTEM = address(0x0900);
 
     /// @notice Address of the Proof-of-Personhood precompile backed by the

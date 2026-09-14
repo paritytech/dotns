@@ -30,10 +30,11 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 ///      no event indexing is required. A name holds at most `maxClaimants` live claims, which
 ///      bounds the loop that clears them on resolution. Resolving a name deletes its claims,
 ///      refunding their storage deposit, so only reserved or won names persist. The entire admin
-///      surface is substrate Root: `SystemUtils.originIsRoot` is true through the proxy's
-///      delegatecall frame, and no gate reads `msg.sender`, so Root's lack of an address is not a
-///      problem. No signed account grants, revokes, reserves, or retunes a cap; the owner's
-///      authority is upgrade only. The public and PoP controllers hold only the `consume` hook.
+///      surface is governance: every gate requires `msg.sender` to be the `ROOT_GATEWAY`, the
+///      non-upgradeable contract Root dispatches to, which proves Root in its own frame and
+///      forwards by regular `CALL`. No signed account grants, revokes, reserves, or retunes a cap;
+///      the owner's authority is upgrade only. The public and PoP controllers hold only the
+///      `consume` hook.
 ///      Entries are keyed by the node under the active TLD, which the deployment holds immutable
 ///      for the whitelist's lifetime.
 /// @custom:security-contact admin@parity.io
@@ -84,11 +85,10 @@ contract DotnsNameWhitelist is
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
 
-    /// @notice Restricts a call to a substrate Root dispatch.
+    /// @notice Restricts a call to a Root dispatch arriving through the Root gateway.
     /// @dev The whole admin surface is governance-only: no key grants, revokes, reserves, or
     ///      retunes a cap. The owner's authority is deployment and upgrade, not allocation, so no
-    ///      signed account can hand out a name. `msg.sender` is never read here, which is also what
-    ///      keeps every gated entry point callable under a Root origin, since Root has no account.
+    ///      signed account can hand out a name.
     modifier onlyGovernance() {
         _onlyGovernance();
         _;

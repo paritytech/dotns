@@ -160,9 +160,10 @@ interface IDotnsNameWhitelist {
     /// @param node Namehash of the label under the active TLD.
     error NothingToRevoke(bytes32 node);
 
-    /// @notice Thrown when a governance-gated call is not a substrate Root dispatch.
-    /// @dev The whitelist's whole admin surface is Root-only: no signed account, owner included,
-    ///      grants, revokes, reserves, or retunes a cap.
+    /// @notice Thrown when a governance-gated call did not arrive through the Root gateway.
+    /// @dev The whitelist's whole admin surface is governance-only: no signed account, owner
+    ///      included, grants, revokes, reserves, or retunes a cap. Also thrown when the
+    ///      `ROOT_GATEWAY` key is unset, so an unwired deployment fails closed.
     error NotGovernance();
 
     /// @notice Thrown when `consume` is called by any address other than a registrar controller.

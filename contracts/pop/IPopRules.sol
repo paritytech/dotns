@@ -44,10 +44,11 @@ interface IPopRules {
     /// @param reason Human-readable explanation of the failure condition.
     error PopError(string reason);
 
-    /// @notice Thrown when @custom:function setShortNamesEnabled is called without a substrate
-    /// Root origin.
-    /// @dev Carries no caller parameter: a Root origin has no account to report, and reading
-    /// `msg.sender` under one traps.
+    /// @notice Thrown when @custom:function setShortNamesEnabled is called by anything other than
+    /// the Root gateway.
+    /// @dev Carries no caller parameter: the only accepted caller is the single address under
+    /// `DotnsConstants.ROOT_GATEWAY`, so the rejected value adds nothing. Also thrown when that
+    /// key is unset, so an unwired deployment fails closed.
     error NotRoot();
 
     /// @notice Thrown when a caller is not an authorised controller on the registrar.
