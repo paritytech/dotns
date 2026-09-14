@@ -196,7 +196,8 @@ contract RegistryHandler is Test {
             parentNode: parentNode,
             subLabel: _subnodeLabels[index],
             parentLabel: parentLabel,
-            owner: newOwner
+            owner: newOwner,
+            persist: true
         });
 
         vm.prank(parentOwner);
@@ -315,7 +316,8 @@ contract RegistryHandler is Test {
             parentNode: parentNode,
             subLabel: subLabel,
             parentLabel: parentLabel,
-            owner: subnodeOwner
+            owner: subnodeOwner,
+            persist: true
         });
 
         bytes memory subLabelBytes = bytes(subLabel);

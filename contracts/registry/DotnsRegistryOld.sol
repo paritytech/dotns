@@ -6,7 +6,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {IDotnsRegistry} from "./IDotnsRegistry.sol";
+import {IDotnsRegistryOld} from "./IDotnsRegistryOld.sol";
 import {IDotnsController} from "../registrars/IDotnsController.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
@@ -22,7 +22,7 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 /// @dev Tokenised second-level nodes store `owner == address(0)` as a sentinel and defer to
 ///      `IDotnsRegistrar.ownerOf`; subnodes carry an explicit owner address in `records`.
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistry {
+contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistryOld {
     using StoreUtils for IStoreFactory;
     using StringUtils for *;
 
@@ -63,7 +63,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         protocolRegistry = registry;
     }
 
-    /// @inheritdoc IDotnsRegistry
+    /// @inheritdoc IDotnsRegistryOld
     function setSubnodeOwner(SubnodeRecord calldata record)
         external
         override
@@ -99,24 +99,22 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
                 emit NewResolver(subnode, reverseResolver);
             }
 
-            if (record.persist && newOwner != previousOwner) {
+            if (newOwner != previousOwner) {
                 string memory fullName =
                     string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
                 _writeSubnodeToStore(newOwner, subnode, fullName);
             }
         } else {
             records[subnode] = Record({owner: newOwner, resolver: reverseResolver, exists: true});
-            if (record.persist) {
-                string memory fullName =
-                    string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
-                _writeSubnodeToStore(newOwner, subnode, fullName);
-            }
+            string memory fullName =
+                string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
+            _writeSubnodeToStore(newOwner, subnode, fullName);
         }
 
         emit NewOwner(parentNode, labelhash, newOwner);
     }
 
-    /// @inheritdoc IDotnsRegistry
+    /// @inheritdoc IDotnsRegistryOld
     function setOwner(bytes32 node, address newOwner) external override onlyRegistrarController {
         require(newOwner != address(0), NotAllowed());
         IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
@@ -137,13 +135,13 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         emit NodeTransferred(node, newOwner);
     }
 
-    /// @inheritdoc IDotnsRegistry
+    /// @inheritdoc IDotnsRegistryOld
     function setResolver(bytes32 node, address newResolver) external override authorised(node) {
         records[node].resolver = newResolver;
         emit NewResolver(node, newResolver);
     }
 
-    /// @inheritdoc IDotnsRegistry
+    /// @inheritdoc IDotnsRegistryOld
     function setSubnodeResolver(SubnodeResolverRecord calldata record)
         external
         override
@@ -164,7 +162,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         emit NewResolver(subnode, record.resolver);
     }
 
-    /// @inheritdoc IDotnsRegistry
+    /// @inheritdoc IDotnsRegistryOld
     function owner(bytes32 node) external view override returns (address) {
         Record storage record = records[node];
         // Read `owner` first: a non-zero stored owner proves the record exists and is a subnode,
@@ -177,17 +175,17 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         return registrar.ownerOf(uint256(node));
     }
 
-    /// @inheritdoc IDotnsRegistry
+    /// @inheritdoc IDotnsRegistryOld
     function resolver(bytes32 node) external view override returns (address) {
         return records[node].resolver;
     }
 
-    /// @inheritdoc IDotnsRegistry
+    /// @inheritdoc IDotnsRegistryOld
     function recordExists(bytes32 node) external view override returns (bool) {
         return records[node].exists;
     }
 
-    /// @inheritdoc IDotnsRegistry
+    /// @inheritdoc IDotnsRegistryOld
     function isAuthorised(
         bytes32 node,
         address account

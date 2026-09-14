@@ -95,8 +95,9 @@ contract PopLifecycleFlow is BaseDotns {
         bytes32 reassignedSubnode = _setSubnode(ed, fullNode, SUB_LABEL, FULL_LABEL, tiago);
         assertEq(reassignedSubnode, subnode);
         assertEq(dotnsRegistry.owner(subnode), tiago);
-        // The lite token is also gateway-minted and equally soulbound.
-        assertTrue(dotnsRegistrar.isSoulbound(uint256(_nodeOf(LITE_LABEL))));
+        // The lite name is a subname owned in the registry, not a transferable token.
+        assertEq(dotnsRegistry.owner(_liteNodeOf(LITE_LABEL)), ed);
+        assertFalse(dotnsRegistrar.exists(uint256(_liteNodeOf(LITE_LABEL))));
     }
 
     function test_cold_gateway_reserve_then_user_settles_pending_claim() public {
@@ -108,8 +109,8 @@ contract PopLifecycleFlow is BaseDotns {
             })
         );
 
-        bytes32 liteNode = _nodeOf(LITE_LABEL);
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)), ed);
+        bytes32 liteNode = _liteNodeOf(LITE_LABEL);
+        assertEq(dotnsRegistry.owner(liteNode), ed);
         assertEq(dotnsRegistry.owner(liteNode), ed);
         assertEq(storeFactory.getLabelStore(ed), address(0));
         // Chat key is persisted eagerly on the resolver at reserve time; only the
@@ -153,7 +154,7 @@ contract PopLifecycleFlow is BaseDotns {
 
         address store = storeFactory.getLabelStore(ed);
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(LITE_LABEL)),
+            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL)),
             string.concat(LITE_LABEL, protocolRegistry.tld())
         );
 
@@ -168,10 +169,10 @@ contract PopLifecycleFlow is BaseDotns {
 
         // The user is warm now, so the second reservation writes straight into the store.
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(secondLabel)),
+            ILabelStore(store).getLabel(_liteNodeOf(secondLabel)),
             string.concat(secondLabel, protocolRegistry.tld())
         );
-        assertEq(dotnsPopResolver.chatKey(_nodeOf(secondLabel)), secondKey);
+        assertEq(dotnsPopResolver.chatKey(_liteNodeOf(secondLabel)), secondKey);
         assertGt(firstMintedAt, 0);
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
         assertEq(dotnsPopController.pendingClaimUserCount(), 0);
@@ -185,15 +186,13 @@ contract PopLifecycleFlow is BaseDotns {
             })
         );
 
-        uint256 tokenId = uint256(_nodeOf(LITE_LABEL));
-        assertTrue(dotnsRegistrar.isSoulbound(tokenId));
-        // The gateway name is soulbound while its claim is still pending, so it cannot be moved
-        // out of the beneficiary's wallet before settlement. This is the path the issue closes:
-        // a pre-claim transfer previously escaped tier pricing entirely.
-        vm.expectRevert(abi.encodeWithSelector(IDotnsRegistrar.NameSoulbound.selector, tokenId));
-        vm.prank(ed);
-        dotnsRegistrar.transferFrom(ed, tiago, tokenId);
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(tokenId), ed);
+        // The lite name is a subname owned in the registry, not a transferable ERC-721 token, so it
+        // cannot be moved out of the beneficiary's wallet before settlement: there is no token to
+        // transfer and the owner holds no reassignment primitive. This is the path the issue
+        // closes: a pre-claim transfer previously escaped tier pricing entirely.
+        bytes32 liteNode = _liteNodeOf(LITE_LABEL);
+        assertEq(dotnsRegistry.owner(liteNode), ed);
+        assertFalse(dotnsRegistrar.exists(uint256(liteNode)));
 
         // The pending claim is keyed by the original user and still settles into their store.
         IDotnsPopController.PendingClaim[] memory pending =
@@ -205,7 +204,7 @@ contract PopLifecycleFlow is BaseDotns {
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
         address edStore = storeFactory.getLabelStore(ed);
         assertTrue(edStore != address(0));
-        bytes32 node = _nodeOf(LITE_LABEL);
+        bytes32 node = _liteNodeOf(LITE_LABEL);
         assertEq(
             ILabelStore(edStore).getLabel(node), string.concat(LITE_LABEL, protocolRegistry.tld())
         );
@@ -223,7 +222,7 @@ contract PopLifecycleFlow is BaseDotns {
 
         // Permissionless settlement from a stranger address: age never drops the claim, so the
         // store is deployed for the beneficiary and the label is written and readable.
-        bytes32 liteNode = _nodeOf(LITE_LABEL);
+        bytes32 liteNode = _liteNodeOf(LITE_LABEL);
         vm.prank(makeAddr("settler"));
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
 
@@ -244,8 +243,8 @@ contract PopLifecycleFlow is BaseDotns {
             })
         );
 
-        bytes32 liteNode = _nodeOf(LITE_LABEL);
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)), ed);
+        bytes32 liteNode = _liteNodeOf(LITE_LABEL);
+        assertEq(dotnsRegistry.owner(liteNode), ed);
 
         _grantPopFull(ed);
 
@@ -254,7 +253,7 @@ contract PopLifecycleFlow is BaseDotns {
 
         bytes32 fullNode = _nodeOf(popfullLabel);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(fullNode)), ed);
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(liteNode)), ed);
+        assertEq(dotnsRegistry.owner(liteNode), ed);
     }
 
     /// @notice Mints the lite label for `user` then claims the full label against it.
@@ -293,7 +292,11 @@ contract PopLifecycleFlow is BaseDotns {
         returns (bytes32 subnode)
     {
         IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: subOwner
+            parentNode: parentNode,
+            subLabel: subLabel,
+            parentLabel: parentLabel,
+            owner: subOwner,
+            persist: true
         });
 
         vm.prank(parentOwner);

@@ -140,7 +140,8 @@ contract DotnsRegistryInvariantTest is BaseDotns {
                 parentNode: parentNode,
                 subLabel: handler.subnodeLabelAt(i),
                 parentLabel: parentLabel,
-                owner: parentOwner
+                owner: parentOwner,
+                persist: true
             });
 
             vm.prank(parentOwner);
