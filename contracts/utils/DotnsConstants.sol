@@ -189,4 +189,21 @@ library DotnsConstants {
     ///      controller does not consult it.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant NAME_WHITELIST = bytes32("nameWhitelist");
+
+    /// @notice Well-known key for the non-upgradeable gateway fronting every governance entry
+    ///         point.
+    /// @dev Role: sole authorised caller of the governance surface on the registrar controller,
+    ///      `PopRules`, the name whitelist and the PoP controller. Root dispatches to this address
+    ///      directly; it proves Root in its own frame with `ISystem.callerIsRoot` and forwards by
+    ///      regular `CALL`, so each gated contract authorises on `msg.sender`. The indirection
+    ///      exists because neither revive primitive is usable from a UUPS implementation on its
+    ///      own: `callerIsRoot` reads false through the proxy's delegatecall frame, and
+    ///      `originIsRoot` is true in every frame of the transaction and so admits far more than
+    ///      the caller. See @custom:contract GovernanceAuth.
+    ///
+    ///      The contract behind this key must never sit behind a proxy and must never be made
+    ///      upgradeable: a delegatecall frame breaks `callerIsRoot` and bricks the whole
+    ///      governance surface. Rotate it by pointing this key at a new deployment.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant ROOT_GATEWAY = bytes32("rootGateway");
 }
