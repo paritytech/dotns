@@ -283,40 +283,59 @@ If the deployment was intended to update a public environment, update the addres
 
 ## Name grants (whitelisting)
 
-Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label to one beneficiary address and is single use: `registerReserved` requires a grant naming `registration.owner`, spends it on the mint, and refuses a second attempt. See the [README economics section](./README.md#economics) for what a grant does and does not confer; this section covers the mechanics.
+Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label to one beneficiary address and is single use: on the public branch `registerReserved` requires a grant naming `registration.owner`, spends it on the mint, and refuses a second attempt. A governance mint arriving through the Root gateway skips both the grant check and the spend, so that governance can issue a withheld label without first granting it to itself; that branch is reachable only from the single address registered under `ROOT_GATEWAY`. See the [README economics section](./README.md#economics) for what a grant does and does not confer; this section covers the mechanics.
 
 **Every admin action on the whitelist is a substrate Root dispatch.** Granting, revoking, accepting, rejecting, reserving, setting the request window and retuning the caps all require it. No signed account can do any of them, the contract owner included: the owner's authority is deployment and upgrade, not allocation. A signed call reverts with `NotGovernance`. There is no operator role and no address allowlist.
 
-That is the point of the design. As a security measure, no single key can grant a name; a grant costs a referendum, or on a test network a sudo-dispatched Root call.
+That is the point of the design. As a security measure, no single key can grant a name; a grant costs a referendum, or on a test network a sudo-dispatched Root call. "Root dispatch" here means a dispatch whose `dest` is the `ROOT_GATEWAY` contract, and the gates admit that address alone. See [Governance dispatch](#governance-dispatch).
 
-Two owner-level routes reach the same outcome and are **not** closed by this. `DotnsProtocolRegistry.set` is `onlyOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. `DotnsRegistrar.addController` is `onlyOwner`, and a controller can mint any available name directly, without the whitelist at all. Treat the guarantee here as covering the whitelist's own admin surface, not the protocol as a whole, until upgrade authority and deploy-time ownership are settled.
+Three owner-level routes reach the same outcome and are **not** closed by this. `DotnsProtocolRegistry.set` is `onlyOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything, or point `rootGateway` at a contract it controls and call the governance surface through it. `DotnsRegistrar.addController` is `onlyOwner`, and a controller can mint any available name directly, without the whitelist at all. None of these is new: the owner authorises every UUPS upgrade, so it could always replace an implementation with one that has no gate. Treat the guarantee here as covering the whitelist's own admin surface, not the protocol as a whole, until upgrade authority and deploy-time ownership are settled.
 
 The controller carries no roles either. It reads grants and consumes them, so `setRole` on the controller reverts with `UnsupportedRole`.
 
-### Dispatching a grant
+### Governance dispatch
 
-The dispatch is a Substrate extrinsic with the contract call nested inside it:
+Every governance call goes through `DotnsRootGateway`, the address registered under `ROOT_GATEWAY`. It is the `dest` of the `Revive.call`; the call you actually want is wrapped inside its `execute`:
 
 ```
 Root origin
-  └─ Revive.call { dest: <DotnsNameWhitelist H160>, value: 0, data: <EVM calldata> }
-       └─ grantName(string,address)
+  └─ Revive.call { dest: <DotnsRootGateway H160>, value: 0, data: <EVM calldata> }
+       └─ execute(address[],bytes[])
+            └─ [<DotnsNameWhitelist H160>], [grantName(string,address)]
 ```
 
-`cast` can be used for the innermost layer to encode `data`:
+`cast` encodes the inner payloads:
 
 ```bash
 # grant one label to one beneficiary
-cast calldata "grantName(string,address)" "$LABEL" "$ADDRESS"
+INNER=$(cast calldata "grantName(string,address)" "$LABEL" "$ADDRESS")
 
 # grant several labels to one beneficiary, up to maxGrantBatch
-cast calldata "grantNames(string[],address)" '["alpha01","beta02"]' "$ADDRESS"
+INNER=$(cast calldata "grantNames(string[],address)" '["alpha01","beta02"]' "$ADDRESS")
 
 # release an unspent grant
-cast calldata "revokeName(string)" "$LABEL"
+INNER=$(cast calldata "revokeName(string)" "$LABEL")
 ```
 
-Building the `Revive.call` around that hex and dispatching it as Root is done on the Substrate side. Wrap it in `Sudo.sudo` on a test network; put it up as a referendum on a production one. Both produce the same Root origin the contract checks, so the same `data` works either way.
+then wrap them for the gateway:
+
+```bash
+cast calldata "execute(address[],bytes[])" "[$WHITELIST]" "[$INNER]"
+```
+
+`execute` takes positionally matched arrays, so several governance actions ride in one dispatch and either all apply or none do:
+
+```bash
+cast calldata "execute(address[],bytes[])" \
+  "[$WHITELIST,$POP_RULES]" \
+  "[$GRANT_CALLDATA,$SHORT_NAMES_CALLDATA]"
+```
+
+Building the `Revive.call` around that hex and dispatching it as Root is done on the Substrate side. Wrap it in `Sudo.sudo` on a test network; put it up as a referendum on a production one. Both produce the same Root origin the gateway checks, so the same `data` works either way.
+
+**The gateway must be the direct `dest` of the dispatch.** It authorises with `ISystem.callerIsRoot`, which resolves the caller two frames below the precompile. Any contract sitting between Root and the gateway — `Multicall3`, or another forwarder — occupies that frame and the check reads `false`, reverting with `NotRoot`. Batch through `execute` instead of through `Multicall3`. A Substrate-level `Utility.batch` of several separate `Revive.call`s is fine, since each one starts its own call stack.
+
+Targets must be registered in the protocol registry; anything else reverts with `TargetNotProtocol`. The gateway holds no storage, has no owner, and is deliberately not upgradeable: a proxy would insert a delegatecall frame and break `callerIsRoot`, bricking the whole governance surface. Replacing it means deploying a new one and repointing `ROOT_GATEWAY`, which is an `onlyOwner` call on the protocol registry.
 
 The gas and storage-deposit limits belong to the `Revive.call` extrinsic rather than the contract call. Dry-run the call to size them rather than guessing, as an underestimate fails the whole dispatch.
 
