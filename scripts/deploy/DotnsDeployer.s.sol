@@ -13,6 +13,7 @@ import {DotnsRegistrar} from "../../contracts/registrars/DotnsRegistrar.sol";
 import {DotnsRegistrarController} from "../../contracts/registrars/DotnsRegistrarController.sol";
 import {DotnsPopController} from "../../contracts/registrars/DotnsPopController.sol";
 import {DotnsNameWhitelist} from "../../contracts/whitelist/DotnsNameWhitelist.sol";
+import {DotnsRootGateway} from "../../contracts/governance/DotnsRootGateway.sol";
 import {DotnsNameEscrow} from "../../contracts/escrow/DotnsNameEscrow.sol";
 import {IDotnsController} from "../../contracts/registrars/IDotnsController.sol";
 import {DotnsRegistry} from "../../contracts/registry/DotnsRegistry.sol";
@@ -67,6 +68,7 @@ contract DotnsDeployer is BaseDeployer {
     DotnsRegistrarController public dotnsRegistrarController;
     DotnsPopController public dotnsPopController;
     DotnsNameWhitelist public dotnsNameWhitelist;
+    DotnsRootGateway public dotnsRootGateway;
     DotnsNameEscrow public dotnsNameEscrow;
     DotnsProtocolRegistry public protocolRegistry;
 
@@ -90,6 +92,7 @@ contract DotnsDeployer is BaseDeployer {
         address popController;
         address popLens;
         address nameWhitelist;
+        address rootGateway;
     }
 
     /// @notice Deploys the full DotNS contract set, wires the protocol registry,
@@ -136,6 +139,7 @@ contract DotnsDeployer is BaseDeployer {
         deployment.popController = _deployPopController(OWNER, deployment.protocolRegistry);
         deployment.popLens = _deployPopLens(OWNER, deployment.protocolRegistry);
         deployment.nameWhitelist = _deployNameWhitelist(OWNER, deployment.protocolRegistry);
+        deployment.rootGateway = _deployRootGateway(OWNER, deployment.protocolRegistry);
 
         _authoriseControllers(OWNER, deployment);
         _wireProtocolRegistryKeys(OWNER, deployment);
@@ -456,6 +460,11 @@ contract DotnsDeployer is BaseDeployer {
         protocolRegistry.set(DotnsConstants.POP_RESOLVER, deployment.popResolver);
         protocolRegistry.set(DotnsConstants.POP_LENS, deployment.popLens);
         protocolRegistry.set(DotnsConstants.NAME_WHITELIST, deployment.nameWhitelist);
+        // The governance gate on the controller, PopRules, the whitelist and the PoP controller
+        // resolves this key on every call and fails closed while it is unset. On an upgrade of an
+        // existing deployment it must therefore be set BEFORE the new implementations go live,
+        // or the whole governance surface reverts until it is.
+        protocolRegistry.set(DotnsConstants.ROOT_GATEWAY, deployment.rootGateway);
         vm.stopBroadcast();
         console.log("Protocol registry keys set");
     }
@@ -550,6 +559,31 @@ contract DotnsDeployer is BaseDeployer {
         _assertKey(DotnsConstants.POP_CONTROLLER, deployment.popController, "Key: popController");
         _assertKey(DotnsConstants.POP_RESOLVER, deployment.popResolver, "Key: popResolver");
         _assertKey(DotnsConstants.POP_LENS, deployment.popLens, "Key: popLens");
+        _assertKey(DotnsConstants.ROOT_GATEWAY, deployment.rootGateway, "Key: rootGateway");
+    }
+
+    /// @notice Deploys the non-upgradeable Root gateway.
+    /// @dev Deliberately NOT a UUPS proxy. `ISystem.callerIsRoot` resolves the caller two frames
+    ///      below the precompile and a delegatecall occupies a frame of its own, so behind a proxy
+    ///      the check reads false even on a direct Root dispatch. Deploying this through
+    ///      `_broadcastDeployUups` would silently brick the entire governance surface.
+    /// @param owner Broadcasting account. The gateway itself has no owner and no storage.
+    /// @param protocolRegistryProxy Protocol registry the gateway validates targets against.
+    /// @return deployed Address of the deployed gateway.
+    function _deployRootGateway(
+        address owner,
+        address protocolRegistryProxy
+    )
+        internal
+        returns (address deployed)
+    {
+        deployed = _broadcastDeployCreate3(
+            owner,
+            "DotnsRootGateway.sol:DotnsRootGateway",
+            abi.encode(IDotnsProtocolRegistry(protocolRegistryProxy)),
+            "DotnsRootGateway"
+        );
+        dotnsRootGateway = DotnsRootGateway(deployed);
     }
 
     function _assertKey(bytes32 key, address expected, string memory label) internal view {
