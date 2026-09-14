@@ -174,7 +174,7 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @dev Grant-backed issuance path: skips the PoP price check and the escrow deposit, but
     /// reuses the same commit-reveal pipeline so the same anti-front-running guarantees apply.
     ///
-    /// Authority is either a substrate Root dispatch or a grant naming `registration.owner` on the
+    /// Authority is either the Root gateway or a grant naming `registration.owner` on the
     /// name whitelist registered under `DotnsConstants.NAME_WHITELIST`; anything else
     /// @custom:reverts NameNotGranted, and an unset registry key
     /// @custom:reverts WhitelistNotConfigured. The gate reads `registration.owner` rather than the

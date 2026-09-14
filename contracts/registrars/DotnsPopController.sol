@@ -147,7 +147,7 @@ contract DotnsPopController is
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
     uint256[50] private __gap;
 
-    /// @notice Restricts calls to a Root origin.
+    /// @notice Restricts calls to the Root gateway, the protocol's governance entry point.
     modifier onlyRoot() {
         _onlyRoot();
         _;
