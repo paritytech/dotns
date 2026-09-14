@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="poprules"><a class="header" href="#poprules">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b029f4562b91eb85bc3d2003245dbeff1dc47a93/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/afb84303e6cdbaf8d415fd0441587f15770c9656/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -247,9 +247,9 @@ registered under <code>DotnsConstants.COST_MODEL</code>, so no price is seeded h
 </div>
 <h3 id="setshortnamesenabled"><a class="header" href="#setshortnamesenabled">setShortNamesEnabled</a></h3>
 <p>Opens or closes the public market for names shorter than nine characters.</p>
-<p>Restricted to a substrate Root origin; any other caller triggers @custom:reverts
+<p>Restricted to the Root gateway; any other caller triggers @custom:reverts
 NotRoot. Short names are otherwise issued through the PoP gateway, so this flag is the
-Root-only lever that additionally admits them on the public paid path.
+governance-only lever that additionally admits them on the public paid path.
 While closed, which is the deploy default, @custom:function priceWithCheck and</p>
 <p><strong>Note:</strong>
 function: priceWithoutCheck trigger @custom:reverts PopError for a base length

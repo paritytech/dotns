@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b029f4562b91eb85bc3d2003245dbeff1dc47a93/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/afb84303e6cdbaf8d415fd0441587f15770c9656/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></p>
 <p><strong>Title:</strong>
@@ -317,7 +317,7 @@ boundary, which is the question it is asking.</p>
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlyroot"><a class="header" href="#onlyroot">onlyRoot</a></h3>
-<p>Restricts calls to a Root origin.</p>
+<p>Restricts calls to the Root gateway, the protocol's governance entry point.</p>
 <pre><code class="language-solidity">modifier onlyRoot() ;
 </code></pre>
 <h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
@@ -371,7 +371,7 @@ for it.</p>
 <h3 id="reservelitename"><a class="header" href="#reservelitename">reserveLiteName</a></h3>
 <p>Registers a lite-person username on behalf of the supplied
 user without touching the base-name reservation queue.</p>
-<p>Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
+<p>Callable only through the Root gateway (otherwise @custom:reverts NotRoot). The
 supplied label must satisfy the <code>stem.NN</code> shape and must classify outside the
 governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel); a supplied chat
 key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code> reverts</p>
@@ -397,7 +397,7 @@ mint @custom:emits LiteNameReserved and @custom:emits PendingClaimStashed, with<
 <p>Registers a lite-person username on behalf of the supplied user
 and optionally enqueues a reservation for a base name they intend to
 claim as a full person later.</p>
-<p>Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
+<p>Callable only through the Root gateway (otherwise @custom:reverts NotRoot). The
 lite leg validates the <code>stem.NN</code> shape and requires the label to classify outside the
 governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel), and rejects a
 supplied chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code>
@@ -438,7 +438,7 @@ the call's payload, which Solidity decodes directly.</p>
 </div>
 <h3 id="reservebasenameonly"><a class="header" href="#reservebasenameonly">reserveBaseNameOnly</a></h3>
 <p>Enqueues only the full/base-name reservation for a user.</p>
-<p>Callable only under a Root origin (otherwise @custom:reverts NotRoot).
+<p>Callable only through the Root gateway (otherwise @custom:reverts NotRoot).
 This is the second step of the split
 gateway flow: @custom:function reserveLiteName mints the lite username first, then this
 function reserves the full/base label in a separate transaction so proof-size stays below
@@ -473,7 +473,7 @@ entrypoint forwards <code>params.lite</code>.</p>
 </code></pre>
 <h3 id="registerbasename"><a class="header" href="#registerbasename">registerBaseName</a></h3>
 <p>Registers a full-person username on behalf of the supplied user.</p>
-<p>Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
+<p>Callable only through the Root gateway (otherwise @custom:reverts NotRoot). The
 base label must be a letters-only person label, and therefore a true base label,
 (otherwise @custom:reverts InvalidBaseLabel), and the label must not
 classify as governance-reserved (otherwise @custom:reverts InvalidBaseLabel). The

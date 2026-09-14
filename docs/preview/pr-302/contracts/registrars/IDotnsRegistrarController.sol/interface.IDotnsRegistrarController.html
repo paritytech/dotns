@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b029f4562b91eb85bc3d2003245dbeff1dc47a93/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/afb84303e6cdbaf8d415fd0441587f15770c9656/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -273,7 +273,7 @@ fallback, and @custom:emits NameRegistered on success.</li>
 <p>Registers a granted name after the commitment delay, at zero base cost.</p>
 <p>Grant-backed issuance path: skips the PoP price check and the escrow deposit, but
 reuses the same commit-reveal pipeline so the same anti-front-running guarantees apply.
-Authority is either a substrate Root dispatch or a grant naming <code>registration.owner</code> on the
+Authority is either the Root gateway or a grant naming <code>registration.owner</code> on the
 name whitelist registered under <code>DotnsConstants.NAME_WHITELIST</code>; anything else</p>
 <p><strong>Notes:</strong></p>
 <ul>
