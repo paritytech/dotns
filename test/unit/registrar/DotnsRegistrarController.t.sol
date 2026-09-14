@@ -370,8 +370,8 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     }
 
     /// @dev The controller exposes no role surface at all: reserved registration reads grants
-    /// from `DotnsNameWhitelist`, whose own admin surface is Root-only, so there is no role to
-    /// hold and nothing to advertise.
+    /// from `DotnsNameWhitelist`, whose own admin surface is governance-only, so there is no role
+    /// to hold and nothing to advertise.
     function test_controller_advertises_no_role_interface() public view {
         assertTrue(
             dotnsRegistrarController.supportsInterface(type(IDotnsRegistrarController).interfaceId)
@@ -453,9 +453,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         address nameOwner = ed;
 
         _grantName(nameLabel, nameOwner);
-        _mockOriginIsRoot(true);
+        _actAsGovernance(true);
         dotnsNameWhitelist.revokeName(nameLabel);
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
 
         assertFalse(dotnsNameWhitelist.isGrantedTo(nameLabel, nameOwner));
 
@@ -985,14 +985,16 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         // survive; an unrelated label could not detect consumption of the one being minted.
         _grantName(nameLabel, ed);
 
-        _mockOriginIsRoot(true);
+        // `tiago` submits, so `tiago` is the gateway for this call: the governance branch is
+        // selected by `msg.sender`, not by anything about the transaction it sits in.
+        _actAsGovernanceFor(tiago);
         _revealReserved(nameLabel, ed, tiago);
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
 
         assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(nameLabel)), ed);
         assertTrue(
             dotnsNameWhitelist.isGrantedTo(nameLabel, ed),
-            "a Root mint consumed the grant on the label it minted"
+            "a governance mint consumed the grant on the label it minted"
         );
     }
 
@@ -1085,10 +1087,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         IDotnsRegistrarController.Registration memory registration =
             _commitReserved(nameLabel, ed, ed);
-        _mockOriginIsRoot(true);
+        _actAsGovernanceFor(ed);
         vm.prank(ed);
         dotnsRegistrarController.registerReserved(registration);
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
 
         assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(nameLabel)), ed);
     }

@@ -2,10 +2,11 @@
 pragma solidity ^0.8.34;
 
 import {Test} from "forge-std/Test.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 import {DotnsNameWhitelist} from "../../../contracts/whitelist/DotnsNameWhitelist.sol";
 import {IDotnsNameWhitelist} from "../../../contracts/whitelist/IDotnsNameWhitelist.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
-import {ISystem} from "../../../contracts/external/revive/ISystem.sol";
+import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocolRegistry.sol";
 
 /// @title WhitelistHandler
 /// @notice Drives the whitelist through its lifecycle for the invariant suite, cycling a fixed
@@ -116,26 +117,47 @@ contract WhitelistHandler is Test {
         return _labels[seed % _labels.length];
     }
 
-    /// @notice Puts the next call under a substrate Root origin. The whitelist's admin surface is
-    /// Root-only, so every governance action here needs it; a plain prank produces a Signed origin
-    /// and would revert into the catch, leaving the campaign to exercise only the permissionless
-    /// entry points.
+    /// @notice Opens the governance gate for the next call. The whitelist's admin surface admits
+    /// the Root gateway alone, so every governance action here needs it; without it the call
+    /// reverts into the catch and the campaign exercises only the permissionless entry points.
     function _asRoot() internal {
-        _mockOriginIsRoot(true);
+        _actAsGovernance(true);
     }
 
-    /// @notice Restores the default. `DotnsRegistrarController.registerReserved` reads
-    /// `originIsRoot` too, and handler state is campaign-scoped, so a sticky `true` would put a
-    /// later reserved registration on the Root branch.
+    /// @notice Closes the gate again. `DotnsRegistrarController.registerReserved` resolves the
+    /// same key, and handler state is campaign-scoped, so a sticky open gate would put a later
+    /// reserved registration on the governance branch.
     function _asSigned() internal {
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
     }
 
-    function _mockOriginIsRoot(bool returnValue) internal {
+    /// @notice Stand-in address for the Root gateway, so the closed gate rejects every caller.
+    address internal constant ROOT_GATEWAY_STUB = address(uint160(0x600D6A7E));
+
+    /// @notice Opens or closes the governance gate for calls made from this handler.
+    /// @dev The gates authorise on `msg.sender == protocolRegistry.get(ROOT_GATEWAY)`, so this
+    ///      points that key at the handler to open the gate and at an unrelated stub to close it.
+    ///      A registry mock rather than a prank, so it does not collide with the per-call pranks
+    ///      the handler already makes.
+    /// @param enabled True to admit calls from this handler, false to reject every caller.
+    function _actAsGovernance(bool enabled) internal {
+        // Whoever the next call will come from: `address(this)` normally, or the pranked address
+        // when the suite is inside a `vm.startPrank`, as the shared fixture is while it wires the
+        // protocol up. Pointing the key at the wrong one closes the gate on the fixture itself.
+        //
+        // `readCallers` reports the transaction-level sender, which is forge's default sender and
+        // NOT this contract when no prank is active, so its answer is only usable in prank modes.
+        (VmSafe.CallerMode mode, address pranked,) = vm.readCallers();
+        address effectiveSender = (mode == VmSafe.CallerMode.Prank
+                || mode == VmSafe.CallerMode.RecurrentPrank)
+            ? pranked
+            : address(this);
         vm.mockCall(
-            DotnsConstants.REVIVE_SYSTEM,
-            abi.encodeWithSelector(ISystem.originIsRoot.selector),
-            abi.encode(returnValue)
+            address(WHITELIST.protocolRegistry()),
+            abi.encodeWithSelector(
+                IDotnsProtocolRegistry.get.selector, DotnsConstants.ROOT_GATEWAY
+            ),
+            abi.encode(enabled ? effectiveSender : ROOT_GATEWAY_STUB)
         );
     }
 }

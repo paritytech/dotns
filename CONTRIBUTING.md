@@ -133,7 +133,9 @@ Example query paths. Each row starts from a small set of known contracts; every 
 
 Any new contract address that other contracts need to read must be looked up through `DotnsProtocolRegistry` at the point of use. Do not hardcode it in a constructor, store it in an `immutable`, or expose a one-off `setX(address)` setter. The protocol registry is the only address a contract may hold directly; everything else is fetched on demand so rotation is a single `protocolRegistry.set(KEY, newAddress)` call with no upgrade.
 
-If you are adding a new contract category, add a `bytes32` key for it in `DotnsConstants.sol`, wire it up in `WireDeployments.s.sol`, and list the contract and its interface in `.github/abi-contracts.txt` so their ABIs ship in the release artifact. Read it the same way every existing contract does.
+If you are adding a new contract category, add a `bytes32` key for it in `DotnsConstants.sol`, deploy it from one of the stages in `scripts/deploy/run.sh` (not from `DotnsDeployer.s.sol`, which is not in that list and which `scripts/genesis/build-genesis.sh` therefore never runs), wire it up in `WireDeployments.s.sol`, and list the contract and its interface in `.github/abi-contracts.txt` so their ABIs ship in the release artifact. Read it the same way every existing contract does.
+
+There is exactly one sanctioned exception, `DotnsRootGateway`. It is a non-upgradeable leaf that holds the protocol registry in an `immutable`, because it must not sit behind a proxy: `ISystem.callerIsRoot` resolves the caller two frames below the precompile, and a delegatecall frame displaces the one it inspects. The rule the exception preserves rather than breaks is the point of the rule — the immutable it holds *is* the registry, so every sibling it touches is still resolved on demand, and the gateway itself is rotated by `protocolRegistry.set(ROOT_GATEWAY, ...)` rather than by an upgrade.
 
 Bad — the registrar address is frozen at construction, so rotating it needs an upgrade:
 

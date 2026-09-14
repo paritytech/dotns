@@ -71,7 +71,7 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_reserveBaseName_reverts_when_origin_is_not_root() public {
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.reserveBaseName(
             IDotnsPopController.BaseReservation({
@@ -213,7 +213,7 @@ contract DotnsPopControllerTests is BaseDotns {
     function test_registerBaseName_reverts_when_origin_is_not_root() public {
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xaa));
 
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.registerBaseName(
             IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
@@ -757,7 +757,7 @@ contract DotnsPopControllerTests is BaseDotns {
     function test_registered_controller_without_root_origin_cannot_enter_pop_flow() public {
         // The public commit-reveal controller is already a registered controller.
         // Even from that origin, the Root-gate must reject the call.
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         vm.prank(address(dotnsRegistrarController));
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.reserveBaseName(
@@ -1149,7 +1149,7 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_reserveLiteName_reverts_when_origin_is_not_root() public {
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.reserveLiteName(
             IDotnsPopController.LiteRegistration({
@@ -1200,7 +1200,7 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_reserveBaseNameOnly_reverts_when_origin_is_not_root() public {
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.reserveBaseNameOnly(
             IDotnsPopController.BaseNameReservation({user: ed, reservedBaseLabel: BASE_LABEL_A})

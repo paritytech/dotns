@@ -200,9 +200,10 @@ interface IDotnsPopController is IDotnsController {
     /// @param newHead Address now holding the head slot.
     event ReservationHeadAdvanced(bytes32 indexed labelhash, address indexed newHead);
 
-    /// @notice Thrown when a gated entrypoint is reached without a Root origin.
-    /// @dev Carries no caller parameter: a Root origin has no account to report,
-    ///      and reading `msg.sender` under one traps.
+    /// @notice Thrown when a gated entrypoint is called by anything other than the Root gateway.
+    /// @dev Carries no caller parameter: exactly one address is accepted, the one registered under
+    ///      `DotnsConstants.ROOT_GATEWAY`, so the rejected value adds nothing. Also thrown when
+    ///      that key is unset, so an unwired deployment fails closed.
     error NotRoot();
 
     /// @notice Thrown when a supplied lite-person label does not match `stem.NN`.
@@ -255,7 +256,7 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Registers a lite-person username on behalf of the supplied user
     /// and optionally enqueues a reservation for a base name they intend to
     /// claim as a full person later.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
+    /// @dev Callable only through the Root gateway (otherwise @custom:reverts NotRoot). The
     /// lite leg validates the `stem.NN` shape and requires the label to classify outside the
     /// governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel), and rejects a
     /// supplied chat key whose length is neither zero nor `CHAT_KEY_LENGTH`
@@ -284,7 +285,7 @@ interface IDotnsPopController is IDotnsController {
     function reserveBaseName(BaseReservation calldata params) external;
 
     /// @notice Enqueues only the full/base-name reservation for a user.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot).
+    /// @dev Callable only through the Root gateway (otherwise @custom:reverts NotRoot).
     /// This is the second step of the split
     /// gateway flow: @custom:function reserveLiteName mints the lite username first, then this
     /// function reserves the full/base label in a separate transaction so proof-size stays below
@@ -299,7 +300,7 @@ interface IDotnsPopController is IDotnsController {
 
     /// @notice Registers a lite-person username on behalf of the supplied
     /// user without touching the base-name reservation queue.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
+    /// @dev Callable only through the Root gateway (otherwise @custom:reverts NotRoot). The
     /// supplied label must satisfy the `stem.NN` shape and must classify outside the
     /// governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel); a supplied chat
     /// key whose length is neither zero nor `CHAT_KEY_LENGTH` reverts
@@ -326,7 +327,7 @@ interface IDotnsPopController is IDotnsController {
     function isPopIssued(string calldata label) external view returns (bool issued);
 
     /// @notice Registers a full-person username on behalf of the supplied user.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
+    /// @dev Callable only through the Root gateway (otherwise @custom:reverts NotRoot). The
     /// base label must be a letters-only person label, and therefore a true base label,
     /// (otherwise @custom:reverts InvalidBaseLabel), and the label must not
     /// classify as governance-reserved (otherwise @custom:reverts InvalidBaseLabel). The

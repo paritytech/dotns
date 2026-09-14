@@ -224,32 +224,32 @@ contract PopRulesTests is BaseDotns {
     }
 
     function test_setShortNamesEnabled_emits() public {
-        _mockOriginIsRoot(true);
+        _actAsGovernance(true);
         vm.expectEmit(address(popRules));
         emit IPopRules.ShortNamesEnabledUpdated(false);
         popRules.setShortNamesEnabled(false);
     }
 
     function test_setShortNamesEnabled_requires_root() public {
-        // A non-Root origin: originIsRoot returns false, so the setter reverts NotRoot regardless
-        // of the caller (owner included).
-        _mockOriginIsRoot(false);
+        // Gate closed: the `ROOT_GATEWAY` key points somewhere else, so the setter reverts NotRoot
+        // regardless of the caller (owner included).
+        _actAsGovernance(false);
         vm.expectRevert(IPopRules.NotRoot.selector);
         vm.prank(ed);
         popRules.setShortNamesEnabled(false);
     }
 
     function test_setShortNamesEnabled_owner_reverts() public {
-        // The owner used to hold this switch. It is now Root-only, so the owner reverts NotRoot
-        // too.
-        _mockOriginIsRoot(false);
+        // The owner used to hold this switch. It is now governance-only, so the owner reverts
+        // NotRoot too.
+        _actAsGovernance(false);
         vm.expectRevert(IPopRules.NotRoot.selector);
         vm.prank(owner);
         popRules.setShortNamesEnabled(false);
     }
 
     function test_setShortNamesEnabled_root_succeeds() public {
-        _mockOriginIsRoot(true);
+        _actAsGovernance(true);
         popRules.setShortNamesEnabled(true);
         assertTrue(popRules.shortNamesEnabled());
     }

@@ -26,7 +26,7 @@ import {SubnodeUtils} from "../utils/SubnodeUtils.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
-import {SystemUtils} from "../utils/SystemUtils.sol";
+import {GovernanceAuth} from "../utils/GovernanceAuth.sol";
 
 /// @title DotnsPopController
 /// @notice Dedicated PoP controller orchestrating lite-person and full-person username
@@ -147,7 +147,7 @@ contract DotnsPopController is
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
     uint256[50] private __gap;
 
-    /// @notice Restricts calls to a Root origin.
+    /// @notice Restricts calls to the Root gateway, the protocol's governance entry point.
     modifier onlyRoot() {
         _onlyRoot();
         _;
@@ -920,20 +920,16 @@ contract DotnsPopController is
         delete _reservedBaseLabel[labelhash];
     }
 
-    /// @notice Internal check enforcing a Root origin.
-    /// @dev Authorises a call when @custom:function SystemUtils.originIsRoot is true, and
-    ///      reverts with NotRoot otherwise. `msg.sender` is deliberately not consulted: a
-    ///      Root origin has no account behind it, so reading `msg.sender` traps. That holds
-    ///      for this frame and any delegatecall sharing it; a nested call sees the calling
-    ///      contract as its sender and reads normally.
-    ///
-    ///      The check also holds for the whole Root transaction rather than the entry frame
-    ///      alone, so nothing reachable from an onlyRoot entrypoint may call a
-    ///      user-controlled address: such a callee could re-enter a gated function and still
-    ///      pass. Every call out of this contract goes to a protocol contract resolved
-    ///      through the registry.
+    /// @notice Internal check enforcing that the call arrived through the Root gateway.
+    /// @dev Authorises on `msg.sender` and reverts with NotRoot otherwise. See
+    ///      @custom:contract GovernanceAuth for what counts as governance, and for why this must
+    ///      not be replaced by a check on the transaction's origin.
+    /// @dev Calls out of this contract go only to protocol contracts resolved through the
+    ///      registry. That is defence in depth rather than the gate itself, and is worth keeping:
+    ///      it bounds what a governance dispatch can reach from here, independently of how the
+    ///      gate is implemented.
     function _onlyRoot() internal view {
-        require(SystemUtils.originIsRoot(), NotRoot());
+        require(GovernanceAuth.isGovernance(protocolRegistry, msg.sender), NotRoot());
     }
 
     /// @inheritdoc UUPSUpgradeable

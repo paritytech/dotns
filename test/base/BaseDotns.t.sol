@@ -2,6 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {Test} from "forge-std/Test.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 
 import {PopRules, IPopRules} from "../../contracts/pop/PopRules.sol";
 import {DotnsFlatPricing} from "../../contracts/pop/DotnsFlatPricing.sol";
@@ -35,7 +36,6 @@ import {DotnsNameWhitelist} from "../../contracts/whitelist/DotnsNameWhitelist.s
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {LabelUtils} from "../../contracts/utils/LabelUtils.sol";
 import {StringUtils} from "../../contracts/utils/StringUtils.sol";
-import {ISystem} from "../../contracts/external/revive/ISystem.sol";
 import {IPersonhood} from "../../contracts/external/personhood/IPersonhood.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
@@ -273,8 +273,8 @@ abstract contract BaseDotns is Test {
         popRules = PopRules(popRulesAddress);
         vm.label(popRulesAddress, "PopRules");
         // Open the short-name market so the band and registration suites exercise names below nine
-        // characters. Toggled as a Root origin because the setter is Root-gated. The default-closed
-        // state is covered directly in PopRules unit tests.
+        // characters. Toggled as governance because the setter is governance-gated. The
+        // default-closed state is covered directly in PopRules unit tests.
         _setShortNames(true);
 
         address dotnsResolverAddress = Upgrades.deployUUPSProxy(
@@ -358,31 +358,70 @@ abstract contract BaseDotns is Test {
             abi.encodeWithSelector(IPersonhood.personhoodStatus.selector),
             abi.encode(IPersonhood.PersonhoodInfo({status: 0, contextAlias: bytes32(0)}))
         );
-        // Default the revive System precompile to a non-Root origin. Every governance-gated path
-        // reads it (`DotnsNameWhitelist.onlyGovernance`, `DotnsRegistrarController`'s reserved
-        // path), and there is no code at the precompile address under forge, so an unmocked read
-        // decodes empty returndata and reverts. Tests exercising the Root branch override with
-        // `_mockOriginIsRoot(true)`.
-        _mockOriginIsRoot(false);
+        // Default the governance gate to closed. Every governance-gated path resolves the
+        // `ROOT_GATEWAY` key (`DotnsNameWhitelist.onlyGovernance`, `PopRules`, the PoP
+        // controller, and `DotnsRegistrarController`'s reserved path), and an unwired key would
+        // read as the zero address, which those gates reject anyway. Tests exercising the
+        // governance branch open it with `_actAsGovernance(true)`.
+        _actAsGovernance(false);
     }
 
-    /// @notice Mocks revive's System precompile originIsRoot result.
-    /// @param returnValue Value to return from `originIsRoot`.
-    function _mockOriginIsRoot(bool returnValue) internal {
+    /// @notice Stand-in address for the Root gateway in tests that do not route through a real one.
+    /// @dev Any address that no test account uses. `_actAsGovernance(false)` points the
+    ///      `ROOT_GATEWAY` key here so the gate is closed for every caller.
+    address internal constant ROOT_GATEWAY_STUB = address(uint160(0x600D6A7E));
+
+    /// @notice Opens or closes the governance gate for calls made from this contract.
+    /// @dev Governance gates authorise on `msg.sender == protocolRegistry.get(ROOT_GATEWAY)`, so
+    ///      this points that key at the caller to open the gate and at an unrelated stub to close
+    ///      it. Ambient rather than per-call, so a suite can open the gate once and make several
+    ///      governance calls under it.
+    ///
+    ///      Deliberately a registry mock rather than a prank: `vm.startPrank` would collide with
+    ///      the per-call `vm.prank`s the suites already use, and the gate only ever inspects
+    ///      `msg.sender`, so pointing the key at the caller exercises exactly the branch under
+    ///      test. The real dispatch path, Root to the gateway to the target, is covered end to end
+    ///      in `test/unit/governance/DotnsRootGateway.t.sol`.
+    /// @param enabled True to admit calls from this contract, false to reject every caller.
+    function _actAsGovernance(bool enabled) internal {
+        // Whoever the next call will come from: `address(this)` normally, or the pranked address
+        // when the suite is inside a `vm.startPrank`, as the shared fixture is while it wires the
+        // protocol up. Pointing the key at the wrong one closes the gate on the fixture itself.
+        //
+        // `readCallers` reports the transaction-level sender, which is forge's default sender and
+        // NOT this contract when no prank is active, so its answer is only usable in prank modes.
+        (VmSafe.CallerMode mode, address pranked,) = vm.readCallers();
+        address effectiveSender = (mode == VmSafe.CallerMode.Prank
+                || mode == VmSafe.CallerMode.RecurrentPrank)
+            ? pranked
+            : address(this);
+        _actAsGovernanceFor(enabled ? effectiveSender : ROOT_GATEWAY_STUB);
+    }
+
+    /// @notice Treats `caller` as the Root gateway for subsequent calls.
+    /// @dev For the tests that drive a governance action through a specific pranked submitter,
+    ///      where the ambient form above cannot see who that will be. The gates compare
+    ///      `msg.sender` against the `ROOT_GATEWAY` key, so pointing the key at that submitter is
+    ///      equivalent to routing its call through the real gateway, without standing the gateway
+    ///      fixture up. `DotnsRootGateway.t.sol` covers the real contract.
+    /// @param caller Address the gates should accept as governance.
+    function _actAsGovernanceFor(address caller) internal {
         vm.mockCall(
-            DotnsConstants.REVIVE_SYSTEM,
-            abi.encodeWithSelector(ISystem.originIsRoot.selector),
-            abi.encode(returnValue)
+            address(protocolRegistry),
+            abi.encodeWithSelector(
+                IDotnsProtocolRegistry.get.selector, DotnsConstants.ROOT_GATEWAY
+            ),
+            abi.encode(caller)
         );
     }
 
-    /// @notice Toggles the short-name market as a substrate Root origin.
-    /// @dev `setShortNamesEnabled` is Root-gated, so mock the System precompile's `originIsRoot`
-    ///      true for the call, then restore false so the default test origin stays non-Root.
+    /// @notice Toggles the short-name market as governance.
+    /// @dev `setShortNamesEnabled` is gated on the Root gateway, so open the gate for the call and
+    ///      close it afterwards so the default test caller stays unprivileged.
     function _setShortNames(bool enabled) internal {
-        _mockOriginIsRoot(true);
+        _actAsGovernance(true);
         popRules.setShortNamesEnabled(enabled);
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
     }
 
     /// @notice Computes the namehash of `parent` and `labelhash`.
@@ -497,22 +536,22 @@ abstract contract BaseDotns is Test {
         protocolRegistry.set(DotnsConstants.NAME_WHITELIST, address(dotnsNameWhitelist));
     }
 
-    /// @notice Grants `label` to `user` on the name whitelist under a mocked Root origin.
-    /// @dev The whitelist's admin surface is Root-only, so this mocks `originIsRoot` for the call
-    ///      and restores the default afterwards. The reserved registration path requires a grant
-    ///      naming the intended owner, so this is the setup step every `registerReserved` test
-    ///      needs. Restoring matters: `registerReserved` reads `originIsRoot` too, and a sticky
-    ///      `true` would put the registration itself on the Root branch.
+    /// @notice Grants `label` to `user` on the name whitelist as governance.
+    /// @dev The whitelist's admin surface is governance-only, so this opens the gate for the call
+    ///      and closes it afterwards. The reserved registration path requires a grant naming the
+    ///      intended owner, so this is the setup step every `registerReserved` test needs. Closing
+    ///      matters: `registerReserved` reads the same key, and a sticky open gate would put the
+    ///      registration itself on the governance branch, skipping the grant check and consume.
     function _grantName(string memory label, address user) internal {
-        _mockOriginIsRoot(true);
+        _actAsGovernance(true);
         dotnsNameWhitelist.grantName(label, user);
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
     }
 
-    /// @notice Drives a PoP reservation under a Root origin and settles the resulting
-    /// pending claim from the user's signed origin.
-    /// @dev Single canonical helper for PoP-gateway reservations across unit and fuzz
-    /// test suites. Calls the controller under a mocked Root origin.
+    /// @notice Drives a PoP reservation as governance and settles the resulting pending claim
+    /// from the user's own account.
+    /// @dev Single canonical helper for PoP reservations across unit and fuzz test suites. Calls
+    /// the controller with the governance gate open.
     /// The auto-settle deploys the user's `LabelStore` and writes the stashed label so
     /// subsequent gateway mints for the same user take the warm path and assertions
     /// against the resolver and store hold. Chat keys are persisted eagerly on the PoP
@@ -542,42 +581,42 @@ abstract contract BaseDotns is Test {
         }
     }
 
-    /// @notice Dispatches the typed `reserveLiteName` call under a mocked Root origin.
+    /// @notice Dispatches the typed `reserveLiteName` call as governance.
     function _rootReserveLiteName(IDotnsPopController.LiteRegistration memory params) internal {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_LITE_TYPED, params));
     }
 
-    /// @notice Dispatches the typed `reserveBaseName` call under a mocked Root origin.
+    /// @notice Dispatches the typed `reserveBaseName` call as governance.
     function _rootReserveBaseName(IDotnsPopController.BaseReservation memory params) internal {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_TYPED, params));
     }
 
-    /// @notice Dispatches the typed `reserveBaseNameOnly` call under a mocked Root origin.
+    /// @notice Dispatches the typed `reserveBaseNameOnly` call as governance.
     function _rootReserveBaseNameOnly(IDotnsPopController.BaseNameReservation memory params)
         internal
     {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_ONLY_TYPED, params));
     }
 
-    /// @notice Dispatches the typed `registerBaseName` call under a mocked Root origin.
+    /// @notice Dispatches the typed `registerBaseName` call as governance.
     /// @dev Dispatches the label as written. The gateway sends what People Chain holds, so a
     ///      helper that reshaped it would hide whether a fixture is a valid lite label.
     function _rootRegisterBaseName(IDotnsPopController.FullRegistration memory params) internal {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_REGISTER_BASE_TYPED, params));
     }
 
-    /// @notice Calls `payload` on the PoP controller under a mocked Root origin.
+    /// @notice Calls `payload` on the PoP controller with the governance gate open.
     /// @dev Reverts with the inner error data when the call fails, so
     ///      `vm.expectRevert` assertions remain meaningful at the test level.
     function _dispatchFromRoot(bytes memory payload) internal returns (bytes memory ret) {
-        _mockOriginIsRoot(true);
+        _actAsGovernance(true);
 
         (bool ok, bytes memory data) = address(dotnsPopController).call(payload);
-        // Restore the default before unwinding, on both the success and revert paths.
-        // `DotnsRegistrarController.registerReserved` reads `originIsRoot` too, so a sticky
-        // `true` here would silently put a later reserved registration on the Root branch,
+        // Close the gate before unwinding, on both the success and revert paths.
+        // `DotnsRegistrarController.registerReserved` resolves the same key, so a sticky open
+        // gate here would silently put a later reserved registration on the governance branch,
         // skipping the grant check and the consume.
-        _mockOriginIsRoot(false);
+        _actAsGovernance(false);
         if (!ok) {
             assembly {
                 revert(add(data, 32), mload(data))

@@ -19,6 +19,7 @@ import {DotnsPopResolver} from "../../contracts/resolvers/DotnsPopResolver.sol";
 import {PopRules} from "../../contracts/pop/PopRules.sol";
 import {StoreFactory} from "../../contracts/store/StoreFactory.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
+import {DotnsRootGateway} from "../../contracts/governance/DotnsRootGateway.sol";
 
 /// @title WireDeployments
 /// @notice Final stage. Runs no proxy deployments; reads every address the
@@ -48,6 +49,7 @@ contract WireDeployments is BaseDeployer {
         address popResolver;
         address popController;
         address popLens;
+        address rootGateway;
     }
 
     function run() external {
@@ -83,6 +85,7 @@ contract WireDeployments is BaseDeployer {
         addr.popResolver = _readAddress("DotnsPopResolver");
         addr.popController = _readAddress("DotnsPopController");
         addr.popLens = _readAddress("DotnsPopLens");
+        addr.rootGateway = _readAddress("DotnsRootGateway");
     }
 
     function _authoriseControllers(address owner, Addresses memory addr) internal {
@@ -116,6 +119,9 @@ contract WireDeployments is BaseDeployer {
         registry.set(DotnsConstants.POP_CONTROLLER, addr.popController);
         registry.set(DotnsConstants.POP_RESOLVER, addr.popResolver);
         registry.set(DotnsConstants.POP_LENS, addr.popLens);
+        // Governance gates resolve this key on every call and fail closed while it is unset, so on
+        // an upgrade it must be set before the new implementations go live.
+        registry.set(DotnsConstants.ROOT_GATEWAY, addr.rootGateway);
         vm.stopBroadcast();
         console.log("Protocol registry keys set");
     }
@@ -191,6 +197,7 @@ contract WireDeployments is BaseDeployer {
         );
         require(registry.get(DotnsConstants.POP_RESOLVER) == addr.popResolver, "Key: popResolver");
         require(registry.get(DotnsConstants.POP_LENS) == addr.popLens, "Key: popLens");
+        require(registry.get(DotnsConstants.ROOT_GATEWAY) == addr.rootGateway, "Key: rootGateway");
 
         require(
             DotnsRegistrar(addr.registrar).controllers(IDotnsController(addr.registrarController)),

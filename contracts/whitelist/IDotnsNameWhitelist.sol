@@ -10,10 +10,10 @@ pragma solidity ^0.8.34;
 ///      mismatched hash. Claims are keyed by the beneficiary `user`, not the submitter, so a
 ///      relayer or a cross-chain sovereign account can submit a claim on a user's behalf and the
 ///      name still binds to that user. All state is on-chain and queryable through views; no event
-///      indexing is required. The entire admin surface is substrate Root: the gates check
-///      `originIsRoot` and read no `msg.sender`, so Root's lack of an address is not a problem, and
-///      no signed account grants, revokes, reserves, or retunes a cap. The controllers hold only
-///      the `consume` hook.
+///      indexing is required. The entire admin surface is governance: the gates require
+///      `msg.sender` to be the `ROOT_GATEWAY`, the non-upgradeable contract Root dispatches to,
+///      so no signed account grants, revokes, reserves, or retunes a cap. The controllers hold
+///      only the `consume` hook.
 /// @custom:security-contact admin@parity.io
 interface IDotnsNameWhitelist {
     /// @notice Status of a name.
@@ -160,9 +160,10 @@ interface IDotnsNameWhitelist {
     /// @param node Namehash of the label under the active TLD.
     error NothingToRevoke(bytes32 node);
 
-    /// @notice Thrown when a governance-gated call is not a substrate Root dispatch.
-    /// @dev The whitelist's whole admin surface is Root-only: no signed account, owner included,
-    ///      grants, revokes, reserves, or retunes a cap.
+    /// @notice Thrown when a governance-gated call did not arrive through the Root gateway.
+    /// @dev The whitelist's whole admin surface is governance-only: no signed account, owner
+    ///      included, grants, revokes, reserves, or retunes a cap. Also thrown when the
+    ///      `ROOT_GATEWAY` key is unset, so an unwired deployment fails closed.
     error NotGovernance();
 
     /// @notice Thrown when `consume` is called by any address other than a registrar controller.
@@ -197,8 +198,9 @@ interface IDotnsNameWhitelist {
     function requestName(string calldata label, string calldata reason, address user) external;
 
     /// @notice Accepts `user`'s claim as the winner of `label`.
-    /// @dev Restricted to a substrate Root dispatch. Requires `user`'s claim `Requested`.
-    /// Sets the name `Claimed` with `user` the winner and clears every claim on the name, rejecting
+    /// @dev Restricted to governance: the call must arrive through the Root gateway. Requires
+    /// `user`'s claim `Requested`. Sets the name `Claimed` with `user` the winner and clears every
+    /// claim on the name, rejecting
     ///      the losers. @custom:reverts NotRequested. @custom:emits NameAccepted for the winner and
     ///      @custom:emits NameRejected for each loser.
     /// @param label Bare label to resolve.
@@ -206,15 +208,16 @@ interface IDotnsNameWhitelist {
     function accept(string calldata label, address user) external;
 
     /// @notice Rejects `user`'s pending claim on `label` without resolving the name.
-    /// @dev Restricted to a substrate Root dispatch. Requires the claim `Requested`.
-    /// @custom:reverts NotRequested. @custom:emits NameRejected.
+    /// @dev Restricted to governance: the call must arrive through the Root gateway. Requires the
+    /// claim `Requested`. @custom:reverts NotRequested. @custom:emits NameRejected.
     /// @param label Bare label.
     /// @param user Beneficiary whose claim is rejected.
     function reject(string calldata label, address user) external;
 
     /// @notice Grants `label` to `user` directly, without a prior claim.
-    /// @dev Restricted to a substrate Root dispatch. Requires the name Open, `user` non-zero
-    /// and a canonical label. Sets the name `Claimed` with `user` the winner and clears any pending
+    /// @dev Restricted to governance: the call must arrive through the Root gateway. Requires the
+    /// name Open, `user` non-zero and a canonical label. Sets the name `Claimed` with `user` the
+    /// winner and clears any pending
     ///      claims. @custom:reverts NameNotOpen, @custom:reverts ZeroUser or
     ///      @custom:reverts InvalidLabel. @custom:emits NameAccepted, and
     ///      @custom:emits NameRejected for each cleared claim.
@@ -223,24 +226,26 @@ interface IDotnsNameWhitelist {
     function grantName(string calldata label, address user) external;
 
     /// @notice Grants several labels to one `user` directly.
-    /// @dev Restricted to a substrate Root dispatch. Applies @custom:function grantName to
-    ///      each, at most `maxGrantBatch` labels per call.
+    /// @dev Restricted to governance: the call must arrive through the Root gateway. Applies
+    /// @custom:function grantName to each, at most `maxGrantBatch` labels per call.
     ///      @custom:reverts TooManyLabels when `labels` exceeds the batch cap.
     /// @param labels Bare labels to grant.
     /// @param user Beneficiary each name binds to.
     function grantNames(string[] calldata labels, address user) external;
 
     /// @notice Resets `label` to Open, clearing any winner and claims.
-    /// @dev Restricted to a substrate Root dispatch. Resolves a Claimed or claim-holding
-    /// name; a Reserved name is released through @custom:function setReserved, not here.
+    /// @dev Restricted to governance: the call must arrive through the Root gateway. Resolves a
+    /// Claimed or claim-holding name; a Reserved name is released through @custom:function
+    /// setReserved, not here.
     ///      @custom:reverts NothingToRevoke when the name is not Claimed and holds no claims.
     ///      @custom:emits NameRevoked, and @custom:emits NameRejected for each cleared claim.
     /// @param label Bare label to reset.
     function revokeName(string calldata label) external;
 
     /// @notice Reserves or releases `label`.
-    /// @dev Restricted to a substrate Root dispatch. Reserving requires the name Open and clears
-    /// any pending claims, rejecting each; releasing requires it `Reserved`. @custom:reverts
+    /// @dev Restricted to governance: the call must arrive through the Root gateway. Reserving
+    /// requires the name Open and clears any pending claims, rejecting each; releasing requires it
+    /// `Reserved`. @custom:reverts
     /// NameNotOpen or @custom:reverts NotReserved. @custom:emits NameReserved or @custom:emits
     /// NameUnreserved. @param label Bare label.
     /// @param reserved True to reserve, false to release.
@@ -256,29 +261,31 @@ interface IDotnsNameWhitelist {
     function consume(string calldata label, address registrant) external;
 
     /// @notice Sets the request window relative to the current time.
-    /// @dev Restricted to a substrate Root dispatch. Opens at `block.timestamp + startsIn` for
-    /// `duration`. @custom:reverts BadWindow when `duration` is zero. @custom:emits WindowSet.
+    /// @dev Restricted to governance: the call must arrive through the Root gateway. Opens at
+    /// `block.timestamp + startsIn` for `duration`. @custom:reverts BadWindow when `duration` is
+    /// zero. @custom:emits WindowSet.
     /// @param startsIn Seconds from now until requests start being accepted.
     /// @param duration Seconds the window stays open.
     function setWindow(uint64 startsIn, uint64 duration) external;
 
     /// @notice Sets the live-claim cap per name.
-    /// @dev Restricted to a substrate Root dispatch. The cap is bounded by
-    /// `DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT`, which bounds the resolution clear-loop.
+    /// @dev Restricted to governance: the call must arrive through the Root gateway. The cap is
+    /// bounded by `DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT`, which bounds the resolution
+    /// clear-loop.
     /// @custom:reverts MaxClaimantsOutOfRange when `newMax` is zero or above the ceiling.
     /// @custom:emits MaxClaimantsSet.
     /// @param newMax New per-name claim cap.
     function setMaxClaimants(uint16 newMax) external;
 
     /// @notice Sets the reason byte cap.
-    /// @dev Restricted to a substrate Root dispatch, bounded by
+    /// @dev Restricted to governance through the Root gateway, bounded by
     /// `DotnsConstants.WHITELIST_MAX_REASON_LIMIT`. @custom:reverts MaxReasonBytesOutOfRange when
     /// `newMax` is zero or above the ceiling. @custom:emits MaxReasonBytesSet.
     /// @param newMax New reason byte cap.
     function setMaxReasonBytes(uint256 newMax) external;
 
     /// @notice Sets the cap on labels per `grantNames` call.
-    /// @dev Restricted to a substrate Root dispatch, bounded by
+    /// @dev Restricted to governance through the Root gateway, bounded by
     /// `DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT`. @custom:reverts MaxGrantBatchOutOfRange
     /// when `newMax` is zero or above the ceiling. @custom:emits MaxGrantBatchSet.
     /// @param newMax New batch cap.

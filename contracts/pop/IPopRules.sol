@@ -36,7 +36,7 @@ interface IPopRules {
 
     /// @notice Emitted when the public market for names shorter than nine characters is opened or
     ///         closed.
-    /// @dev Set by the Root-gated @custom:function setShortNamesEnabled.
+    /// @dev Set by the governance-gated @custom:function setShortNamesEnabled.
     /// @param enabled Whether names shorter than nine characters may now be bought.
     event ShortNamesEnabledUpdated(bool enabled);
 
@@ -44,10 +44,11 @@ interface IPopRules {
     /// @param reason Human-readable explanation of the failure condition.
     error PopError(string reason);
 
-    /// @notice Thrown when @custom:function setShortNamesEnabled is called without a substrate
-    /// Root origin.
-    /// @dev Carries no caller parameter: a Root origin has no account to report, and reading
-    /// `msg.sender` under one traps.
+    /// @notice Thrown when @custom:function setShortNamesEnabled is called by anything other than
+    /// the Root gateway.
+    /// @dev Carries no caller parameter: the only accepted caller is the single address under
+    /// `DotnsConstants.ROOT_GATEWAY`, so the rejected value adds nothing. Also thrown when that
+    /// key is unset, so an unwired deployment fails closed.
     error NotRoot();
 
     /// @notice Thrown when a caller is not an authorised controller on the registrar.
@@ -110,9 +111,9 @@ interface IPopRules {
         returns (PopStatus requirement, string memory message);
 
     /// @notice Opens or closes the public market for names shorter than nine characters.
-    /// @dev Restricted to a substrate Root origin; any other caller triggers @custom:reverts
+    /// @dev Restricted to the Root gateway; any other caller triggers @custom:reverts
     ///      NotRoot. Short names are otherwise issued through the PoP gateway, so this flag is the
-    ///      Root-only lever that additionally admits them on the public paid path.
+    ///      governance-only lever that additionally admits them on the public paid path.
     ///      While closed, which is the deploy default, @custom:function priceWithCheck and
     ///      @custom:function priceWithoutCheck trigger @custom:reverts PopError for a base length
     ///      below nine, so no public caller buys a short name. The gateway free grant and the
