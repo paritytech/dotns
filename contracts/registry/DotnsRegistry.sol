@@ -73,6 +73,13 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         address newOwner = record.owner;
         require(newOwner != address(0), NotAllowed());
 
+        // Deferring the store write (persist == false) is a controller workflow: the deferred label
+        // is backfilled later by an authorised writer, and only a registered controller drives that
+        // path. Every other caller must persist eagerly rather than strand an unindexed label.
+        if (!record.persist) {
+            _onlyRegistrarController();
+        }
+
         bytes32 parentNode = record.parentNode;
         string calldata subLabel = record.subLabel;
         string calldata parentLabel = record.parentLabel;
