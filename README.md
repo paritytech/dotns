@@ -149,7 +149,7 @@ Commit-reveal controller for the public registration path. A caller first submit
 
 ### DotnsPopController
 
-Dedicated controller for the Proof-of-Personhood gateway flow. Lives behind its own UUPS proxy with its own storage and is registered on the registrar via addController alongside the commit-reveal controller. Its gated entry points are callable only under a substrate Root origin, which the controller verifies itself by reading `originIsRoot` from the revive System precompile.
+Dedicated controller for the Proof-of-Personhood gateway flow. Lives behind its own UUPS proxy with its own storage and is registered on the registrar via addController alongside the commit-reveal controller. Its gated entry points are callable only by governance, which reaches them through `DotnsRootGateway`: the controller checks that `msg.sender` is the address registered under the `rootGateway` key rather than inspecting the transaction's origin.
 
 Today the Pop gateway does not write a standalone user-status mapping. It materialises the PoP flow through gateway-issued labels, PoP resolver records, and reservation queue state; user tier checks for public pricing still come from the personhood precompile/context read.
 
