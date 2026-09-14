@@ -180,9 +180,9 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="storefactory"><a class="header" href="#storefactory">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/c60a5b790a0e9365dbcbe7d24e937ec69b8bce67/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/2757c47c8ec05bea2fc6fdac3b3d3a45ab347763/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
-Ownable, <a href="/contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
+Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
 StoreFactory</p>
 <p>Factory for the two per-user DotNS store types, sharing one factory contract and two
@@ -196,25 +196,27 @@ The factory owns both beacons so the factory owner can upgrade implementations f
 every proxy atomically. Neither per-user mapping is ever transferred, reassigned, or
 overwritten after the first write; bindings are permanent.</li>
 </ul>
+<p>Lives behind its own UUPS proxy. The per-user bindings and both beacon addresses are
+proxy storage, so the factory is upgraded in place: the bindings cannot be exported, so
+a replacement reached by re-pointing <code>STORE_FACTORY</code> would start with an empty directory.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
+<h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="labelstorebeacon"><a class="header" href="#labelstorebeacon">labelStoreBeacon</a></h3>
 <p>Beacon backing every <code>LabelStore</code> proxy.</p>
 <p>Public getter name is interface-constrained by @custom:contract IStoreFactory.</p>
-<pre><code class="language-solidity">address public immutable override labelStoreBeacon
+<pre><code class="language-solidity">address public override labelStoreBeacon
 </code></pre>
 <h3 id="userstorebeacon"><a class="header" href="#userstorebeacon">userStoreBeacon</a></h3>
 <p>Beacon backing every <code>UserStore</code> proxy.</p>
 <p>Public getter name is interface-constrained by @custom:contract IStoreFactory.</p>
-<pre><code class="language-solidity">address public immutable override userStoreBeacon
+<pre><code class="language-solidity">address public override userStoreBeacon
 </code></pre>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
 <p>Protocol registry used to authorise <code>deployLabelStoreFor</code> callers.</p>
 <p>Public getter name is interface-constrained by @custom:contract IStoreFactory.</p>
-<pre><code class="language-solidity">address public immutable override protocolRegistry
+<pre><code class="language-solidity">address public override protocolRegistry
 </code></pre>
-<h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="_labelstores"><a class="header" href="#_labelstores">_labelStores</a></h3>
 <p>user =&gt; their permanent <code>LabelStore</code>. Set once per user, forever.</p>
 <pre><code class="language-solidity">mapping(address user =&gt; address store) private _labelStores
@@ -231,6 +233,10 @@ security-contact: admin@parity.io</p>
 <p>Insertion-order list of every <code>UserStore</code> proxy ever claimed. Append-only.</p>
 <pre><code class="language-solidity">address[] private _userStoreList
 </code></pre>
+<h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
+<p>Reserved storage space to allow for layout changes in future upgrades.</p>
+<pre><code class="language-solidity">uint256[50] private __gap
+</code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlyownerorprotocol"><a class="header" href="#onlyownerorprotocol">onlyOwnerOrProtocol</a></h3>
 <p>Restricts <code>deployLabelStoreFor</code> to the owner or a component named in</p>
@@ -239,27 +245,32 @@ function: StoreAuth.isStoreWriter.</p>
 <pre><code class="language-solidity">modifier onlyOwnerOrProtocol() ;
 </code></pre>
 <h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
-<p>Deploys the factory together with both store implementations and beacons.</p>
-<p>A single <code>new StoreFactory(protocolRegistry, owner)</code> call wires everything:</p>
+<p><strong>Note:</strong>
+oz-upgrades-unsafe-allow: constructor</p>
+<pre><code class="language-solidity">constructor() ;
+</code></pre>
+<h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
+<p>Initialises the factory together with both store implementations and beacons.</p>
+<p>Callable exactly once via <code>Initializable</code>, otherwise</p>
+<p><strong>Note:</strong>
+reverts: InvalidInitialization. A single initialiser call wires everything:</p>
 <ul>
 <li>Deploys a fresh <code>LabelStore</code> implementation.</li>
 <li>Deploys a fresh <code>UserStore</code> implementation.</li>
-<li>Constructs both <code>UpgradeableBeacon</code> instances, owned by <code>address(this)</code>
-so <code>upgrade*Implementation</code> can delegate to <code>beacon.upgradeTo</code>.
-Keeping the implementation deployments inside the constructor removes a class of
-operator error: there is no "did I deploy the implementation first?" step and no
-way to pass the wrong implementation address. <code>protocolRegistry_</code> must be
+<li>Constructs both <code>UpgradeableBeacon</code> instances, owned by <code>address(this)</code>, which
+under the proxy is the proxy itself, so <code>upgrade*Implementation</code> can delegate to
+<code>beacon.upgradeTo</code> and the beacons outlive any implementation swap.
+The implementations are deployed here rather than accepted as parameters, so the call
+carries no ordering dependency on a prior deploy and exposes no argument through which
+a mismatched implementation could reach a beacon. <code>protocolRegistry_</code> must be
 non-zero, otherwise @custom:reverts InvalidProtocolRegistry.</li>
 </ul>
-<p>Implementations and beacons are deployed inline so a single factory address fully
-describes the store topology, removing a class of operator error around mismatched
-beacons.</p>
-<pre><code class="language-solidity">constructor(address protocolRegistry_, address owner_) Ownable(owner_);
+<pre><code class="language-solidity">function initialize(address initialOwner, address protocolRegistry_) external initializer;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>initialOwner</code></td><td><code>address</code></td><td>Account that owns this factory and can upgrade it and the store implementations.</td></tr>
 <tr><td><code>protocolRegistry_</code></td><td><code>address</code></td><td>The protocol registry for writer auth on label stores.</td></tr>
-<tr><td><code>owner_</code></td><td><code>address</code></td><td>Account that owns this factory and can upgrade store implementations.</td></tr>
 </tbody></table>
 </div>
 <h3 id="deploylabelstorefor"><a class="header" href="#deploylabelstorefor">deployLabelStoreFor</a></h3>
@@ -472,6 +483,16 @@ does not implement that selector the probe reverts and the upgrade does not land
 <tr><td><code>versionString</code></td><td><code>string</code></td><td>Current version string.</td></tr>
 </tbody></table>
 </div>
+<h3 id="_authorizeupgrade"><a class="header" href="#_authorizeupgrade">_authorizeUpgrade</a></h3>
+<p>Function that should revert when <code>msg.sender</code> is not authorized to upgrade the contract.
+Called by
+{upgradeToAndCall}.
+Normally, this function will use an xref:access.adoc[access control] modifier such as
+{Ownable-onlyOwner}.</p>
+<pre><code class="language-solidity">function _authorizeUpgrade(address) internal onlyOwner {}
+</code></pre>
+<pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
+</code></pre>
 <h3 id="_onlyownerorprotocol"><a class="header" href="#_onlyownerorprotocol">_onlyOwnerOrProtocol</a></h3>
 <p>Internal authorisation check deferred from the <code>onlyOwnerOrProtocol</code> modifier.</p>
 <pre><code class="language-solidity">function _onlyOwnerOrProtocol() internal view;
