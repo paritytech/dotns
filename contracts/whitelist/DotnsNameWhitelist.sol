@@ -16,7 +16,7 @@ import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
-import {SystemUtils} from "../utils/SystemUtils.sol";
+import {GovernanceAuth} from "../utils/GovernanceAuth.sol";
 
 /// @title DotnsNameWhitelist
 /// @notice Pre-launch name whitelist. A name is Open until governance reserves it or a claim is
@@ -104,9 +104,13 @@ contract DotnsNameWhitelist is
         _;
     }
 
-    /// @notice Internal check enforcing the substrate Root gate.
+    /// @notice Internal check enforcing the governance gate.
+    /// @dev Authority is the Root gateway's address, resolved through the protocol registry on
+    ///      every call. See @custom:contract GovernanceAuth for why the gate is an address rather
+    ///      than a check on the transaction's origin, and why an origin check must not be
+    ///      substituted for it.
     function _onlyGovernance() internal view {
-        require(SystemUtils.originIsRoot(), NotGovernance());
+        require(GovernanceAuth.isGovernance(protocolRegistry, msg.sender), NotGovernance());
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor

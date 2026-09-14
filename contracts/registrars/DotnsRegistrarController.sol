@@ -24,10 +24,10 @@ import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
+import {GovernanceAuth} from "../utils/GovernanceAuth.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
-import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title Dotns Registrar Controller
 /// @notice Allocates top-level labels using a commit reveal scheme.
@@ -289,13 +289,17 @@ contract DotnsRegistrarController is
 
     /// @inheritdoc IDotnsRegistrarController
     function registerReserved(Registration calldata registration) external override nonReentrant {
-        // Read Root once, up front. Everything below must stay callable under a substrate Root
-        // origin, which has no account, so no branch may read `msg.sender`: the grant is checked
-        // against `registration.owner`, the commitment is keyed on its own hash, and the mint
-        // targets the owner.
-        bool isRoot = SystemUtils.originIsRoot();
+        // Two branches on one entry point. The governance branch mints a withheld label without
+        // a grant; the public branch requires one naming `registration.owner` and spends it. Read
+        // the branch once, up front, so the two checks below cannot disagree. See
+        // @custom:contract GovernanceAuth for what counts as governance.
+        //
+        // Neither branch treats `msg.sender` as the beneficiary: the grant is checked against
+        // `registration.owner`, the commitment is keyed on its own hash, and the mint targets the
+        // owner. That is what lets a relayer submit on a beneficiary's behalf.
+        bool isGovernance = GovernanceAuth.isGovernance(protocolRegistry, msg.sender);
         IDotnsNameWhitelist whitelist;
-        if (!isRoot) {
+        if (!isGovernance) {
             whitelist = _nameWhitelist();
             require(
                 whitelist.isGrantedTo(registration.label, registration.owner),
@@ -307,13 +311,15 @@ contract DotnsRegistrarController is
         _consumeCommitment(registration);
 
         // Spend the grant before minting so a grant in the wrong state fails before any name is
-        // issued. Root skips it: a governance mint must not consume a grant held by someone else.
+        // issued. Governance skips it: a governance mint must not consume a grant held by someone
+        // else.
         //
-        // A consequence worth knowing: if Root mints a label that is `Claimed` or `Reserved` on
-        // the whitelist, that record survives the mint. The beneficiary's own `registerReserved`
-        // then fails `NameNotAvailable`, and the node stays in the whitelist's active set until
-        // governance calls `revokeName`. Nothing is lost, but the grant is stranded.
-        if (!isRoot) {
+        // A consequence worth knowing: if governance mints a label that is `Claimed` or `Reserved`
+        // on the whitelist, that record survives the mint. The beneficiary's own
+        // `registerReserved` then fails `NameNotAvailable`, and the node stays in the whitelist's
+        // active set until governance calls `revokeName`. Nothing is lost, but the grant is
+        // stranded.
+        if (!isGovernance) {
             whitelist.consume(registration.label, registration.owner);
         }
 

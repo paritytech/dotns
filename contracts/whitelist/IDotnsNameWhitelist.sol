@@ -10,10 +10,10 @@ pragma solidity ^0.8.34;
 ///      mismatched hash. Claims are keyed by the beneficiary `user`, not the submitter, so a
 ///      relayer or a cross-chain sovereign account can submit a claim on a user's behalf and the
 ///      name still binds to that user. All state is on-chain and queryable through views; no event
-///      indexing is required. The entire admin surface is substrate Root: the gates check
-///      `originIsRoot` and read no `msg.sender`, so Root's lack of an address is not a problem, and
-///      no signed account grants, revokes, reserves, or retunes a cap. The controllers hold only
-///      the `consume` hook.
+///      indexing is required. The entire admin surface is governance: the gates require
+///      `msg.sender` to be the `ROOT_GATEWAY`, the non-upgradeable contract Root dispatches to,
+///      so no signed account grants, revokes, reserves, or retunes a cap. The controllers hold
+///      only the `consume` hook.
 /// @custom:security-contact admin@parity.io
 interface IDotnsNameWhitelist {
     /// @notice Status of a name.
