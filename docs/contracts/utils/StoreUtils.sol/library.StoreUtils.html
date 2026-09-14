@@ -180,13 +180,13 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="storeutils"><a class="header" href="#storeutils">StoreUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/f0be180f057c273ef73fc4ad3f4aae1023c59697/contracts/utils/StoreUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/3662410fe15ed37527a99bc060bc929a61c675ea/contracts/utils/StoreUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Store Utilities Library</p>
 <p>Canonical helpers for protocol writes into per-user <code>LabelStore</code> instances.</p>
 <p>One auth rule, one write path. Every DotNS consumer (controller, registrar,
-registry, PoP controller) funnels label writes through <code>writeLabel</code> so
-authorisation and deploy-on-first-use semantics are identical across flows.</p>
+registry, PoP controller) funnels label writes through <code>writeNewLabel</code> so
+authorisation, deploy-on-first-use and conflict handling are identical across flows.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
@@ -214,43 +214,12 @@ reverts: NotAuthorised when a deployment is required.</p>
 </div>
 <h3 id="writenewlabel"><a class="header" href="#writenewlabel">writeNewLabel</a></h3>
 <p>Writes <code>label</code> for a name being registered, rejecting a conflicting entry.</p>
-<p>Same as @custom:function writeLabel except that an existing entry is only tolerated
-when it already holds <code>label</code>. A registration is the first time the protocol names a
-node in this user's store, so an entry saying something else was put there by
-someone else and must not be silently honoured: <code>storeLabel</code> is single-write with no
-delete, so accepting it would leave the name permanently mislabelled and
-untransferable. Matching entries stay a no-op, which keeps re-registration by a
-previous holder working.</p>
+<p>An existing entry is tolerated only when it already holds <code>label</code>. An entry saying
+something else was put there by someone else and must not be silently honoured:
+<code>storeLabel</code> is single-write with no delete, so accepting it would leave the name
+permanently mislabelled and untransferable. Matching entries stay a no-op, which keeps
+re-registration by a previous holder, and a transfer back to one, working.</p>
 <pre><code class="language-solidity">function writeNewLabel(
-    IStoreFactory factory,
-    address user,
-    bytes32 labelhash,
-    string memory label
-)
-    internal
-    returns (address store);
-</code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>factory</code></td><td><code>IStoreFactory</code></td><td>The store factory.</td></tr>
-<tr><td><code>user</code></td><td><code>address</code></td><td>The label store owner.</td></tr>
-<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>The labelhash key.</td></tr>
-<tr><td><code>label</code></td><td><code>string</code></td><td>The label string (typically the full name, e.g. "alice.dot").</td></tr>
-</tbody></table>
-</div>
-<p><strong>Returns</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>store</code></td><td><code>address</code></td><td>The resolved or newly deployed store address.</td></tr>
-</tbody></table>
-</div>
-<h3 id="writelabel"><a class="header" href="#writelabel">writeLabel</a></h3>
-<p>Writes <code>label</code> under <code>labelhash</code> for <code>user</code>, deploying their <code>LabelStore</code> if needed.</p>
-<p>Idempotent on locked entries: once a label is locked the call is a no-op rather
-than a revert, so retried protocol flows (e.g. an ERC721 transfer back to a prior
-owner) pass through without failing on the existing lock. Inherits the factory's
-writer authorisation: callers that are not the factory owner and not
-a store writer @custom:reverts NotAuthorised when the user has no store yet.</p>
-<pre><code class="language-solidity">function writeLabel(
     IStoreFactory factory,
     address user,
     bytes32 labelhash,

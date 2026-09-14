@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="registrationutils"><a class="header" href="#registrationutils">RegistrationUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/f0be180f057c273ef73fc4ad3f4aae1023c59697/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/3662410fe15ed37527a99bc060bc929a61c675ea/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 DotNS Registration Utilities Library</p>
 <p>Single canonical implementation of the "mint + forward-registry + store-write"
@@ -211,7 +211,7 @@ underlying state-transition layer. Store authorisation is resolved against the
 protocol registry on every write (@custom:function StoreAuth.isStoreWriter), so no
 per-store allowlist bookkeeping is needed here.</p>
 <p>The registrar writes the <code>LabelStore</code> entry directly inside <code>register</code>
-so this helper deliberately does not call <code>StoreUtils.writeLabel</code>.
+so this helper deliberately does not call <code>StoreUtils.writeNewLabel</code>.
 Doing it twice would deploy or touch the store on every flow and
 could conflict with the registrar's locked-entry semantics.</p>
 <pre><code class="language-solidity">function registerAndStore(RegistrationContext memory context)

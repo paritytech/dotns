@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/f0be180f057c273ef73fc4ad3f4aae1023c59697/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/3662410fe15ed37527a99bc060bc929a61c675ea/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -441,6 +441,17 @@ non-transferable. Raised by the <code>_update</code> transfer gate and by</p>
 <p><strong>Note:</strong>
 function: quoteTransferFee.</p>
 <pre><code class="language-solidity">error NameSoulbound(uint256 tokenId);
+</code></pre>
+<h3 id="unsolicitedescrowdeposit"><a class="header" href="#unsolicitedescrowdeposit">UnsolicitedEscrowDeposit</a></h3>
+<p>Thrown when a name is transferred into escrow custody by anything other than the
+escrow's own release path.</p>
+<p><code>redeem</code> and <code>reclaim</code>, the two calls that return a name from custody, gate on the
+release position the escrow records before it moves the name, so custody reached any other
+way has no exit.</p>
+<p><strong>Note:</strong>
+function: IDotnsNameEscrow.onERC721Received refuses such a deposit but does not run
+on a plain <code>transferFrom</code>, which is why the gate is enforced here too.</p>
+<pre><code class="language-solidity">error UnsolicitedEscrowDeposit(uint256 tokenId);
 </code></pre>
 
                     </main>
