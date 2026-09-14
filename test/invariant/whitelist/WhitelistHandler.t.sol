@@ -117,17 +117,16 @@ contract WhitelistHandler is Test {
         return _labels[seed % _labels.length];
     }
 
-    /// @notice Puts the next call under a substrate Root origin. The whitelist's admin surface is
-    /// Root-only, so every governance action here needs it; a plain prank produces a Signed origin
-    /// and would revert into the catch, leaving the campaign to exercise only the permissionless
-    /// entry points.
+    /// @notice Opens the governance gate for the next call. The whitelist's admin surface admits
+    /// the Root gateway alone, so every governance action here needs it; without it the call
+    /// reverts into the catch and the campaign exercises only the permissionless entry points.
     function _asRoot() internal {
         _actAsGovernance(true);
     }
 
-    /// @notice Restores the default. `DotnsRegistrarController.registerReserved` reads
-    /// `originIsRoot` too, and handler state is campaign-scoped, so a sticky `true` would put a
-    /// later reserved registration on the Root branch.
+    /// @notice Closes the gate again. `DotnsRegistrarController.registerReserved` resolves the
+    /// same key, and handler state is campaign-scoped, so a sticky open gate would put a later
+    /// reserved registration on the governance branch.
     function _asSigned() internal {
         _actAsGovernance(false);
     }

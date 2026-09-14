@@ -370,8 +370,8 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     }
 
     /// @dev The controller exposes no role surface at all: reserved registration reads grants
-    /// from `DotnsNameWhitelist`, whose own admin surface is Root-only, so there is no role to
-    /// hold and nothing to advertise.
+    /// from `DotnsNameWhitelist`, whose own admin surface is governance-only, so there is no role
+    /// to hold and nothing to advertise.
     function test_controller_advertises_no_role_interface() public view {
         assertTrue(
             dotnsRegistrarController.supportsInterface(type(IDotnsRegistrarController).interfaceId)

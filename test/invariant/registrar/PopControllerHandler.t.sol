@@ -562,9 +562,9 @@ contract PopControllerHandler is Test {
         } catch {
             ok = false;
         }
-        // Restore before returning. The mock is campaign-scoped in an invariant run, and
-        // `DotnsRegistrarController.registerReserved` reads `originIsRoot` too, so leaving it
-        // `true` would put any later reserved registration on the Root branch.
+        // Close the gate before returning. The mock is campaign-scoped in an invariant run, and
+        // `DotnsRegistrarController.registerReserved` resolves the same key, so leaving it open
+        // would put any later reserved registration on the governance branch.
         _actAsGovernance(false);
     }
 
@@ -583,7 +583,6 @@ contract PopControllerHandler is Test {
         _actAsGovernance(false);
     }
 
-    /// @notice Mocks the revive `originIsRoot()` query to return `returnValue`.
     /// @notice Stand-in address for the Root gateway, so the closed gate rejects every caller.
     address internal constant ROOT_GATEWAY_STUB = address(uint160(0x600D6A7E));
 

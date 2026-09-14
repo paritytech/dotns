@@ -28,10 +28,8 @@ contract DotnsNameWhitelistFuzz is BaseDotns {
         );
         vm.stopPrank();
 
-        // Configuration is Root-only, and the suite's own actions are governance calls, so it
-        // runs under a Root origin throughout.
-        // The suite calls governance entry points directly, so it runs under a Root origin
-        // throughout rather than mocking per call.
+        // The suite calls governance entry points directly, so it holds the gate open throughout
+        // rather than opening it per call. Tests that need a rejection close it themselves.
         _actAsGovernance(true);
         whitelist.setWindow(0, 365 days);
     }

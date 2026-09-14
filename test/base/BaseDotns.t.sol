@@ -273,8 +273,8 @@ abstract contract BaseDotns is Test {
         popRules = PopRules(popRulesAddress);
         vm.label(popRulesAddress, "PopRules");
         // Open the short-name market so the band and registration suites exercise names below nine
-        // characters. Toggled as a Root origin because the setter is Root-gated. The default-closed
-        // state is covered directly in PopRules unit tests.
+        // characters. Toggled as governance because the setter is governance-gated. The
+        // default-closed state is covered directly in PopRules unit tests.
         _setShortNames(true);
 
         address dotnsResolverAddress = Upgrades.deployUUPSProxy(
@@ -548,10 +548,10 @@ abstract contract BaseDotns is Test {
         _actAsGovernance(false);
     }
 
-    /// @notice Drives a PoP reservation under a Root origin and settles the resulting
-    /// pending claim from the user's signed origin.
-    /// @dev Single canonical helper for PoP-gateway reservations across unit and fuzz
-    /// test suites. Calls the controller under a mocked Root origin.
+    /// @notice Drives a PoP reservation as governance and settles the resulting pending claim
+    /// from the user's own account.
+    /// @dev Single canonical helper for PoP reservations across unit and fuzz test suites. Calls
+    /// the controller with the governance gate open.
     /// The auto-settle deploys the user's `LabelStore` and writes the stashed label so
     /// subsequent gateway mints for the same user take the warm path and assertions
     /// against the resolver and store hold. Chat keys are persisted eagerly on the PoP
@@ -581,31 +581,31 @@ abstract contract BaseDotns is Test {
         }
     }
 
-    /// @notice Dispatches the typed `reserveLiteName` call under a mocked Root origin.
+    /// @notice Dispatches the typed `reserveLiteName` call as governance.
     function _rootReserveLiteName(IDotnsPopController.LiteRegistration memory params) internal {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_LITE_TYPED, params));
     }
 
-    /// @notice Dispatches the typed `reserveBaseName` call under a mocked Root origin.
+    /// @notice Dispatches the typed `reserveBaseName` call as governance.
     function _rootReserveBaseName(IDotnsPopController.BaseReservation memory params) internal {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_TYPED, params));
     }
 
-    /// @notice Dispatches the typed `reserveBaseNameOnly` call under a mocked Root origin.
+    /// @notice Dispatches the typed `reserveBaseNameOnly` call as governance.
     function _rootReserveBaseNameOnly(IDotnsPopController.BaseNameReservation memory params)
         internal
     {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_ONLY_TYPED, params));
     }
 
-    /// @notice Dispatches the typed `registerBaseName` call under a mocked Root origin.
+    /// @notice Dispatches the typed `registerBaseName` call as governance.
     /// @dev Dispatches the label as written. The gateway sends what People Chain holds, so a
     ///      helper that reshaped it would hide whether a fixture is a valid lite label.
     function _rootRegisterBaseName(IDotnsPopController.FullRegistration memory params) internal {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_REGISTER_BASE_TYPED, params));
     }
 
-    /// @notice Calls `payload` on the PoP controller under a mocked Root origin.
+    /// @notice Calls `payload` on the PoP controller with the governance gate open.
     /// @dev Reverts with the inner error data when the call fails, so
     ///      `vm.expectRevert` assertions remain meaningful at the test level.
     function _dispatchFromRoot(bytes memory payload) internal returns (bytes memory ret) {

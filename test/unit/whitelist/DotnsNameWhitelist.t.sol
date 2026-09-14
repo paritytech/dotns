@@ -12,10 +12,11 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 /// @title DotnsNameWhitelist unit tests
 /// @notice Covers claiming, competing claims and resolution, the request window, reservation, the
 ///         controller-only consume hook, and the review views.
-/// @dev No test here pranks a caller for a governance action. The admin surface is Root-only and
-///      the gates read no `msg.sender`, so who submits is irrelevant and a prank would imply an
-///      owner authority that does not exist. The negative cases mock a signed origin instead and
-///      assert `NotGovernance`.
+/// @dev The admin surface admits exactly one caller, the Root gateway, so who submits is the
+///      whole question. Positive cases open the gate for this contract with
+///      `_actAsGovernance(true)` rather than pranking an account, since pranking the owner would
+///      imply an owner authority that does not exist. Negative cases close the gate, or call from
+///      a third party or an intermediate contract, and assert `NotGovernance`.
 contract DotnsNameWhitelistTests is BaseDotns {
     DotnsNameWhitelist internal whitelist;
 
@@ -324,7 +325,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
         assertEq(whitelist.nameCount(), 0);
     }
 
-    /// @dev Not even the owner revokes: the admin surface is Root-only.
+    /// @dev Not even the owner revokes: the admin surface admits the Root gateway alone.
     function test_revokeName_rejects_the_owner() public {
         _grant(ed, BASE_LABEL_A);
         _actAsGovernance(false);
@@ -586,7 +587,8 @@ contract DotnsNameWhitelistTests is BaseDotns {
         whitelist.setMaxGrantBatch(aboveLimit);
     }
 
-    /// @dev Caps are configuration, and configuration is Root-only too: the owner cannot retune.
+    /// @dev Caps are configuration, and configuration is governance-only too: the owner cannot
+    /// retune them.
     function test_setMaxClaimants_reverts_for_a_signed_caller() public {
         _actAsGovernance(false);
         vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);

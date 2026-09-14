@@ -90,8 +90,8 @@ contract ReservedGrantHandler is Test {
         address beneficiary = actors[actorSeed % actors.length];
         string memory label = _freshLabel();
 
-        // The whitelist is Root-only. Restore the default afterwards: `registerReserved` reads
-        // `originIsRoot` too, and a sticky `true` would skip the grant check and the consume.
+        // The whitelist admits governance only. Close the gate afterwards: `registerReserved`
+        // resolves the same key, and a sticky open gate would skip the grant check and consume.
         _actAsGovernance(true);
         WHITELIST.grantName(label, beneficiary);
         _actAsGovernance(false);
@@ -217,7 +217,6 @@ contract ReservedGrantHandler is Test {
         beneficiaries.push(account);
     }
 
-    /// @notice Mocks the revive `originIsRoot()` query for the next call.
     /// @notice Stand-in address for the Root gateway, so the closed gate rejects every caller.
     address internal constant ROOT_GATEWAY_STUB = address(uint160(0x600D6A7E));
 
