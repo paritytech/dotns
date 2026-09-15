@@ -28,6 +28,14 @@ library StringUtils {
     ///      on charset than a DNS label: letters only.
     uint256 internal constant MAX_DNS_LABEL_OCTETS = 63;
 
+    /// @notice RFC 1035 ceiling on a whole dotted name, in octets.
+    /// @dev @custom:constant MAX_DNS_LABEL_OCTETS bounds one segment; this bounds the path. Without
+    ///      it a caller composes an arbitrarily long `parentLabel` out of legal 63-octet segments,
+    ///      and `DotnsRegistry.setSubnodeOwner` stores the full name built from it verbatim in a
+    ///      `LabelStore` row that has no delete path, so the text is a permanent multiplier on
+    ///      every enumeration that reads the row back.
+    uint256 internal constant MAX_NAME_PATH_OCTETS = 255;
+
     /// @notice ASCII full stop separating a lite label's stem from its digit suffix.
     /// @dev A lite label is the only label shape in DotNS that carries a separator;
     ///      @custom:function _isDnsLabel rejects it everywhere else.
@@ -224,6 +232,7 @@ library StringUtils {
         bytes memory path = bytes(value);
         uint256 length = path.length;
         if (length == 0) return false;
+        if (length > MAX_NAME_PATH_OCTETS) return false;
 
         uint256 start;
         for (uint256 i = 0; i < length; ++i) {
