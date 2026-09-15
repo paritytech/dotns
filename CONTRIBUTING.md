@@ -135,7 +135,7 @@ Any new contract address that other contracts need to read must be looked up thr
 
 If you are adding a new contract category, add a `bytes32` key for it in `DotnsConstants.sol`, wire it up in `WireDeployments.s.sol` (including its entry in `_registryEntries`, so its code identity is declared and verified with the rest), and list the contract and its interface in `.github/abi-contracts.txt` so their ABIs ship in the release artifact. Read it the same way every existing contract does. Give the contract the standard `version()` mirror — a `view` that returns `protocolRegistry.protocolVersion()`, copied from any existing contract — and never a hardcoded version constant: what a network runs is declared once, on the protocol registry, every contract reports that one value, and per-contract identity is the declared codehash the deploy pipeline writes, not a self-report compiled into the bytecode.
 
-A change that moves or adds an address (a new salt, a new contract, a contract restructured behind a proxy) must update `deployments/expected.json` in the same PR — that diff is where review sees the move — and must NOT touch any `deployments/<network>/<chainId>.json`. Those are records of live networks, updated only by a real deploy on that network; editing one from a code PR publishes an address nothing is deployed at. The expected set diverging from a network's manifest is normal and means a redeploy or migration is owed on that network — see "Network manifests and the expected set" in `DEPLOYMENTS.md`.
+A change that moves or adds an address (a new salt, a new contract, a contract restructured behind a proxy) must update `deployments/expected.json` in the same PR — that diff is where review sees the move — and must NOT touch any `deployments/<network>/<chainId>.json`. Those are records of live networks, updated only by a real deploy on that network; editing one from a code PR publishes an address nothing is deployed at. The expected set diverging from a network's manifest is normal and means a redeploy or migration is owed on that network — see "Network manifests and the expected set" in `DEPLOYMENTS.md`. CI enforces this: `release-metadata.yml` fails a pull request that edits a live manifest unless the pull request carries the `deployment-record` label, which is how a real deploy records its addresses.
 
 Bad — the registrar address is frozen at construction, so rotating it needs an upgrade:
 
@@ -278,6 +278,8 @@ forge test --no-match-path 'test/fork/**'
 3. Delete every `*Old.sol` and `I*Old.sol` referenced only by the upgrade script.
 4. Delete temporary forge artefacts: `broadcast/<Script>.s.sol/` and `cache/<Script>.s.sol/`.
 5. Update `deployments/<network>/<chainid>.json` with any new addresses. It is the only place they are recorded, so nothing else needs editing.
+   That edit is the one case where touching a live manifest is correct, so label the pull
+   request `deployment-record`; without it the `live-manifests-unchanged` check refuses the diff.
 
 ## Code of conduct
 
