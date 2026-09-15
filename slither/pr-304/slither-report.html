@@ -8,13 +8,13 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">DotNS Slither Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-09-14 23:13 UTC | 190 findings</p>
+<p class="text-sm text-gray-500">Generated 2026-09-15 00:10 UTC | 192 findings</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">High</p><p class="text-xl font-mono font-bold text-red-400">4</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Medium</p><p class="text-xl font-mono font-bold text-yellow-400">40</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">89</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Informational</p><p class="text-xl font-mono font-bold text-gray-400">57</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Informational</p><p class="text-xl font-mono font-bold text-gray-400">59</p></div>
 </div></div>
 <h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">High (4)</h2>
 <div class="overflow-x-auto"><table class="w-full text-sm">
@@ -148,6 +148,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
+<td class="py-2 px-3 text-gray-200">StoreFactory.upgradeLabelStoreImplementation(address) (contracts/store/StoreFactory.sol#146-155) ignores return value by</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:146</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
 <td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.reject(string,address) (contracts/whitelist/DotnsNameWhitelist.sol#208-223) ignores return value by _</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:208</td>
 </tr>
@@ -178,8 +183,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">StoreFactory.upgradeUserStoreImplementation(address) (contracts/store/StoreFactory.sol#182-187) ignores return value by </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:182</td>
+<td class="py-2 px-3 text-gray-200">StoreFactory.upgradeUserStoreImplementation(address) (contracts/store/StoreFactory.sol#198-203) ignores return value by </td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:198</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
@@ -213,13 +218,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">StoreFactory.upgradeLabelStoreImplementation(address) (contracts/store/StoreFactory.sol#130-139) ignores return value by</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:130</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">StoreFactory.constructor(address,address) (contracts/store/StoreFactory.sol#78-85) ignores return value by IDotnsProtoco</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:78</td>
+<td class="py-2 px-3 text-gray-200">StoreFactory.initialize(address,address) (contracts/store/StoreFactory.sol#90-101) ignores return value by IDotnsProtoco</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:90</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
@@ -536,13 +536,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:198</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in StoreFactory.upgradeUserStoreImplementation(address) (contracts/store/StoreFactory.sol#198-203): 	External</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:198</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in StoreFactory.upgradeUserStoreImplementation(address) (contracts/store/StoreFactory.sol#182-187): 	External</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:182</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:198</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -576,6 +576,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in StoreFactory.upgradeLabelStoreImplementation(address) (contracts/store/StoreFactory.sol#146-155): 	Externa</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:146</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseNameOnly(IDotnsPopController.BaseNameReservation) (contracts/registrars/Dotn</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:216</td>
 </tr>
@@ -593,11 +598,6 @@
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.registerBaseName(IDotnsPopController.FullRegistration) (contracts/registrars/DotnsPopCo</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:254</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in StoreFactory.upgradeLabelStoreImplementation(address) (contracts/store/StoreFactory.sol#130-139): 	Externa</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:130</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -705,7 +705,7 @@
 <td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:495</td>
 </tr>
 </tbody></table></div>
-<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Informational (57)</h2>
+<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Informational (59)</h2>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Check</th>
@@ -821,6 +821,11 @@
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
 <td class="py-2 px-3 text-gray-200">Variable DotnsProtocolRegistry.__gap (contracts/registry/DotnsProtocolRegistry.sol#52) is not in mixedCase </td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistry.sol:52</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
+<td class="py-2 px-3 text-gray-200">Variable StoreFactory.__gap (contracts/store/StoreFactory.sol#61) is not in mixedCase </td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:61</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
@@ -996,6 +1001,11 @@
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopController.__gap (contracts/registrars/DotnsPopController.sol#148) is never used in DotnsPopController (contract</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:148</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
+<td class="py-2 px-3 text-gray-200">StoreFactory.__gap (contracts/store/StoreFactory.sol#61) is never used in StoreFactory (contracts/store/StoreFactory.sol</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:61</td>
 </tr>
 </tbody></table></div>
 </div></body></html>
