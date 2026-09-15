@@ -138,8 +138,14 @@ interface IDotnsRegistry {
     ///      prior owner's resolver pointer (and the records keyed under it) cannot be inherited
     ///      by the next holder across that recycle. A secondary-market ERC-721 `transferFrom` does
     ///      not call the registry, so a name sold directly keeps the seller's resolver pointer
-    ///      until the buyer overwrites it. Stores `owner = address(0)` as a sentinel so reads
-    ///      delegate to `IDotnsRegistrar.ownerOf` and ERC-721 transfers remain authoritative. Emits
+    ///      until the buyer overwrites it. That covers the node itself and not the nodes beneath
+    /// it: a subname stores its own owner, and @custom:function isAuthorised returns on that
+    ///      owner before consulting the registrar, so a seller keeps write authority over every
+    ///      subname they minted until the buyer reassigns each one through
+    ///      @custom:function setSubnodeOwner. The set is derivable from
+    ///      @custom:emits NewOwner, which indexes the parent node. Stores `owner = address(0)` as a
+    /// sentinel so reads delegate to `IDotnsRegistrar.ownerOf` and ERC-721 transfers remain
+    /// authoritative. Emits
     ///      @custom:emits NodeTransferred on success.
     function setOwner(bytes32 node, address newOwner) external;
 
