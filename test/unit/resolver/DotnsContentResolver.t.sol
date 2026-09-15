@@ -72,4 +72,87 @@ contract DotnsContentResolverTests is BaseDotns {
 
         assertEq(dotnsContentResolver.text(node, textKey), textValue);
     }
+
+    function test_contenthash_updated_at_block_is_zero_when_unset() public {
+        bytes32 node = _register("unsetblock01", ed, IPopRules.PopStatus.NoStatus);
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 0);
+    }
+
+    function test_set_contenthash_records_block_number() public {
+        address nameOwner = ed;
+
+        bytes32 node = _register("blockrecord01", nameOwner, IPopRules.PopStatus.NoStatus);
+
+        bytes memory contentHash =
+            hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        vm.roll(1_234);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 1_234);
+    }
+
+    function test_set_contenthash_again_moves_block_number() public {
+        address nameOwner = ed;
+
+        bytes32 node = _register("blockmove0001", nameOwner, IPopRules.PopStatus.NoStatus);
+
+        bytes memory contentHash =
+            hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        vm.roll(100);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 100);
+
+        // A rewrite of the identical hash is still a write and is recorded as one, matching
+        // ContentHashUpdated, which is emitted on every call rather than only on a change.
+        vm.roll(250);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 250);
+    }
+
+    function test_set_text_does_not_touch_contenthash_block() public {
+        address nameOwner = ed;
+
+        bytes32 node = _register("textnoblock01", nameOwner, IPopRules.PopStatus.NoStatus);
+
+        bytes memory contentHash =
+            hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        vm.roll(40);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+
+        vm.roll(80);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setText(node, "url", "https://example.org");
+        vm.stopPrank();
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 40);
+    }
+
+    function testFuzz_set_contenthash_records_any_block(uint64 blockNumber) public {
+        blockNumber = uint64(bound(blockNumber, 1, type(uint64).max));
+        address nameOwner = ed;
+
+        bytes32 node = _register("fuzzblock0001", nameOwner, IPopRules.PopStatus.NoStatus);
+
+        bytes memory contentHash =
+            hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        vm.roll(blockNumber);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), blockNumber);
+    }
 }
