@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsprotocolregistry"><a class="header" href="#dotnsprotocolregistry">DotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/2757c47c8ec05bea2fc6fdac3b3d3a45ab347763/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/3c8a9e96cee6348529a42d6b2dcf711b84da96d5/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></p>
 <p><strong>Title:</strong>
@@ -214,6 +214,14 @@ multiple keys without being treated as deregistered when only one key is rewired
 <h3 id="_tld"><a class="header" href="#_tld">_tld</a></h3>
 <p>TLD suffix including the leading dot, e.g. <code>.dot</code>.</p>
 <pre><code class="language-solidity">string private _tld
+</code></pre>
+<h3 id="_expectedcodehash"><a class="header" href="#_expectedcodehash">_expectedCodehash</a></h3>
+<p>Codehash declared for the code that executes for each well-known key.</p>
+<pre><code class="language-solidity">mapping(bytes32 key =&gt; bytes32 codehash) private _expectedCodehash
+</code></pre>
+<h3 id="_protocolversion"><a class="header" href="#_protocolversion">_protocolVersion</a></h3>
+<p>Release tag the network was last declared to run, bare semver (e.g. <code>0.8.0</code>).</p>
+<pre><code class="language-solidity">string private _protocolVersion
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <pre><code class="language-solidity">uint256[50] private __gap
@@ -264,9 +272,9 @@ hold an address, otherwise @custom:reverts KeyNotRegistered. Decrements the remo
 address's refcount, so a contract still reachable under another key keeps its
 registered status. Exists because the registry is a discovery directory that would
 otherwise only ever grow: a contract retired from the protocol, or one published for
-lookup that should no longer be listed, has no other way out. Emits</p>
-<p><strong>Note:</strong>
-emits: AddressRemoved.</p>
+lookup that should no longer be listed, has no other way out. Also clears any
+codehash declared for the key, so a later re-registration never starts out with a
+stale claim. Emits @custom:emits AddressRemoved.</p>
 <pre><code class="language-solidity">function remove(bytes32 key) external override onlyOwner;
 </code></pre>
 <h3 id="isregisteredaddress"><a class="header" href="#isregisteredaddress">isRegisteredAddress</a></h3>
@@ -291,15 +299,67 @@ as the root parent when deriving a name's node.</p>
 <p>Fixed at initialisation. Consumers append it when rendering a label as a full name.</p>
 <pre><code class="language-solidity">function tld() external view override returns (string memory suffix);
 </code></pre>
+<h3 id="protocolversion"><a class="header" href="#protocolversion">protocolVersion</a></h3>
+<p>Returns the release tag this network was last declared to run, as bare semver
+(e.g. <code>0.8.0</code>, never <code>v0.8.0</code> and never with build metadata).</p>
+<p>Written by the deploy and upgrade tooling as the final step of a fully applied
+deployment or upgrade, so a crashed or partial run leaves the previous value
+standing rather than over-claiming. Empty until first set; consumers treat empty
+as "this deployment predates version declarations" and fall back to probing. A
+declaration, not a proof: the owner is trusted to keep it truthful, and</p>
+<p><strong>Note:</strong>
+function: expectedCodehash is the per-contract cross-check.</p>
+<pre><code class="language-solidity">function protocolVersion() external view override returns (string memory semver);
+</code></pre>
+<h3 id="setprotocolversion"><a class="header" href="#setprotocolversion">setProtocolVersion</a></h3>
+<p>Declares the release tag this network runs.</p>
+<p>Owner-restricted, otherwise @custom:reverts OwnableUnauthorizedAccount. <code>semver</code>
+must be non-empty, start with an ASCII digit, and contain only alphanumerics, dots,
+and hyphens, otherwise @custom:reverts InvalidProtocolVersion. That admits semver
+core and pre-release identifiers (<code>0.8.0</code>, <code>0.8.0-rc.1</code>) while rejecting the two
+values consumers cannot parse and compare: a leading <code>v</code> and <code>+</code> build metadata.
+Full semver validation stays in the tooling. Emits</p>
+<p><strong>Note:</strong>
+emits: ProtocolVersionSet.</p>
+<pre><code class="language-solidity">function setProtocolVersion(string calldata semver) external override onlyOwner;
+</code></pre>
 <h3 id="version"><a class="header" href="#version">version</a></h3>
-<p>Returns implementation version.</p>
-<pre><code class="language-solidity">function version() external pure virtual returns (string memory versionString);
+<p>Returns the declared release, mirroring <code>protocolVersion</code> under the historical
+<code>version()</code> selector every DotNS contract exposes.</p>
+<p>Sibling contracts mirror the same stored value by reading it from here, so
+<code>version()</code> answers identically network-wide; this contract is where the value
+lives, so it reads its own storage.</p>
+<pre><code class="language-solidity">function version() external view virtual returns (string memory versionString);
 </code></pre>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>versionString</code></td><td><code>string</code></td><td>Current version string.</td></tr>
+<tr><td><code>versionString</code></td><td><code>string</code></td><td>Declared release as bare semver, empty when never declared.</td></tr>
 </tbody></table>
 </div>
+<h3 id="expectedcodehash"><a class="header" href="#expectedcodehash">expectedCodehash</a></h3>
+<p>Returns the codehash declared for the code that executes for <code>key</code>.</p>
+<p>For a proxy entry this is the implementation's codehash; for a plain contract, its
+own. <code>bytes32(0)</code> means never declared (or reset). Comparing this against the
+actual codehash behind @custom:function get detects an upgrade performed outside
+the release tooling: the declaration lives here while the code lives there, so
+drift between the two is the signal, and clearing it requires re-declaring, which
+is the discipline the check enforces. Verification against release artifacts is
+the trustless escalation and lives off chain.</p>
+<pre><code class="language-solidity">function expectedCodehash(bytes32 key) external view override returns (bytes32 codehash);
+</code></pre>
+<h3 id="setexpectedcodehash"><a class="header" href="#setexpectedcodehash">setExpectedCodehash</a></h3>
+<p>Declares the codehash of the code that executes for <code>key</code>.</p>
+<p>Owner-restricted, otherwise @custom:reverts OwnableUnauthorizedAccount. The key
+must currently be registered, otherwise @custom:reverts KeyNotRegistered; a
+removal clears the declaration, so an unregistered key never carries a stale
+claim. <code>bytes32(0)</code> is allowed as an explicit reset to "undeclared". Kept separate
+from @custom:function set so the write API stays minimal: the deploy tooling pairs
+the two calls, and an unpaired rewire is not silent, it surfaces as
+declared-versus-actual drift to any verifier. Emits</p>
+<p><strong>Note:</strong>
+emits: ExpectedCodehashSet.</p>
+<pre><code class="language-solidity">function setExpectedCodehash(bytes32 key, bytes32 codehash) external override onlyOwner;
+</code></pre>
 <h3 id="_authorizeupgrade"><a class="header" href="#_authorizeupgrade">_authorizeUpgrade</a></h3>
 <p>Function that should revert when <code>msg.sender</code> is not authorized to upgrade the contract.
 Called by
