@@ -11,6 +11,8 @@ interface IDotnsRegistry {
     /// @notice Record describing a subnode creation request.
     /// @param subLabel Human readable subnode label e.g "alice".
     /// @param parentLabel Canonical parent name without the TLD suffix e.g. bob or child.bob.
+    ///        At most `StringUtils.MAX_NAME_PATH_OCTETS` octets, which is what bounds nesting
+    ///        depth.
     /// @param owner Address to assign as owner of the created subnode.
     /// @param persist Whether to index the subnode into the owner's `LabelStore`, deploying it on
     ///        demand. When false the ownership and resolver record is still written but the store
@@ -65,12 +67,20 @@ interface IDotnsRegistry {
     /// @notice Thrown when a sublabel is not a canonical lowercase ASCII DNS label.
     error InvalidLabel();
 
-    /// @notice Thrown when the supplied parent label does not match the parent node.
+    /// @notice Thrown when the supplied parent label does not match the parent node, or is not a
+    ///         valid name path.
+    /// @dev The two cases share one error because both mean the caller's `parentLabel` cannot be
+    ///      trusted to name `parentNode`: a mismatched namehash, a malformed segment, or a path
+    ///      over `StringUtils.MAX_NAME_PATH_OCTETS`. The last is what bounds how deep a chain of
+    ///      subnames can nest, since the composed full name is stored in a `LabelStore` row that
+    ///      has no delete path.
     error ParentLabelMismatch();
 
     /// @notice Record describing a subnode resolver update request.
     /// @param subLabel Human-readable subnode label e.g "alice".
     /// @param parentLabel Canonical parent name without the TLD suffix e.g bob or child.bob.
+    ///        At most `StringUtils.MAX_NAME_PATH_OCTETS` octets, which is what bounds nesting
+    ///        depth.
     /// @param resolver Resolver contract address (zero clears).
     struct SubnodeResolverRecord {
         bytes32 parentNode;
@@ -84,7 +94,8 @@ interface IDotnsRegistry {
     ///      @custom:reverts NotAuthorised. The new owner address must be non-zero, otherwise
     ///      @custom:reverts NotAllowed. `record.subLabel` must be a single canonical DNS label
     ///      (otherwise @custom:reverts InvalidLabel) and `record.parentLabel` must be a name
-    ///      path whose namehash matches `record.parentNode` (otherwise
+    ///      path of at most `StringUtils.MAX_NAME_PATH_OCTETS` octets whose namehash matches
+    ///      `record.parentNode` (otherwise
     ///      @custom:reverts ParentLabelMismatch). Subnodes are parent-sovereign: the current
     ///      `record.parentNode` owner may reassign or rotate a subnode's resolver at any time
     ///      without the prior subnode owner's consent. On reassignment the resolver pointer is
@@ -110,7 +121,8 @@ interface IDotnsRegistry {
     ///      that surface trust signals to subnode owners should treat any resolver rotation as
     ///      a re-attestation prompt. `record.subLabel` must be a single canonical DNS label
     ///      (otherwise @custom:reverts InvalidLabel) and `record.parentLabel` must be a name
-    ///      path whose namehash matches `record.parentNode` (otherwise
+    ///      path of at most `StringUtils.MAX_NAME_PATH_OCTETS` octets whose namehash matches
+    ///      `record.parentNode` (otherwise
     ///      @custom:reverts ParentLabelMismatch). The resulting subnode must already exist,
     ///      otherwise @custom:reverts NotAuthorised. Emits @custom:emits NewResolver on
     ///      success.

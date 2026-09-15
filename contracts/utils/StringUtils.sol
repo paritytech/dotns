@@ -26,6 +26,8 @@ library StringUtils {
     ///      it reaches `MAX_DNS_LABEL_OCTETS + LITE_SUFFIX_DIGITS + 1` octets. Its stem is
     ///      bounded here but checked in @custom:function _isLitePersonLabel, which is stricter
     ///      on charset than a DNS label: letters only.
+    ///      This is the per-segment bound only; @custom:function isNamePath additionally bounds
+    ///      the whole path with @custom:constant MAX_NAME_PATH_OCTETS.
     uint256 internal constant MAX_DNS_LABEL_OCTETS = 63;
 
     /// @notice RFC 1035 ceiling on a whole dotted name, in octets.
@@ -221,13 +223,19 @@ library StringUtils {
         suffix = string(suffixBytes);
     }
 
-    /// @notice Validates that `s` is a dot-separated path of canonical DNS labels.
+    /// @notice Validates that `value` is a dot-separated path of canonical DNS labels, within
+    ///         the whole-path octet ceiling.
     /// @dev Each segment between dots must satisfy @custom:function isSingleLabel. Empty
     ///      segments (leading, trailing, or consecutive dots) fail. Used when
     ///      callers submit multi-label paths (e.g. `alice.dot`) rather than
     ///      bare labels.
+    ///      Two bounds apply and they are not the same one: @custom:constant MAX_DNS_LABEL_OCTETS
+    ///      caps each segment, and @custom:constant MAX_NAME_PATH_OCTETS caps the path. Without
+    ///      the second, a caller composes an unbounded path out of legal segments, so the
+    ///      segment bound alone does not bound what a caller can submit here.
     /// @param value Candidate name path.
-    /// @return isValid True if every dot-separated segment is a canonical DNS label.
+    /// @return isValid True if the path is at most @custom:constant MAX_NAME_PATH_OCTETS octets
+    ///         and every dot-separated segment is a canonical DNS label.
     function isNamePath(string calldata value) internal pure returns (bool isValid) {
         bytes memory path = bytes(value);
         uint256 length = path.length;
