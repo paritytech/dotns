@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="istorefactory"><a class="header" href="#istorefactory">IStoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/75ec25970eb4c3267e4382341037c719e007cacf/contracts/store/IStoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/0440eae62ed14fabdf5fa9073ac27e54149ececd/contracts/store/IStoreFactory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStoreFactory</p>
 <p>Interface for the DotNS per-user store factory.</p>
@@ -396,9 +396,11 @@ returns an empty array; result length is <code>min(limit, count - offset)</code>
 <li>
 <p>reverts: OwnableUnauthorizedAccount. <code>newImplementation</code> must be non-zero,
 otherwise @custom:reverts InvalidImplementation. The candidate is sentinel-probed by
-calling <code>IUserStore.getKeyCount</code> on it before the beacon is rotated; if the address
-does not implement that selector the probe reverts and the upgrade does not land
-(deliberate fail-fast guard, no named error). Delegates to
+calling <code>IUserStore.protocolRegistry</code> on it before the beacon is rotated; if the
+address does not implement that selector the probe reverts and the upgrade does not
+land (deliberate fail-fast guard, no named error). That selector also rejects an
+implementation predating the two-argument <code>initialize</code>, whose claims would revert
+under this factory's claim calldata. Delegates to
 <code>UpgradeableBeacon.upgradeTo</code> and emits</p>
 </li>
 <li>
