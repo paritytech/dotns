@@ -74,6 +74,47 @@ contract DotnsRegistryTests is BaseDotns {
         vm.stopPrank();
     }
 
+    /// @notice A parent path over the whole-path octet ceiling is refused.
+    /// @dev Every segment here is a legal 63-octet DNS label, so the per-segment bound cannot be
+    ///      what rejects it. `ParentLabelMismatch` is shared with a genuine namehash mismatch, so
+    ///      this pins the user-facing surface rather than the ceiling itself; the ceiling is
+    ///      pinned directly in `test/unit/utils/StringUtilsNamePath.t.sol`. Without the bound a
+    ///      parent owner composes an arbitrarily long name and `setSubnodeOwner` writes it, as a
+    ///      row that cannot be deleted, into whichever store they name as `owner`.
+    function test_subnode_parent_path_over_the_octet_ceiling_is_rejected() public {
+        string memory parentLabel = "parentnode02";
+        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+
+        // Four 63-octet segments and three dots: 255 octets, one past the ceiling once the
+        // fifth segment and its dot are appended below.
+        string memory overlong = _runOfA(63);
+        for (uint256 i = 0; i < 4; ++i) {
+            overlong = string.concat(overlong, ".", _runOfA(63));
+        }
+        assertGt(bytes(overlong).length, 255, "fixture is not over the ceiling");
+
+        vm.prank(owner);
+        vm.expectRevert(IDotnsRegistry.ParentLabelMismatch.selector);
+        dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: parentNode,
+                subLabel: "alice",
+                parentLabel: overlong,
+                owner: ed,
+                persist: true
+            })
+        );
+    }
+
+    /// @notice A run of `count` lowercase `a` octets, a canonical DNS label up to 63.
+    function _runOfA(uint256 count) private pure returns (string memory run) {
+        bytes memory buffer = new bytes(count);
+        for (uint256 i = 0; i < count; ++i) {
+            buffer[i] = "a";
+        }
+        run = string(buffer);
+    }
+
     /// @notice A subname created outside the gateway carries no person provenance.
     /// @dev The gateway issues a lite name as the subname `michael` under `01` and records it in
     ///      `_popIssued`. This test creates the same subname directly, without the gateway, and
