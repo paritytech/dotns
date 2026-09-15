@@ -29,3 +29,30 @@ jobs:
 
       - name: Validate deployment manifests and the contract list
         run: bun scripts/js/release-metadata.mjs validate
+
+  # Live network manifests record what is deployed on a real chain and ship verbatim into the
+  # deployments.json release asset, so they are written by a deploy and never by a code change
+  # (CONTRIBUTING.md). The CREATE3 parity gates compare deployments/expected.json rather than
+  # these files, so this job is where that rule is enforced. A pull request that records a real
+  # deploy carries the `deployment-record` label and is exempt.
+  live-manifests-unchanged:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'deployment-record') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject edits to a live network manifest
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA"...HEAD -- 'deployments/*/*.json')
+          if [ -n "$changed" ]; then
+            echo "::error::A code pull request must not edit a live network manifest."
+            printf '  %s\n' $changed
+            echo "Update deployments/expected.json instead; the live file is written by a deploy."
+            echo "If this pull request records a real deploy, add the 'deployment-record' label."
+            exit 1
+          fi
+          echo "No live network manifest was edited."
