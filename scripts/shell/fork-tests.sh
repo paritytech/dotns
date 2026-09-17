@@ -38,6 +38,12 @@ fi
 echo "fork-tests: forge clean"
 forge clean
 
+# A layout diff is only meaningful when the snapshot it diffs against is the code that is
+# actually deployed, and nothing in the build can check that. Do it here, before the suite
+# runs, so a drifted snapshot fails loudly instead of passing quietly.
+echo "fork-tests: verifying snapshots against deployed bytecode"
+scripts/shell/verify-snapshots.sh
+
 echo "fork-tests: running test/fork/** against $RPC_URL"
 forge test --match-path 'test/fork/**' "${@:--vvv}"
 

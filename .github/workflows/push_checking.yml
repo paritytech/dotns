@@ -12,11 +12,15 @@ name: Run Solidity Tests
 # inside a `pull_request_target` job would let a malicious PR exfiltrate
 # repo secrets. Re-review carefully if this trigger surface widens.
 on:
+  # `spha/**` covers the long-lived upgrade branches, which are never merged to
+  # master and therefore never get tested by the master triggers alone. Without
+  # them a PR into an upgrade branch runs lint and nothing else, which is how a
+  # storage snapshot that no longer matched the live chain reached review.
   pull_request:
-    branches: [master]
+    branches: [master, "spha/**"]
     paths: ["contracts/**", "test/**", "**.sol"]
   push:
-    branches: [master]
+    branches: [master, "spha/**"]
     paths: ["contracts/**", "test/**", "**.sol"]
   pull_request_target:
     types: [closed]

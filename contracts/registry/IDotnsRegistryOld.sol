@@ -12,11 +12,20 @@ interface IDotnsRegistryOld {
     /// @param subLabel Human readable subnode label e.g "alice".
     /// @param parentLabel Canonical parent name without the TLD suffix e.g. bob or child.bob.
     /// @param owner Address to assign as owner of the created subnode.
+    /// @param persist Whether to index the subnode into the owner's `LabelStore`, deploying it on
+    ///        demand. When false the ownership and resolver record is still written, but the store
+    ///        is left untouched. The store write is gated to protocol store writers (the registrar
+    ///        and its controllers), not the name owner, so a deferring writer indexes the label
+    ///        itself by deploying the owner's store and writing to it. The registry writes the
+    /// store only on creation or on a reassignment to a new owner, so a later same-owner re-call
+    ///        with `persist` true does not backfill it; the authorised writer backfills it
+    /// directly.
     struct SubnodeRecord {
         bytes32 parentNode;
         string subLabel;
         string parentLabel;
         address owner;
+        bool persist;
     }
 
     /// @notice Record describing the state of a node.
@@ -83,8 +92,10 @@ interface IDotnsRegistryOld {
     ///      contracts are keyed by node and are not cleared by this function; downstream
     ///      consumers should gate resolver reads on current ownership). Indexes the subnode
     ///      under the new owner's `LabelStore` keyed by the namehashed `subnode` so off-chain
-    ///      consumers can enumerate names per address. Emits @custom:emits NewOwner on each
-    ///      successful assignment.
+    ///      consumers can enumerate names per address. Indexing into the owner's `LabelStore` is
+    ///      governed by `record.persist` (see @custom:struct SubnodeRecord); the ownership and
+    ///      resolver record is written either way. Emits @custom:emits NewOwner on each successful
+    ///      assignment.
     function setSubnodeOwner(SubnodeRecord calldata record) external returns (bytes32 subnode);
 
     /// @notice Sets the resolver for an existing subnode.
@@ -113,7 +124,7 @@ interface IDotnsRegistryOld {
     ///      by the next holder across that recycle. A secondary-market ERC-721 `transferFrom` does
     ///      not call the registry, so a name sold directly keeps the seller's resolver pointer
     ///      until the buyer overwrites it. Stores `owner = address(0)` as a sentinel so reads
-    ///      delegate to `IDotnsRegistrar.ownerOf` and ERC-721 transfers remain authoritative. Emits
+    ///      delegate to `IDotnsRegistrarOld.ownerOf` and ERC-721 transfers remain authoritative. Emits
     ///      @custom:emits NodeTransferred on success.
     function setOwner(bytes32 node, address newOwner) external;
 
@@ -129,7 +140,7 @@ interface IDotnsRegistryOld {
 
     /// @notice Returns the owner of a node.
     /// @dev For tokenised nodes the stored owner is the zero sentinel; the implementation falls
-    ///      back to `IDotnsRegistrar.ownerOf(uint256(node))`.
+    ///      back to `IDotnsRegistrarOld.ownerOf(uint256(node))`.
     function owner(bytes32 node) external view returns (address);
 
     /// @notice Returns the resolver of a node.

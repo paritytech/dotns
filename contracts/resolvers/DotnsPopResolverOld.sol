@@ -1,0 +1,151 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.34;
+
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC165Upgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+
+import {IDotnsPopResolver} from "./IDotnsPopResolver.sol";
+import {IDotnsProtocolRegistryOld} from "../registry/IDotnsProtocolRegistryOld.sol";
+import {DotnsConstantsOld} from "../utils/DotnsConstantsOld.sol";
+
+/// @title DotnsPopResolverOld
+/// @notice Per-node resolver holding records produced by the PoP username flow.
+/// @dev Writes are gated on the protocol-registered `POP_CONTROLLER` rather
+///      than on node ownership. PoP records are issued by the gateway as part
+///      of identity issuance, not curated by the holder, so authority lives
+///      with the controller and not the user.
+/// @custom:security-contact admin@parity.io
+contract DotnsPopResolverOld is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ERC165Upgradeable,
+    IDotnsPopResolver
+{
+    /// @notice Protocol-level address registry used to resolve the authorised writer.
+    IDotnsProtocolRegistryOld public protocolRegistry;
+
+    /// @notice Stored chat-key bytes keyed by node.
+    mapping(bytes32 node => bytes chatKey) private _chatKeys;
+
+    /// @notice Stored lite-person labelhash keyed by full-person node.
+    /// @dev Forward direction (full => lite): maps a full-person node to the
+    ///      labelhash of the lite username it was claimed from.
+    mapping(bytes32 fullNode => bytes32 liteLabelhash) private _liteLinks;
+
+    /// @notice Reverse index mapping a lite labelhash to the full-person node
+    ///         it was promoted to.
+    /// @dev Written alongside `_liteLinks` on every claim so consumers that look
+    ///      up by lite username resolve the full name without scanning events.
+    ///      Zero when the lite label has never been linked to a full claim.
+    mapping(bytes32 liteLabelhash => bytes32 fullNode) private _fullClaims;
+
+    /// @dev Reserved storage space to allow for layout changes in the future.
+    uint256[50] private __gap;
+
+    /// @notice Restricts writes to the address registered as `POP_CONTROLLER`.
+    modifier onlyPopController() {
+        _onlyPopController();
+        _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @notice Initialises the PoP resolver.
+    /// @dev Called once through the UUPS proxy; `_disableInitializers` on the implementation
+    ///      makes direct calls revert and any repeat call on the proxy reverts with
+    ///      @custom:reverts InvalidInitialization. The registry pointer is the only storage this
+    ///      setup needs because the authorised writer is resolved dynamically through
+    ///      `POP_CONTROLLER`. Emits @custom:emits OwnershipTransferred when `msg.sender` is
+    ///      recorded as the initial owner and @custom:emits Initialized once setup completes.
+    /// @param registry Protocol-level address registry used for writer resolution.
+    function initialize(IDotnsProtocolRegistryOld registry) external initializer {
+        __Ownable_init(msg.sender);
+        __ERC165_init();
+        protocolRegistry = registry;
+    }
+
+    /// @inheritdoc IDotnsPopResolver
+    function setChatKey(
+        bytes32 node,
+        bytes calldata chatKeyBytes
+    )
+        external
+        override
+        onlyPopController
+    {
+        require(chatKeyBytes.length == 65, InvalidChatKeyLength(chatKeyBytes.length));
+        _chatKeys[node] = chatKeyBytes;
+        emit ChatKeyUpdated(node, chatKeyBytes);
+    }
+
+    /// @inheritdoc IDotnsPopResolver
+    function setLiteLink(
+        bytes32 fullNode,
+        bytes32 liteLabelhash
+    )
+        external
+        override
+        onlyPopController
+    {
+        bytes32 oldLite = _liteLinks[fullNode];
+        bytes32 oldFull = _fullClaims[liteLabelhash];
+        if (oldLite != bytes32(0) && oldLite != liteLabelhash) {
+            delete _fullClaims[oldLite];
+        }
+        if (oldFull != bytes32(0) && oldFull != fullNode) {
+            delete _liteLinks[oldFull];
+        }
+        _liteLinks[fullNode] = liteLabelhash;
+        _fullClaims[liteLabelhash] = fullNode;
+        emit LiteLinkUpdated(fullNode, liteLabelhash);
+    }
+
+    /// @inheritdoc IDotnsPopResolver
+    function chatKey(bytes32 node) external view override returns (bytes memory) {
+        return _chatKeys[node];
+    }
+
+    /// @inheritdoc IDotnsPopResolver
+    function liteLink(bytes32 fullNode) external view override returns (bytes32) {
+        return _liteLinks[fullNode];
+    }
+
+    /// @inheritdoc IDotnsPopResolver
+    function fullClaim(bytes32 liteLabelhash) external view override returns (bytes32) {
+        return _fullClaims[liteLabelhash];
+    }
+
+    /// @notice Returns implementation version.
+    /// @dev Bumped on every upgrade. Used by deployment scripts as a
+    ///      post-upgrade assertion target.
+    /// @return versionString Current version string.
+    function version() external pure virtual returns (string memory versionString) {
+        versionString = "1.0.0";
+    }
+
+    /// @inheritdoc ERC165Upgradeable
+    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
+        return
+            interfaceId == type(IDotnsPopResolver).interfaceId
+                || super.supportsInterface(interfaceId);
+    }
+
+    /// @notice Internal check enforcing PoP-controller-only access.
+    function _onlyPopController() internal view {
+        address popController = protocolRegistry.get(DotnsConstantsOld.POP_CONTROLLER);
+        require(msg.sender == popController, NotPopController(msg.sender));
+    }
+
+    /// @inheritdoc UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+}
