@@ -111,6 +111,13 @@ invocation:
 After each stage the runner verifies every manifest address actually has
 bytecode. On any failure it restores the previous manifest and stops.
 
+The runner also needs to know which release it is deploying, because the final
+stage declares it on chain (`protocolVersion()` on the protocol registry). From
+a checkout of a release tag this resolves automatically; anywhere else, export
+`DOTNS_RELEASE_TAG` (bare semver, e.g. `0.8.0`; pre-release identifiers such as
+`0.8.0-rc.1` are accepted, since deploys run from pre-release tags, but build
+metadata is not) or the run aborts before deploying anything.
+
 - [ ] Ends with `=== Pipeline complete ===` and
   `Deleted one-off env file: .env`.
 
@@ -138,6 +145,10 @@ Confirm these keys are present:
 - [ ] `LabelStoreBeacon`
 - [ ] `UserStoreBeacon`
 - [ ] `Multicall3`
+- [ ] `Create3Factory`
+- [ ] `DotnsCostModelRegistry`
+- [ ] `DotnsFlatPricing`
+- [ ] `DotnsPopLens`
 
 The wiring stage already asserts every protocol-registry binding, so a green deploy means they
 are set. One is worth confirming by hand, because it is the only key whose absence surfaces to
@@ -151,7 +162,58 @@ cast call "$PROTOCOL_REGISTRY" "get(bytes32)(address)" \
 
 - [ ] The address returned matches `DotnsNameWhitelist` in the manifest.
 
+The chain should also say what it runs. The wiring stage declared the release
+tag and, per registry key, the codehash of the code that executes for it; both
+are best-effort claims consumers rely on, and this checks them against the
+chain in one command:
+
+```bash
+node scripts/js/release-metadata.mjs verify --network <folder> --rpc "$RPC_URL" \
+  --tag "$DOTNS_RELEASE_TAG"
+```
+
+- [ ] Ends with `<network> matches the chain`, including
+  `ok   protocolVersion <tag>`.
+
 Done. ✅
+
+## Upgrading a live network
+
+Upgrade tooling does not live in this repository; operations do. What lives
+here is the contract every upgrade has to honour, because the network's
+declared version and code identity must move together with the code or every
+consumer that reads them is lied to:
+
+- Upgrade only to code built from a release tag, and cover everything that
+  release changed. The release's `codehashes.json` diffed against the previous
+  release's (`release-metadata.mjs changedset --previous <file>`) is the exact
+  list; declaring a tag while only part of that list is applied is the one
+  state the declarations cannot represent.
+- After upgrading a proxy, re-declare its key:
+  `setExpectedCodehash(key, <implementation codehash>)`. A registry rewire
+  (`protocolRegistry.set`) must be paired with the same call for its key.
+  An unpaired upgrade or rewire is not silent: the next `verify --tag` run
+  reports it as drift, indistinguishable from an unauthorised swap, which is
+  the check working as designed.
+- Store implementations sit behind the factory's beacons, so a beacon upgrade
+  (`upgradeLabelStoreImplementation` / `upgradeUserStoreImplementation`) moves
+  no declared hash: `expectedCodehash(storeFactory)` covers the factory's own
+  code only. Store code identity has to be audited through the beacons, not
+  via the registry declarations. Note also that this release changed
+  `UserStore.initialize`'s shape, so a user-store beacon upgrade that crosses
+  it must land together with a factory implementation upgrade (the factory is
+  a UUPS proxy owning its beacons): new store code with the old factory's
+  one-argument claim calldata breaks every claim that follows.
+- Declare the release last: `setProtocolVersion("X.Y.Z")` only once every
+  upgraded contract verifies. An aborted upgrade then leaves the previous
+  declaration standing (under-claiming, which clients handle) rather than a
+  false new one.
+- The declarations are claims, not proofs. `verify --tag` checks the chain
+  against them. A trustless check needs to compare the chain against the release's
+  `codehashes.json` instead.
+
+- [ ] `verify --network <folder> --rpc <url> --tag vX.Y.Z` passes after the
+  upgrade.
 
 ## Troubleshooting — the four things that actually go wrong
 

@@ -9,6 +9,8 @@ import {ILabelStore} from "../../../contracts/store/ILabelStore.sol";
 import {IUserStore} from "../../../contracts/store/IUserStore.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /// @title LabelStoreV2
 /// @notice Test-only LabelStore implementation extended with a version marker, used to verify
@@ -25,19 +27,89 @@ contract LabelStoreV2 is LabelStore {
 /// @notice Unit tests for StoreFactory: beacon wiring, authorisation, deployment and claim flows,
 /// beacon upgrades, and enumeration.
 contract StoreFactoryTests is BaseDotns {
-    function test_constructor_reverts_on_zero_registry() public {
+    function test_initialize_reverts_on_zero_registry() public {
+        address implementation = address(new StoreFactory());
         vm.expectRevert(
             abi.encodeWithSelector(IStoreFactory.InvalidProtocolRegistry.selector, address(0))
         );
-        new StoreFactory(address(0), owner);
+        new ERC1967Proxy(
+            implementation, abi.encodeCall(StoreFactory.initialize, (owner, address(0)))
+        );
     }
 
-    function test_constructor_deploys_both_beacons_and_implementations() public {
-        StoreFactory fresh = new StoreFactory(address(protocolRegistry), owner);
+    function test_initialize_deploys_both_beacons_and_implementations() public {
+        StoreFactory fresh = _freshFactory();
         assertTrue(fresh.labelStoreBeacon() != address(0));
         assertTrue(fresh.userStoreBeacon() != address(0));
         assertTrue(fresh.labelStoreBeacon() != fresh.userStoreBeacon());
         assertEq(fresh.owner(), owner);
+    }
+
+    /// @notice The beacons belong to the proxy, not to the implementation that minted them.
+    /// @dev Owning them anywhere else would strand every store-implementation upgrade on a
+    ///      contract the pipeline never wires in.
+    function test_initialize_mints_beacons_owned_by_the_proxy() public {
+        StoreFactory fresh = _freshFactory();
+        assertEq(UpgradeableBeacon(fresh.labelStoreBeacon()).owner(), address(fresh));
+        assertEq(UpgradeableBeacon(fresh.userStoreBeacon()).owner(), address(fresh));
+    }
+
+    function test_initialize_reverts_on_second_call() public {
+        StoreFactory fresh = _freshFactory();
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        fresh.initialize(owner, address(protocolRegistry));
+    }
+
+    /// @notice The implementation is inert: its initialisers are disabled at construction, so a
+    ///         third party cannot claim it and mint beacons it controls.
+    function test_implementation_cannot_be_initialised_directly() public {
+        StoreFactory implementation = new StoreFactory();
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        implementation.initialize(owner, address(protocolRegistry));
+    }
+
+    /// @notice The factory is upgraded in place, and only by its owner, carrying its bindings
+    ///         and beacons across.
+    function test_upgrade_is_owner_gated_and_preserves_bindings() public {
+        vm.prank(owner);
+        address store = storeFactory.deployLabelStoreFor(ed);
+        address beacon = storeFactory.labelStoreBeacon();
+
+        address newImplementation = address(new StoreFactory());
+        vm.prank(ed);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, ed));
+        storeFactory.upgradeToAndCall(newImplementation, bytes(""));
+
+        vm.prank(owner);
+        storeFactory.upgradeToAndCall(newImplementation, bytes(""));
+
+        assertEq(storeFactory.getLabelStore(ed), store, "binding survived the upgrade");
+        assertEq(storeFactory.labelStoreBeacon(), beacon, "beacon survived the upgrade");
+        assertEq(storeFactory.protocolRegistry(), address(protocolRegistry));
+
+        // Beacon ownership sits with the proxy, so the upgraded logic must still be able to
+        // rotate the implementation.
+        address labelStoreV2 = address(new LabelStoreV2());
+        vm.prank(owner);
+        storeFactory.upgradeLabelStoreImplementation(labelStoreV2);
+        assertEq(
+            UpgradeableBeacon(beacon).implementation(),
+            labelStoreV2,
+            "the upgraded factory still owns its beacon"
+        );
+        assertEq(LabelStoreV2(store).versionMarker(), "v2", "the live store follows the rotation");
+    }
+
+    /// @notice Deploys a factory the way the pipeline does, behind its own ERC1967 proxy.
+    function _freshFactory() private returns (StoreFactory fresh) {
+        fresh = StoreFactory(
+            address(
+                new ERC1967Proxy(
+                    address(new StoreFactory()),
+                    abi.encodeCall(StoreFactory.initialize, (owner, address(protocolRegistry)))
+                )
+            )
+        );
     }
 
     function test_beacon_owner_is_factory_for_both_beacons() public view {

@@ -10,7 +10,7 @@ import {IDotnsRegistryOld} from "./IDotnsRegistryOld.sol";
 import {IDotnsController} from "../registrars/IDotnsController.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
-import {StoreUtils} from "../utils/StoreUtils.sol";
+import {StoreUtilsOld} from "../utils/StoreUtilsOld.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
@@ -23,7 +23,7 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 ///      `IDotnsRegistrar.ownerOf`; subnodes carry an explicit owner address in `records`.
 /// @custom:security-contact admin@parity.io
 contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistryOld {
-    using StoreUtils for IStoreFactory;
+    using StoreUtilsOld for IStoreFactory;
     using StringUtils for *;
 
     /// @notice Mapping of node identifiers to records.

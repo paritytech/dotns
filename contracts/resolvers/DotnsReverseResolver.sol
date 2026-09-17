@@ -58,9 +58,16 @@ contract DotnsReverseResolver is
     ///      @custom:reverts InvalidInitialization. Emits @custom:emits OwnershipTransferred when
     ///      `msg.sender` is recorded as the initial owner and @custom:emits Initialized once
     ///      setup completes.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(IDotnsProtocolRegistry registry) external initializer {
-        __Ownable_init(msg.sender);
+    function initialize(
+        address initialOwner,
+        IDotnsProtocolRegistry registry
+    )
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
     }
@@ -135,12 +142,16 @@ contract DotnsReverseResolver is
         );
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every DotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
-
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

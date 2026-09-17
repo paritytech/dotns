@@ -30,7 +30,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
                 "DotnsNameWhitelist.sol:DotnsNameWhitelist",
                 abi.encodeCall(
                     DotnsNameWhitelist.initialize,
-                    (IDotnsProtocolRegistry(address(protocolRegistry)))
+                    (owner, IDotnsProtocolRegistry(address(protocolRegistry)))
                 )
             )
         );
@@ -481,7 +481,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
 
     function test_initialize_reverts_on_second_call() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        whitelist.initialize(IDotnsProtocolRegistry(address(protocolRegistry)));
+        whitelist.initialize(owner, IDotnsProtocolRegistry(address(protocolRegistry)));
     }
 
     function test_claims_pagination() public {

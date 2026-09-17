@@ -43,8 +43,10 @@ jobs:
           fi
           # The suffix is restricted to characters GitHub keeps verbatim in an asset
           # name; a space, for instance, is rewritten to a dot and would fail the
-          # asset check after a full build.
-          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z.]+$ ]]; then
+          # asset check after a full build. Segmented like run.sh's semver check
+          # (dot-separated, non-empty identifiers), so no tag can be published
+          # here that the deploy pipeline would then refuse.
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*$ ]]; then
             echo "::error::Pre-release version must look like v1.2.3-rc1, got '$TAG'."
             exit 1
           fi
@@ -162,7 +164,7 @@ jobs:
         run: |
           TAG="$RELEASE_TAG"
           cd release
-          zip -r "../dotns-abis-${TAG}.zip" abis/ release-manifest.json \
+          zip -r "../dotns-abis-${TAG}.zip" abis/ release-manifest.json codehashes.json \
             "dotns-genesis-${DOTNS_TLD}.json"
 
       - name: Generate release body
@@ -223,6 +225,24 @@ jobs:
             echo "- [dotns-genesis-${DOTNS_TLD}.json]($ASSET_BASE/dotns-genesis-${DOTNS_TLD}.json) — pallet-revive genesis, \`.${DOTNS_TLD}\` TLD, for ${DOTNS_TLD} networks only."
           } >> release-body.md
 
+      - name: ABI diff since previous release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The previous published release's ABIs come from its zip; diffing against them
+          # announces every selector change in the body, most importantly a same-name
+          # signature change, which an old caller experiences as a bare revert. A previous
+          # release without the zip degrades to "no diff" rather than failing the release.
+          PREV=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)
+          prev_args=()
+          if [ -n "$PREV" ] && gh release download "$PREV" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'dotns-abis-*.zip' --dir prev-abis >/dev/null 2>&1; then
+            unzip -q -o prev-abis/dotns-abis-*.zip -d prev-abis
+            prev_args=(--previous prev-abis/abis --previous-tag "$PREV")
+          fi
+          bun scripts/js/release-metadata.mjs abidiff --current release/abis \
+            "${prev_args[@]}" --json release/abi-diff.json >> release-body.md
+
       - name: Create draft pre-release with artifacts
         uses: softprops/action-gh-release@v2
         with:
@@ -234,6 +254,8 @@ jobs:
             dotns-abis-*.zip
             release/abis/*.json
             release/release-manifest.json
+            release/codehashes.json
+            release/abi-diff.json
             release/dotns-genesis-${{ env.DOTNS_TLD }}.json
           body_path: release-body.md
           draft: true
@@ -251,6 +273,8 @@ jobs:
           { cat release/expected-assets.txt
             echo "dotns-abis-${TAG}.zip"
             echo "release-manifest.json"
+            echo "codehashes.json"
+            echo "abi-diff.json"
             echo "dotns-genesis-${DOTNS_TLD}.json"
           } | sort > "$RUNNER_TEMP/wanted-assets.txt"
           if ! diff -u "$RUNNER_TEMP/wanted-assets.txt" "$RUNNER_TEMP/actual-assets.txt"; then

@@ -88,6 +88,15 @@ library DotnsConstants {
     /// limit.
     uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 256;
 
+    /// @notice Well-known key the protocol registry is registered under, itself.
+    /// @dev Not for discovery: the registry is the bootstrap contract every consumer already
+    ///      holds. The entry exists so the registry's own implementation has a declared codehash
+    ///      (`expectedCodehash`) to drift from when it is upgraded outside the release tooling,
+    ///      like every other component. Self-declared, so it catches sloppy drift rather than a
+    ///      malicious registry; the trustless check against release artifacts lives off chain.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant PROTOCOL_REGISTRY = bytes32("protocolRegistry");
+
     /// @notice Well-known key for the ERC721 registrar backing name ownership.
     /// @dev Role: token-of-record for registered names. Mints, burns, and tracks the
     ///      `tokenId => label` mapping consumed by the forward registry on

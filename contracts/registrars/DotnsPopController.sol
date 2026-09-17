@@ -165,7 +165,9 @@ contract DotnsPopController is
     /// call outside an active initialiser scope reverts with @custom:reverts NotInitializing.
     /// Emits @custom:emits ReservationDurationSet so indexers observe the initial value
     /// through the same event the setter uses later.
+    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
+        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint64 reservationDuration_
     )
@@ -176,7 +178,7 @@ contract DotnsPopController is
             reservationDuration_ >= MIN_RESERVATION_DURATION,
             ReservationDurationTooLow(reservationDuration_)
         );
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
         reservationDuration = reservationDuration_;
@@ -558,10 +560,15 @@ contract DotnsPopController is
             || super.supportsInterface(interfaceId);
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every DotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
 
     /// @notice Mints a name, wires forward registry, persists PoP-flow records (chat key,

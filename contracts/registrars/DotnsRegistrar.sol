@@ -82,7 +82,9 @@ contract DotnsRegistrar is
     /// proxy; direct calls on the implementation revert with @custom:reverts InvalidInitialization
     /// because `_disableInitializers` runs in the constructor, and any nested call outside an
     /// active initialiser scope reverts with @custom:reverts NotInitializing.
+    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
+        address initialOwner,
         string calldata name,
         string calldata symbol,
         IDotnsProtocolRegistry registry
@@ -91,7 +93,7 @@ contract DotnsRegistrar is
         initializer
     {
         require(address(registry) != address(0), ProtocolRegistryRequired());
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC721_init(name, symbol);
         protocolRegistry = registry;
     }
@@ -223,10 +225,15 @@ contract DotnsRegistrar is
         super.safeTransferFrom(from, to, tokenId, data);
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every DotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
 
     /// @inheritdoc IDotnsRegistrar
@@ -289,6 +296,9 @@ contract DotnsRegistrar is
         IDotnsProtocolRegistry registry = protocolRegistry;
         address escrow = registry.get(DotnsConstants.NAME_ESCROW);
         require(escrow != address(0), EscrowNotConfigured());
+        // `release` is the only caller that moves a name into custody, so any other sender is a
+        // deposit the escrow holds no position for.
+        require(to != escrow || msg.sender == escrow, UnsolicitedEscrowDeposit(tokenId));
         IStoreFactory factory = IStoreFactory(registry.get(DotnsConstants.STORE_FACTORY));
 
         bool isEscrowTouching = to == escrow || from == escrow;
@@ -348,7 +358,11 @@ contract DotnsRegistrar is
             // downstream writes are demand-deploy through `StoreUtils.ensureLabelStore`.
             return;
         }
-        factory.writeLabel(to, bytes32(tokenId), fullName);
+        // A slot holding a different string was written by someone else, and `storeLabel` has no
+        // delete, so mirroring nothing would hand over a name `_quoteTransferFeeFor` rejects on
+        // every onward transfer. A matching entry is still a no-op, so a transfer back to a prior
+        // owner passes.
+        factory.writeNewLabel(to, bytes32(tokenId), fullName);
     }
 
     /// @notice Reads the full name (`label.tld`) for `tokenId` from `holder`'s `LabelStore` using
@@ -403,7 +417,7 @@ contract DotnsRegistrar is
     /// the registry would have already broken every other call site).
     function _writeOwnerLabel(address owner, uint256 tokenId, string calldata label) private {
         _storeFactory()
-            .writeLabel(owner, bytes32(tokenId), string.concat(label, protocolRegistry.tld()));
+            .writeNewLabel(owner, bytes32(tokenId), string.concat(label, protocolRegistry.tld()));
     }
 
     /// @notice Quotes the friction fee required for a transfer.

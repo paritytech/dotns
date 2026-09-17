@@ -26,10 +26,12 @@ jobs:
     # Shared across steps. ACCOUNT_* is anvil test account 7 (public test keys,
     # never valid on a real network) used to run the pipeline. FACTORY_DEPLOYER is
     # the public address of the single-purpose factory key. CANONICAL is the
-    # committed manifest, the address set this deploy has to reproduce; MANIFEST is
+    # committed expected-address set this deploy has to reproduce: what a fresh
+    # deploy of this revision lands through the pinned factory (see "Network
+    # manifests and the expected set" in DEPLOYMENTS.md). MANIFEST is
     # the file this CI deploy writes. PINNED_FACTORY is read out of CANONICAL after
     # checkout rather than repeated here, so the expectation cannot drift from the
-    # manifest it is meant to describe. PRIVATE_KEY is deliberately absent: it is set
+    # file it is meant to describe. PRIVATE_KEY is deliberately absent: it is set
     # only on the first deploy to import the keystore, and must not reach the resume
     # run, which reuses the already-imported account.
     env:
@@ -39,8 +41,14 @@ jobs:
       # to DotnsProtocolRegistry.initialize as init calldata, which does not affect
       # any CREATE3 address, so the reproduction still lands the canonical set.
       DOTNS_TLD: dot
+      # Declared on the protocol registry by WireDeployments. 0.0.0 is
+      # unmistakably not a release: this workflow reproduces the pipeline from
+      # untagged commits against a throwaway chain, and real deploys resolve
+      # the value from the release tag they run from. The value enters via a
+      # post-deploy setter, so it cannot affect any CREATE3 address.
+      DOTNS_RELEASE_TAG: "0.0.0"
       FACTORY_DEPLOYER: "0xd498F7BC5bB3cBdd0068c3deEbbd814b69C3F164"
-      CANONICAL: deployments/paseo-assethub/420420417.json
+      CANONICAL: deployments/expected.json
       MANIFEST: deployments/paseo-local/420420420.json
 
     steps:
@@ -273,24 +281,24 @@ jobs:
             exit 1
           fi
 
-      # This CI deploy reproduces the published address set. The canonical factory
+      # This CI deploy reproduces the expected address set. The canonical factory
       # was deployed above, and every DotNS address is a pure function of that
       # factory plus a fixed salt, so the freshly deployed manifest must equal the
-      # committed manifest. Assert that, print the expected-vs-actual table, then
+      # committed expected set. Assert that, print the expected-vs-actual table, then
       # rerun the pipeline to prove the deploy is resumable: a rerun adopts every
       # contract and still lands on the same set.
-      - name: Verify addresses match the committed manifest
+      - name: Verify addresses match the expected set
         id: verify_addresses
         if: steps.verify.outcome == 'success'
         run: |
           set +e
 
-          # Markdown expected-vs-actual table: expected = committed manifest,
+          # Markdown expected-vs-actual table: expected = the committed expected set,
           # actual = this CI deployment. Any row whose addresses differ is MOVED.
           emit_table() {
-            echo "### Deployed addresses vs the committed manifest"
+            echo "### Deployed addresses vs the expected set"
             echo ""
-            echo "Expected is the committed manifest; actual is this CI deployment of the same pipeline."
+            echo "Expected is the committed expected-address set; actual is this CI deployment of the same pipeline."
             echo ""
             echo "| Contract | Expected | Actual | Match |"
             echo "|:---------|:---------|:-------|:-----:|"
@@ -302,11 +310,11 @@ jobs:
             '
           }
 
-          # True when the deployed manifest equals the committed one. Sort keys so only value
+          # True when the deployed manifest equals the expected set. Sort keys so only value
           # differences, never ordering, register as a mismatch. Underscore-prefixed keys are
-          # deploy metadata rather than addresses: `_seed` varies per run, and `_deployedFrom`
-          # exists only in a committed manifest, never in a fresh deploy's output. The release
-          # generator and the dotns-releases report drop the same prefix.
+          # deploy metadata rather than addresses: `_seed` varies per run, and the expected
+          # set carries no metadata at all. The release generator and the dotns-releases
+          # report drop the same prefix.
           addresses() {
             jq -S 'with_entries(select(.key | startswith("_") | not))' "$1"
           }
@@ -328,15 +336,15 @@ jobs:
 
           if ! matches_canonical; then
             {
-              echo "### Deployed addresses do not match the committed manifest"
+              echo "### Deployed addresses do not match the expected set"
               echo ""
-              echo "The pipeline no longer reproduces the published set. Rows marked MOVED"
-              echo "below differ from the committed manifest; update it, or restore the"
-              echo "salt or label that moved."
+              echo "The pipeline no longer reproduces the expected addresses. Rows marked"
+              echo "MOVED below differ from deployments/expected.json; update it, or"
+              echo "restore the salt or label that moved."
               echo ""
               cat table.md
             } > deploy-error.md
-            fail "Failed - addresses differ from the committed manifest"
+            fail "Failed - addresses differ from the expected set"
           fi
 
           # Resume: rerun the same pinned pipeline. It must adopt every contract
@@ -360,7 +368,7 @@ jobs:
             {
               echo "### Resume moved addresses"
               echo ""
-              echo "The rerun no longer matches the committed manifest, so a resumed deploy would"
+              echo "The rerun no longer matches the expected set, so a resumed deploy would"
               echo "relocate contracts."
               echo ""
               emit_table
@@ -371,7 +379,7 @@ jobs:
           # Surface the table under the passing row too, so the address set is on
           # record every run, not only on failure.
           cp table.md deploy-error.md
-          echo "result=Reproduces the committed manifest; resume verified" >> "$GITHUB_OUTPUT"
+          echo "result=Reproduces the expected address set; resume verified" >> "$GITHUB_OUTPUT"
           echo "has_details=true" >> "$GITHUB_OUTPUT"
 
       - name: Set final result

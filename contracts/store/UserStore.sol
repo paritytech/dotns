@@ -5,6 +5,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 
 import {IDotnsStore} from "./IDotnsStore.sol";
 import {IUserStore} from "./IUserStore.sol";
+import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 
 /// @title UserStore
 /// @notice Permanent per-user generic key/value store with per-key history.
@@ -35,6 +36,10 @@ contract UserStore is Initializable, IUserStore {
     /// @dev key => 1-indexed position in `_keyList` (zero means "never written").
     mapping(bytes32 key => uint256 indexPlusOne) private _keyIndex;
 
+    /// @dev Protocol registry, the one address a contract may hold directly; read for
+    /// network-level facts such as the declared release.
+    address private _protocolRegistry;
+
     /// @dev Reserved storage space to allow for layout changes in future beacon upgrades.
     // forge-lint: disable-next-line(mixed-case-variable)
     uint256[50] private __gap;
@@ -51,9 +56,16 @@ contract UserStore is Initializable, IUserStore {
     }
 
     /// @inheritdoc IUserStore
-    function initialize(address user_) external override initializer {
+    function initialize(address user_, address protocolRegistry_) external override initializer {
         require(user_ != address(0), InvalidUser(user_));
+        require(protocolRegistry_ != address(0), InvalidProtocolRegistry(protocolRegistry_));
         _owner = user_;
+        _protocolRegistry = protocolRegistry_;
+    }
+
+    /// @inheritdoc IUserStore
+    function protocolRegistry() external view override returns (address protocolRegistry_) {
+        return _protocolRegistry;
     }
 
     /// @inheritdoc IUserStore
@@ -169,10 +181,19 @@ contract UserStore is Initializable, IUserStore {
         }
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every DotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry. A store instance initialised before the registry pointer existed (a
+    ///      beacon upgrade on a live network reaches those) holds no registry to mirror, so it
+    ///      answers with the same "never declared" empty string instead of reverting.
+    /// @return versionString Declared release as bare semver, empty when never declared or when
+    ///         this instance predates the registry pointer.
+    function version() external view virtual returns (string memory versionString) {
+        if (_protocolRegistry == address(0)) return "";
+        versionString = IDotnsProtocolRegistry(_protocolRegistry).protocolVersion();
     }
 
     /// @notice Internal owner check deferred from the `onlyOwner` modifier.

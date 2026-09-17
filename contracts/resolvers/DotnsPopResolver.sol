@@ -67,9 +67,16 @@ contract DotnsPopResolver is
     ///      setup needs because the authorised writer is resolved dynamically through
     ///      `POP_CONTROLLER`. Emits @custom:emits OwnershipTransferred when `msg.sender` is
     ///      recorded as the initial owner and @custom:emits Initialized once setup completes.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used for writer resolution.
-    function initialize(IDotnsProtocolRegistry registry) external initializer {
-        __Ownable_init(msg.sender);
+    function initialize(
+        address initialOwner,
+        IDotnsProtocolRegistry registry
+    )
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
     }
@@ -125,12 +132,15 @@ contract DotnsPopResolver is
         return _fullClaims[liteLabelhash];
     }
 
-    /// @notice Returns implementation version.
-    /// @dev Bumped on every upgrade. Used by deployment scripts as a
-    ///      post-upgrade assertion target.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every DotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
 
     /// @inheritdoc ERC165Upgradeable
