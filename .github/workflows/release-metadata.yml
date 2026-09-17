@@ -7,6 +7,13 @@ name: Release Metadata
 # resolved against sources.
 on:
   pull_request:
+    # Includes labeled and unlabeled so adding `deployment-record` re-runs the manifest guard
+    # below. Listing types at all replaces the default set, so the defaults are repeated here.
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review]
+    # A pull request touching none of the paths below never starts this workflow, so no job in
+    # it reports a conclusion on that pull request. Harmless while these are optional checks,
+    # and the thing to settle before marking any of them required: a required check that never
+    # reports blocks the merge.
     paths:
       - "deployments/**"
       - ".github/abi-contracts.txt"
@@ -35,8 +42,10 @@ jobs:
   # (CONTRIBUTING.md). The CREATE3 parity gates compare deployments/expected.json rather than
   # these files, so this job is where that rule is enforced. A pull request that records a real
   # deploy carries the `deployment-record` label and is exempt.
+  # Runs on every pull request rather than being skipped for a labelled one: a skipped job
+  # reports no conclusion, so making this a required check would leave a correctly labelled
+  # deploy pull request unable to merge. The label is read inside the step instead.
   live-manifests-unchanged:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'deployment-record') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,13 +55,20 @@ jobs:
       - name: Reject edits to a live network manifest
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          IS_DEPLOY_RECORD: ${{ contains(github.event.pull_request.labels.*.name, 'deployment-record') }}
         run: |
           changed=$(git diff --name-only "$BASE_SHA"...HEAD -- 'deployments/*/*.json')
-          if [ -n "$changed" ]; then
-            echo "::error::A code pull request must not edit a live network manifest."
-            printf '  %s\n' $changed
-            echo "Update deployments/expected.json instead; the live file is written by a deploy."
-            echo "If this pull request records a real deploy, add the 'deployment-record' label."
-            exit 1
+          if [ -z "$changed" ]; then
+            echo "No live network manifest was edited."
+            exit 0
           fi
-          echo "No live network manifest was edited."
+          if [ "$IS_DEPLOY_RECORD" = "true" ]; then
+            echo "Live network manifest edited under the 'deployment-record' label:"
+            printf '  %s\n' $changed
+            exit 0
+          fi
+          echo "::error::A code pull request must not edit a live network manifest."
+          printf '  %s\n' $changed
+          echo "Update deployments/expected.json instead; the live file is written by a deploy."
+          echo "If this pull request records a real deploy, add the 'deployment-record' label."
+          exit 1

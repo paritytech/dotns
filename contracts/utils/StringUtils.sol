@@ -30,7 +30,14 @@ library StringUtils {
     ///      the whole path with @custom:constant MAX_NAME_PATH_OCTETS.
     uint256 internal constant MAX_DNS_LABEL_OCTETS = 63;
 
-    /// @notice RFC 1035 ceiling on a whole dotted name, in octets.
+    /// @notice Cap on the dotted parent path a caller submits, in octets.
+    /// @dev Not an RFC 1035 figure, despite the value. That ceiling is 255 octets of *wire* name,
+    ///      where each label carries a length prefix and the name ends in a zero byte, and it
+    ///      covers the fully qualified name. This bounds the dotted presentation string the caller
+    ///      passes in, which also carries no TLD, so the two are not the same quantity and this
+    ///      one must not be retuned to "match RFC 1035". What reaches a `LabelStore` row is longer
+    ///      again, and depends on the network's TLD: `subLabel` + "." + path + the TLD, so about
+    ///      323 octets at the maximum where the TLD is four octets.
     /// @dev @custom:constant MAX_DNS_LABEL_OCTETS bounds one segment; this bounds the path. Without
     ///      it a caller composes an arbitrarily long `parentLabel` out of legal 63-octet segments,
     ///      and `DotnsRegistry.setSubnodeOwner` stores the full name built from it verbatim in a
@@ -237,11 +244,12 @@ library StringUtils {
     /// @return isValid True if the path is at most @custom:constant MAX_NAME_PATH_OCTETS octets
     ///         and every dot-separated segment is a canonical DNS label.
     function isNamePath(string calldata value) internal pure returns (bool isValid) {
-        bytes memory path = bytes(value);
-        uint256 length = path.length;
-        if (length == 0) return false;
-        if (length > MAX_NAME_PATH_OCTETS) return false;
+        // Measured on calldata and rejected before the copy: an oversized path is exactly the
+        // input this bound exists for, so it must not be paid for in memory first.
+        uint256 length = bytes(value).length;
+        if (length == 0 || length > MAX_NAME_PATH_OCTETS) return false;
 
+        bytes memory path = bytes(value);
         uint256 start;
         for (uint256 i = 0; i < length; ++i) {
             if (path[i] != bytes1(0x2e)) continue;

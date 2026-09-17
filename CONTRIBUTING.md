@@ -277,9 +277,7 @@ forge test --no-match-path 'test/fork/**'
 2. Delete the paired fork test under `test/fork/`.
 3. Delete every `*Old.sol` and `I*Old.sol` referenced only by the upgrade script.
 4. Delete temporary forge artefacts: `broadcast/<Script>.s.sol/` and `cache/<Script>.s.sol/`.
-5. Update `deployments/<network>/<chainid>.json` with any new addresses. It is the only place they are recorded, so nothing else needs editing.
-   That edit is the one case where touching a live manifest is correct, so label the pull
-   request `deployment-record`; without it the `live-manifests-unchanged` check refuses the diff.
+5. Update `deployments/<network>/<chainid>.json` with any new addresses. It is the only place they are recorded, so nothing else needs editing. That edit is the one case where touching a live manifest is correct, so label the pull request `deployment-record`; without it the `live-manifests-unchanged` check refuses the diff.
 
 ## Code of conduct
 
