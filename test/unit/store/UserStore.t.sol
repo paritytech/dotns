@@ -33,19 +33,37 @@ contract UserStoreTests is BaseDotns {
         IUserStore uninitialised =
             IUserStore(address(new BeaconProxy(storeFactory.userStoreBeacon(), "")));
         vm.expectRevert(abi.encodeWithSelector(IUserStore.InvalidUser.selector, address(0)));
-        uninitialised.initialize(address(0));
+        uninitialised.initialize(address(0), address(protocolRegistry));
+    }
+
+    /// @notice A store holding no registry pointer answers version() with the "never declared"
+    ///         empty string instead of reverting. Models an instance initialised before the
+    ///         pointer existed, which a beacon upgrade on a live network brings onto this code.
+    function test_version_is_empty_without_a_registry_pointer() public {
+        IUserStore legacyShaped =
+            IUserStore(address(new BeaconProxy(storeFactory.userStoreBeacon(), "")));
+        assertEq(UserStore(address(legacyShaped)).version(), "");
+    }
+
+    function test_initialize_reverts_on_zero_protocol_registry() public {
+        IUserStore uninitialised =
+            IUserStore(address(new BeaconProxy(storeFactory.userStoreBeacon(), "")));
+        vm.expectRevert(
+            abi.encodeWithSelector(IUserStore.InvalidProtocolRegistry.selector, address(0))
+        );
+        uninitialised.initialize(ed, address(0));
     }
 
     function test_initialize_reverts_on_second_call() public {
         IUserStore store = _freshUserStore(ed);
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        store.initialize(ed);
+        store.initialize(ed, address(protocolRegistry));
     }
 
     function test_implementation_cannot_be_initialised_directly() public {
         UserStore impl = new UserStore();
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        impl.initialize(ed);
+        impl.initialize(ed, address(protocolRegistry));
     }
 
     function test_setValue_reverts_for_non_owner() public {

@@ -37,11 +37,21 @@ interface IUserStore is IDotnsStore {
     /// @notice Thrown when `setValue` is called with a zero key.
     error InvalidKey();
 
+    /// @notice Thrown when a zero protocol registry is supplied at initialisation.
+    error InvalidProtocolRegistry(address protocolRegistry);
+
     /// @notice Initialises the store, binding it permanently to `user_`.
     /// @dev Callable exactly once via `Initializable`. `user_` must be non-zero, otherwise
-    ///      @custom:reverts InvalidUser.
+    ///      @custom:reverts InvalidUser. `protocolRegistry_` must be non-zero, otherwise
+    ///      @custom:reverts InvalidProtocolRegistry.
     /// @param user_ The user this store is bound to forever.
-    function initialize(address user_) external;
+    /// @param protocolRegistry_ The protocol registry, held per the one-address rule so the
+    ///        store can report network-level facts such as the declared release.
+    function initialize(address user_, address protocolRegistry_) external;
+
+    /// @notice Returns the protocol registry this store reads network-level facts from.
+    /// @return protocolRegistry_ The registry address.
+    function protocolRegistry() external view returns (address protocolRegistry_);
 
     /// @notice Sets the current value for `key`.
     /// @dev Callable only by the bound owner; any other caller @custom:reverts NotOwner.

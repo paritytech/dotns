@@ -62,7 +62,7 @@ library RegistrationUtils {
     ///      protocol registry on every write (@custom:function StoreAuth.isStoreWriter), so no
     ///      per-store allowlist bookkeeping is needed here.
     /// @dev The registrar writes the `LabelStore` entry directly inside `register`
-    ///      so this helper deliberately does not call `StoreUtils.writeLabel`.
+    ///      so this helper deliberately does not call `StoreUtils.writeNewLabel`.
     ///      Doing it twice would deploy or touch the store on every flow and
     ///      could conflict with the registrar's locked-entry semantics.
     /// @param context Registration inputs. See @custom:struct RegistrationContext.

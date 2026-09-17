@@ -19,6 +19,32 @@ contract DeterministicDeploymentHarness is BaseDeployer {
         initDeployment("__test_scratch", "deterministic");
     }
 
+    /// @notice First immutable range (smallest start) an artefact records, so a test can
+    ///         target a real range without hardcoding an offset that moves with every code
+    ///         change to the contract or its dependencies.
+    function firstImmutableRange(string memory artefact)
+        external
+        view
+        returns (uint256 start, uint256 len)
+    {
+        string memory json = vm.readFile(_artefactPath(artefact));
+        string memory root = "$.deployedBytecode.immutableReferences";
+        string[] memory ids = vm.parseJsonKeys(json, root);
+        start = type(uint256).max;
+        for (uint256 i; i < ids.length; ++i) {
+            ImmutableRef[] memory refs = abi.decode(
+                vm.parseJson(json, string.concat(root, '["', ids[i], '"]')), (ImmutableRef[])
+            );
+            for (uint256 j; j < refs.length; ++j) {
+                if (refs[j].start < start) {
+                    start = refs[j].start;
+                    len = refs[j].len;
+                }
+            }
+        }
+        require(start != type(uint256).max, "artefact has no immutable ranges");
+    }
+
     function bootstrapCreate3Factory(address owner) external returns (address) {
         return _bootstrapCreate3Factory(owner);
     }
@@ -67,6 +93,22 @@ contract DeterministicDeploymentHarness is BaseDeployer {
         returns (address)
     {
         return _broadcastDeployCreate3(owner, artefact, constructorData, label);
+    }
+
+    function addressDerivedRanges(
+        string memory artefact,
+        bytes memory first,
+        bytes memory second
+    )
+        external
+        view
+        returns (bool[] memory)
+    {
+        return _addressDerivedRanges(artefact, first, second);
+    }
+
+    function create3Salt(string memory label, string memory kind) external view returns (bytes32) {
+        return _create3Salt(label, kind);
     }
 
     function predictCreate3(

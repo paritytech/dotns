@@ -26,7 +26,9 @@ interface IDotnsPricing {
 
     /// @notice Returns a stable identifier for this model and its parameters.
     /// @dev Changes when the model shape or its parameters change, so clients and telemetry can
-    ///      tell one live curve from another. Not consulted on the pricing path.
+    ///      tell one live curve from another. Not consulted on the pricing path. This is the
+    ///      cost-model identity used by `DotnsCostModelRegistry`, unrelated to the network's
+    ///      release declaration (`protocolVersion()` on the protocol registry).
     /// @return modelVersion Identifier derived from the model form and its parameters.
     function version() external view returns (uint256 modelVersion);
 }

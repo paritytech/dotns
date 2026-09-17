@@ -5,6 +5,7 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 import {BaseDotns, IDotnsRegistrarController} from "../../base/BaseDotns.t.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
+import {IDotnsRegistrar} from "../../../contracts/registrars/IDotnsRegistrar.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 
 /// @title ForceSender
@@ -82,6 +83,43 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(pos.asset, address(0), "asset should be native (address(0))");
         assertFalse(pos.released, "released should be false");
         assertFalse(pos.claimed, "claimed should be false");
+    }
+
+    /// @notice A name cannot be moved into escrow custody except by `release`, on either transfer
+    ///         spelling.
+    /// @dev `onERC721Received` covers only the safe spelling, since it is the only one that runs a
+    ///      receiver hook. Both are asserted here so the plain `transferFrom` cannot regress.
+    function test_direct_transfer_into_escrow_is_rejected_on_both_spellings() public {
+        uint256 tokenId = _registerNoStatus(LABEL, ed);
+        address escrow = address(dotnsNameEscrow);
+
+        vm.prank(ed);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsRegistrar.UnsolicitedEscrowDeposit.selector, tokenId)
+        );
+        dotnsRegistrar.transferFrom(ed, escrow, tokenId);
+
+        vm.prank(ed);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsRegistrar.UnsolicitedEscrowDeposit.selector, tokenId)
+        );
+        dotnsRegistrar.safeTransferFrom(ed, escrow, tokenId);
+
+        // An approved operator is refused on the same terms: approval carries no authority to
+        // strand the name.
+        vm.prank(ed);
+        dotnsRegistrar.approve(leonardo, tokenId);
+        vm.prank(leonardo);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsRegistrar.UnsolicitedEscrowDeposit.selector, tokenId)
+        );
+        dotnsRegistrar.transferFrom(ed, escrow, tokenId);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), ed, "the name never left its holder");
+
+        // The legitimate route still works, so the guard reads the caller rather than the target.
+        _approveAndRelease(tokenId, ed);
+        assertEq(dotnsRegistrar.ownerOf(tokenId), escrow, "release still reaches custody");
     }
 
     function test_release_transfers_token_to_escrow() public {

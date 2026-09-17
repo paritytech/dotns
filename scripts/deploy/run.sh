@@ -38,6 +38,11 @@
 #   RPC_URL            Foundry rpc alias (see [rpc_endpoints] in foundry.toml)
 #                      or full https/wss URL. Defaults to `paseo_local`.
 #   ENV_FILE           Path to env file. Defaults to `.env`.
+#   DOTNS_TLD          Bare TLD label the protocol registry initialises with.
+#                      Required; no default (see below).
+#   DOTNS_RELEASE_TAG  Release the final stage declares on chain, bare semver.
+#                      Defaults to the tag the checkout sits exactly on;
+#                      required otherwise (see below).
 #
 # Extra forge flags are forwarded verbatim to every stage, e.g.
 #   ./scripts/deploy/run.sh '--slow --timeout 1000'
@@ -60,6 +65,32 @@ set -euo pipefail
 if [ -n "${DOTNS_TLD:-}" ]; then
   export DOTNS_TLD
 fi
+
+# Release tag WireDeployments declares on the protocol registry, as bare semver
+# ("0.8.0", no leading v). Resolution order: explicit DOTNS_RELEASE_TAG, else
+# the tag the checkout sits exactly on. Real deploys happen from release tags,
+# so a checkout that is not on one aborts here rather than landing a network
+# that cannot say what it runs; the CI reproduction workflow sets an explicit
+# 0.0.0 placeholder. A leading v is stripped rather than rejected because the
+# git tag itself carries one.
+if [ -z "${DOTNS_RELEASE_TAG:-}" ]; then
+  DOTNS_RELEASE_TAG="$(git describe --tags --exact-match 2>/dev/null || true)"
+fi
+DOTNS_RELEASE_TAG="${DOTNS_RELEASE_TAG#v}"
+if [ -z "$DOTNS_RELEASE_TAG" ]; then
+  echo "run.sh: DOTNS_RELEASE_TAG is not set and HEAD is not exactly on a tag." >&2
+  echo "        Deploys happen from release tags; check one out, or set DOTNS_RELEASE_TAG." >&2
+  exit 1
+fi
+# Semver core plus optional pre-release identifiers: deploys run from pre-release
+# tags (see RELEASE_ARTIFACTS.md), so 0.8.0-rc.1 must pass. Build metadata does
+# not: consumers parse and compare the declared value.
+if ! printf '%s' "$DOTNS_RELEASE_TAG" \
+  | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+  echo "run.sh: DOTNS_RELEASE_TAG '$DOTNS_RELEASE_TAG' is not semver (expected e.g. 0.8.0 or 0.8.0-rc.1)." >&2
+  exit 1
+fi
+export DOTNS_RELEASE_TAG
 
 # Forward every extra forge flag (word-split), not just the first token.
 extra="$*"

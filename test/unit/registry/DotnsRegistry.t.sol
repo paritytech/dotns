@@ -136,14 +136,16 @@ contract DotnsRegistryTests is BaseDotns {
         assertEq(dotnsRegistry.resolver(returnedSubnode), address(dotnsReverseResolver));
     }
 
-    /// @notice A `persist: false` subname records ownership and a resolver but writes no store row.
-    /// @dev An authorised store writer indexes the label later, so the registry leaves the store
-    ///      untouched and no store is deployed for the owner here.
-    function test_setSubnodeOwner_persist_false_writes_no_store_row() public {
+    /// @notice A registered controller may defer the store write, recording ownership and a
+    ///         resolver but no store row.
+    /// @dev Only a registered controller may pass `persist: false`, so the parent here is owned by
+    /// a controller. It backfills the label later, so the registry leaves the store untouched and
+    ///      no store is deployed for the owner here.
+    function test_setSubnodeOwner_registered_controller_defers_and_writes_no_store_row() public {
         string memory parentLabel = "parentnode07";
-        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+        bytes32 parentNode = _registerNodeTo(parentLabel, address(dotnsPopController));
 
-        vm.prank(owner);
+        vm.prank(address(dotnsPopController));
         bytes32 subnode = dotnsRegistry.setSubnodeOwner(
             IDotnsRegistry.SubnodeRecord({
                 parentNode: parentNode,
@@ -161,6 +163,35 @@ contract DotnsRegistryTests is BaseDotns {
         assertEq(storeFactory.getLabelStore(ed), address(0), "no store row written");
     }
 
+    /// @notice A caller that is not a registered controller cannot defer the store write.
+    /// @dev The parent owner here is a plain account that owns the parent, so it clears the
+    ///      ownership gate; the deferral then fails the controller gate. Deferring would strand the
+    ///      label under an owner who can never backfill it, so the caller must persist eagerly.
+    function test_setSubnodeOwner_reverts_when_a_non_controller_defers() public {
+        string memory parentLabel = "parentnode10";
+        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+
+        IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNode,
+            subLabel: "alice",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: false
+        });
+
+        vm.prank(owner);
+        vm.expectRevert(IDotnsRegistry.NotAuthorised.selector);
+        dotnsRegistry.setSubnodeOwner(record);
+
+        // Positive control: the same caller creating the same subname with `persist: true`
+        // succeeds, proving `owner` holds parent authority and the revert above is the deferral
+        // gate rather than the ownership modifier (both revert `NotAuthorised`).
+        record.persist = true;
+        vm.prank(owner);
+        bytes32 subnode = dotnsRegistry.setSubnodeOwner(record);
+        assertEq(dotnsRegistry.owner(subnode), ed, "eager persist by the parent owner is allowed");
+    }
+
     /// @notice A same-owner re-call with `persist: true` does not backfill the store.
     /// @dev The registry writes the store on creation or on reassignment to a new owner, so a
     /// repeat call that leaves the owner unchanged is a no-op for the store. Backfilling is done by
@@ -168,7 +199,7 @@ contract DotnsRegistryTests is BaseDotns {
     ///      authorised store writer instead (see the backfill test below), not by re-calling this.
     function test_setSubnodeOwner_same_owner_recall_does_not_backfill_store() public {
         string memory parentLabel = "parentnode08";
-        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+        bytes32 parentNode = _registerNodeTo(parentLabel, address(dotnsPopController));
 
         IDotnsRegistry.SubnodeRecord memory deferred = IDotnsRegistry.SubnodeRecord({
             parentNode: parentNode,
@@ -177,13 +208,13 @@ contract DotnsRegistryTests is BaseDotns {
             owner: ed,
             persist: false
         });
-        vm.prank(owner);
+        vm.prank(address(dotnsPopController));
         dotnsRegistry.setSubnodeOwner(deferred);
 
         // Re-issue the same subname to the same owner, now asking to persist.
         IDotnsRegistry.SubnodeRecord memory reissue = deferred;
         reissue.persist = true;
-        vm.prank(owner);
+        vm.prank(address(dotnsPopController));
         dotnsRegistry.setSubnodeOwner(reissue);
 
         assertEq(storeFactory.getLabelStore(ed), address(0), "same-owner re-call does not backfill");
@@ -197,9 +228,9 @@ contract DotnsRegistryTests is BaseDotns {
     ///      does. The registry is not re-called.
     function test_deferred_subname_is_backfilled_by_an_authorised_store_writer() public {
         string memory parentLabel = "parentnode09";
-        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+        bytes32 parentNode = _registerNodeTo(parentLabel, address(dotnsPopController));
 
-        vm.prank(owner);
+        vm.prank(address(dotnsPopController));
         bytes32 subnode = dotnsRegistry.setSubnodeOwner(
             IDotnsRegistry.SubnodeRecord({
                 parentNode: parentNode,
@@ -712,5 +743,20 @@ contract DotnsRegistryTests is BaseDotns {
         vm.prank(ed);
         vm.expectRevert(IDotnsRegistry.NotAuthorised.selector);
         dotnsRegistry.setSubnodeResolver(resolverRecord);
+    }
+
+    /// @notice Registers `label` directly under the TLD, owned by `nodeOwner`, without
+    /// commit-reveal.
+    /// @dev Lets a registered controller own a parent node, which the deferred-persist tests need
+    ///      since only a registered controller may pass `persist: false`.
+    function _registerNodeTo(string memory label, address nodeOwner)
+        private
+        returns (bytes32 node)
+    {
+        node = _nodeOf(label);
+        vm.startPrank(address(dotnsRegistrarController));
+        dotnsRegistrar.register(uint256(node), nodeOwner, "");
+        dotnsRegistry.setOwner(node, nodeOwner);
+        vm.stopPrank();
     }
 }

@@ -2103,13 +2103,15 @@ contract DotnsPopControllerTests is BaseDotns {
         // A second lite name, issued to leonardo, so its text reads as PoP-issued.
         _reservePop(leonardo, "another.01", _validChatKey(0x02), "");
 
-        // ed owns a storeless subname beneath their own lite name.
-        vm.prank(ed);
+        // ed owns a storeless subname beneath the numeric container. Only a registered controller
+        // may defer the store write, so the controller, which owns the container, creates it with
+        // persist false and ed as owner, leaving ed's store untouched at that node.
+        vm.prank(address(dotnsPopController));
         bytes32 forgedNode = dotnsRegistry.setSubnodeOwner(
             IDotnsRegistry.SubnodeRecord({
-                parentNode: _liteNodeOf(LITE_LABEL_A),
+                parentNode: _nodeOf("01"),
                 subLabel: "sub",
-                parentLabel: LITE_LABEL_A,
+                parentLabel: "01",
                 owner: ed,
                 persist: false
             })

@@ -7,11 +7,13 @@ import {CREATE3} from "solady/utils/CREATE3.sol";
 /// @notice Permissionless wrapper around Solady's audited CREATE3 library.
 /// @dev Anyone may call @custom:function deploy. CREATE3 addresses are a pure function of
 /// `(factory_address, salt)` — the caller never enters the derivation — so caller-gating
-/// would not strengthen address determinism. Salt-squatting griefing is in-scope for the
-/// caller, not the factory: salts in the DotNS namespace (`CREATE3_SALT_NAMESPACE` in
-/// `BaseDeployer`) get bumped end-to-end if a slot is ever found occupied. Keeping the
-/// factory permissionless removes the cross-chain ownership-coordination burden and lets
-/// CI keys, ops keys, and recovery flows all coexist without ownership transfers.
+/// would not strengthen address determinism. Keeping the factory permissionless removes the
+/// cross-chain ownership-coordination burden and lets CI keys, ops keys, and recovery flows
+/// all coexist without ownership transfers.
+///
+/// An occupied salt is handled by the caller. `BaseDeployer._deployCreate3` adopts an occupied
+/// address only when the occupant's runtime code is the artefact that run would have deployed,
+/// and `DOTNS_SALT_VERSION` moves the DotNS address set to fresh addresses when it is not.
 /// @custom:security-contact admin@parity.io
 contract Create3Factory {
     /// @notice Emitted on every successful CREATE3 deployment through this factory.
