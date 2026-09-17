@@ -49,7 +49,13 @@ contract DotnsProtocolRegistry is
     /// @notice Release tag the network was last declared to run, bare semver (e.g. `0.8.0`).
     string private _protocolVersion;
 
-    uint256[50] private __gap;
+    /// @dev Reserved storage space to allow for layout changes in future upgrades. The declaration
+    ///      fields above consume two of the reserved slots, so the gap holds 48 and the contract
+    ///      keeps the 54-slot footprint the deployed proxy already uses. Sized this way rather than
+    ///      left at 50 because the gap would otherwise start two slots later than on chain, which
+    ///      the storage-layout diff rejects and which would put any future appended field on a slot
+    ///      the live proxy does not expect.
+    uint256[48] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
