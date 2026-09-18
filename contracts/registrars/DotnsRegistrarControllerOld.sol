@@ -12,22 +12,22 @@ import {
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
+import {IDotnsRegistrarOld} from "./IDotnsRegistrarOld.sol";
 import {IDotnsReverseResolver} from "../resolvers/IDotnsReverseResolver.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
-import {IDotnsCostModelRegistry} from "../pop/IDotnsCostModelRegistry.sol";
+import {IDotnsCostModelRegistryOld} from "../pop/IDotnsCostModelRegistryOld.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {IDotnsRegistrarController} from "./IDotnsRegistrarController.sol";
 import {IDotnsNameEscrow} from "../escrow/IDotnsNameEscrow.sol";
 import {IDotnsNameWhitelist} from "../whitelist/IDotnsNameWhitelist.sol";
-import {IStoreFactory} from "../store/IStoreFactory.sol";
-import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
-import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
-import {DotnsConstants} from "../utils/DotnsConstants.sol";
+import {IStoreFactoryOld} from "../store/IStoreFactoryOld.sol";
+import {IDotnsProtocolRegistryOld} from "../registry/IDotnsProtocolRegistryOld.sol";
+import {IDotnsRegistryOld} from "../registry/IDotnsRegistryOld.sol";
+import {DotnsConstantsOld} from "../utils/DotnsConstantsOld.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
-import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
-import {StoreUtils} from "../utils/StoreUtils.sol";
-import {SystemUtils} from "../utils/SystemUtils.sol";
+import {RegistrationUtilsOld} from "../utils/RegistrationUtilsOld.sol";
+import {StoreUtilsOld} from "../utils/StoreUtilsOld.sol";
+import {SystemUtilsOld} from "../utils/SystemUtilsOld.sol";
 
 /// @title Dotns Registrar Controller
 /// @notice Allocates top-level labels using a commit reveal scheme.
@@ -39,7 +39,7 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 /// (`address(0)`) for tokenised nodes and derives ownership from the ERC721 registrar for
 /// authorisation.
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistrarController is
+contract DotnsRegistrarControllerOld is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
@@ -48,7 +48,7 @@ contract DotnsRegistrarController is
     IDotnsRegistrarController
 {
     using StringUtils for *;
-    using StoreUtils for IStoreFactory;
+    using StoreUtilsOld for IStoreFactoryOld;
 
     /// @notice One role's membership and its admin role.
     /// @dev Member of the reserved AccessControl namespace, unused because gating is Root only.
@@ -88,12 +88,12 @@ contract DotnsRegistrarController is
     mapping(bytes32 hash => uint256 version) public committedPricingVersion;
 
     /// @dev Reserved slot held so the sequential storage layout stays fixed across the in-place
-    ///      upgrade. Unused: name eligibility lives in @custom:contract DotnsNameWhitelist.
+    ///      upgrade. Unused: name eligibility lives in @custom:contract DotnsNameWhitelistOld.
     /// @custom:oz-renamed-from whiteList
     mapping(address account => bool retained) private __whiteListSlot;
 
     /// @notice Protocol-level address registry for all DotNS contracts.
-    IDotnsProtocolRegistry public protocolRegistry;
+    IDotnsProtocolRegistryOld public protocolRegistry;
 
     /// @dev Reserved storage space to allow for layout changes in the future. The retained
     ///      whitelist slot above holds one slot, so the gap holds 49 to keep the footprint fixed.
@@ -114,10 +114,8 @@ contract DotnsRegistrarController is
     /// @custom:reverts MaxCommitmentAgeTooLow) and must stay within
     /// `MAX_ALLOWED_COMMITMENT_AGE` (otherwise @custom:reverts MaxCommitmentAgeTooHigh) before
     /// wiring the protocol registry.
-    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
-        address initialOwner,
-        IDotnsProtocolRegistry registry,
+        IDotnsProtocolRegistryOld registry,
         uint256 minAge,
         uint256 maxAge
     )
@@ -125,7 +123,7 @@ contract DotnsRegistrarController is
         initializer
     {
         __ERC165_init();
-        __Ownable_init(initialOwner);
+        __Ownable_init(msg.sender);
 
         require(minAge > 0, MinCommitmentAgeZero());
         require(maxAge > minAge, MaxCommitmentAgeTooLow());
@@ -141,7 +139,8 @@ contract DotnsRegistrarController is
     function available(string calldata label) public view override returns (bool) {
         bytes32 node;
         (, node) = _validatedLabelNode(label);
-        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
         return registrar.available(uint256(node));
     }
 
@@ -181,19 +180,18 @@ contract DotnsRegistrarController is
     /// @dev Resolved at commit time so the stamp binds the version live then, not at reveal.
     /// @return pricingVersion The current cost-model version.
     function _currentPricingVersion() internal view returns (uint256 pricingVersion) {
-        return
-            IDotnsCostModelRegistry(protocolRegistry.get(DotnsConstants.COST_MODEL))
-                .currentVersion();
+        return IDotnsCostModelRegistryOld(protocolRegistry.get(DotnsConstantsOld.COST_MODEL))
+            .currentVersion();
     }
 
     /// @inheritdoc IDotnsRegistrarController
     function register(Registration calldata registration) external payable override nonReentrant {
-        (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
+        (IDotnsRegistrarOld registrar, bytes32 labelhash, bytes32 node) =
             _requireAvailableLabel(registration.label);
         _consumeCommitment(registration);
 
         address escrow = _escrow();
-        IPopRules rules = IPopRules(protocolRegistry.get(DotnsConstants.POP_RULES));
+        IPopRules rules = IPopRules(protocolRegistry.get(DotnsConstantsOld.POP_RULES));
 
         uint256 tokenId = uint256(node);
         bool isReclaim = registrar.exists(tokenId);
@@ -249,7 +247,8 @@ contract DotnsRegistrarController is
         IDotnsReverseResolver reverse;
         bool setReverseRecord;
         if (registration.reserved && isDirect) {
-            reverse = IDotnsReverseResolver(protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER));
+            reverse =
+                IDotnsReverseResolver(protocolRegistry.get(DotnsConstantsOld.REVERSE_RESOLVER));
             setReverseRecord = bytes(reverse.nameOf(registration.owner)).length == 0;
         }
 
@@ -262,7 +261,7 @@ contract DotnsRegistrarController is
             // Reclaim hands the NFT to the new holder; rewrite the registry record so the prior
             // owner's resolver pointer cannot follow the name. Must run after `escrow.reclaim`
             // so the registry's `ownerOf` check sees the new holder, not the escrow.
-            IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY))
+            IDotnsRegistryOld(protocolRegistry.get(DotnsConstantsOld.REGISTRY))
                 .setOwner(node, registration.owner);
         }
 
@@ -317,7 +316,7 @@ contract DotnsRegistrarController is
         // origin, which has no account, so no branch may read `msg.sender`: the grant is checked
         // against `registration.owner`, the commitment is keyed on its own hash, and the mint
         // targets the owner.
-        bool isRoot = SystemUtils.originIsRoot();
+        bool isRoot = SystemUtilsOld.originIsRoot();
         IDotnsNameWhitelist whitelist;
         if (!isRoot) {
             whitelist = _nameWhitelist();
@@ -380,10 +379,10 @@ contract DotnsRegistrarController is
     function _requireAvailableLabel(string calldata label)
         internal
         view
-        returns (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node)
+        returns (IDotnsRegistrarOld registrar, bytes32 labelhash, bytes32 node)
     {
         (labelhash, node) = _validatedLabelNode(label);
-        registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        registrar = IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
         require(registrar.available(uint256(node)), NameNotAvailable(label));
     }
 
@@ -404,7 +403,7 @@ contract DotnsRegistrarController is
         uint256 stamped = committedPricingVersion[commitment];
         require(
             registration.pricingVersion == stamped,
-            IDotnsCostModelRegistry.PricingVersionMismatch(stamped, registration.pricingVersion)
+            IDotnsCostModelRegistryOld.PricingVersionMismatch(stamped, registration.pricingVersion)
         );
 
         delete commitments[commitment];
@@ -415,8 +414,9 @@ contract DotnsRegistrarController is
     /// wires forward registry, optionally sets the reverse record, and writes the owner's
     /// Store.
     /// @dev On a fresh mint the triad of mint + forward-registry + store-write is delegated
-    /// to @custom:function RegistrationUtils.registerAndStore, the single canonical implementation
-    /// shared across every DotNS registration flow. On a reclaim the mint step is skipped (the
+    /// to @custom:function RegistrationUtilsOld.registerAndStore, the single canonical
+    /// implementation shared across every DotNS registration flow. On a reclaim the mint step is
+    /// skipped (the
     /// escrow has already moved custody) and only the registry wiring and store write run.
     /// Reverse-record setting and the priced-registration event stay here because they are
     /// commit-reveal-specific policy.
@@ -433,8 +433,8 @@ contract DotnsRegistrarController is
     {
         address labelStore;
         if (!isReclaim) {
-            labelStore = RegistrationUtils.registerAndStore(
-                RegistrationUtils.RegistrationContext({
+            labelStore = RegistrationUtilsOld.registerAndStore(
+                RegistrationUtilsOld.RegistrationContext({
                     protocolRegistry: protocolRegistry,
                     user: registration.owner,
                     label: registration.label,
@@ -445,10 +445,10 @@ contract DotnsRegistrarController is
         } else {
             // Registry reset on reclaim is deferred until after `escrow.reclaim` runs (see
             // @custom:function register) so the registry's `ownerOf` check sees the new holder.
-            IStoreFactory factory =
-                IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
+            IStoreFactoryOld factory =
+                IStoreFactoryOld(protocolRegistry.get(DotnsConstantsOld.STORE_FACTORY));
             string memory fullName = string.concat(registration.label, protocolRegistry.tld());
-            labelStore = factory.writeNewLabel(registration.owner, node, fullName);
+            labelStore = factory.writeLabel(registration.owner, node, fullName);
         }
 
         if (setReverseRecord) {
@@ -462,24 +462,19 @@ contract DotnsRegistrarController is
 
     /// @notice Returns the configured name escrow from the protocol registry.
     function _escrow() internal view returns (address escrow) {
-        escrow = protocolRegistry.get(DotnsConstants.NAME_ESCROW);
+        escrow = protocolRegistry.get(DotnsConstantsOld.NAME_ESCROW);
         require(escrow != address(0), EscrowNotConfigured());
     }
 
-    /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
-    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
-    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
-    ///      not this contract's build; per-contract identity is the codehash declared on the
-    ///      registry.
-    /// @return versionString Declared release as bare semver, empty when never declared.
-    function version() external view virtual returns (string memory versionString) {
-        versionString = protocolRegistry.protocolVersion();
+    /// @notice Returns implementation version.
+    /// @return versionString Current version string.
+    function version() external pure virtual returns (string memory versionString) {
+        versionString = "1.0.0";
     }
 
     /// @notice Returns the configured name whitelist from the protocol registry.
     function _nameWhitelist() internal view returns (IDotnsNameWhitelist whitelist) {
-        address configured = protocolRegistry.get(DotnsConstants.NAME_WHITELIST);
+        address configured = protocolRegistry.get(DotnsConstantsOld.NAME_WHITELIST);
         require(configured != address(0), WhitelistNotConfigured());
         whitelist = IDotnsNameWhitelist(configured);
     }

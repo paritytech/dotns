@@ -12,13 +12,13 @@ import {
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IDotnsNameWhitelist} from "./IDotnsNameWhitelist.sol";
-import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
+import {IDotnsProtocolRegistryOld} from "../registry/IDotnsProtocolRegistryOld.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
-import {DotnsConstants} from "../utils/DotnsConstants.sol";
-import {SystemUtils} from "../utils/SystemUtils.sol";
+import {DotnsConstantsOld} from "../utils/DotnsConstantsOld.sol";
+import {SystemUtilsOld} from "../utils/SystemUtilsOld.sol";
 
-/// @title DotnsNameWhitelist
+/// @title DotnsNameWhitelistOld
 /// @notice Pre-launch name whitelist. A name is Open until governance reserves it or a claim is
 ///         accepted for it. Several beneficiaries may claim the same Open name, each with a
 ///         reason, and governance accepts one as the winner.
@@ -30,14 +30,14 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 ///      no event indexing is required. A name holds at most `maxClaimants` live claims, which
 ///      bounds the loop that clears them on resolution. Resolving a name deletes its claims,
 ///      refunding their storage deposit, so only reserved or won names persist. The entire admin
-///      surface is substrate Root: `SystemUtils.originIsRoot` is true through the proxy's
+///      surface is substrate Root: `SystemUtilsOld.originIsRoot` is true through the proxy's
 ///      delegatecall frame, and no gate reads `msg.sender`, so Root's lack of an address is not a
 ///      problem. No signed account grants, revokes, reserves, or retunes a cap; the owner's
 ///      authority is upgrade only. The public and PoP controllers hold only the `consume` hook.
 ///      Entries are keyed by the node under the active TLD, which the deployment holds immutable
 ///      for the whitelist's lifetime.
 /// @custom:security-contact admin@parity.io
-contract DotnsNameWhitelist is
+contract DotnsNameWhitelistOld is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
@@ -67,18 +67,18 @@ contract DotnsNameWhitelist is
     }
 
     /// @notice Protocol-level address registry for all DotNS contracts.
-    IDotnsProtocolRegistry public protocolRegistry;
+    IDotnsProtocolRegistryOld public protocolRegistry;
 
     /// @notice Live-claim cap per name, tunable by governance within
-    ///         `DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT`.
+    ///         `DotnsConstantsOld.WHITELIST_MAX_CLAIMANTS_LIMIT`.
     uint16 public maxClaimants;
 
     /// @notice Cap on labels per `grantNames` call, tunable by governance within
-    ///         `DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT`.
+    ///         `DotnsConstantsOld.WHITELIST_MAX_GRANT_BATCH_LIMIT`.
     uint16 public maxGrantBatch;
 
     /// @notice Reason byte cap, tunable by governance within
-    ///         `DotnsConstants.WHITELIST_MAX_REASON_LIMIT`.
+    ///         `DotnsConstantsOld.WHITELIST_MAX_REASON_LIMIT`.
     uint256 public maxReasonBytes;
 
     /// @notice Resolved state per name.
@@ -115,8 +115,8 @@ contract DotnsNameWhitelist is
     /// @notice Restricts a call to a registrar controller resolved through the registry.
     modifier onlyController() {
         require(
-            msg.sender == protocolRegistry.get(DotnsConstants.CONTROLLER)
-                || msg.sender == protocolRegistry.get(DotnsConstants.POP_CONTROLLER),
+            msg.sender == protocolRegistry.get(DotnsConstantsOld.CONTROLLER)
+                || msg.sender == protocolRegistry.get(DotnsConstantsOld.POP_CONTROLLER),
             NotController(msg.sender)
         );
         _;
@@ -124,7 +124,7 @@ contract DotnsNameWhitelist is
 
     /// @notice Internal check enforcing the substrate Root gate.
     function _onlyGovernance() internal view {
-        require(SystemUtils.originIsRoot(), NotGovernance());
+        require(SystemUtilsOld.originIsRoot(), NotGovernance());
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -134,29 +134,22 @@ contract DotnsNameWhitelist is
 
     /// @notice Initialises the whitelist.
     /// @dev Callable once through the UUPS proxy; direct calls on the implementation
-    ///      @custom:reverts InvalidInitialization. Sets `initialOwner` as owner and wires the
+    ///      @custom:reverts InvalidInitialization. Sets the deployer as owner and wires the
     ///      protocol registry the node derivation reads the TLD from.
-    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol registry all DotNS contracts resolve through.
-    function initialize(
-        address initialOwner,
-        IDotnsProtocolRegistry registry
-    )
-        external
-        initializer
-    {
+    function initialize(IDotnsProtocolRegistryOld registry) external initializer {
         __ERC165_init();
-        __Ownable_init(initialOwner);
+        __Ownable_init(msg.sender);
         protocolRegistry = registry;
-        maxClaimants = DotnsConstants.WHITELIST_DEFAULT_MAX_CLAIMANTS;
-        maxGrantBatch = DotnsConstants.WHITELIST_DEFAULT_MAX_GRANT_BATCH;
-        maxReasonBytes = DotnsConstants.WHITELIST_DEFAULT_MAX_REASON_BYTES;
+        maxClaimants = DotnsConstantsOld.WHITELIST_DEFAULT_MAX_CLAIMANTS;
+        maxGrantBatch = DotnsConstantsOld.WHITELIST_DEFAULT_MAX_GRANT_BATCH;
+        maxReasonBytes = DotnsConstantsOld.WHITELIST_DEFAULT_MAX_REASON_BYTES;
     }
 
     /// @inheritdoc IDotnsNameWhitelist
     function setMaxClaimants(uint16 newMax) external override onlyGovernance {
         require(
-            newMax > 0 && newMax <= DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT,
+            newMax > 0 && newMax <= DotnsConstantsOld.WHITELIST_MAX_CLAIMANTS_LIMIT,
             MaxClaimantsOutOfRange()
         );
         maxClaimants = newMax;
@@ -166,7 +159,7 @@ contract DotnsNameWhitelist is
     /// @inheritdoc IDotnsNameWhitelist
     function setMaxReasonBytes(uint256 newMax) external override onlyGovernance {
         require(
-            newMax > 0 && newMax <= DotnsConstants.WHITELIST_MAX_REASON_LIMIT,
+            newMax > 0 && newMax <= DotnsConstantsOld.WHITELIST_MAX_REASON_LIMIT,
             MaxReasonBytesOutOfRange()
         );
         maxReasonBytes = newMax;
@@ -176,7 +169,7 @@ contract DotnsNameWhitelist is
     /// @inheritdoc IDotnsNameWhitelist
     function setMaxGrantBatch(uint16 newMax) external override onlyGovernance {
         require(
-            newMax > 0 && newMax <= DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT,
+            newMax > 0 && newMax <= DotnsConstantsOld.WHITELIST_MAX_GRANT_BATCH_LIMIT,
             MaxGrantBatchOutOfRange()
         );
         maxGrantBatch = newMax;

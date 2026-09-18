@@ -488,4 +488,54 @@ Every network deployed through the shared CREATE3 factory lands on the same addr
 
 Each release also publishes the same addresses as `deployments.json`, attached to the release and at the root of `dotns-abis-<tag>.zip`, for consumers outside this repository. See [`RELEASE_ARTIFACTS.md`](./RELEASE_ARTIFACTS.md).
 
+### Paseo Asset Hub Next, and why its manifest folder is ambiguous
+
+`deployments/paseo-assethub/420420417.json` is Paseo Asset Hub Next, reached at
+`https://eth-rpc-paseo-next.polkadot.io`. Chain id 420420417 is shared with other Paseo-style
+environments, including the public Polkadot Hub TestNet gateway, which answers on that id and has
+no code at any of these addresses. Point the fork adapter at the wrong one and every address
+resolves and every call reverts for reasons that look like anything but the real cause.
+
+The public gateway also answers `eth_getLogs` with an empty result for every range, not an error,
+so anything derived from a log replay against it looks like it worked and is empty. Nothing in
+this repository depends on that: the store migration reads its holders from the factory's own
+`getLabelStores` and each store's `owner`. Worth knowing before reaching for logs to answer a
+question about this network. Use an archive node, or Blockscout at
+`https://blockscout-paseo-next.polkadot.io`.
+
+### Broadcast order
+
+The in-place upgrade to v0.8.0 has a fixed order, and nothing in the scripts enforces it: the
+protocol registry has to go first because every other contract's `version()` reads through it,
+the store migration after that because it rewires a key the declaration records, and the
+declaration last because it is a claim about the whole deployment.
+[`docs/PASEO-V080-RUNBOOK.md`](./docs/PASEO-V080-RUNBOOK.md) is the step list, with what to check
+after each one.
+
+### The deployed code is not always the code in a release
+
+This network's proxies are upgraded in place from the `dev/testnet-upgrades` branch, which is
+never merged to `master`, so no release tag describes what they run. Two consequences that look
+like faults and are not:
+
+- `verify --tag` reports the `registrarController` key as drift, permanently. The deployed
+  implementation carries a retained storage slot that keeps `protocolRegistry` where the live
+  proxy has it; an implementation built from the tag reads that field as the zero address and
+  bricks the contract, so the branch build is the only deployable one. Every other key verifies.
+  A second drifting key is a real finding.
+- `protocolVersion()` names the release the deployment tracks, and is accurate for every contract
+  but that one, which runs a superset differing only in storage-slot constants.
+
+Before broadcasting, re-run `scripts/shell/verify-snapshots.sh` against the network. It compares
+every snapshot with the implementation actually deployed, which is the only check that catches a
+snapshot describing code that stopped running months ago.
+
+### Lite usernames issued before the numeric namespace
+
+Lite usernames issued before that upgrade were recorded as atomic labels under the top level. The
+current code addresses a lite name at the container-then-stem node instead, so a pre-upgrade lite
+name is not read by the new path, and its subname node is free to be issued afresh. That overwrite
+is accepted: the numeric namespace is the intended shape. Nothing reads the old records, and they
+are not migrated.
+
 Prefer reading an address from the protocol registry at runtime. Every consumer contract exposes `protocolRegistry`, and the registry resolves each well-known key in `DotnsConstants`, so one known address is enough to reach the rest and the chain stays the authority.
