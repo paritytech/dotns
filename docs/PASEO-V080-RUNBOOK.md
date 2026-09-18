@@ -83,6 +83,20 @@ the old factory**: it is the only contract that can upgrade the implementations 
 stores, and it answers to the same owner. A `BeaconProxy` holds its beacon in an immutable, so no
 migration can move them.
 
+The replacement takes the `StoreFactory` label and mints its own beacons, so after this step the
+manifest's usual three entries all describe the new deployment. The outgoing addresses are
+written first, under keys that do not move:
+
+| Key | What it is |
+| --- | --- |
+| `StoreFactoryLegacy` | The factory the imported stores were created by. |
+| `LabelStoreBeaconLegacy` | Beacon behind every imported `LabelStore`. |
+| `UserStoreBeaconLegacy` | Its user-store counterpart. |
+
+A `LabelStore` implementation rotation for the existing holders goes through
+`StoreFactoryLegacy`, not through the new factory. The new factory's beacons serve only stores
+created after this migration.
+
 ## After step 14
 
 ```bash
@@ -104,3 +118,14 @@ for the swapped ones, and the declaration has not been made, so nothing on chain
 Fix the cause and resume from the failed step. Do not skip ahead to `DeclareRelease` to tidy up;
 declaring a release the deployment does not fully run is the one state the declarations cannot
 represent.
+
+**Step 13 is the exception: do not re-run it.** The other twelve are idempotent, and re-running
+one that failed is safe. The migration is not. Its deploy leg adopts an existing proxy, which
+covers a failure between the deploy and the import and nothing else. Once the import has landed,
+a second run reverts on the first user it tries to bind, because bindings here are permanent. And
+if the run died while the proxy was still on the migrator, the adopt is refused outright, since
+the deployer requires the occupant to delegate to the implementation that run deployed.
+
+So a step 13 failure is inspected, not retried. Read the proxy's implementation slot and its
+`getLabelStoreCount`, work out which of the four legs completed, and continue from there by hand.
+The legs are separate internals for that reason.

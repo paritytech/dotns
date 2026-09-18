@@ -85,6 +85,10 @@ contract MigrateStoreFactory is BaseDeployer {
         console.log("  migrating from", oldFactory);
         console.log("  bindings to carry", IStoreFactory(oldFactory).getLabelStoreCount());
 
+        // Written before the deploy, which reuses the `StoreFactory` label and would otherwise
+        // leave nothing pointing at the factory being replaced.
+        _recordOutgoing(oldFactory);
+
         address replacement = _deployReplacement(owner, protocolRegistry);
         require(
             replacement != oldFactory,
@@ -103,8 +107,13 @@ contract MigrateStoreFactory is BaseDeployer {
 
     /// @notice Deploys the replacement proxy, or adopts one a previous run left behind.
     /// @dev The pipeline's own helper, so the replacement lands on the same deterministic address
-    ///      a fresh deploy would give it and is checked the same way. Adoption is what makes the
-    ///      script resumable: an interrupted run can be repeated without stranding a proxy.
+    ///      a fresh deploy would give it and is checked the same way. Adoption covers one case
+    ///      only: a run that died after this step and before the import. It does not make the
+    ///      script re-runnable in general. Once the import has landed a second run reverts on the
+    ///      first user it tries to bind, and if the proxy is still on the migrator the adopt
+    ///      itself is refused, because the helper requires the occupant to delegate to the
+    ///      implementation this run deployed. A failure after this point is inspected and
+    ///      continued from, never restarted.
     /// @param owner Account that owns the deployment and broadcasts.
     /// @param protocolRegistry Registry the new factory is initialised against.
     /// @return replacement Address of the replacement proxy.
@@ -115,6 +124,14 @@ contract MigrateStoreFactory is BaseDeployer {
         internal
         returns (address replacement)
     {
+        // Adopt the CREATE3 factory from the registry that was passed in. Left unset, the
+        // deployer falls back to resolving it out of the manifest, which only works once
+        // `initDeployment` has been called: that makes this leg unreachable from anything but
+        // `run`, including the fork test that is supposed to be exercising the same path.
+        _setCreate3Factory(
+            IDotnsProtocolRegistry(protocolRegistry).get(DotnsConstants.CREATE3_FACTORY)
+        );
+
         replacement = _broadcastDeployUups(
             owner,
             "StoreFactory.sol:StoreFactory",
@@ -194,6 +211,21 @@ contract MigrateStoreFactory is BaseDeployer {
             "MigrateStoreFactory: storeFactory key did not take"
         );
         console.log("  storeFactory key now resolves to", replacement);
+    }
+
+    /// @notice Records the outgoing factory and its beacons under their own manifest keys.
+    /// @dev The replacement takes the `StoreFactory` label and mints its own beacons, so after
+    ///      this migration the manifest's usual three entries all name the new deployment. The
+    ///      old factory cannot simply be forgotten: the stores it created hold their beacon
+    ///      address in an immutable, so those 58 proxies stay on its beacons, and it is the only
+    ///      contract that can ever rotate their implementation. Losing its address from the
+    ///      manifest would leave that upgrade path reachable only by reading an old commit.
+    /// @param oldFactory The factory being migrated away from.
+    function _recordOutgoing(address oldFactory) internal {
+        logDeployment("StoreFactoryLegacy", oldFactory);
+        logDeployment("LabelStoreBeaconLegacy", IStoreFactory(oldFactory).labelStoreBeacon());
+        logDeployment("UserStoreBeaconLegacy", IStoreFactory(oldFactory).userStoreBeacon());
+        console.log("  recorded the outgoing factory as StoreFactoryLegacy");
     }
 
     /// @notice Records the replacement and its beacons in the manifest.
