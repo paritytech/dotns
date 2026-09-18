@@ -21,8 +21,14 @@ lives here and in the fork tests that reproduce it.
 
 ```bash
 RPC_URL=https://eth-rpc-paseo-next.polkadot.io scripts/shell/verify-snapshots.sh
-bun run test:fork
+
+PASEO_FORK_RPC=https://eth-rpc-paseo-next.polkadot.io \
+  RPC_URL=https://eth-rpc-paseo-next.polkadot.io scripts/shell/fork-tests.sh
 ```
+
+The second form needs no Docker. `bun run test:fork` brings up the local ETH-RPC adapter, which
+only translates for the same node the hosted endpoint already fronts, so both exercise the same
+state. Use whichever is available; the suite is 15 tests and takes under a minute either way.
 
 The first is the check that matters most and takes seconds. Every `*Old.sol` snapshot must
 reproduce the implementation currently deployed; a snapshot that has drifted makes every layout

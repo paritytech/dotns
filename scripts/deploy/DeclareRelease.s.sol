@@ -4,6 +4,7 @@ pragma solidity ^0.8.34;
 import {console} from "forge-std/Script.sol";
 
 import {WireDeployments} from "./WireDeployments.s.sol";
+import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
 
 /// @title DeclareRelease
 /// @notice Re-declares, on chain, what code each well-known key is expected to execute and which
@@ -38,10 +39,39 @@ contract DeclareRelease is WireDeployments {
 
         Addresses memory addr = _loadAddresses();
 
+        _wireMissingKeys(owner, addr);
         _declareCodeIdentity(owner, addr);
         _verifyDeployment(addr, owner);
         _declareProtocolVersion(owner, addr, releaseTag);
 
         console.log("=== DeclareRelease complete ===");
+    }
+
+    /// @notice Sets any registry key that is still unset, and leaves the rest alone.
+    /// @dev A network wired before a key existed carries a hole that a fresh deploy never has,
+    ///      and `_verifyDeployment` fails on it at the last step of an upgrade, after every swap
+    ///      has already been broadcast. Paseo Asset Hub Next has exactly one: `protocolRegistry`,
+    ///      the registry's self-reference, which resolves to the zero address there. The key
+    ///      exists so the registry's own implementation has a declared codehash to drift from;
+    ///      consumers bootstrap from the manifest address, so nothing is broken by its absence
+    ///      until something tries to declare against it.
+    ///
+    ///      Only unset keys are written. A key pointing somewhere unexpected is left exactly as
+    ///      it is, so `_verifyDeployment` still fails on it: that is drift, and repairing it here
+    ///      would make the verification that follows tautological and hide the thing it exists to
+    ///      surface.
+    /// @param owner Account that owns the registry and broadcasts.
+    /// @param addr Deployment addresses read from the manifest.
+    function _wireMissingKeys(address owner, Addresses memory addr) internal {
+        IDotnsProtocolRegistry registry = IDotnsProtocolRegistry(addr.protocolRegistry);
+        RegistryEntry[] memory entries = _registryEntries(addr);
+
+        for (uint256 i; i < entries.length; ++i) {
+            if (registry.get(entries[i].key) != address(0)) continue;
+
+            vm.broadcast(owner);
+            registry.set(entries[i].key, entries[i].target);
+            console.log("  wired missing key", entries[i].label, entries[i].target);
+        }
     }
 }

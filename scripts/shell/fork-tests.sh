@@ -12,6 +12,16 @@ set -euo pipefail
 #   bun run test:fork                 # default verbosity (-vvv)
 #   bun run test:fork -- -vvvvv       # pass extra forge args through
 #   RPC_URL=http://127.0.0.1:8545 bun run test:fork
+#
+# Without Docker: the adapter only translates for the same node the hosted endpoint already
+# fronts, so the suite can be run straight against that instead. This skips the adapter
+# entirely, including the snapshot check's own RPC:
+#
+#   PASEO_FORK_RPC=https://eth-rpc-paseo-next.polkadot.io \
+#     RPC_URL=https://eth-rpc-paseo-next.polkadot.io scripts/shell/fork-tests.sh
+#
+# The default stays local on purpose, so CI and anyone mid-deployment are not silently
+# pointed at a public gateway.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"

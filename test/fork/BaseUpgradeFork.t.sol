@@ -35,8 +35,21 @@ abstract contract BaseUpgradeFork is Test {
     string internal manifest;
 
     function setUp() public virtual {
-        vm.createSelectFork(vm.rpcUrl("paseo_local"));
+        vm.createSelectFork(_forkUrl());
         manifest = vm.readFile(MANIFEST_PATH);
+    }
+
+    /// @notice The endpoint these tests fork from.
+    /// @dev Defaults to the `paseo_local` alias, which is the ETH-RPC adapter `fork-tests.sh`
+    ///      brings up under Docker. `PASEO_FORK_RPC` overrides it, because requiring Docker is
+    ///      why this suite went unrun for as long as it did: the adapter only translates for the
+    ///      same node the hosted endpoint already fronts, so a run against that endpoint
+    ///      exercises the same state. Keep the default local, so CI and anyone mid-deployment
+    ///      are not silently pointed at a public gateway.
+    /// @return url Endpoint to fork from.
+    function _forkUrl() internal view returns (string memory url) {
+        url = vm.envOr("PASEO_FORK_RPC", string(""));
+        if (bytes(url).length == 0) url = vm.rpcUrl("paseo_local");
     }
 
     /// @notice Resolves `label` from the manifest and asserts something is deployed there.
