@@ -249,7 +249,7 @@ git config core.hooksPath .githooks
 
 The conventions below apply specifically to PRs that upgrade an already-deployed proxy. They are scoped to the lifetime of the PR and must be removed before merge; the cleanup checklist at the end of this section is the gate reviewers enforce.
 
-**Long-lived upgrade branches are the exception, and the rest of this section reads differently on one.** A branch under `spha/` holds the tooling for a network that is upgraded in place and is never merged to `master`: `master` flows into it, never back. The reason the artefacts have to be deleted is that they must not reach `master`, and on a branch that never merges they cannot. Deleting them there would throw away the only record of what was deployed, and the starting point for the next round, in exchange for nothing. So on such a branch the snapshots, upgrade scripts and fork tests stay, and the cleanup checklist below applies to the ordinary case: an upgrade PR that is going to `master`.
+**Long-lived upgrade branches are the exception, and the rest of this section reads differently on one.** A branch under `dev/` holds the tooling for a network that is upgraded in place and is never merged to `master`: `master` flows into it, never back. The reason the artefacts have to be deleted is that they must not reach `master`, and on a branch that never merges they cannot. Deleting them there would throw away the only record of what was deployed, and the starting point for the next round, in exchange for nothing. So on such a branch the snapshots, upgrade scripts and fork tests stay, and the cleanup checklist below applies to the ordinary case: an upgrade PR that is going to `master`.
 
 ### Storage-collision checks
 

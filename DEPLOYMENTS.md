@@ -514,7 +514,7 @@ after each one.
 
 ### The deployed code is not always the code in a release
 
-This network's proxies are upgraded in place from the `spha/registrar-upgrade` branch, which is
+This network's proxies are upgraded in place from the `dev/testnet-upgrades` branch, which is
 never merged to `master`, so no release tag describes what they run. Two consequences that look
 like faults and are not:
 
