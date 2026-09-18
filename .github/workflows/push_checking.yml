@@ -12,11 +12,15 @@ name: Run Solidity Tests
 # inside a `pull_request_target` job would let a malicious PR exfiltrate
 # repo secrets. Re-review carefully if this trigger surface widens.
 on:
+  # `spha/**` covers the long-lived upgrade branches, which are never merged to
+  # master and therefore never get tested by the master triggers alone. Without
+  # them a PR into an upgrade branch runs lint and nothing else, which is how a
+  # storage snapshot that no longer matched the live chain reached review.
   pull_request:
-    branches: [master]
+    branches: [master, "spha/**"]
     paths: ["contracts/**", "test/**", "**.sol"]
   push:
-    branches: [master]
+    branches: [master, "spha/**"]
     paths: ["contracts/**", "test/**", "**.sol"]
   pull_request_target:
     types: [closed]
@@ -211,7 +215,18 @@ jobs:
           # A clean build-info keeps the OZ upgrade validator (vm.ffi) from reading
           # a partial JSON on a warm self-hosted runner.
           rm -rf out/build-info
-          forge test -vv --match-path 'test/fork/**' 2>&1 | tee fork.log
+          # The layout diff compares whatever pair it is handed, so it stays green when a
+          # snapshot has drifted away from the implementation actually deployed, and a
+          # calldata-only change leaves no trace in a layout at all. This is the only check
+          # that catches that, and it belongs here as well as in `fork-tests.sh`: CI runs
+          # `forge test` directly, so a local-only guard protects nobody reviewing a PR.
+          scripts/shell/verify-snapshots.sh 2>&1 | tee -a fork.log
+          SNAPSHOTS=${PIPESTATUS[0]}
+          if [ "$SNAPSHOTS" -ne 0 ]; then
+            echo "result=Failed (snapshots)" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          forge test -vv --match-path 'test/fork/**' 2>&1 | tee -a fork.log
           FORK=${PIPESTATUS[0]}
           if [ "$FORK" -eq 0 ]; then
             echo "result=Passed" >> "$GITHUB_OUTPUT"

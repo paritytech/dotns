@@ -2,16 +2,13 @@
 pragma solidity ^0.8.34;
 
 import {ILabelStore} from "../store/ILabelStore.sol";
-import {IStoreFactory} from "../store/IStoreFactory.sol";
+import {IStoreFactoryOld} from "../store/IStoreFactoryOld.sol";
 
 /// @title DotNS Store Utilities Library
 /// @notice Canonical helpers for protocol writes into per-user `LabelStore` instances.
 /// @dev One auth rule, one write path. Every DotNS consumer (controller, registrar,
 ///      registry, PoP controller) funnels label writes through `writeLabel` so
 ///      authorisation and deploy-on-first-use semantics are identical across flows.
-/// @dev PR-scoped snapshot of the `StoreUtils` library as deployed on chain, kept only so the
-///      `*Old.sol` implementation snapshots compile after master removed `writeLabel` (#301).
-///      Deleted before merge with the other upgrade artefacts per CONTRIBUTING.md.
 /// @custom:security-contact admin@parity.io
 library StoreUtilsOld {
     /// @notice Returns the `LabelStore` for `user`, deploying one via the factory if absent.
@@ -22,7 +19,10 @@ library StoreUtilsOld {
     /// @param factory The store factory.
     /// @param user The user whose label store is being resolved.
     /// @return store The resolved or newly deployed store address.
-    function ensureLabelStore(IStoreFactory factory, address user)
+    function ensureLabelStore(
+        IStoreFactoryOld factory,
+        address user
+    )
         internal
         returns (address store)
     {
@@ -44,7 +44,7 @@ library StoreUtilsOld {
     /// @param label The label string (typically the full name, e.g. "alice.dot").
     /// @return store The resolved or newly deployed store address.
     function writeLabel(
-        IStoreFactory factory,
+        IStoreFactoryOld factory,
         address user,
         bytes32 labelhash,
         string memory label

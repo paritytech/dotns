@@ -12,26 +12,30 @@ import {
 
 /// @title UpgradePopController
 /// @notice Upgrades the deployed DotnsPopController proxy to the current implementation. Resolves
-///         the proxy from the on-disk manifest, diffs the new storage layout against the pinned
+/// the proxy from the on-disk manifest, diffs the new storage layout against the pinned
 ///         @custom:contract DotnsPopControllerOld snapshot, and swaps the implementation only when
-///         the diff and every unsafe-pattern check pass.
-/// @dev PR-scoped. This script, the `DotnsPopControllerOld` snapshot it references, and the paired
-///      `test/fork/UpgradePopController.t.sol` are deleted before merge per the upgrade-PR workflow
-///      in CONTRIBUTING.md. The storage-layout reference is always supplied, so the layout diff is
-///      mandatory: there is no environment switch that turns it off, and the run fails closed if a
-///      slot moves, shrinks, or changes type.
+/// the diff and every unsafe-pattern check pass.
+/// @dev The swap carries no behavioural change of its own: `version()` stops returning a hardcoded
+/// string and reads the protocol registry's declaration instead.
+///
+///      The snapshot is the implementation deployed on chain, not the previous release: these
+///      proxies were upgraded in place after their last release, so a snapshot taken from a tag
+///      would describe code that has not run on this network for months.
+///      `scripts/shell/verify-snapshots.sh` is what holds that property, by building the snapshot
+///      and comparing it against the chain. The layout diff cannot: it compares whatever pair it
+///      is given, and is blind to a change that lives in calldata.
 /// @custom:security-contact admin@parity.io
 contract UpgradePopController is BaseDeployer {
     /// @notice Pre-upgrade snapshot the layout diff compares the new implementation against.
     /// @dev Source-file route, not a stored build-info directory, so the snapshot is versioned
-    ///      beside the implementation and rebuilt by `forge build`. Deleted before merge.
+    ///      beside the implementation and rebuilt by `forge build`.
     string internal constant REFERENCE_CONTRACT = "DotnsPopControllerOld.sol:DotnsPopControllerOld";
 
-    /// @notice Manifest label the PoP controller proxy is recorded under.
+    /// @notice Manifest label the DotnsPopController proxy is recorded under.
     string internal constant POP_CONTROLLER_LABEL = "DotnsPopController";
 
-    /// @notice Reads the manifest, resolves the PoP controller proxy, and upgrades it as
-    ///         `msg.sender`.
+    /// @notice Reads the manifest, resolves the DotnsPopController proxy, and upgrades it as
+    /// `msg.sender`.
     /// @dev `msg.sender` must own the proxy, otherwise the `_authorizeUpgrade` owner gate reverts.
     function run() external {
         address owner = msg.sender;
@@ -48,11 +52,11 @@ contract UpgradePopController is BaseDeployer {
     /// @notice Upgrades `proxy` to the current `DotnsPopController` implementation under `owner`.
     /// @dev The layout diff runs inside `Upgrades.upgradeProxy` before the implementation swap. No
     ///      `unsafeSkipAllChecks` or `unsafeAllow` override is set, so an incompatible layout
-    /// aborts the run rather than corrupting state. An empty upgrade call is passed because the new
-    ///      implementation seeds no storage: `_popIssued` defaults to false for every label, which
-    ///      is the correct provenance for names issued before the upgrade.
+    ///      aborts the run rather than corrupting state. An empty upgrade call is passed because
+    ///      the new implementation seeds no storage of its own; where a release declares anything
+    ///      on chain, `DeclareRelease.s.sol` does it once, after every swap has verified.
     /// @param owner Account that owns the proxy and broadcasts the upgrade.
-    /// @param proxy PoP controller proxy address resolved from the manifest.
+    /// @param proxy DotnsPopController proxy address resolved from the manifest.
     function _upgradePopController(address owner, address proxy) internal {
         require(
             owner == OwnableUpgradeable(proxy).owner(),

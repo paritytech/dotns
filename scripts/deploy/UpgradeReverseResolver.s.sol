@@ -11,28 +11,32 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /// @title UpgradeReverseResolver
-/// @notice Upgrades the deployed DotnsReverseResolver proxy to the current implementation. It
-///         resolves the proxy from the on-disk manifest, diffs the new storage layout against the
-///         pinned @custom:contract DotnsReverseResolverOld snapshot, and swaps the implementation
-///         only when the diff and every unsafe-pattern check pass.
-/// @dev PR-scoped. This script, the `DotnsReverseResolverOld` snapshot, and the paired fork test
-///      `test/fork/UpgradeReverseResolver.t.sol` are deleted before merge per the upgrade-PR
-///      workflow in CONTRIBUTING.md. The storage-layout reference is always supplied, so the diff
-///      is mandatory: there is no switch that turns it off, and the run fails closed if a slot
-///      moves, shrinks, or changes type.
+/// @notice Upgrades the deployed DotnsReverseResolver proxy to the current implementation. Resolves
+/// the proxy from the on-disk manifest, diffs the new storage layout against the pinned
+///         @custom:contract DotnsReverseResolverOld snapshot, and swaps the implementation only
+/// when the diff and every unsafe-pattern check pass.
+/// @dev The swap carries no behavioural change of its own: `version()` stops returning a hardcoded
+/// string and reads the protocol registry's declaration instead.
+///
+///      The snapshot is the implementation deployed on chain, not the previous release: these
+///      proxies were upgraded in place after their last release, so a snapshot taken from a tag
+///      would describe code that has not run on this network for months.
+///      `scripts/shell/verify-snapshots.sh` is what holds that property, by building the snapshot
+///      and comparing it against the chain. The layout diff cannot: it compares whatever pair it
+///      is given, and is blind to a change that lives in calldata.
 /// @custom:security-contact admin@parity.io
 contract UpgradeReverseResolver is BaseDeployer {
     /// @notice Pre-upgrade snapshot the layout diff compares the new implementation against.
     /// @dev Source-file route, not a stored build-info directory, so the snapshot is versioned
-    ///      beside the implementation and rebuilt by `forge build`. Deleted before merge.
+    ///      beside the implementation and rebuilt by `forge build`.
     string internal constant REFERENCE_CONTRACT =
         "DotnsReverseResolverOld.sol:DotnsReverseResolverOld";
 
-    /// @notice Manifest label the reverse resolver proxy is recorded under.
+    /// @notice Manifest label the DotnsReverseResolver proxy is recorded under.
     string internal constant REVERSE_RESOLVER_LABEL = "DotnsReverseResolver";
 
-    /// @notice Reads the manifest, resolves the reverse resolver proxy, and upgrades it as
-    ///         `msg.sender`.
+    /// @notice Reads the manifest, resolves the DotnsReverseResolver proxy, and upgrades it as
+    /// `msg.sender`.
     /// @dev `msg.sender` must own the proxy, otherwise the `_authorizeUpgrade` owner gate reverts.
     function run() external {
         address owner = msg.sender;
@@ -49,12 +53,11 @@ contract UpgradeReverseResolver is BaseDeployer {
     /// @notice Upgrades `proxy` to the current `DotnsReverseResolver` implementation under `owner`.
     /// @dev The layout diff runs inside `Upgrades.upgradeProxy` before the implementation swap. No
     ///      `unsafeSkipAllChecks` or `unsafeAllow` override is set, so an incompatible layout
-    /// aborts the run rather than corrupting state. An empty upgrade call is passed because the new
-    ///      implementation seeds no storage: it reads a lite name's owner through the registry at
-    ///      the hierarchical node and adds no storage slot, so every existing reverse record is
-    ///      preserved unchanged.
+    ///      aborts the run rather than corrupting state. An empty upgrade call is passed because
+    ///      the new implementation seeds no storage of its own; where a release declares anything
+    ///      on chain, `DeclareRelease.s.sol` does it once, after every swap has verified.
     /// @param owner Account that owns the proxy and broadcasts the upgrade.
-    /// @param proxy Reverse resolver proxy address resolved from the manifest.
+    /// @param proxy DotnsReverseResolver proxy address resolved from the manifest.
     function _upgradeReverseResolver(address owner, address proxy) internal {
         require(
             owner == OwnableUpgradeable(proxy).owner(),
