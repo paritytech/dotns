@@ -6,8 +6,8 @@ pragma solidity ^0.8.34;
 /// @dev The seam between name policy and the wei amount a registration costs. `PopRulesOld` and the
 ///      public commit-reveal controller keep the classification, reservation, and tier rules; the
 ///      model owns only the amount for a given base length, so the curve can be swapped by
-///      registering a new model under `DotnsConstantsOld.COST_MODEL` without touching either. Only the
-///      base length crosses the seam: the model reads no personhood band or `PopStatus`. The public
+///      registering a new model under `DotnsConstantsOld.COST_MODEL` without touching either. Only
+/// the base length crosses the seam: the model reads no personhood band or `PopStatus`. The public
 ///      controller prices NoStatus deposits through this same path, so the model carries no PoP
 ///      name.
 /// @custom:security-contact admin@parity.io

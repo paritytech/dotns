@@ -111,4 +111,19 @@ contract LayoutCompatibilityTests is Test {
             "DotnsPopResolver.sol:DotnsPopResolver", "DotnsPopResolverOld.sol:DotnsPopResolverOld"
         );
     }
+
+    /// @notice The store-factory migration swaps the implementation twice, so both directions have
+    ///         to be layout-compatible, not just the way in.
+    /// @dev The migrator is the shipped factory with four fields widened and one entrypoint added,
+    ///      so these hold by construction. Asserting them anyway is what catches someone editing
+    ///      the migrator into something that can no longer be swapped back out, which would strand
+    ///      the proxy on migration tooling.
+    function test_storeFactory_migration_is_compatible_in_both_directions() public {
+        _assertCompatible(
+            "StoreFactoryMigrator.sol:StoreFactoryMigrator", "StoreFactory.sol:StoreFactory"
+        );
+        _assertCompatible(
+            "StoreFactory.sol:StoreFactory", "StoreFactoryMigrator.sol:StoreFactoryMigrator"
+        );
+    }
 }

@@ -124,7 +124,8 @@ interface IDotnsRegistryOld {
     ///      by the next holder across that recycle. A secondary-market ERC-721 `transferFrom` does
     ///      not call the registry, so a name sold directly keeps the seller's resolver pointer
     ///      until the buyer overwrites it. Stores `owner = address(0)` as a sentinel so reads
-    ///      delegate to `IDotnsRegistrarOld.ownerOf` and ERC-721 transfers remain authoritative. Emits
+    ///      delegate to `IDotnsRegistrarOld.ownerOf` and ERC-721 transfers remain authoritative.
+    /// Emits
     ///      @custom:emits NodeTransferred on success.
     function setOwner(bytes32 node, address newOwner) external;
 

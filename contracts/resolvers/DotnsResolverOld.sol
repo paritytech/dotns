@@ -84,7 +84,8 @@ contract DotnsResolverOld is
     ///      upgrade or rewire is picked up automatically without a resolver upgrade.
     /// @param node Node identifier.
     function _onlyNodeOwner(bytes32 node) internal view {
-        IDotnsRegistryOld _registry = IDotnsRegistryOld(protocolRegistry.get(DotnsConstantsOld.REGISTRY));
+        IDotnsRegistryOld _registry =
+            IDotnsRegistryOld(protocolRegistry.get(DotnsConstantsOld.REGISTRY));
         require(_registry.owner(node) == msg.sender, NotAuthorised(node, msg.sender));
     }
 

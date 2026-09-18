@@ -119,7 +119,8 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     /// @inheritdoc IDotnsRegistryOld
     function setOwner(bytes32 node, address newOwner) external override onlyRegistrarController {
         require(newOwner != address(0), NotAllowed());
-        IDotnsRegistrarOld registrar = IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
         require(registrar.ownerOf(uint256(node)) == newOwner, NotAuthorised());
 
         // The resolver pointer is reset to the default reverse resolver on every call to this
@@ -173,7 +174,8 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         address storedOwner = record.owner;
         if (storedOwner != address(0)) return storedOwner;
         if (!record.exists) return address(0);
-        IDotnsRegistrarOld registrar = IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
         return registrar.ownerOf(uint256(node));
     }
 
@@ -210,7 +212,8 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     )
         internal
     {
-        IStoreFactoryOld factory = IStoreFactoryOld(protocolRegistry.get(DotnsConstantsOld.STORE_FACTORY));
+        IStoreFactoryOld factory =
+            IStoreFactoryOld(protocolRegistry.get(DotnsConstantsOld.STORE_FACTORY));
         factory.writeLabel(storeOwner, node, fullName);
     }
 
@@ -274,7 +277,8 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
         if (!record.exists) return false;
 
-        IDotnsRegistrarOld registrar = IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
         uint256 tokenId = uint256(node);
         address tokenOwner = registrar.ownerOf(tokenId);
         if (account == tokenOwner) return true;
@@ -290,7 +294,8 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     ///      in one place and lets commit-reveal and PoP controllers coexist without registry
     ///      reconfiguration on each addition.
     function _onlyRegistrarController() internal view {
-        IDotnsRegistrarOld registrar = IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
         require(registrar.controllers(IDotnsController(msg.sender)), NotAuthorised());
     }
 

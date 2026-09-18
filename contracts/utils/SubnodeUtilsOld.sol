@@ -12,8 +12,9 @@ import {DotnsConstantsOld} from "./DotnsConstantsOld.sol";
 /// @notice General-purpose helpers for registering names that live as subnodes of another name,
 ///         rather than as tokenised second-level registrations.
 /// @dev A subname has no token: its ownership lives in the registry record, not in the registrar's
-///      ERC-721 ledger. So it is registered through @custom:function IDotnsRegistryOld.setSubnodeOwner
-///      here, rather than through the tokenised mint triad of @custom:contract RegistrationUtilsOld.
+///      ERC-721 ledger. So it is registered through @custom:function
+/// IDotnsRegistryOld.setSubnodeOwner here, rather than through the tokenised mint triad of
+/// @custom:contract RegistrationUtilsOld.
 /// @custom:security-contact admin@parity.io
 library SubnodeUtilsOld {
     /// @notice Inputs describing a single subname registration.
@@ -106,8 +107,10 @@ library SubnodeUtilsOld {
             protocolRegistry.tldNode(), LabelUtils.labelhashMemory(context.parentLabel)
         );
 
-        IDotnsRegistrarOld registrar = IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
-        IDotnsRegistryOld registry = IDotnsRegistryOld(protocolRegistry.get(DotnsConstantsOld.REGISTRY));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistryOld registry =
+            IDotnsRegistryOld(protocolRegistry.get(DotnsConstantsOld.REGISTRY));
 
         // Mint the parent on first use, owned by the caller, and pass an empty label so no
         // `LabelStore` is written for it. When it already exists it must belong to the caller,

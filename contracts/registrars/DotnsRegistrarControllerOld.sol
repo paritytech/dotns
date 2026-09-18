@@ -139,7 +139,8 @@ contract DotnsRegistrarControllerOld is
     function available(string calldata label) public view override returns (bool) {
         bytes32 node;
         (, node) = _validatedLabelNode(label);
-        IDotnsRegistrarOld registrar = IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistrarOld registrar =
+            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
         return registrar.available(uint256(node));
     }
 
@@ -179,9 +180,8 @@ contract DotnsRegistrarControllerOld is
     /// @dev Resolved at commit time so the stamp binds the version live then, not at reveal.
     /// @return pricingVersion The current cost-model version.
     function _currentPricingVersion() internal view returns (uint256 pricingVersion) {
-        return
-            IDotnsCostModelRegistryOld(protocolRegistry.get(DotnsConstantsOld.COST_MODEL))
-                .currentVersion();
+        return IDotnsCostModelRegistryOld(protocolRegistry.get(DotnsConstantsOld.COST_MODEL))
+            .currentVersion();
     }
 
     /// @inheritdoc IDotnsRegistrarController
@@ -247,7 +247,8 @@ contract DotnsRegistrarControllerOld is
         IDotnsReverseResolver reverse;
         bool setReverseRecord;
         if (registration.reserved && isDirect) {
-            reverse = IDotnsReverseResolver(protocolRegistry.get(DotnsConstantsOld.REVERSE_RESOLVER));
+            reverse =
+                IDotnsReverseResolver(protocolRegistry.get(DotnsConstantsOld.REVERSE_RESOLVER));
             setReverseRecord = bytes(reverse.nameOf(registration.owner)).length == 0;
         }
 
@@ -413,8 +414,9 @@ contract DotnsRegistrarControllerOld is
     /// wires forward registry, optionally sets the reverse record, and writes the owner's
     /// Store.
     /// @dev On a fresh mint the triad of mint + forward-registry + store-write is delegated
-    /// to @custom:function RegistrationUtilsOld.registerAndStore, the single canonical implementation
-    /// shared across every DotNS registration flow. On a reclaim the mint step is skipped (the
+    /// to @custom:function RegistrationUtilsOld.registerAndStore, the single canonical
+    /// implementation shared across every DotNS registration flow. On a reclaim the mint step is
+    /// skipped (the
     /// escrow has already moved custody) and only the registry wiring and store write run.
     /// Reverse-record setting and the priced-registration event stay here because they are
     /// commit-reveal-specific policy.

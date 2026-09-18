@@ -538,7 +538,8 @@ contract PopRulesOld is
 
     /// @notice Ensures the caller is any controller authorised on the registrar.
     function _onlyRegistry() internal view {
-        DotnsRegistrarOld registrar = DotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        DotnsRegistrarOld registrar =
+            DotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
         require(registrar.controllers(IDotnsController(msg.sender)), NotRegistry());
     }
 

@@ -19,7 +19,10 @@ library StoreUtilsOld {
     /// @param factory The store factory.
     /// @param user The user whose label store is being resolved.
     /// @return store The resolved or newly deployed store address.
-    function ensureLabelStore(IStoreFactoryOld factory, address user)
+    function ensureLabelStore(
+        IStoreFactoryOld factory,
+        address user
+    )
         internal
         returns (address store)
     {

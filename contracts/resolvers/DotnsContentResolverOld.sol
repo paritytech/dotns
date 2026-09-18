@@ -125,7 +125,8 @@ contract DotnsContentResolverOld is
     ///      local-operator checks run before the cross-contract registry call.
     /// @param node Node identifier.
     function _requireNodeOwnerOrOperator(bytes32 node) internal view {
-        IDotnsRegistryOld _registry = IDotnsRegistryOld(protocolRegistry.get(DotnsConstantsOld.REGISTRY));
+        IDotnsRegistryOld _registry =
+            IDotnsRegistryOld(protocolRegistry.get(DotnsConstantsOld.REGISTRY));
         address nodeOwner = _registry.owner(node);
         require(
             msg.sender == nodeOwner || operators[nodeOwner][msg.sender]

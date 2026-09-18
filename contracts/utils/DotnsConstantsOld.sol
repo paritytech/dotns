@@ -51,8 +51,8 @@ library DotnsConstantsOld {
 
     /// @notice Default release cooldown seeded on `DotnsNameEscrowOld.initialize`.
     /// @dev Single source of truth for deploy scripts and tests so the value cannot drift between
-    ///      call sites. Bounded on-chain by `DotnsNameEscrowOld.MAX_COOLDOWN`. Live deployments rotate
-    ///      the runtime value via `updateCooldown` rather than rebuilding consumers.
+    ///      call sites. Bounded on-chain by `DotnsNameEscrowOld.MAX_COOLDOWN`. Live deployments
+    /// rotate the runtime value via `updateCooldown` rather than rebuilding consumers.
     uint256 internal constant ESCROW_COOLDOWN = 15 minutes;
 
     /// @notice Default redeem window seeded on `DotnsNameEscrowOld.initialize`.
