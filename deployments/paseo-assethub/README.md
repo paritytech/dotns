@@ -24,7 +24,7 @@ question about this network. Use an archive node, or Blockscout at
 
 ## What is deployed here is not a release
 
-These proxies are upgraded in place from `spha/registrar-upgrade`, which is never merged to
+These proxies are upgraded in place from `dev/testnet-upgrades`, which is never merged to
 `master`, so no release tag describes the code they run. `DEPLOYMENTS.md` has the detail; the
 short version is that `verify --tag` reports the `registrarController` key as drift permanently
 and by design, every other key verifies, and a second drifting key is a real finding.
