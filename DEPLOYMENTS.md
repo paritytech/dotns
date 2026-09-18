@@ -496,9 +496,21 @@ environments, including the public Polkadot Hub TestNet gateway, which answers o
 no code at any of these addresses. Point the fork adapter at the wrong one and every address
 resolves and every call reverts for reasons that look like anything but the real cause.
 
-The public gateway also answers `eth_getLogs` with an empty result for every range rather than an
-error, so anything built from a log replay against it looks like it worked and is empty. Use an
-archive node, or Blockscout at `https://blockscout-paseo-next.polkadot.io`.
+The public gateway also answers `eth_getLogs` with an empty result for every range, not an error,
+so anything derived from a log replay against it looks like it worked and is empty. Nothing in
+this repository depends on that: the store migration reads its holders from the factory's own
+`getLabelStores` and each store's `owner`. Worth knowing before reaching for logs to answer a
+question about this network. Use an archive node, or Blockscout at
+`https://blockscout-paseo-next.polkadot.io`.
+
+### Broadcast order
+
+The in-place upgrade to v0.8.0 has a fixed order, and nothing in the scripts enforces it: the
+protocol registry has to go first because every other contract's `version()` reads through it,
+the store migration after that because it rewires a key the declaration records, and the
+declaration last because it is a claim about the whole deployment.
+[`docs/PASEO-V080-RUNBOOK.md`](./docs/PASEO-V080-RUNBOOK.md) is the step list, with what to check
+after each one.
 
 ### The deployed code is not always the code in a release
 

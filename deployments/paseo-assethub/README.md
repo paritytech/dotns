@@ -15,9 +15,12 @@ every address here and finds all of them empty, so calls revert for reasons that
 anything but the real cause. The fork tests assert code is present at each address they resolve,
 which turns that into a clear failure instead of a confusing one.
 
-That gateway also answers `eth_getLogs` with an empty result for every range rather than an
-error, so anything built from a log replay against it looks like it worked and is empty. Use an
-archive node, or Blockscout at `https://blockscout-paseo-next.polkadot.io`.
+That gateway also answers `eth_getLogs` with an empty result for every range, not an error,
+so anything derived from a log replay against it looks like it worked and is empty. Nothing in
+this repository depends on that: the store migration reads its holders from the factory's own
+`getLabelStores` and each store's `owner`. Worth knowing before reaching for logs to answer a
+question about this network. Use an archive node, or Blockscout at
+`https://blockscout-paseo-next.polkadot.io`.
 
 ## What is deployed here is not a release
 

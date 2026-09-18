@@ -1,66 +1,70 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
-import {Vm} from "forge-std/Vm.sol";
-
 import {BaseUpgradeFork} from "./BaseUpgradeFork.t.sol";
 import {MigrateStoreFactory} from "../../scripts/deploy/MigrateStoreFactory.s.sol";
+import {UpgradeProtocolRegistryHarness} from "./UpgradeProtocolRegistry.t.sol";
 import {StoreFactory} from "../../contracts/store/StoreFactory.sol";
 import {IStoreFactory} from "../../contracts/store/IStoreFactory.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {IDotnsStore} from "../../contracts/store/IDotnsStore.sol";
+import {StoreUtils} from "../../contracts/utils/StoreUtils.sol";
+import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
+import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
 
 /// @title MigrateStoreFactoryHarness
-/// @notice Exposes the migration script's internals so the test drives the production path.
-/// @dev The script's `run` resolves the destination from the manifest, which on a fork still
-///      names the factory being migrated from: the replacement is deployed during the upgrade,
-///      and the manifest is updated afterwards. The internals take the addresses directly, which
-///      is what lets this test run the real sequence before that entry exists.
+/// @notice Exposes the migration script's legs so the test drives the production path.
+/// @dev The script's `run` reads the network folder and writes the manifest, neither of which a
+///      fork should do. The legs underneath take their addresses directly, so the test runs the
+///      same code in the same order without touching the working tree.
 contract MigrateStoreFactoryHarness is MigrateStoreFactory {
-    /// @notice Runs the import leg against an explicit destination.
-    function importInto(
+    /// @notice Deploys the replacement proxy, as the script's first step does.
+    function deployReplacement(
         address owner,
-        address proxy,
-        address oldFactory,
-        address[] memory users,
-        uint256 expectedCount
+        address protocolRegistry
     )
         external
+        returns (address replacement)
     {
-        _importBindings(owner, proxy, oldFactory, users, expectedCount);
+        replacement = _deployReplacement(owner, protocolRegistry);
     }
 
-    /// @notice Runs the restore leg against an explicit destination.
-    function restore(address owner, address proxy) external {
-        _restoreShippedImplementation(owner, proxy);
+    /// @notice Imports the bindings from `oldFactory` into `replacement`.
+    function importInto(address owner, address replacement, address oldFactory) external {
+        _importBindings(owner, replacement, oldFactory);
+    }
+
+    /// @notice Returns the proxy to the shipped implementation.
+    function restore(address owner, address replacement) external {
+        _restoreShippedImplementation(owner, replacement);
+    }
+
+    /// @notice Points the `storeFactory` key at the replacement and declares its codehash.
+    function rewire(address owner, address replacement, address protocolRegistry) external {
+        _rewireKey(owner, replacement, protocolRegistry);
     }
 }
 
 /// @title MigrateStoreFactoryForkTest
-/// @notice Pairs one-to-one with `scripts/deploy/MigrateStoreFactory.s.sol`. Stands up the
-///         replacement factory against live state, imports the bindings the deployed factory
-///         holds, and proves an existing holder keeps the store they already had.
-/// @dev This is the only part of the upgrade that moves user state between contracts rather than
-///      swapping code underneath it, so it is the part where a mistake is least reversible. The
-///      holders are read from the chain rather than invented: a fixture would prove the import
-///      copies a fixture, and what needs proving is that it copies what the network holds.
+/// @notice Pairs one-to-one with `scripts/deploy/MigrateStoreFactory.s.sol`. Runs the migration
+///         against live state and checks the condition that actually matters: after the rewire,
+///         the path every registration takes returns the store a holder already has.
+/// @dev The only part of the upgrade that moves user state between contracts instead of swapping
+///      code underneath it, so it is where a mistake is least reversible. Holders are read from
+///      the chain, never invented: a fixture would show the import copies a fixture, and what
+///      needs showing is that it copies what the network holds.
 ///
-///      The deployed factory exposes no enumeration, so the test takes its holders the same way
-///      the operator does, through `LabelStoreDeployed`. Where the fork's RPC does not serve
-///      historical logs the test has nothing to assert against and skips rather than passing
-///      vacuously, which matters because an import of an empty list succeeds.
+///      The protocol registry is upgraded first, because the rewire declares a codehash and that
+///      entrypoint does not exist on the implementation the network starts on. That is also the
+///      production ordering, so running it here keeps the two honest.
 /// @custom:security-contact admin@parity.io
 contract MigrateStoreFactoryForkTest is BaseUpgradeFork {
-    /// @notice keccak("LabelStoreDeployed(address,address)").
-    bytes32 internal constant LABEL_STORE_DEPLOYED =
-        0x6294914f6f12fb260c6b69d8a5435317a9318b45790f0b19b42cdd06708fcdea;
-
-    /// @notice The factory being migrated from, as the manifest currently names it.
+    /// @notice The factory the network runs today, which the manifest still names.
     IStoreFactory internal oldFactory;
 
-    /// @notice The replacement proxy, deployed here as the pipeline deploys it in production.
-    address internal replacement;
+    /// @notice The live protocol registry, rewired to the replacement by the migration.
+    IDotnsProtocolRegistry internal protocolRegistry;
 
-    /// @notice Owner of both, impersonated to authorise every step.
+    /// @notice Owner of the deployment, impersonated to authorise every step.
     address internal factoryOwner;
 
     /// @notice Drives the script's own migration path.
@@ -70,114 +74,90 @@ contract MigrateStoreFactoryForkTest is BaseUpgradeFork {
         super.setUp();
 
         oldFactory = IStoreFactory(_live("StoreFactory"));
+        protocolRegistry = IDotnsProtocolRegistry(_live("DotnsProtocolRegistry"));
         factoryOwner = _ownerOf(address(oldFactory));
-
-        replacement = address(
-            new ERC1967Proxy(
-                address(new StoreFactory()),
-                abi.encodeCall(
-                    StoreFactory.initialize, (factoryOwner, _live("DotnsProtocolRegistry"))
-                )
-            )
-        );
-
         migrator = new MigrateStoreFactoryHarness();
+
+        // `_rewireKey` declares a codehash, which the deployed registry cannot do until it is
+        // swapped. Production runs the registry first for the same reason.
+        UpgradeProtocolRegistryHarness registryUpgrade = new UpgradeProtocolRegistryHarness();
+        registryUpgrade.upgrade(_ownerOf(address(protocolRegistry)), address(protocolRegistry));
     }
 
-    /// @notice Every holder on the deployed factory keeps their store on the replacement.
-    /// @dev The assertion that decides whether the migration is worth doing at all. Without the
-    ///      import, each of these users is unbound on the replacement, and the next registration
-    ///      for any of them deploys a second, empty store: their names survive, held in the
-    ///      registry, but the labels indexed against their address do not.
-    function test_import_carries_every_live_holder_onto_the_replacement() public {
-        address[] memory holders = _liveHolders();
-        if (holders.length == 0) {
-            vm.skip(true);
-            return;
-        }
+    /// @notice After the migration, a lookup through the registry returns the holder's own store.
+    /// @dev The success condition for the whole exercise, and the one an earlier version of this
+    ///      test never reached. Every mint and transfer resolves `STORE_FACTORY` through the
+    ///      protocol registry and calls `ensureLabelStore`, which deploys a store when the caller
+    ///      has none. Had the bindings not come across, this call would quietly deploy a second,
+    ///      empty store for a user who already has one, and their labels would stop being
+    ///      enumerable against their address.
+    function test_after_rewire_a_live_holder_resolves_to_their_existing_store() public {
+        uint256 total = oldFactory.getLabelStoreCount();
+        assertTrue(total != 0, "fork precondition: the network has stores to migrate");
 
-        uint256 expectedCount = oldFactory.getLabelStoreCount();
+        address[] memory stores = oldFactory.getLabelStores(0, total);
+        address holderStore = stores[0];
+        address holder = IDotnsStore(holderStore).owner();
+        assertEq(oldFactory.getLabelStore(holder), holderStore, "fork precondition: binding agrees");
 
-        address[] memory storesBefore = new address[](holders.length);
-        for (uint256 i; i < holders.length; ++i) {
-            storesBefore[i] = oldFactory.getLabelStore(holders[i]);
-            assertTrue(storesBefore[i] != address(0), "fork precondition: holder has a store");
-        }
+        address replacement = migrator.deployReplacement(factoryOwner, address(protocolRegistry));
+        migrator.importInto(factoryOwner, replacement, address(oldFactory));
+        migrator.restore(factoryOwner, replacement);
+        migrator.rewire(factoryOwner, replacement, address(protocolRegistry));
 
-        migrator.importInto(factoryOwner, replacement, address(oldFactory), holders, expectedCount);
+        assertEq(
+            protocolRegistry.get(DotnsConstants.STORE_FACTORY),
+            replacement,
+            "the key resolves to the replacement"
+        );
+
+        // The production path, reached the way registration reaches it.
+        IStoreFactory resolved = IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
+        vm.prank(factoryOwner);
+        address ensured = StoreUtils.ensureLabelStore(resolved, holder);
+
+        assertEq(ensured, holderStore, "the holder resolves to the store they already had");
+        assertEq(resolved.getLabelStoreCount(), total, "no extra store was deployed for anyone");
+    }
+
+    /// @notice Every holder the old factory reports comes across, not only the first.
+    /// @dev The count is the cheap end-to-end check. A partial import would satisfy any
+    ///      single-holder assertion while leaving the rest to be handed empty stores later.
+    function test_every_live_holder_is_carried() public {
+        uint256 total = oldFactory.getLabelStoreCount();
+        address[] memory stores = oldFactory.getLabelStores(0, total);
+
+        address replacement = migrator.deployReplacement(factoryOwner, address(protocolRegistry));
+        migrator.importInto(factoryOwner, replacement, address(oldFactory));
         migrator.restore(factoryOwner, replacement);
 
         StoreFactory migrated = StoreFactory(replacement);
-        for (uint256 i; i < holders.length; ++i) {
-            assertEq(
-                migrated.getLabelStore(holders[i]),
-                storesBefore[i],
-                "holder keeps the store they already had"
-            );
+        assertEq(migrated.getLabelStoreCount(), total, "every binding landed");
+
+        for (uint256 i; i < total; ++i) {
+            address holder = IDotnsStore(stores[i]).owner();
+            assertEq(migrated.getLabelStore(holder), stores[i], "holder keeps their existing store");
         }
-        assertEq(
-            migrated.getLabelStoreCount(), expectedCount, "every binding lands in the enumeration"
-        );
     }
 
-    /// @notice A user who never had a store is still unbound afterwards.
-    /// @dev The import writes bindings directly, so it is worth showing it writes only what it was
-    ///      given. A spurious binding is worse than a missing one: it consumes the user's single
-    ///      permanent slot, and the factory then refuses to deploy them a real store ever after.
-    function test_import_binds_nobody_it_was_not_given() public {
-        address[] memory holders = _liveHolders();
-        if (holders.length == 0) {
-            vm.skip(true);
-            return;
-        }
-
+    /// @notice A user the old factory never held is still unbound afterwards.
+    /// @dev The import writes bindings directly, so it is worth showing it writes only what the
+    ///      old factory holds. A spurious binding is worse than a missing one: it consumes the
+    ///      user's single permanent slot, and the factory then refuses them a real store forever.
+    function test_import_binds_nobody_the_old_factory_did_not_hold() public {
         address stranger = makeAddr("stranger");
         assertEq(
             oldFactory.getLabelStore(stranger), address(0), "fork precondition: stranger is unbound"
         );
 
-        migrator.importInto(
-            factoryOwner, replacement, address(oldFactory), holders, oldFactory.getLabelStoreCount()
-        );
+        address replacement = migrator.deployReplacement(factoryOwner, address(protocolRegistry));
+        migrator.importInto(factoryOwner, replacement, address(oldFactory));
         migrator.restore(factoryOwner, replacement);
 
         assertEq(
             StoreFactory(replacement).getLabelStore(stranger),
             address(0),
-            "a user who was not imported stays unbound"
+            "a user the old factory never held stays unbound"
         );
-    }
-
-    /// @notice Recovers the holders from the factory's own deployment events.
-    /// @dev Returns empty when the fork's RPC does not serve historical logs, which the callers
-    ///      treat as "cannot run here" rather than "nothing to import". The production path uses
-    ///      `scripts/shell/store-holders.sh`, which reconciles the same replay against the
-    ///      factory's count and refuses to emit a list it cannot account for.
-    function _liveHolders() internal returns (address[] memory holders) {
-        bytes32[] memory topics = new bytes32[](1);
-        topics[0] = LABEL_STORE_DEPLOYED;
-
-        Vm.EthGetLogs[] memory logs = vm.eth_getLogs(0, block.number, address(oldFactory), topics);
-
-        address[] memory seen = new address[](logs.length);
-        uint256 count;
-        for (uint256 i; i < logs.length; ++i) {
-            address user = address(uint160(uint256(logs[i].topics[1])));
-            bool known;
-            for (uint256 j; j < count; ++j) {
-                if (seen[j] == user) {
-                    known = true;
-                    break;
-                }
-            }
-            if (!known) {
-                seen[count++] = user;
-            }
-        }
-
-        holders = new address[](count);
-        for (uint256 i; i < count; ++i) {
-            holders[i] = seen[i];
-        }
     }
 }

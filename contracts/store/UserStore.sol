@@ -41,8 +41,14 @@ contract UserStore is Initializable, IUserStore {
     address private _protocolRegistry;
 
     /// @dev Reserved storage space to allow for layout changes in future beacon upgrades.
+    ///      `_protocolRegistry` consumes one of the reserved slots, so the gap holds 49 and the
+    ///      contract keeps the footprint the stores behind the deployed beacon already use.
+    ///      Sized this way rather than left at 50 because the gap would otherwise start one slot
+    ///      later than on those stores, which makes a beacon rotation onto this implementation
+    ///      put every later appended field on a slot they do not expect. `LabelStore` needs no
+    ///      such change: it added no storage in this release.
     // forge-lint: disable-next-line(mixed-case-variable)
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     /// @notice Restricts writes to the bound owner.
     modifier onlyOwner() {

@@ -71,12 +71,21 @@ contract StoreFactoryMigrator is Initializable, UUPSUpgradeable, OwnableUpgradea
     /// @param store The `LabelStore` now bound to `user` on this factory.
     event StoresImported(address indexed user, address indexed store);
 
-    /// @notice The supplied list does not have the length the old factory reports.
-    /// @dev Guards the one failure the loop cannot see: a list that silently omits users, which
-    ///      would leave them unbound and hand them an empty store on their next registration.
+    /// @notice The old factory's store list does not have the length the factory reports.
+    /// @dev Reading the count and the list are two calls, so they can disagree: a truncated
+    ///      enumeration would import a prefix and leave the rest unbound, and unbound users are
+    ///      handed an empty store on their next registration rather than the one they have.
     /// @param expected Count the old factory reports.
-    /// @param supplied Length of the list passed in.
-    error ImportCountMismatch(uint256 expected, uint256 supplied);
+    /// @param actual Number of entries actually seen.
+    error ImportCountMismatch(uint256 expected, uint256 actual);
+
+    /// @notice A store's owner is not the user the old factory has it bound to.
+    /// @dev The store list and the per-user mapping are separate state. Importing on the store's
+    ///      word alone would let a store whose owner no longer matches the mapping bind a user
+    ///      the old factory does not consider its holder.
+    /// @param user Owner the store reports.
+    /// @param store The store in the old factory's list.
+    error ImportBindingMismatch(address user, address store);
 
     /// @notice Restricts `deployLabelStoreFor` to the owner or a component named in
     /// @custom:function StoreAuth.isStoreWriter.
@@ -241,45 +250,59 @@ contract StoreFactoryMigrator is Initializable, UUPSUpgradeable, OwnableUpgradea
     }
 
     /// @notice Copies the per-user `LabelStore` bindings of `oldFactory` into this factory.
-    /// @dev One-shot and owner-only. Each user is bound at most once, here as everywhere else: a
-    ///      user who already holds a binding on this factory is rejected rather than repointed,
-    ///      so a second run with an overlapping list fails loudly instead of rewriting history.
-    ///      `users` is supplied by the caller rather than read from `oldFactory`, because the
-    ///      deployed factory exposes no enumeration; the operator reads its store list out of
-    ///      storage and passes it in, and the length check below is what catches a short list.
+    /// @dev Owner-only, and reads everything it needs from `oldFactory` itself: the count, the
+    ///      store list, and each store's owner. Nothing is supplied by the caller, so there is no
+    ///      window between an operator reading the set and this executing. That window is not
+    ///      hypothetical: the count on the network being migrated moved while this was being
+    ///      written, and a list captured a moment early imports every entry it holds, rewires,
+    ///      and leaves the newest holder to be handed a second empty store on their next
+    ///      registration.
+    ///
+    ///      Each binding is checked back through `getLabelStore` before it is written. A store's
+    ///      `owner` is the user it was deployed for, and the factory's mapping is the authority
+    ///      on that pairing; requiring the two to agree rejects a store whose owner has been
+    ///      changed out from under the mapping, which is the one shape that would bind a user to
+    ///      a store the old factory does not consider theirs.
+    ///
+    ///      Bindings are permanent here as everywhere else in the factory, so a user already
+    ///      bound is rejected instead of repointed. That makes a second call over an overlapping
+    ///      set fail loudly instead of rewriting history.
     ///
     ///      `UserStore` bindings are deliberately not imported. They are claimed by users
-    ///      themselves and the network being migrated from has none; a future migration that does
-    ///      have them needs this function extended rather than reused.
+    ///      themselves and the network being migrated from has none; a migration that does have
+    ///      them needs this extended, not reused.
     /// @param oldFactory Factory whose bindings are being adopted.
-    /// @param users Every address holding a `LabelStore` on `oldFactory`, in any order.
-    /// @param expectedCount Number of bindings `oldFactory` reports, asserted against `users`.
-    function importStores(
-        address oldFactory,
-        address[] calldata users,
-        uint256 expectedCount
-    )
-        external
-        onlyOwner
-    {
+    function importStores(address oldFactory) external onlyOwner {
         require(oldFactory != address(0), InvalidUser(oldFactory));
-        require(users.length == expectedCount, ImportCountMismatch(expectedCount, users.length));
 
-        for (uint256 i; i < users.length; ++i) {
-            address user = users[i];
+        uint256 total = IStoreFactory(oldFactory).getLabelStoreCount();
+        address[] memory stores = IStoreFactory(oldFactory).getLabelStores(0, total);
+        require(stores.length == total, ImportCountMismatch(total, stores.length));
+
+        for (uint256 i; i < total; ++i) {
+            address store = stores[i];
+            require(store != address(0), InvalidImplementation(store));
+
+            address user = IDotnsStore(store).owner();
             require(user != address(0), InvalidUser(user));
+            require(
+                IStoreFactory(oldFactory).getLabelStore(user) == store,
+                ImportBindingMismatch(user, store)
+            );
 
             address existing = _labelStores[user];
             require(existing == address(0), AlreadyDeployed(user, existing));
-
-            address store = IStoreFactory(oldFactory).getLabelStore(user);
-            require(store != address(0), InvalidUser(user));
 
             _labelStores[user] = store;
             _labelStoreList.push(store);
 
             emit StoresImported(user, store);
         }
+
+        // Every binding the old factory reports is now held here. Asserted after the loop as
+        // well as before it, because the two counts are read from different places: a mismatch
+        // means a store appeared in the list twice, or the list disagreed with the mapping.
+        require(_labelStoreList.length == total, ImportCountMismatch(total, _labelStoreList.length));
     }
 
     /// @notice Shared pagination helper used by `getLabelStores` and `getUserStores`.
