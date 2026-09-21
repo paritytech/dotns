@@ -43,6 +43,7 @@ instead of reverting inside an upgrade call.
 
 | # | Script | Why here |
 | --- | --- | --- |
+| 0 | `RotateOwnership` | Moves every contract to a fresh key before anything else is broadcast. |
 | 1 | `UpgradeProtocolRegistry` | Adds `protocolVersion` and `setExpectedCodehash`, which steps 2 to 14 depend on. |
 | 2 | `UpgradeRegistry` | Adds the deferred-write gate. Reads `registrar.controllers` live. |
 | 3 | `UpgradeRegistrar` | Holds the controller authorisations the gate reads. |
@@ -59,6 +60,38 @@ instead of reverting inside an upgrade call.
 | 14 | `DeclareRelease` | Declares every codehash, then the release. Last, always. |
 
 Steps 5 to 12 have no dependency on each other and can go in any order among themselves.
+
+## Step 0, and why it is first
+
+The deployment key's custody includes a laptop belonging to someone who has left, so the key is
+treated as exposed. Rotation is one broadcast, individually verifiable, and doing it first means
+the long upgrade window is not spent hoping an exposed key stays unused. Addresses do not move:
+ownership is a storage field, so hosts, manifests, the SDK pins and the codehash declarations are
+all untouched. Redeployment would buy nothing rotation does not.
+
+The step is the old key's last act, and everything after it is broadcast by the new one:
+
+1. Generate the new key with clean custody and fund its account with gas.
+2. Run `RotateOwnership` as the old key, with `DOTNS_NEW_OWNER` set to the new account. The
+   script hard-fails if any expected contract answers to a surprise owner, refuses to rotate to
+   the broadcaster itself, verifies every transfer by readback, and ends by scanning the whole
+   manifest for anything owner-answering that its inventory missed.
+3. Swap the signer: replace the key in the CI environment (or the local keystore) with the new
+   one. Until this happens, steps 1 to 14 fail their owner assertions, loudly and harmlessly.
+4. Sweep the old account's gas balance to the new one with a plain `cast send`.
+5. Delete every stored copy of the old key: `DOTNS_ADMIN_KEY` on this repository, and the
+   organisation-level `DEPLOYER_KEY`, which the deployment records show controls the same
+   account. An org owner has to do the second.
+
+A partial failure is finished by running the script again with the same inputs: contracts that
+already moved are skipped, so the old key can complete an interrupted rotation. Once everything
+has moved, a re-run is a loud no-op. `test/fork/RotateOwnership.t.sol` proves the rotation, the
+old key's lockout, the new key's ability to upgrade, and the no-op re-run, against live state.
+
+One thing rotation does not cover: the CREATE3 factory deployer key cannot be rotated in any
+meaningful sense, since the factory address is a historical function of it. On this chain the
+slots are spent and it grants nothing; on future chains the deploy pipeline's occupancy checks
+are the protection.
 
 ## After each swap
 
@@ -124,6 +157,8 @@ for the swapped ones, and the declaration has not been made, so nothing on chain
 Fix the cause and resume from the failed step. Do not skip ahead to `DeclareRelease` to tidy up;
 declaring a release the deployment does not fully run is the one state the declarations cannot
 represent.
+
+Step 0 is re-runnable by design, see its section.
 
 **Step 13 is the exception: do not re-run it.** The other twelve are idempotent, and re-running
 one that failed is safe. The migration is not. Its deploy leg adopts an existing proxy, which
