@@ -1,7 +1,9 @@
 # Paseo Asset Hub Next: broadcast order for the v0.8.0 in-place upgrade
 
 Every step is one `scripts/deploy/upgrade.sh` invocation under the deployment owner, and the
-order is not a preference. Three dependencies make it the only order that works:
+order is not a preference. Broadcasts run through CI, one label per step; see "Broadcasting
+through the review PR" below. Running locally instead needs the key material, which nobody
+holds, so the label path is not a convenience but the mechanism. Three dependencies make it the only order that works:
 
 - **The protocol registry goes first.** Every upgraded contract's `version()` reads
   `protocolRegistry.protocolVersion()`, and `MigrateStoreFactory` calls `setExpectedCodehash`.
@@ -60,6 +62,42 @@ instead of reverting inside an upgrade call.
 | 14 | `DeclareRelease` | Declares every codehash, then the release. Last, always. |
 
 Steps 5 to 12 have no dependency on each other and can go in any order among themselves.
+
+## Broadcasting through the review PR
+
+The workflow (`.github/workflows/paseo-upgrade-step.yml`) lives only on this branch and is
+triggered by labels on the open review PR into master, because a dispatch button only exists for
+workflows on the default branch and nothing that signs with the owner key goes there. One step:
+
+1. Add the label `run:<Script>` to the review PR, for example `run:UpgradeProtocolRegistry`.
+2. The run starts and immediately pauses on the `paseo-upgrade` environment. Approve it there.
+   The run is pinned to the PR's head commit at label time, so a push after labelling does not
+   change what an approval executes.
+3. The job starts the local ETH-RPC adapter, broadcasts the one script, uploads the broadcast
+   record and the manifest as artifacts, comments the outcome on the PR, and removes the label.
+4. Retry by re-adding the label. Manual work between steps (funding the fresh account, swapping
+   the environment secret after step 0, committing the step 13 manifest from the artifact,
+   since the runner cannot produce the signed commit this branch requires) happens with no label
+   applied, which is what makes the pauses real.
+
+One-time setup, in the repository UI plus one shell loop:
+
+- Environment `paseo-upgrade`: required reviewer(s), variables `DOTNS_NEW_OWNER` and
+  `DOTNS_RELEASE_TAG` (`0.8.0`), optionally `DOTNS_OLD_STORE_FACTORY`. No secret yet: step 0
+  signs with the repository-level `DOTNS_ADMIN_KEY`, which nobody can read and therefore nobody
+  can move. After step 0, add the fresh key as the environment secret `DOTNS_ADMIN_KEY`, which
+  shadows the repository one for gated jobs, and delete the repository copy.
+- The labels:
+
+```bash
+for s in RotateOwnership UpgradeProtocolRegistry UpgradeRegistry UpgradeRegistrar \
+  UpgradeRegistrarController UpgradePopController UpgradePopRules UpgradeNameEscrow \
+  UpgradeNameWhitelist UpgradeResolver UpgradeReverseResolver UpgradeContentResolver \
+  UpgradePopResolver MigrateStoreFactory DeclareRelease; do
+  gh label create "run:$s" --repo paritytech/dotns --color B60205 \
+    --description "Broadcast $s on Paseo (gated)" --force
+done
+```
 
 ## Step 0, and why it is first
 

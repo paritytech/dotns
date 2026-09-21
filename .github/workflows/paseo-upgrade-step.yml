@@ -1,0 +1,155 @@
+name: Paseo Upgrade Step
+
+# Broadcasts one runbook step against Paseo Asset Hub Next, driven by labels on the review pull
+# request. Adding `run:UpgradeRegistry` runs that script, once, after a human approves.
+#
+# Why labels on a PR, of all things. A dispatchable workflow only registers from the default
+# branch, and nothing that can broadcast with the owner key is going on master. A `pull_request`
+# workflow is taken from the PR itself, so this file lives on `dev/testnet-upgrades` alone and
+# still runs, and the review PR whose base is master becomes the broadcast console. It is
+# unconventional and it is the only shape that keeps master clean, keeps the approval gate, and
+# gives one explicit human action per step.
+#
+# The gate is the `paseo-upgrade` environment: every run pauses until a required reviewer
+# approves it, whoever added the label. The label is the request; the approval is the decision.
+# Labels are also how retries work: the job removes its label when it finishes, so re-adding it
+# re-runs the step. The rotation script skips what already moved and the twelve swaps are
+# idempotent; step 13 is the exception, and its runbook section says to inspect, not re-add.
+#
+# Key handling. Step 0 signs with the repository-level `DOTNS_ADMIN_KEY`, because its value
+# cannot be read by anyone, so it cannot be re-entered as an environment secret. That exposure
+# is time-boxed: step 0's whole purpose is to make that key powerless. The fresh key the
+# operator generates IS entered as an environment secret under the same name, which shadows the
+# repository one for every later step, and the repository copy is then deleted. Runner logs on
+# this public repository are world-readable, so nothing here may ever echo key material; the
+# password below only encrypts a keystore that lives for one run.
+
+on:
+  pull_request:
+    types: [labeled]
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# One broadcast at a time, queued not cancelled: two runs would race nonces on the same chain,
+# and a queued step must never be dropped just because someone labelled twice.
+concurrency:
+  group: paseo-upgrade-broadcast
+  cancel-in-progress: false
+
+jobs:
+  broadcast:
+    name: ${{ github.event.label.name }}
+    # Same-repo head only. A fork's PR gets no secrets anyway, but the guard makes the intent
+    # readable instead of implicit.
+    if: >-
+      startsWith(github.event.label.name, 'run:')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: paseo-upgrade
+    steps:
+      - name: Resolve and validate the requested step
+        id: step
+        env:
+          LABEL: ${{ github.event.label.name }}
+        run: |
+          set -euo pipefail
+          SCRIPT="${LABEL#run:}"
+          case "$SCRIPT" in
+            RotateOwnership|UpgradeProtocolRegistry|UpgradeRegistry|UpgradeRegistrar|\
+            UpgradeRegistrarController|UpgradePopController|UpgradePopRules|\
+            UpgradeNameEscrow|UpgradeNameWhitelist|UpgradeResolver|UpgradeReverseResolver|\
+            UpgradeContentResolver|UpgradePopResolver|MigrateStoreFactory|DeclareRelease) ;;
+            *)
+              echo "::error::'$SCRIPT' is not a runbook step; see docs/PASEO-V080-RUNBOOK.md"
+              exit 1
+              ;;
+          esac
+          echo "script=$SCRIPT" >> "$GITHUB_OUTPUT"
+
+      # The head commit, not the merge ref. A pull_request checkout defaults to the PR merged
+      # into its base, and master merged into this branch is not the code that was reviewed or
+      # fork-tested. Pinning the SHA also means the approver knows exactly what will run: a push
+      # to the branch after the label does not move an approved run.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          submodules: recursive
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+      - run: bun install
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      # The same adapter the deploy pipeline broadcasts through, pointed at the same node. The
+      # hosted gateway has only ever been exercised read-only here, and a broadcast is the wrong
+      # moment to learn whether it accepts transactions.
+      - name: Start the ETH-RPC adapter
+        run: |
+          docker compose up --build -d eth-rpc
+          scripts/shell/wait-for-eth-rpc.sh http://127.0.0.1:8545
+
+      # Only before anything has been broadcast: the moment step 1 lands, the snapshots stop
+      # matching the chain by design, so this gate is pinned to step 0 instead of pretending to
+      # be a mid-flight health check.
+      - name: Verify snapshots against the deployed bytecode
+        if: steps.step.outputs.script == 'RotateOwnership'
+        env:
+          RPC_URL: http://127.0.0.1:8545
+        run: scripts/shell/verify-snapshots.sh
+
+      - name: Broadcast ${{ steps.step.outputs.script }}
+        env:
+          SCRIPT: ${{ steps.step.outputs.script }}
+          RPC_URL: http://127.0.0.1:8545
+          # `_account.sh` imports this into a run-local keystore when none exists. Environment
+          # secrets shadow repository ones for jobs that declare the environment, which is what
+          # switches every post-rotation step onto the fresh key without touching this file.
+          PRIVATE_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
+          # Encrypts a keystore that exists for the lifetime of this runner. Masked because no
+          # log line should print even throwaway credentials in cleartext.
+          ACCOUNT_PASSWORD: paseo-upgrade-run-${{ github.run_id }}
+          # Step parameters, configured as environment variables on `paseo-upgrade`:
+          # DOTNS_NEW_OWNER for step 0, DOTNS_RELEASE_TAG for step 14, and optionally
+          # DOTNS_OLD_STORE_FACTORY as the step 13 cross-check.
+          DOTNS_NEW_OWNER: ${{ vars.DOTNS_NEW_OWNER }}
+          DOTNS_RELEASE_TAG: ${{ vars.DOTNS_RELEASE_TAG }}
+          DOTNS_OLD_STORE_FACTORY: ${{ vars.DOTNS_OLD_STORE_FACTORY }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$ACCOUNT_PASSWORD"
+          ./scripts/deploy/upgrade.sh
+
+      # The broadcast record and the manifest are the two things a step changes on disk. The
+      # manifest cannot be pushed back from here: the branch requires signed commits, which a
+      # runner cannot produce, so step 13's manifest change is committed by the operator from
+      # the artifact. Everything else leaves the workspace unchanged.
+      - name: Keep the broadcast record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.step.outputs.script }}-${{ github.run_id }}
+          path: |
+            broadcast/
+            deployments/
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Report and clear the label
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+          SCRIPT: ${{ steps.step.outputs.script }}
+          PR: ${{ github.event.pull_request.number }}
+          LABEL: ${{ github.event.label.name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" \
+            --body "**${SCRIPT}**: ${RESULT}. [Run](${RUN_URL}). Broadcast record and manifest attached as artifacts. Re-add \`${LABEL}\` to retry; for MigrateStoreFactory, read the runbook before retrying anything."
+          gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --remove-label "$LABEL"
