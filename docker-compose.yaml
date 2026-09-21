@@ -26,8 +26,12 @@ services:
       # the RPC server-side and don't need CORS.
       - "--rpc-cors"
       - "http://localhost,http://127.0.0.1"
+      # A forge script pins its fork to a block hash fetched moments earlier, and a one-block
+      # window on an advancing chain prunes that hash between the two calls, killing the run at
+      # startup with "failed to get block hash". A thousand blocks is minutes of history, ample
+      # for any broadcast, and still trivial for a runner's memory.
       - "--eth-pruning"
-      - "1"
+      - "1000"
       - "--rpc-max-connections"
       - "500"
       - "--rpc-max-request-size"
