@@ -101,8 +101,8 @@ done
 
 ## Step 0, and why it is first
 
-The deployment key's custody includes a laptop belonging to someone who has left, so the key is
-treated as exposed. Rotation is one broadcast, individually verifiable, and doing it first means
+Copies of the deployment key have spread across sources the project does not control, so the
+key is treated as leaked. Rotation is one broadcast, individually verifiable, and doing it first means
 the long upgrade window is not spent hoping an exposed key stays unused. Addresses do not move:
 ownership is a storage field, so hosts, manifests, the SDK pins and the codehash declarations are
 all untouched. Redeployment would buy nothing rotation does not.

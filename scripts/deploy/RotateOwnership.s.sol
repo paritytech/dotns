@@ -15,7 +15,8 @@ interface IOwnable {
 /// @title RotateOwnership
 /// @notice Transfers ownership of every DotNS contract to a fresh key. Step 0 of the upgrade
 ///         runbook, and the step that exists because key custody, not code, is the current risk:
-///         the deployment key has lived on a laptop belonging to someone who has left.
+///         copies of the deployment key have spread across sources the project does not control,
+///         so it is treated as leaked.
 /// @dev Addresses do not move. Ownership is a storage field on each contract, so consumers,
 ///      hosts, manifests and the codehash declarations are all untouched; the only thing that
 ///      changes is which key the `onlyOwner` gates answer to. This is the property that makes
