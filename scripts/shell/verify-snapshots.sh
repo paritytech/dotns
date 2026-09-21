@@ -51,7 +51,7 @@ echo "verify-snapshots: $manifest against $RPC_URL (chain $chain_id)"
 forge build >/dev/null
 
 RPC_URL="$RPC_URL" MANIFEST="$manifest" python3 - "${snapshots[@]}" <<'PY'
-import json, os, sys, urllib.request
+import json, os, sys, time, urllib.request
 
 RPC = os.environ["RPC_URL"]
 manifest = json.load(open(os.environ["MANIFEST"]))
@@ -60,13 +60,25 @@ SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
 
 
 def rpc(method, params):
-    req = urllib.request.Request(
-        RPC,
-        data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode(),
-        # Some public gateways reject urllib's default agent outright.
-        headers={"content-type": "application/json", "user-agent": "dotns-verify-snapshots"},
-    )
-    return json.load(urllib.request.urlopen(req, timeout=60)).get("result")
+    # Forty-odd sequential calls, and one transient hiccup anywhere used to fail the whole
+    # check, which upstream means a wasted label-approve cycle. Three attempts with a short
+    # backoff absorb the blips; a genuine outage still fails, as it must.
+    last = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(
+                RPC,
+                data=json.dumps(
+                    {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
+                ).encode(),
+                # Some public gateways reject urllib's default agent outright.
+                headers={"content-type": "application/json", "user-agent": "dotns-verify-snapshots"},
+            )
+            return json.load(urllib.request.urlopen(req, timeout=60)).get("result")
+        except Exception as error:  # noqa: BLE001 - anything transient deserves the retry
+            last = error
+            time.sleep(1 + 2 * attempt)
+    raise last
 
 
 def strip_metadata(code):
