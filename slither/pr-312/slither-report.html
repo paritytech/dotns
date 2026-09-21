@@ -8,7 +8,7 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">DotNS Slither Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-09-21 14:15 UTC | 203 findings</p>
+<p class="text-sm text-gray-500">Generated 2026-09-21 14:33 UTC | 203 findings</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">High</p><p class="text-xl font-mono font-bold text-red-400">4</p></div>
@@ -58,18 +58,23 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.registerBaseName(IDotnsPopController.FullRegistration) (contracts/registrars/DotnsPopCo</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:255</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._releasePopRulesSlot(bytes32) (contracts/registrars/DotnsPopController.sol#922-927): 	E</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:922</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._releasePopRulesSlot(bytes32) (contracts/registrars/DotnsPopController.sol#922-927): 	E</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:922</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
@@ -80,11 +85,6 @@
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseNameOnly(IDotnsPopController.BaseNameReservation) (contracts/registrars/Dotn</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:217</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
@@ -546,13 +546,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsNameEscrow.release(uint256) (contracts/escrow/DotnsNameEscrow.sol#368-421): 	External calls: 	- regis</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:368</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.registerBaseName(IDotnsPopController.FullRegistration) (contracts/registrars/DotnsPopCo</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:255</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.registerBaseName(IDotnsPopController.FullRegistration) (contracts/registrars/DotnsPopCo</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:255</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsNameEscrow.release(uint256) (contracts/escrow/DotnsNameEscrow.sol#368-421): 	External calls: 	- regis</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:368</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -571,13 +571,18 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in StoreFactory.upgradeUserStoreImplementation(address) (contracts/store/StoreFactory.sol#198-203): 	External</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:198</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.registerBaseName(IDotnsPopController.FullRegistration) (contracts/registrars/DotnsPopCo</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:255</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in StoreFactory.upgradeUserStoreImplementation(address) (contracts/store/StoreFactory.sol#198-203): 	External</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:198</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -626,11 +631,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._completeGatewayRegistration(address,string,bytes32,bytes32,bytes,bytes32) (contracts/r</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:589</td>
 </tr>
@@ -641,18 +641,18 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in StoreFactoryMigrator.upgradeLabelStoreImplementation(address) (contracts/store/StoreFactoryMigrator.sol#17</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactoryMigrator.sol:173</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.registerBaseName(IDotnsPopController.FullRegistration) (contracts/registrars/DotnsPopCo</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:255</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reserveBaseName(IDotnsPopController.BaseReservation) (contracts/registrars/DotnsPopCont</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:199</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
