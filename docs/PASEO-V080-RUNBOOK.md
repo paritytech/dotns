@@ -109,15 +109,19 @@ all untouched. Redeployment would buy nothing rotation does not.
 
 The step is the old key's last act, and everything after it is broadcast by the new one:
 
-1. Generate the new key with clean custody and fund its account with gas.
+1. Generate the new key with clean custody. No funding is needed: the sweep below is the
+   funding, and sending anything to a mapped address by hand risks the wrong sibling chain,
+   where a mapped account has no revive and therefore no key that can ever spend it.
 2. Run `RotateOwnership` as the old key, with `DOTNS_NEW_OWNER` set to the new account. The
    script hard-fails if any expected contract answers to a surprise owner, refuses to rotate to
-   the broadcaster itself, verifies every transfer by readback, and ends by scanning the whole
-   manifest for anything owner-answering that its inventory missed.
-3. Swap the signer: replace the key in the CI environment (or the local keystore) with the new
-   one. Until this happens, steps 1 to 14 fail their owner assertions, loudly and harmlessly.
-4. Sweep the old account's gas balance to the new one with a plain `cast send`.
-5. Delete every stored copy of the old key: `DOTNS_ADMIN_KEY` on this repository, and the
+   the broadcaster itself, verifies every transfer by readback, scans the whole manifest for
+   anything owner-answering that its inventory missed, and finally sweeps the old account's
+   balance to the new owner, keeping a two-unit gas buffer. Ownership and money leave the leaked
+   key in the same approved run; a later manual sweep would be a race offered to whoever else
+   holds it.
+3. Swap the signer: enter the new key as the environment secret. Until this happens, steps 1 to
+   14 fail their owner assertions, loudly and harmlessly.
+4. Delete every stored copy of the old key: `DOTNS_ADMIN_KEY` on this repository, and the
    organisation-level `DEPLOYER_KEY`, which the deployment records show controls the same
    account. An org owner has to do the second.
 

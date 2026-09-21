@@ -39,11 +39,16 @@ interface IOwnable {
 ///      skipped, so the old key can finish what an interrupted run started. Once every contract
 ///      has moved, the old key can no longer run this at all, which is the point.
 ///
-///      Two things this deliberately does not cover. The old account's gas balance is swept by
-///      hand (see the runbook): a native transfer does not belong in an ownership script. And
-///      `Create3Factory` is left alone: its owner is the factory deployer, a different account,
-///      and its deploy surface is permissionless anyway, so there is nothing an owner rotation
-///      would protect.
+///      The old account's balance moves in the same run, once every owner has. Rotation strips
+///      `onlyOwner` powers and cannot strip the right to spend a balance, and a leaked key's
+///      balance is exactly as leaked as its authority was, so leaving the sweep for a later
+///      manual step is a race offered to whoever else holds the key. It is also what funds the
+///      new owner: nobody can extract the old key to sign a transfer by hand, so the gated run
+///      is the one signer the balance has.
+///
+///      One thing this deliberately does not cover: `Create3Factory` is left alone. Its owner is
+///      the factory deployer, a different account, and its deploy surface is permissionless
+///      anyway, so there is nothing an owner rotation would protect.
 /// @custom:security-contact admin@parity.io
 contract RotateOwnership is BaseDeployer {
     /// @notice Reads the new owner, resolves the inventory, and rotates as `msg.sender`.
@@ -64,6 +69,7 @@ contract RotateOwnership is BaseDeployer {
         );
 
         _rotateEverything(current, newOwner);
+        _sweep(current, newOwner);
 
         console.log("=== RotateOwnership complete ===");
     }
@@ -190,6 +196,32 @@ contract RotateOwnership is BaseDeployer {
             string.concat("RotateOwnership: ", label, " readback does not show the new owner")
         );
         console.log("  rotated", label, target);
+    }
+
+    /// @notice Sends the old account's balance to the new owner, keeping a gas buffer.
+    /// @dev Last, after every transfer has been verified, so a sweep failure never strands a
+    ///      half-rotated deployment: ownership is already across, and re-running retries only
+    ///      this. The buffer exists because this same account just paid for fifteen broadcasts
+    ///      and a re-run must not die on fees; whatever the buffer leaves behind is dust on a
+    ///      powerless account, priced accordingly.
+    /// @param current The old owner, whose balance moves.
+    /// @param newOwner Where it goes, the same address every contract now answers to.
+    function _sweep(address current, address newOwner) internal {
+        uint256 keep = 2 ether;
+        uint256 balance = current.balance;
+        if (balance <= keep) {
+            console.log("  sweep skipped, balance is within the gas buffer", balance);
+            return;
+        }
+
+        uint256 amount = balance - keep;
+        vm.broadcast(current);
+        (bool ok,) = payable(newOwner).call{value: amount}("");
+        require(ok, "RotateOwnership: sweep transfer failed");
+        require(
+            newOwner.balance >= amount, "RotateOwnership: sweep readback shows less than was sent"
+        );
+        console.log("  swept to the new owner", amount);
     }
 
     /// @notice Fails the run if any manifest entry outside the three lists answers to the owner.

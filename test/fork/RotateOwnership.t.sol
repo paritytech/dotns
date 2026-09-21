@@ -13,6 +13,11 @@ contract RotateOwnershipHarness is RotateOwnership {
     function rotate(address current, address newOwner) external {
         _rotateEverything(current, newOwner);
     }
+
+    /// @notice Runs the sweep leg through the script's own internal.
+    function sweep(address current, address newOwner) external {
+        _sweep(current, newOwner);
+    }
 }
 
 /// @title RotateOwnershipForkTest
@@ -107,6 +112,26 @@ contract RotateOwnershipForkTest is BaseUpgradeFork {
         assertTrue(
             _implementationOf(registry) != address(0), "the fresh key performed a real upgrade"
         );
+    }
+
+    /// @notice The sweep funds the new owner from the old account, leaving only the gas buffer.
+    /// @dev The sweep is the new owner's funding: the old key cannot be extracted for a manual
+    ///      transfer, so this leg is the one signer its balance has. Asserted against the live
+    ///      balance, whatever it is on the day, because the amount is not the property; the
+    ///      transfer of nearly all of it is.
+    function test_sweep_funds_the_new_owner_and_leaves_only_the_buffer() public {
+        uint256 before = currentOwner.balance;
+        assertTrue(
+            before > 2 ether, "fork precondition: the old account holds more than the buffer"
+        );
+
+        rotator.rotate(currentOwner, freshOwner);
+        rotator.sweep(currentOwner, freshOwner);
+
+        assertEq(
+            freshOwner.balance, before - 2 ether, "the new owner received everything but the buffer"
+        );
+        assertEq(currentOwner.balance, 2 ether, "the old account keeps exactly the buffer");
     }
 
     /// @notice A second run from the old key completes as a no-op instead of failing.
