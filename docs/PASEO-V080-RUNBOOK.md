@@ -70,7 +70,7 @@ triggered by labels on the open review PR into master, because a dispatch button
 workflows on the default branch and nothing that signs with the owner key goes there. One step:
 
 1. Add the label `run:<Script>` to the review PR, for example `run:UpgradeProtocolRegistry`.
-2. The run starts and immediately pauses on the `paseo-upgrade` environment. Approve it there.
+2. The run starts and immediately pauses on the `testnet-upgrades` environment. Approve it there.
    The run is pinned to the PR's head commit at label time, so a push after labelling does not
    change what an approval executes.
 3. The job starts the local ETH-RPC adapter, broadcasts the one script, uploads the broadcast
@@ -82,7 +82,7 @@ workflows on the default branch and nothing that signs with the owner key goes t
 
 One-time setup, in the repository UI plus one shell loop:
 
-- Environment `paseo-upgrade`: required reviewer(s), variables `DOTNS_NEW_OWNER` and
+- Environment `testnet-upgrades`: required reviewer(s), variables `DOTNS_NEW_OWNER` and
   `DOTNS_RELEASE_TAG` (`0.8.0`), optionally `DOTNS_OLD_STORE_FACTORY`. No secret yet: step 0
   signs with the repository-level `DOTNS_ADMIN_KEY`, which nobody can read and therefore nobody
   can move. After step 0, add the fresh key as the environment secret `DOTNS_ADMIN_KEY`, which

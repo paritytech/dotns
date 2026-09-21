@@ -10,7 +10,7 @@ name: Paseo Upgrade Step
 # unconventional and it is the only shape that keeps master clean, keeps the approval gate, and
 # gives one explicit human action per step.
 #
-# The gate is the `paseo-upgrade` environment: every run pauses until a required reviewer
+# The gate is the `testnet-upgrades` environment: every run pauses until a required reviewer
 # approves it, whoever added the label. The label is the request; the approval is the decision.
 # Labels are also how retries work: the job removes its label when it finishes, so re-adding it
 # re-runs the step. The rotation script skips what already moved and the twelve swaps are
@@ -36,7 +36,7 @@ permissions:
 # One broadcast at a time, queued not cancelled: two runs would race nonces on the same chain,
 # and a queued step must never be dropped just because someone labelled twice.
 concurrency:
-  group: paseo-upgrade-broadcast
+  group: testnet-upgrades-broadcast
   cancel-in-progress: false
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
       startsWith(github.event.label.name, 'run:')
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    environment: paseo-upgrade
+    environment: testnet-upgrades
     steps:
       - name: Resolve and validate the requested step
         id: step
@@ -112,8 +112,8 @@ jobs:
           PRIVATE_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
           # Encrypts a keystore that exists for the lifetime of this runner. Masked because no
           # log line should print even throwaway credentials in cleartext.
-          ACCOUNT_PASSWORD: paseo-upgrade-run-${{ github.run_id }}
-          # Step parameters, configured as environment variables on `paseo-upgrade`:
+          ACCOUNT_PASSWORD: testnet-upgrades-run-${{ github.run_id }}
+          # Step parameters, configured as environment variables on `testnet-upgrades`:
           # DOTNS_NEW_OWNER for step 0, DOTNS_RELEASE_TAG for step 14, and optionally
           # DOTNS_OLD_STORE_FACTORY as the step 13 cross-check.
           DOTNS_NEW_OWNER: ${{ vars.DOTNS_NEW_OWNER }}
