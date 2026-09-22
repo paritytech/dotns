@@ -115,6 +115,20 @@ With `--tag vX.Y.Z` it additionally checks the chain's own declarations: `protoc
 
 ## Publishing
 
+Both publish workflows run in the `releases` environment, because building a genesis reads the
+key that owns every contract in it. The environment holds:
+
+- `DOTNS_ADMIN_KEY` (secret): the genesis owner's private key.
+- `DOTNS_ADMIN_ADDRESS` (variable): the address that key derives to. The workflow checks the
+  pair right after the toolchain is installed and fails the run on a mismatch, so a mistyped
+  key dies before anything is built.
+- Required reviewers: the dotns team. Every release run pauses for one approval.
+- Deployment refs: `master` (for `workflow_dispatch`) and `v[0-9]*` tags. A dispatch started
+  from any other branch stops at the environment gate.
+
+Creating a `v*` tag is itself restricted to the dotns team by the `release tags` ruleset, so a
+release takes two distinct human actions: cutting the tag, and approving the run it starts.
+
 `deployments.json`, `release-manifest.json`, and `codehashes.json` are generated during the release by `scripts/js/release-metadata.mjs build`, from the committed deployment manifests and the build that just ran; `abi-diff.json` comes from `abidiff` against the previous release's published ABIs. Neither is committed: an address stored in two tracked files eventually disagrees with itself, so `deployments/<network>/<chain-id>.json` is the only tracked copy.
 
 That file holds exactly one address per contract, the current one. Each deploy overwrites the entries it produces, so it tracks only the latest deployment for a network and never a history of them; previous address sets exist only in this repository's git history. It also carries no implementation addresses behind the UUPS proxies, and no record of which commit was deployed.
