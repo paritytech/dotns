@@ -637,6 +637,15 @@ function verify(args) {
         rpc,
       ]);
       if (declared === ZERO_HASH) {
+        // A key that is tolerated unset is also tolerated undeclared. Such keys are outside
+        // the declared release surface, so the declaration pass never writes a codehash for
+        // them; a network whose genesis predates the current policy can still have one set,
+        // and that combination (set, no code identity) is expected there.
+        if (UNSET_TOLERATED[key]) {
+          resolved.add(address.toLowerCase());
+          console.log(`  skip ${key} ${address} (${label}: no declaration, ${UNSET_TOLERATED[key]})`);
+          continue;
+        }
         problems.push(`key '${key}' (${label}) has no declared codehash`);
         continue;
       }
@@ -669,6 +678,15 @@ function verify(args) {
   const notExpected = new Set(unpointed);
   for (const [address, label] of byAddress) {
     if (!resolved.has(address) && !notExpected.has(address)) {
+      // A `*Legacy` entry records an address that became stale or unused after an in-place
+      // upgrade: when a contract moves to a new address, the outgoing one keeps its manifest
+      // entry under the `Legacy` suffix instead of being erased, because live state can keep
+      // depending on it after nothing points at it. Unkeyed by design, so the reverse check
+      // skips it instead of reading it as an orphan.
+      if (label.endsWith("Legacy")) {
+        console.log(`  skip ${label} ${contracts[label]} (superseded deployment, kept for the beacon upgrade path)`);
+        continue;
+      }
       problems.push(`${label} ${contracts[label]} is in the manifest but no key points at it`);
     }
   }
