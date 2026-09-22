@@ -637,6 +637,14 @@ function verify(args) {
         rpc,
       ]);
       if (declared === ZERO_HASH) {
+        // A key that is tolerated unset is also tolerated undeclared when a network set it
+        // anyway: Paseo's genesis wired multicall3 before the no-registration policy, and the
+        // declaration pass deliberately skips it, so the key is set with no code identity.
+        if (UNSET_TOLERATED[key]) {
+          resolved.add(address.toLowerCase());
+          console.log(`  skip ${key} ${address} (${label}: no declaration, ${UNSET_TOLERATED[key]})`);
+          continue;
+        }
         problems.push(`key '${key}' (${label}) has no declared codehash`);
         continue;
       }
@@ -669,6 +677,14 @@ function verify(args) {
   const notExpected = new Set(unpointed);
   for (const [address, label] of byAddress) {
     if (!resolved.has(address) && !notExpected.has(address)) {
+      // A `*Legacy` entry is a superseded deployment kept on purpose: the store migration
+      // records the outgoing factory and its beacons, because the migrated stores stay on
+      // those beacons forever and the old factory is the only contract able to upgrade them.
+      // No key points at them by design (see MigrateStoreFactory and the runbook's step 13).
+      if (label.endsWith("Legacy")) {
+        console.log(`  skip ${label} ${contracts[label]} (superseded deployment, kept for the beacon upgrade path)`);
+        continue;
+      }
       problems.push(`${label} ${contracts[label]} is in the manifest but no key points at it`);
     }
   }
