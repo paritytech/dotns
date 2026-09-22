@@ -75,6 +75,9 @@ workflows on the default branch and nothing that signs with the owner key goes t
    change what an approval executes.
 3. The job starts the local ETH-RPC adapter, broadcasts the one script, uploads the broadcast
    record and the manifest as artifacts, comments the outcome on the PR, and removes the label.
+   Known cosmetic quirk: when the label validation step itself fails, the comment renders the
+   step name as `****`, because the name was never resolved and the masking hits the empty
+   output. The run page has the real error either way.
 4. Retry by re-adding the label. Manual work between steps (funding the fresh account, swapping
    the environment secret after step 0, committing the step 13 manifest from the artifact,
    since the runner cannot produce the signed commit this branch requires) happens with no label
@@ -94,10 +97,24 @@ for s in RotateOwnership UpgradeProtocolRegistry UpgradeRegistry UpgradeRegistra
   UpgradeRegistrarController UpgradePopController UpgradePopRules UpgradeNameEscrow \
   UpgradeNameWhitelist UpgradeResolver UpgradeReverseResolver UpgradeContentResolver \
   UpgradePopResolver MigrateStoreFactory DeclareRelease; do
-  gh label create "run:$s" --repo paritytech/dotns --color B60205 \
+  gh label create "run:$s" --repo paritytech/dotns --color 4FEF0F \
     --description "Broadcast $s on Paseo (gated)" --force
 done
 ```
+
+Setup order matters, twice:
+
+- **Create the environment, with its required reviewers, before any workflow referencing it is
+  pushed.** A workflow that names an environment which does not exist yet makes GitHub create it
+  on the spot, unprotected, and the first labelled run broadcasts with no gate at all.
+- **Leave the environment's deployment branch policy unrestricted.** A `pull_request` run
+  deploys from `refs/pull/N/merge`, which no branch-name pattern ever matches, so any
+  restriction blocks every gated run with a misleading error. The protection is the required
+  reviewer, not the branch list.
+
+Ephemeral working branches for experiments around the campaign go under `chore/`, never under
+`dev/`: that prefix is protected, and a throwaway branch created there cannot be deleted without
+lifting the protection.
 
 ## Step 0, and why it is first
 
@@ -184,11 +201,19 @@ created after this migration.
 verify --network paseo-assethub --rpc https://eth-rpc-paseo-next.polkadot.io --tag v0.8.0
 ```
 
-This does not come back clean, and must not be made to. Expected: every key verifies except
-`registrarController`, reported as drift because its deployed code carries the retained slot that
-keeps `protocolRegistry` where the live proxy has it, and no release tag describes that build. A
-tag build reads the field as the zero address and bricks the contract, so the branch build is the
-only deployable one. A second drifting key is a real finding. `DEPLOYMENTS.md` has the detail.
+This comes back clean: `paseo-assethub matches the chain` (verified 2026-09-22). It is clean
+because the check compares the on-chain code-identity declarations against the code actually
+executing, and both are the branch build. The `registrarController` divergence from the v0.8.0
+tag still exists, it just cannot appear here: the deployed controller carries the retained slot
+that keeps `protocolRegistry` where the live proxy has it, and no release tag describes that
+build. A tag build reads the field as the zero address and bricks the contract, so the branch
+build is the only deployable one. The divergence surfaces only when comparing artifacts BUILT
+from the tag against this chain; `DEPLOYMENTS.md` has the detail. Any key this verify reports
+as a problem is a real finding.
+
+Close-out, once the verify is green: disable the broadcast console with
+`gh workflow disable "Paseo Upgrade Step"` (done 2026-09-22), close the review PR, and tag the
+branch head so the campaign's exact code stays addressable.
 
 ## If a step fails
 
@@ -226,3 +251,37 @@ mid-loop around the 44th store at any gas limit, the multi-dimensional weight ex
 surfacing as OpenZeppelin's `FailedCall`. No off-chain simulation models that ceiling; the
 default page of 15 stays at roughly a third of the measured capacity, and `DOTNS_IMPORT_CHUNK`
 overrides it if the ceiling moves.
+
+## Running the next campaign on this branch
+
+This runbook is written for the v0.8.0 upgrade, but the branch and its tooling are permanent.
+The next in-place upgrade reuses everything here; what changes is the step list. In order:
+
+1. Merge `master` into `dev/testnet-upgrades`. Nothing ever merges back.
+2. Take fresh `*Old.sol` snapshots **from the code the chain is running**, not from the last
+   tag: read each proxy's implementation and let `scripts/shell/verify-snapshots.sh` prove every
+   snapshot reproduces the deployed bytecode before anything else is written. The snapshot
+   closure rules are in CONTRIBUTING's Upgrade-PR workflow section.
+3. Write one upgrade script and one fork test per contract that changes, same pairing as this
+   campaign. Any script leg that loops over live state is paged from day one; see "Limits the
+   simulator cannot see" in CONTRIBUTING.
+4. Extend the allowlist in `.github/workflows/paseo-upgrade-step.yml` with the new script names
+   and create any missing `run:<Script>` labels (the loop above, color `4FEF0F`). The
+   `testnet-upgrades` environment, its reviewers and variables already exist; update
+   `DOTNS_RELEASE_TAG` to the new version.
+5. Re-enable the console: `gh workflow enable "Paseo Upgrade Step"`. It was disabled at the end
+   of the previous campaign so a stray label cannot broadcast between campaigns.
+6. Open a fresh draft review PR into `master` titled as review-only, and broadcast one label at
+   a time: registry-affecting steps in their required order first, independent swaps in any
+   order, migrations and the release declaration last, manifest committed by the operator
+   between the two.
+7. Verify every step from an independent client before the next label: implementation slot
+   moved, masked runtime bytecode equals the branch build, owner unchanged, and one state read
+   that the specific contract's storage survived. The workflow's green check means the
+   transactions landed; it does not read the chain back.
+8. Close out: run the release verify until it is clean, disable the workflow, close the PR, tag
+   the branch head.
+
+The mid-campaign CI shape is expected to be red: `verify-snapshots` fails by design from the
+first swap until the campaign's snapshots are retired, because the chain no longer matches the
+pre-upgrade snapshots. That red is the guard working, not a failure to fix.

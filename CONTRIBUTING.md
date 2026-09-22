@@ -297,6 +297,18 @@ SCRIPT=UpgradeRegistrar ACCOUNT_NAME=<keystore> RPC_URL=<network> ./scripts/depl
 
 It resolves the deployer account and reuses the shared forge flags (`--legacy`, `--slow`, and the gas limit matching the block gas limit), so an upgrade broadcast cannot drift from the deploy pipeline. The simulation is never skipped.
 
+### Limits the simulator cannot see
+
+pallet-revive meters transactions in more dimensions than gas, and neither forge's simulation nor a fork test models any of them: both run on a plain EVM where the only budget is gas. A transaction can therefore simulate green and still be unbroadcastable, rejected at gas estimation at every gas limit, with the weight exhaustion surfacing as an empty inner revert (OpenZeppelin call helpers turn it into `FailedCall`). The v0.8.0 store migration hit exactly this: one transaction importing 63 store bindings exceeded a block's weight, dying around the 44th.
+
+The rule that follows: **a broadcast transaction must never do work proportional to unbounded live state.** Any script leg that loops over on-chain collections (stores, holders, keys) is written paged from the start, one bounded page per transaction, idempotent so replaying a page is a no-op and an interrupted run is finished by running the pages again. Size pages well under measured capacity, and make the page size an environment override so a moved ceiling is an operator setting, not a code change.
+
+Operational pitfalls of the local ETH-RPC adapter, each learned the hard way:
+
+- forge pins a fork by block hash, so the adapter's `--eth-pruning` depth must exceed the longest run; at the default of 1 the second read fails with `Ethereum block not found`.
+- Readiness is not "the port answers": wait until the adapter serves a full latest block body and the block number advances, or the first script call races the warm-up.
+- RPC reads flake under load; wrap chain reads in shell tooling with a small retry and backoff. Never retry a broadcast itself.
+
 ### Cleanup checklist before merging an upgrade PR
 
 1. Delete the upgrade script under `scripts/deploy/`.
