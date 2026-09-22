@@ -43,13 +43,14 @@ CANONICAL_MANIFEST="deployments/expected.json"
 # does: this key ends up owning the registry, the resolvers, the registrar, the
 # store factory and the beacons.
 #
-# Accepted, in order of precedence:
-#   DOTNS_ADMIN_KEY       a raw private key — the admin credential this repo already holds
-#   DOTNS_ADMIN_MNEMONIC  the admin mnemonic; index $DOTNS_ADMIN_INDEX (default 0)
+# Accepted:
+#   DOTNS_ADMIN_KEY       a raw private key — in CI it lives on the `releases` environment,
+#                         behind a required reviewer, paired with a DOTNS_ADMIN_ADDRESS
+#                         variable the workflow checks the key against before this runs
 #
-# Deliberately NOT accepted: DOTNS_MNEMONIC. That is an operational credential for driving
-# the `dotns` CLI, not the contract admin, and quietly making it the owner of every
-# contract in a genesis would be a hard mistake to spot.
+# Deliberately NOT accepted: DOTNS_ADMIN_MNEMONIC and DOTNS_MNEMONIC. A second credential
+# accepted here would let a different secret silently decide who owns every contract in a
+# genesis, and a wrong owner is a hard mistake to spot. One explicit key, or a loud failure.
 # Not DEPLOYER_KEY: that name is dotns-releases' own secret, and accepting it here
 # would make which key owns a published genesis depend on which repo the build ran in.
 ADMIN_KEY="${DOTNS_ADMIN_KEY:-}"
@@ -84,15 +85,9 @@ for tool in forge anvil cast node jq curl; do
     command -v "$tool" >/dev/null 2>&1 || { echo "Error: $tool is not on PATH" >&2; exit 1; }
 done
 
-# Needs cast, so it happens after the check above.
-if [ -z "$ADMIN_KEY" ] && [ -n "${DOTNS_ADMIN_MNEMONIC:-}" ]; then
-    ADMIN_KEY="$(cast wallet private-key --mnemonic "$DOTNS_ADMIN_MNEMONIC" "${DOTNS_ADMIN_INDEX:-0}")"
-    echo "Owner key derived from DOTNS_ADMIN_MNEMONIC, index ${DOTNS_ADMIN_INDEX:-0}."
-fi
-
 if [ -z "$ADMIN_KEY" ]; then
     cat >&2 <<'MSG'
-Error: no owner key. Set DOTNS_ADMIN_KEY or DOTNS_ADMIN_MNEMONIC.
+Error: no owner key. Set DOTNS_ADMIN_KEY.
 
 Whichever is given becomes the owner of every DotNS contract in the genesis
 state, so this build refuses to fall back to a public dev key.
