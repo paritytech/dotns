@@ -5,6 +5,8 @@ import {BaseUpgradeFork} from "./BaseUpgradeFork.t.sol";
 import {MigrateStoreFactory} from "../../scripts/deploy/MigrateStoreFactory.s.sol";
 import {UpgradeProtocolRegistryHarness} from "./UpgradeProtocolRegistry.t.sol";
 import {StoreFactory} from "../../contracts/store/StoreFactory.sol";
+import {StoreFactoryMigrator} from "../../contracts/store/StoreFactoryMigrator.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IStoreFactory} from "../../contracts/store/IStoreFactory.sol";
 import {IDotnsStore} from "../../contracts/store/IDotnsStore.sol";
 import {StoreUtils} from "../../contracts/utils/StoreUtils.sol";
@@ -137,6 +139,52 @@ contract MigrateStoreFactoryForkTest is BaseUpgradeFork {
         for (uint256 i; i < total; ++i) {
             address holder = IDotnsStore(stores[i]).owner();
             assertEq(migrated.getLabelStore(holder), stores[i], "holder keeps their existing store");
+        }
+    }
+
+    /// @notice A death between import pages is finished by replaying the pages.
+    /// @dev The import is paged because the whole list does not fit in one pallet-revive block,
+    ///      and pages are separate transactions, so the run can die with a prefix imported and
+    ///      the proxy parked on the migrator. This drills the recovery the runbook prescribes
+    ///      against live state: replay the import from the top, and the pages that already landed
+    ///      skip themselves. The count assertions are the proof nothing was carried twice.
+    function test_a_death_between_pages_is_finished_by_replaying_them() public {
+        uint256 total = oldFactory.getLabelStoreCount();
+        assertTrue(total > 1, "fork precondition: enough stores for more than one page");
+
+        address replacement = migrator.deployReplacement(factoryOwner, address(protocolRegistry));
+
+        // Park the proxy exactly where a mid-run death leaves it: on the migrator, holding a
+        // prefix of the bindings.
+        uint256 firstPage = total / 2;
+        StoreFactoryMigrator parked = new StoreFactoryMigrator();
+        vm.prank(factoryOwner);
+        UUPSUpgradeable(replacement)
+            .upgradeToAndCall(
+                address(parked),
+                abi.encodeCall(
+                    StoreFactoryMigrator.importStores, (address(oldFactory), 0, firstPage)
+                )
+            );
+        assertEq(
+            IStoreFactory(replacement).getLabelStoreCount(),
+            firstPage,
+            "the interrupted state holds exactly the prefix"
+        );
+
+        // The continuation: the import leg again, whole. Its first pages overlap what landed.
+        migrator.importInto(factoryOwner, replacement, address(oldFactory));
+        migrator.restore(factoryOwner, replacement);
+
+        StoreFactory migrated = StoreFactory(replacement);
+        assertEq(migrated.getLabelStoreCount(), total, "the replay finished the import");
+
+        address[] memory stores = oldFactory.getLabelStores(0, total);
+        for (uint256 i; i < total; ++i) {
+            address holder = IDotnsStore(stores[i]).owner();
+            assertEq(
+                migrated.getLabelStore(holder), stores[i], "no holder was rebound or duplicated"
+            );
         }
     }
 

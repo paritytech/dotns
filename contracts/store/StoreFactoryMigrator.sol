@@ -19,9 +19,9 @@ import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {StoreAuth} from "../utils/StoreAuth.sol";
 
 /// @title StoreFactoryMigrator
-/// @notice The shipped `StoreFactory`, with the per-user bindings reachable and a one-shot import
+/// @notice The shipped `StoreFactory`, with the per-user bindings reachable and a paged import
 ///         that copies them from the factory a network used before this one.
-/// @dev PR-scoped migration tooling, upgraded into the proxy for a single transaction and
+/// @dev PR-scoped migration tooling, upgraded into the proxy for the import transactions and
 ///      upgraded straight back out. It exists because a `StoreFactory` cannot be moved: the
 ///      bindings are proxy storage and the shipped contract offers no way to write one except by
 ///      deploying a new store, so a network that re-points `STORE_FACTORY` at a fresh factory
@@ -86,6 +86,11 @@ contract StoreFactoryMigrator is Initializable, UUPSUpgradeable, OwnableUpgradea
     /// @param user Owner the store reports.
     /// @param store The store in the old factory's list.
     error ImportBindingMismatch(address user, address store);
+
+    /// @notice A page of zero bindings was requested.
+    /// @dev A zero limit would import nothing while looking like progress, so it is a caller bug
+    ///      worth naming rather than a no-op worth allowing.
+    error ImportPageEmpty();
 
     /// @notice Restricts `deployLabelStoreFor` to the owner or a component named in
     /// @custom:function StoreAuth.isStoreWriter.
@@ -249,14 +254,21 @@ contract StoreFactoryMigrator is Initializable, UUPSUpgradeable, OwnableUpgradea
         require(StoreAuth.isStoreWriter(protocolRegistry, msg.sender), NotAuthorised(msg.sender));
     }
 
-    /// @notice Copies the per-user `LabelStore` bindings of `oldFactory` into this factory.
+    /// @notice Copies one page of `oldFactory`'s per-user `LabelStore` bindings into this factory.
     /// @dev Owner-only, and reads everything it needs from `oldFactory` itself: the count, the
-    ///      store list, and each store's owner. Nothing is supplied by the caller, so there is no
-    ///      window between an operator reading the set and this executing. That window is not
-    ///      hypothetical: the count on the network being migrated moved while this was being
-    ///      written, and a list captured a moment early imports every entry it holds, rewires,
-    ///      and leaves the newest holder to be handed a second empty store on their next
-    ///      registration.
+    ///      store list, and each store's owner. Nothing is supplied by the caller but the page
+    ///      bounds, so there is no window between an operator reading the set and this executing.
+    ///      That window is not hypothetical: the count on the network being migrated moved while
+    ///      this was being written, and a list captured a moment early imports every entry it
+    ///      holds, rewires, and leaves the newest holder to be handed a second empty store on
+    ///      their next registration.
+    ///
+    ///      Paged because of where this runs. pallet-revive meters transactions in more
+    ///      dimensions than gas, and a single call importing all 63 live bindings exceeded what
+    ///      one block admits on Paseo Asset Hub Next: estimation died mid-loop around the 44th
+    ///      store, at any gas limit, with the weight exhaustion surfacing as an empty revert.
+    ///      Nothing off-chain models that ceiling, so the import is sized to stay far under it
+    ///      instead of proven against it.
     ///
     ///      Each binding is checked back through `getLabelStore` before it is written. A store's
     ///      `owner` is the user it was deployed for, and the factory's mapping is the authority
@@ -264,22 +276,33 @@ contract StoreFactoryMigrator is Initializable, UUPSUpgradeable, OwnableUpgradea
     ///      changed out from under the mapping, which is the one shape that would bind a user to
     ///      a store the old factory does not consider theirs.
     ///
-    ///      Bindings are permanent here as everywhere else in the factory, so a user already
-    ///      bound is rejected instead of repointed. That makes a second call over an overlapping
-    ///      set fail loudly instead of rewriting history.
+    ///      A pair this factory already holds is skipped, so an interrupted import is finished by
+    ///      running the same pages again and a page replayed whole is a no-op. Rebinding stays
+    ///      impossible: a user bound to a DIFFERENT store is rejected, because bindings are
+    ///      permanent here as everywhere else in the factory.
+    ///
+    ///      The page that reaches the end of the list asserts the count equality; until then the
+    ///      factory legitimately holds a prefix and no key points at it.
     ///
     ///      `UserStore` bindings are deliberately not imported. They are claimed by users
     ///      themselves and the network being migrated from has none; a migration that does have
     ///      them needs this extended, not reused.
     /// @param oldFactory Factory whose bindings are being adopted.
-    function importStores(address oldFactory) external onlyOwner {
+    /// @param offset Index into the old factory's store list where this page starts.
+    /// @param limit Maximum number of bindings this page carries. Must be non-zero.
+    function importStores(address oldFactory, uint256 offset, uint256 limit) external onlyOwner {
         require(oldFactory != address(0), InvalidUser(oldFactory));
+        require(limit != 0, ImportPageEmpty());
 
         uint256 total = IStoreFactory(oldFactory).getLabelStoreCount();
-        address[] memory stores = IStoreFactory(oldFactory).getLabelStores(0, total);
-        require(stores.length == total, ImportCountMismatch(total, stores.length));
+        address[] memory stores = IStoreFactory(oldFactory).getLabelStores(offset, limit);
+        // The shipped pagination truncates at the end of the list, so a short page is only legal
+        // on the last one. Anything else is a truncated read, and importing it would leave a gap
+        // the closing count check could not attribute.
+        uint256 expected = offset >= total ? 0 : (total - offset < limit ? total - offset : limit);
+        require(stores.length == expected, ImportCountMismatch(expected, stores.length));
 
-        for (uint256 i; i < total; ++i) {
+        for (uint256 i; i < stores.length; ++i) {
             address store = stores[i];
             require(store != address(0), InvalidImplementation(store));
 
@@ -291,6 +314,11 @@ contract StoreFactoryMigrator is Initializable, UUPSUpgradeable, OwnableUpgradea
             );
 
             address existing = _labelStores[user];
+            if (existing == store) {
+                // Carried by an earlier run of this same page. Skipping it is what makes an
+                // interrupted import finishable by replaying pages.
+                continue;
+            }
             require(existing == address(0), AlreadyDeployed(user, existing));
 
             _labelStores[user] = store;
@@ -299,10 +327,14 @@ contract StoreFactoryMigrator is Initializable, UUPSUpgradeable, OwnableUpgradea
             emit StoresImported(user, store);
         }
 
-        // Every binding the old factory reports is now held here. Asserted after the loop as
-        // well as before it, because the two counts are read from different places: a mismatch
-        // means a store appeared in the list twice, or the list disagreed with the mapping.
-        require(_labelStoreList.length == total, ImportCountMismatch(total, _labelStoreList.length));
+        // The page that reaches the end of the list closes the books: every binding the old
+        // factory reports must now be held here, once. A mismatch means a store appeared in the
+        // list twice, or the list disagreed with the mapping.
+        if (offset + stores.length == total) {
+            require(
+                _labelStoreList.length == total, ImportCountMismatch(total, _labelStoreList.length)
+            );
+        }
     }
 
     /// @notice Shared pagination helper used by `getLabelStores` and `getUserStores`.

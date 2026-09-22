@@ -202,13 +202,27 @@ represent.
 
 Step 0 is re-runnable by design, see its section.
 
-**Step 13 is the exception: do not re-run it.** The other twelve are idempotent, and re-running
-one that failed is safe. The migration is not. Its deploy leg adopts an existing proxy, which
-covers a failure between the deploy and the import and nothing else. Once the import has landed,
-a second run reverts on the first user it tries to bind, because bindings here are permanent. And
-if the run died while the proxy was still on the migrator, the adopt is refused outright, since
-the deployer requires the occupant to delegate to the implementation that run deployed.
+**Step 13 is the exception: inspect before re-running it.** The other twelve are idempotent, and
+re-running one that failed is safe. The migration is re-runnable only from some states. Read the
+proxy's implementation slot and its `getLabelStoreCount` first, and place the failure:
 
-So a step 13 failure is inspected, not retried. Read the proxy's implementation slot and its
-`getLabelStoreCount`, work out which of the four legs completed, and continue from there by hand.
-The legs are separate internals for that reason.
+- **Died before or during the deploy leg, or between the deploy and the first import page**
+  (proxy absent, or present and delegating to the shipped `StoreFactory` with a count of zero):
+  re-adding the label is safe. The deploy leg adopts the proxy, the import starts over.
+- **Died between import pages** (proxy delegating to the migrator, count below the old factory's):
+  the label does NOT work, because the deploy leg refuses to adopt a proxy parked on the
+  migrator. Continue by hand instead: call `importStores(oldFactory, offset, page)` on the proxy
+  as the owner until the count matches, replaying from offset 0 if in doubt, because pages skip
+  bindings that already landed. Then upgrade back to the shipped implementation, rewire the key
+  with `setExpectedCodehash`, and commit the manifest. The fork test
+  `test_a_death_between_pages_is_finished_by_replaying_them` is the executable version of this
+  recipe.
+- **Died after the import** (proxy back on the shipped implementation, counts equal): re-adding
+  the label completes the remaining legs; the pages replay as no-ops.
+
+The import is paged because the first attempt (2026-09-22, run 35692062453) proved a single
+transaction importing all 63 bindings does not fit in a pallet-revive block: gas estimation died
+mid-loop around the 44th store at any gas limit, the multi-dimensional weight exhaustion
+surfacing as OpenZeppelin's `FailedCall`. No off-chain simulation models that ceiling; the
+default page of 15 stays at roughly a third of the measured capacity, and `DOTNS_IMPORT_CHUNK`
+overrides it if the ceiling moves.

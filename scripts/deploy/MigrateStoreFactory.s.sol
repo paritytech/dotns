@@ -37,8 +37,9 @@ import {
 ///
 ///        1. deploy the replacement through the pipeline's CREATE3 helper, which lands it on its
 ///           deterministic address and adopts it if a previous run got that far;
-///        2. upgrade it to `StoreFactoryMigrator`, calling `importStores` in the same transaction
-///           so the proxy is never left on migration tooling between two broadcasts;
+///        2. upgrade it to `StoreFactoryMigrator` and import the bindings in pages, one
+///           transaction each, because a single import of every binding does not fit in a
+///           pallet-revive block (the first attempt proved it);
 ///        3. upgrade it back to the shipped `StoreFactory`;
 ///        4. re-point the `storeFactory` key and declare the new codehash together, because the
 ///           checklist treats an unpaired rewire as drift;
@@ -108,12 +109,13 @@ contract MigrateStoreFactory is BaseDeployer {
     /// @notice Deploys the replacement proxy, or adopts one a previous run left behind.
     /// @dev The pipeline's own helper, so the replacement lands on the same deterministic address
     ///      a fresh deploy would give it and is checked the same way. Adoption covers one case
-    ///      only: a run that died after this step and before the import. It does not make the
-    ///      script re-runnable in general. Once the import has landed a second run reverts on the
-    ///      first user it tries to bind, and if the proxy is still on the migrator the adopt
-    ///      itself is refused, because the helper requires the occupant to delegate to the
-    ///      implementation this run deployed. A failure after this point is inspected and
-    ///      continued from, never restarted.
+    ///      only: a run that died after this step and before the first import page. It does not
+    ///      make the script re-runnable in general. If the proxy is still on the migrator the
+    ///      adopt is refused, because the helper requires the occupant to delegate to the
+    ///      implementation this run deployed; a death between import pages is therefore continued
+    ///      by hand, replaying the pages against the parked migrator, which skips what already
+    ///      landed. The runbook's step section carries the recipe. A failure after this point is
+    ///      inspected and continued from, never restarted.
     /// @param owner Account that owns the deployment and broadcasts.
     /// @param protocolRegistry Registry the new factory is initialised against.
     /// @return replacement Address of the replacement proxy.
@@ -145,11 +147,24 @@ contract MigrateStoreFactory is BaseDeployer {
         console.log("  replacement factory at", replacement);
     }
 
-    /// @notice Swaps in the migrator and imports in one transaction.
-    /// @dev `upgradeToAndCall` runs the import as a delegatecall from the proxy, so `msg.sender`
-    ///      is preserved and the `onlyOwner` gate on `importStores` is satisfied by the
-    ///      broadcaster. The import reads the holders from `oldFactory` itself, so nothing about
-    ///      the set is captured before this transaction runs.
+    /// @notice Swaps in the migrator and imports the bindings, one page per transaction.
+    /// @dev Paged because pallet-revive meters transactions in more dimensions than gas, and the
+    ///      first attempt at this step proved a single import of all 63 live bindings does not
+    ///      fit in a block: estimation died mid-loop around the 44th store at any gas limit, and
+    ///      no off-chain simulation models that ceiling. The default page of 15 keeps each
+    ///      transaction to roughly a third of the measured capacity; `DOTNS_IMPORT_CHUNK`
+    ///      overrides it should the ceiling move.
+    ///
+    ///      Between the page transactions the proxy runs the migrator. That is safe to leave for
+    ///      a few blocks because nothing resolves to the proxy until `_rewireKey`, and every
+    ///      mutating surface the migrator carries is owner-gated; it is also unavoidable, since
+    ///      the pages have to be separate transactions to fit. `importStores` skips bindings it
+    ///      already holds, so a death between pages is finished by replaying the pages, though
+    ///      not by re-running the whole script: the deploy leg's adopt check refuses a proxy left
+    ///      on the migrator, and the runbook's step section says how to continue by hand.
+    ///
+    ///      Every page is `onlyOwner` and the broadcaster is the owner, on the first page through
+    ///      `upgradeToAndCall`'s preserved sender and on the rest as the direct caller.
     /// @param owner Account that owns the proxy and broadcasts.
     /// @param replacement The proxy being migrated into.
     /// @param oldFactory Factory whose bindings are adopted.
@@ -157,13 +172,26 @@ contract MigrateStoreFactory is BaseDeployer {
         Options memory opts;
         opts.referenceContract = "StoreFactory.sol:StoreFactory";
 
+        uint256 total = IStoreFactory(oldFactory).getLabelStoreCount();
+        uint256 page = vm.envOr("DOTNS_IMPORT_CHUNK", uint256(15));
+        require(page != 0, "MigrateStoreFactory: DOTNS_IMPORT_CHUNK must be positive");
+
         vm.startBroadcast(owner);
         Upgrades.upgradeProxy(
             replacement,
             "StoreFactoryMigrator.sol:StoreFactoryMigrator",
-            abi.encodeCall(StoreFactoryMigrator.importStores, (oldFactory)),
+            total == 0
+                ? bytes("")
+                : abi.encodeCall(
+                    StoreFactoryMigrator.importStores, (oldFactory, 0, page < total ? page : total)
+                ),
             opts
         );
+        for (uint256 offset = page; offset < total; offset += page) {
+            uint256 remaining = total - offset;
+            StoreFactoryMigrator(replacement)
+                .importStores(oldFactory, offset, page < remaining ? page : remaining);
+        }
         vm.stopBroadcast();
 
         require(

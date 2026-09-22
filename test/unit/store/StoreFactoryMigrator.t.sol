@@ -10,7 +10,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title StoreFactoryMigratorTests
-/// @notice Covers the one-shot import that carries per-user `LabelStore` bindings onto a new
+/// @notice Covers the paged import that carries per-user `LabelStore` bindings onto a new
 ///         factory, which is the only part of the store migration with behaviour of its own.
 /// @dev `storeFactory` from `BaseDotns` stands in for the factory being migrated from, and a
 ///      fresh proxy for the one being migrated to. What is asserted is what reading the diff
@@ -49,7 +49,7 @@ contract StoreFactoryMigratorTests is BaseDotns {
         address tiagoStore = storeFactory.getLabelStore(tiago);
 
         vm.prank(owner);
-        target.importStores(address(storeFactory));
+        target.importStores(address(storeFactory), 0, 10);
 
         assertEq(target.getLabelStore(ed), edStore, "ed keeps the store he already had");
         assertEq(target.getLabelStore(tiago), tiagoStore, "tiago keeps the store he already had");
@@ -70,7 +70,7 @@ contract StoreFactoryMigratorTests is BaseDotns {
         address lateStore = storeFactory.getLabelStore(latecomer);
 
         vm.prank(owner);
-        target.importStores(address(storeFactory));
+        target.importStores(address(storeFactory), 0, 10);
 
         assertEq(target.getLabelStore(latecomer), lateStore, "the late binding is carried too");
         assertEq(target.getLabelStoreCount(), 3, "and is counted");
@@ -95,23 +95,84 @@ contract StoreFactoryMigratorTests is BaseDotns {
                 StoreFactoryMigrator.ImportBindingMismatch.selector, impostor, edStore
             )
         );
-        target.importStores(address(storeFactory));
+        target.importStores(address(storeFactory), 0, 10);
     }
 
-    /// @notice Importing twice is rejected instead of repointing anyone.
-    /// @dev Bindings are permanent everywhere else in the factory, and the migration does not get
-    ///      to be the exception: a second run fails loudly instead of rewriting history.
-    function test_import_reverts_when_run_twice() public {
-        vm.startPrank(owner);
-        target.importStores(address(storeFactory));
+    /// @notice The import lands identically when carried one binding per page.
+    /// @dev The pages exist because a whole-list import does not fit in a pallet-revive block,
+    ///      so the property that matters is that page boundaries are invisible in the result:
+    ///      same bindings, same count, no matter how the list was sliced.
+    function test_import_is_the_same_result_page_by_page() public {
+        address edStore = storeFactory.getLabelStore(ed);
+        address tiagoStore = storeFactory.getLabelStore(tiago);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IStoreFactory.AlreadyDeployed.selector, ed, storeFactory.getLabelStore(ed)
-            )
-        );
-        target.importStores(address(storeFactory));
+        vm.startPrank(owner);
+        target.importStores(address(storeFactory), 0, 1);
+        target.importStores(address(storeFactory), 1, 1);
         vm.stopPrank();
+
+        assertEq(target.getLabelStore(ed), edStore, "ed keeps his store across a page boundary");
+        assertEq(target.getLabelStore(tiago), tiagoStore, "tiago keeps his on the later page");
+        assertEq(target.getLabelStoreCount(), 2, "both pages land, neither twice");
+    }
+
+    /// @notice Replaying pages already carried is a no-op instead of a failure.
+    /// @dev Partial-failure recovery: a death between pages is finished by running the same pages
+    ///      again, so a page that already landed must skip its bindings silently. Loud rejection
+    ///      here would make the interrupted import unfinishable.
+    function test_replaying_an_imported_page_is_a_noop() public {
+        vm.startPrank(owner);
+        target.importStores(address(storeFactory), 0, 10);
+        target.importStores(address(storeFactory), 0, 10);
+        vm.stopPrank();
+
+        assertEq(target.getLabelStoreCount(), 2, "the replay carried nothing twice");
+        assertEq(
+            target.getLabelStore(ed),
+            storeFactory.getLabelStore(ed),
+            "the binding is the one the old factory holds"
+        );
+    }
+
+    /// @notice A user already bound to a DIFFERENT store is rejected, not repointed.
+    /// @dev The skip above is strictly for identical pairs. Bindings are permanent everywhere
+    ///      else in the factory, and the migration does not get to be the exception: a
+    ///      conflicting pair fails loudly instead of rewriting history.
+    function test_import_reverts_on_a_conflicting_binding() public {
+        address edStore = storeFactory.getLabelStore(ed);
+        address tiagoStore = storeFactory.getLabelStore(tiago);
+
+        vm.prank(owner);
+        target.importStores(address(storeFactory), 0, 10);
+
+        // The old factory now claims ed holds tiago's store: list slot, store owner and mapping
+        // all agree with each other, and disagree only with the binding already imported.
+        address[] memory page = new address[](1);
+        page[0] = tiagoStore;
+        vm.mockCall(
+            address(storeFactory),
+            abi.encodeWithSelector(IStoreFactory.getLabelStores.selector, 0, 1),
+            abi.encode(page)
+        );
+        vm.mockCall(tiagoStore, abi.encodeWithSelector(IDotnsStore.owner.selector), abi.encode(ed));
+        vm.mockCall(
+            address(storeFactory),
+            abi.encodeWithSelector(IStoreFactory.getLabelStore.selector, ed),
+            abi.encode(tiagoStore)
+        );
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(IStoreFactory.AlreadyDeployed.selector, ed, edStore));
+        target.importStores(address(storeFactory), 0, 1);
+    }
+
+    /// @notice A zero-sized page is a caller bug, named as such.
+    /// @dev Importing nothing while looking like progress is how a wrong pagination loop would
+    ///      hide; the guard turns it into a revert at the first page.
+    function test_import_rejects_an_empty_page() public {
+        vm.prank(owner);
+        vm.expectRevert(StoreFactoryMigrator.ImportPageEmpty.selector);
+        target.importStores(address(storeFactory), 0, 0);
     }
 
     /// @notice Only the owner may import.
@@ -120,7 +181,7 @@ contract StoreFactoryMigratorTests is BaseDotns {
     function test_import_is_owner_only() public {
         vm.prank(ed);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, ed));
-        target.importStores(address(storeFactory));
+        target.importStores(address(storeFactory), 0, 10);
     }
 
     /// @notice The imported bindings survive the upgrade back to the shipped implementation.
@@ -131,7 +192,7 @@ contract StoreFactoryMigratorTests is BaseDotns {
         address edStore = storeFactory.getLabelStore(ed);
 
         vm.startPrank(owner);
-        target.importStores(address(storeFactory));
+        target.importStores(address(storeFactory), 0, 10);
         target.upgradeToAndCall(address(new StoreFactory()), "");
         vm.stopPrank();
 
