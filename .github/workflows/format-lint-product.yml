@@ -9,6 +9,12 @@ permissions:
   pull-requests: write
   issues: write
 
+# Keyed by PR number so a new push cancels this PR's still-running lint job instead of
+# queuing behind it; every other content-triggered workflow in this repo does the same.
+concurrency:
+  group: format-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
