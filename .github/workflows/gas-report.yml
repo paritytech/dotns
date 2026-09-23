@@ -128,6 +128,13 @@ jobs:
       # pinned dependencies for both shards and reapplies the OZ patches on top,
       # so hashing `lib/` any earlier would key the cache off content that step
       # is about to replace.
+      #
+      # Forge also drops persisted fuzz/invariant/test failure state under
+      # `cache/fuzz`, `cache/invariant`, and `cache/test-failures`, and replays it
+      # on the next run before exploring anything new (see foundry.toml's
+      # `[profile.ci.invariant]` comment). That state is cleared below, both before
+      # this job's `forge test` run and again right before the job ends, so it
+      # never rides along in what gets restored or saved here.
       - uses: actions/cache@v4
         with:
           path: |
@@ -150,6 +157,13 @@ jobs:
           # while preserving the solc compilation cache under `cache/`.
           rm -rf out/build-info
           forge build
+
+          # A restored cache can carry a fuzz/invariant/test failure persisted by
+          # an earlier, unrelated run. Forge replays those before running anything
+          # new, so a stale one would show up in this gas report even after the
+          # real bug behind it was fixed. Clear it before testing.
+          rm -rf cache/fuzz cache/invariant cache/test-failures
+
           # Skip invariant tests in the gas report: invariant runs dominate
           # the wall-clock for ~20% of the gas signal (most invariants exercise
           # the same paths the unit/fuzz suites already cost). Keep the
@@ -172,6 +186,14 @@ jobs:
           name: gas-shard-${{ matrix.target.id }}
           path: shard
           retention-days: 7
+
+      # Last step in the job on purpose: `actions/cache`'s save only runs once
+      # every step above has finished, and it caches whatever is on disk at that
+      # point, not just what "Generate gas report" left behind. Clearing here too
+      # means nothing this job did can leave a persisted failure in the saved cache.
+      - name: Clear persisted Foundry failure state before cache save
+        if: always()
+        run: rm -rf cache/fuzz cache/invariant cache/test-failures
 
   report:
     name: Gas Report Diff

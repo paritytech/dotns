@@ -87,6 +87,13 @@ jobs:
       # `lib/`'s pinned dependencies and reapplies the OZ patches on top, so hashing
       # `lib/` any earlier would key the cache off content these steps are about to
       # replace.
+      #
+      # Forge also drops persisted fuzz/invariant/test failure state under
+      # `cache/fuzz`, `cache/invariant`, and `cache/test-failures`, and replays it
+      # on the next run before exploring anything new (see foundry.toml's
+      # `[profile.ci.invariant]` comment). That state is cleared below, both before
+      # this job's `forge test` runs and again right before the job ends, so it
+      # never rides along in what gets restored or saved here.
       - uses: actions/cache@v4
         with:
           path: |
@@ -122,6 +129,13 @@ jobs:
           # build-info from another solc invocation would otherwise survive.
           # Preserving `cache/` keeps incremental compile fast.
           rm -rf out/build-info
+
+          # A restored cache can carry a fuzz/invariant/test failure persisted by
+          # an earlier, unrelated run. Forge replays those before running anything
+          # new, so a stale one would fail this job even after the real bug behind
+          # it was fixed. Clear it before building or testing.
+          rm -rf cache/fuzz cache/invariant cache/test-failures
+
           forge build --sizes > build.log 2>&1
           BUILD=$?
 
@@ -180,6 +194,14 @@ jobs:
 
       - if: steps.run.outputs.result && contains(steps.run.outputs.result, 'Failed')
         run: exit 1
+
+      # Last step in the job on purpose: `actions/cache`'s save only runs once
+      # every step above has finished, and it caches whatever is on disk at that
+      # point, not just what "Run tests" left behind. Clearing here too means
+      # nothing this job did can leave a persisted failure in the saved cache.
+      - name: Clear persisted Foundry failure state before cache save
+        if: always()
+        run: rm -rf cache/fuzz cache/invariant cache/test-failures
 
   report:
     name: Report Test Results
