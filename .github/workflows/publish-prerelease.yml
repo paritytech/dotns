@@ -1,5 +1,8 @@
 name: Publish Beta Package
 
+# Creating a `v*` tag is restricted to the dotns team by the `release tags` ruleset, and the
+# job below pauses on the `releases` environment for a reviewer, so a release takes two
+# distinct human actions: cutting the tag, and approving the run it starts.
 on:
   push:
     tags:
@@ -23,6 +26,9 @@ concurrency:
 jobs:
   beta-release:
     runs-on: ubuntu-latest
+    # Gated: this job reads the genesis owner key, which lives only on the `releases`
+    # environment, so every run waits for a reviewer's approval there.
+    environment: releases
     # Baked into the genesis registry, so it decides which networks the artifact suits.
     # Job-level: five steps name the file derived from it and must not disagree.
     env:
@@ -87,6 +93,30 @@ jobs:
 
       - uses: ./.github/actions/setup-foundry
 
+      # The environment pairs the key (secret) with its address (variable). Deriving one from
+      # the other before the build turns a mistyped key into a failed run instead of a genesis
+      # owned by an address nobody holds. The address is public; the key is never printed.
+      - name: Check the owner key against its declared address
+        env:
+          DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
+          DOTNS_ADMIN_ADDRESS: ${{ vars.DOTNS_ADMIN_ADDRESS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DOTNS_ADMIN_KEY" ]; then
+            echo "::error::DOTNS_ADMIN_KEY is not configured on the releases environment"
+            exit 1
+          fi
+          if [ -z "$DOTNS_ADMIN_ADDRESS" ]; then
+            echo "::error::DOTNS_ADMIN_ADDRESS is not configured on the releases environment"
+            exit 1
+          fi
+          DERIVED="$(cast wallet address --private-key "$DOTNS_ADMIN_KEY")"
+          if [ "$(printf '%s' "$DERIVED" | tr 'A-Z' 'a-z')" != "$(printf '%s' "$DOTNS_ADMIN_ADDRESS" | tr 'A-Z' 'a-z')" ]; then
+            echo "::error::DOTNS_ADMIN_KEY derives to $DERIVED, the environment declares $DOTNS_ADMIN_ADDRESS"
+            exit 1
+          fi
+          echo "Owner key derives to the declared address $DERIVED"
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.2.6"
@@ -125,7 +155,6 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
           FACTORY_DEPLOYER_KEY: ${{ secrets.FACTORY_DEPLOYER_KEY }}
           DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
-          DOTNS_ADMIN_MNEMONIC: ${{ secrets.DOTNS_ADMIN_MNEMONIC }}
         run: bash scripts/genesis/build-genesis.sh release
 
       - name: Extract ABIs
