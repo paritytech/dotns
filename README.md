@@ -312,4 +312,4 @@ The protocol carries a handful of constraints worth knowing before deploying or 
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](./LICENSE). External interface definitions under `contracts/external/` retain their upstream licences (the SPDX header in each file is authoritative). Security policy and disclosure: see [SECURITY.md](./SECURITY.md).
+Licensed under the MIT License. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE). External interface definitions under `contracts/external/` retain their upstream licences (the SPDX header in each file is authoritative). Security policy and disclosure: see [SECURITY.md](./SECURITY.md).
