@@ -116,13 +116,18 @@ jobs:
           chmod +x scripts/shell/apply-oz-patches.sh
           bash scripts/shell/apply-oz-patches.sh
 
+      - run: bun install
+
       # `cache/` and `out/` are forge's own incremental-compile state: it hashes each
       # source file and only recompiles what changed since the hash it last saw. A
       # restored cache from an unrelated commit is always safe to build on top of.
       # Forge just recompiles whatever the content hashes say is dirty, so a partial
-      # match via `restore-keys` still saves most of a cold `via_ir` build. Hashing
-      # runs after the master shard's patch step above, so the key reflects the
-      # patched tree each shard actually builds.
+      # match via `restore-keys` still saves most of a cold `via_ir` build. This has
+      # to sit after `bun install`, not just after the master shard's patch step
+      # above: `bun install`'s postinstall (`setup.bash`) force-reclones `lib/`'s
+      # pinned dependencies for both shards and reapplies the OZ patches on top,
+      # so hashing `lib/` any earlier would key the cache off content that step
+      # is about to replace.
       - uses: actions/cache@v4
         with:
           path: |
@@ -131,8 +136,6 @@ jobs:
           key: foundry-build-${{ runner.os }}-${{ matrix.target.id }}-${{ hashFiles('foundry.toml', 'remappings.txt', 'contracts/**/*.sol', 'test/**/*.sol', 'scripts/**/*.sol', 'lib/**/*.sol') }}
           restore-keys: |
             foundry-build-${{ runner.os }}-${{ matrix.target.id }}-
-
-      - run: bun install
 
       - name: Start revive-eth-rpc (paseo_local fork target)
         run: |

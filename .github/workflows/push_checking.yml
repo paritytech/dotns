@@ -76,11 +76,17 @@ jobs:
           key: bun-${{ hashFiles('bun.lock') }}
           restore-keys: bun-
 
+      - run: bun install
+
       # `cache/` and `out/` are forge's own incremental-compile state: it hashes each
       # source file and only recompiles what changed since the hash it last saw. A
       # restored cache from an unrelated commit is always safe to build on top of.
       # Forge just recompiles whatever the content hashes say is dirty, so a partial
-      # match via `restore-keys` still saves most of a cold `via_ir` build.
+      # match via `restore-keys` still saves most of a cold `via_ir` build. This has
+      # to sit after `bun install`: its postinstall (`setup.bash`) force-reclones
+      # `lib/`'s pinned dependencies and reapplies the OZ patches on top, so hashing
+      # `lib/` any earlier would key the cache off content these steps are about to
+      # replace.
       - uses: actions/cache@v4
         with:
           path: |
@@ -89,8 +95,6 @@ jobs:
           key: foundry-build-${{ runner.os }}-${{ hashFiles('foundry.toml', 'remappings.txt', 'contracts/**/*.sol', 'test/**/*.sol', 'scripts/**/*.sol', 'lib/**/*.sol') }}
           restore-keys: |
             foundry-build-${{ runner.os }}-
-
-      - run: bun install
 
       # Only the unit-fuzz job needs the fork adapter, and only when fork tests
       # actually exist in the tree. Fork tests are PR-scoped, so `test/fork/` is
