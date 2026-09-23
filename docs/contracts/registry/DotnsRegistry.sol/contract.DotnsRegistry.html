@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3c8a9e96cee6348529a42d6b2dcf711b84da96d5/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/14f55a67dda1a3083567ec862df31f056f9886fd/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -268,8 +268,15 @@ registration and on every reclaim from escrow: each call rewrites
 prior owner's resolver pointer (and the records keyed under it) cannot be inherited
 by the next holder across that recycle. A secondary-market ERC-721 <code>transferFrom</code> does
 not call the registry, so a name sold directly keeps the seller's resolver pointer
-until the buyer overwrites it. Stores <code>owner = address(0)</code> as a sentinel so reads
-delegate to <code>IDotnsRegistrar.ownerOf</code> and ERC-721 transfers remain authoritative. Emits</p>
+until the buyer overwrites it. That covers the node itself and not the nodes beneath
+it: a subname stores its own owner, and @custom:function isAuthorised returns on that
+owner before consulting the registrar, so after the sale the seller keeps write
+authority over every subname whose stored owner is still the seller, until the buyer
+reassigns each one through @custom:function setSubnodeOwner. A subname created for
+someone else stays with that owner and leaves the seller no write path. The set is
+derivable from @custom:emits NewOwner, which indexes the parent node. Stores
+<code>owner = address(0)</code> as a sentinel so reads delegate to <code>IDotnsRegistrar.ownerOf</code> and
+ERC-721 transfers remain authoritative. Emits</p>
 </li>
 <li>
 <p>emits: NodeTransferred on success.</p>
@@ -303,7 +310,8 @@ this is the parent-sovereign hierarchy applied to resolution. Off-chain consumer
 that surface trust signals to subnode owners should treat any resolver rotation as
 a re-attestation prompt. <code>record.subLabel</code> must be a single canonical DNS label
 (otherwise @custom:reverts InvalidLabel) and <code>record.parentLabel</code> must be a name
-path whose namehash matches <code>record.parentNode</code> (otherwise</p>
+path of at most <code>StringUtils.MAX_NAME_PATH_OCTETS</code> octets whose namehash matches
+<code>record.parentNode</code> (otherwise</p>
 <pre><code class="language-solidity">function setSubnodeResolver(SubnodeResolverRecord calldata record)
     external
     override
