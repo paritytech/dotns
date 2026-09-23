@@ -137,11 +137,6 @@ jobs:
           restore-keys: |
             foundry-build-${{ runner.os }}-${{ matrix.target.id }}-
 
-      - name: Start revive-eth-rpc (paseo_local fork target)
-        run: |
-          docker compose up -d --build
-          bash scripts/shell/wait-for-eth-rpc.sh
-
       - name: Generate gas report
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
@@ -164,10 +159,6 @@ jobs:
             --no-match-contract Invariant \
             --no-match-path 'test/fork/**' \
             2>&1 | tee gas-report.txt
-
-      - name: Tear down revive-eth-rpc
-        if: always()
-        run: docker compose down --volumes --remove-orphans
 
       - name: Stage shard output
         if: always()
