@@ -28,6 +28,10 @@ contract StringUtilsHarness {
     function isLitePersonLabelMemory(string calldata value) external pure returns (bool) {
         return StringUtils.isLitePersonLabelMemory(value);
     }
+
+    function isNamePath(string calldata value) external pure returns (bool) {
+        return value.isNamePath();
+    }
 }
 
 /// @title StringUtilsTests
@@ -133,5 +137,29 @@ contract StringUtilsTests is Test {
         assertEq(bytes(longest).length, 66, "longest lite label is 66 octets");
         _assertLite(longest, true);
         assertFalse(utils.isSingleLabel(longest), "a lite label is not a single DNS label");
+    }
+
+    /// @notice A path of exactly @custom:constant StringUtils.MAX_NAME_PATH_OCTETS octets passes.
+    /// @dev The per-segment bound leaves the path itself unbounded, and `setSubnodeOwner` stores
+    ///      the full name composed from a caller's path in a `LabelStore` row that has no delete
+    ///      path. The two cases below are what fix that ceiling: moving the constant without
+    ///      moving them is a failing build.
+    function test_isNamePath_accepts_a_path_at_the_ceiling() public view {
+        string memory segment = _stem(63);
+        string memory path = string.concat(segment, ".", segment, ".", segment, ".", segment);
+        assertEq(bytes(path).length, StringUtils.MAX_NAME_PATH_OCTETS, "fixture is not at the cap");
+        assertTrue(utils.isNamePath(path));
+    }
+
+    /// @notice One octet over the ceiling is refused, with every segment individually legal so
+    ///         the refusal cannot come from the per-segment bound.
+    function test_isNamePath_rejects_a_path_one_octet_over_the_ceiling() public view {
+        string memory segment = _stem(63);
+        string memory path =
+            string.concat(segment, ".", segment, ".", segment, ".", _stem(62), ".", _stem(1));
+        assertEq(
+            bytes(path).length, StringUtils.MAX_NAME_PATH_OCTETS + 1, "fixture is not one over"
+        );
+        assertFalse(utils.isNamePath(path));
     }
 }

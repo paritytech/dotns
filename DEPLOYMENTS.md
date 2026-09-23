@@ -283,7 +283,7 @@ If the deployment was intended to update a public environment, update the addres
 
 ### Network manifests and the expected set
 
-`deployments/<network>/<chainId>.json` is a **network record**: what is deployed on that live network right now. It is updated only by a real deploy or migration on that network, never by a code change. Everything that answers for reality reads these files: releases copy their addresses verbatim, and pointing tooling or the wire stage at an address with nothing behind it breaks whatever reads it.
+`deployments/<network>/<chainId>.json` is a **network record**: what is deployed on that live network right now. It is updated only by a real deploy or migration on that network, never by a code change. Everything that answers for reality reads these files: releases copy their addresses verbatim, and pointing tooling or the wire stage at an address with nothing behind it breaks whatever reads it. The CREATE3 parity gates compare `expected.json` rather than these files, so the rule that a code change leaves them alone is enforced in CI instead: `release-metadata.yml` fails a pull request that edits one unless it carries the `deployment-record` label.
 
 `deployments/expected.json` is the **expected set**: the addresses a fresh deploy of the current revision lands through the pinned CREATE3 factory. It is a property of the code, not of any network; the CI deploy job and `scripts/genesis/build-genesis.sh` verify against it, and releases never publish it.
 
