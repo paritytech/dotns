@@ -77,21 +77,22 @@ jobs:
       # this job's `forge coverage` run and again right before the job ends, so it
       # never rides along in what gets restored or saved here.
       #
-      # This job gets its own `-coverage-` key segment, separate from the plain
-      # `foundry-build-${{ runner.os }}-` key the test job uses. Both jobs hash the
-      # same source files, so without this they'd land on the exact same key, but
-      # `forge coverage --ir-minimum` compiles under different settings and leaves
-      # different content in `cache/`/`out/`. Cache keys are write-once: whichever
-      # job saves first would permanently occupy that key for the commit, and the
-      # other job would keep restoring a build made under the wrong settings.
+      # This job keys its cache under `foundry-build-coverage-`, with `coverage`
+      # ahead of the OS on purpose. `forge coverage --ir-minimum` compiles under
+      # different settings from the test job and leaves different content in
+      # `cache/`/`out/`, so the two must never restore each other's builds. The
+      # test job restores anything starting with `foundry-build-${{ runner.os }}-`
+      # and GitHub picks the newest match, so any key that starts with that
+      # prefix (even `foundry-build-${{ runner.os }}-coverage-...`) would get
+      # picked up by it. Putting `coverage` first keeps it out of that prefix.
       - uses: actions/cache@v4
         with:
           path: |
             cache
             out
-          key: foundry-build-${{ runner.os }}-coverage-${{ hashFiles('foundry.toml', 'remappings.txt', 'contracts/**/*.sol', 'test/**/*.sol', 'scripts/**/*.sol', 'lib/**/*.sol') }}
+          key: foundry-build-coverage-${{ runner.os }}-${{ hashFiles('foundry.toml', 'remappings.txt', 'contracts/**/*.sol', 'test/**/*.sol', 'scripts/**/*.sol', 'lib/**/*.sol') }}
           restore-keys: |
-            foundry-build-${{ runner.os }}-coverage-
+            foundry-build-coverage-${{ runner.os }}-
 
       - name: Build contracts
         env:
