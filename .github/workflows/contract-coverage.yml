@@ -76,14 +76,22 @@ jobs:
       # `[profile.ci.invariant]` comment). That state is cleared below, both before
       # this job's `forge coverage` run and again right before the job ends, so it
       # never rides along in what gets restored or saved here.
+      #
+      # This job gets its own `-coverage-` key segment, separate from the plain
+      # `foundry-build-${{ runner.os }}-` key the test job uses. Both jobs hash the
+      # same source files, so without this they'd land on the exact same key, but
+      # `forge coverage --ir-minimum` compiles under different settings and leaves
+      # different content in `cache/`/`out/`. Cache keys are write-once: whichever
+      # job saves first would permanently occupy that key for the commit, and the
+      # other job would keep restoring a build made under the wrong settings.
       - uses: actions/cache@v4
         with:
           path: |
             cache
             out
-          key: foundry-build-${{ runner.os }}-${{ hashFiles('foundry.toml', 'remappings.txt', 'contracts/**/*.sol', 'test/**/*.sol', 'scripts/**/*.sol', 'lib/**/*.sol') }}
+          key: foundry-build-${{ runner.os }}-coverage-${{ hashFiles('foundry.toml', 'remappings.txt', 'contracts/**/*.sol', 'test/**/*.sol', 'scripts/**/*.sol', 'lib/**/*.sol') }}
           restore-keys: |
-            foundry-build-${{ runner.os }}-
+            foundry-build-${{ runner.os }}-coverage-
 
       - name: Build contracts
         env:
