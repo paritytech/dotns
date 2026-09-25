@@ -170,6 +170,10 @@ forge clean
 forge build
 echo ""
 
+# The stages extend an existing manifest, and one left by an earlier build (for another TLD)
+# describes a chain this anvil never saw.
+rm -f "$DEPLOYMENT_FILE"
+
 # Deploy the Create3Factory from the single-purpose key at nonce 0 so it lands on
 # the canonical address, then hand it to the stages via CREATE3_FACTORY (read by
 # BaseDeployer._configuredCreate3Factory).
