@@ -155,6 +155,8 @@ jobs:
           for tld in $DOTNS_TLDS; do
             DOTNS_TLD="$tld" bash scripts/genesis/build-genesis.sh release
           done
+          # The address set every genesis above carries, which the builder asserted.
+          cp deployments/expected.json release/dotns-genesis-addresses.json
 
       - name: Extract ABIs
         run: |
@@ -262,7 +264,7 @@ jobs:
             echo ""
             echo "Previewnet uses \`.testnet\`, Paseo Asset Hub Next V2 uses \`.paseo\`."
             echo ""
-            echo "- A chain booted from these genesis files carries the fresh-deploy address set: \`deployments/expected.json\` in the repository at this tag. [deployments.json]($ASSET_BASE/deployments.json) records the live networks instead, and the two can differ where a live network has moved a contract."
+            echo "- [dotns-genesis-addresses.json]($ASSET_BASE/dotns-genesis-addresses.json) - the address set a chain booted from any of these genesis files carries. [deployments.json]($ASSET_BASE/deployments.json) records the live networks instead, and the two can differ where a live network has moved a contract."
           } >> release-body.md
 
           # `gh release view` with no tag resolves through /releases/latest, which skips
@@ -330,6 +332,7 @@ jobs:
             echo "release-manifest.json"
             echo "codehashes.json"
             echo "abi-diff.json"
+            echo "dotns-genesis-addresses.json"
             for tld in $DOTNS_TLDS; do echo "dotns-genesis-${tld}.json"; done
           } | sort > "$RUNNER_TEMP/wanted-assets.txt"
           if ! diff -u "$RUNNER_TEMP/wanted-assets.txt" "$RUNNER_TEMP/actual-assets.txt"; then

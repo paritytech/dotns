@@ -12,6 +12,7 @@ What each release publishes, what the files guarantee, and how to consume them.
 | `codehashes.json` | Stripped-metadata hash of each contract's built runtime bytecode |
 | `abi-diff.json` | Selector-level ABI changes since the previous release, machine readable |
 | `dotns-genesis-<tld>.json` | pallet-revive genesis with DotNS deployed, one per TLD (`testnet` for previewnet, `paseo` for Paseo Asset Hub Next V2) |
+| `dotns-genesis-addresses.json` | The addresses a chain booted from those genesis files carries, a copy of `deployments/expected.json` |
 | `dotns-abis-<tag>.zip` | The same files in one archive |
 
 Every JSON asset is attached to the release individually, at the top level, with no folder. The zip holds the ABIs under `abis/` plus `deployments.json`, `release-manifest.json`, and `codehashes.json` at its root; `abi-diff.json` is generated together with the release body and attached individually.
@@ -45,7 +46,7 @@ The release surface is decided in `.github/abi-contracts.txt` so a contract reac
 - One entry can serve more than one live network. `paseo-assethub` is the deployment that both previewnet and Paseo Asset Hub Next V2 run, because every network deployed through the shared CREATE3 factory lands on the same addresses. So expect entries named after deployments, not after every chain you might connect to.
 - The names under `contracts` (`DotnsRegistrar`, `PopRules`) do not change, and a name always means the same contract. Your code can depend on that.
 - Addresses are copied from the manifest verbatim, which the deploy pipeline writes EIP-55 checksummed. Compare them case-insensitively rather than relying on the casing.
-- Only per-network manifests are published. `deployments/expected.json` — the fresh-deploy address set that CI and the genesis builder verify against (see `DEPLOYMENTS.md`) — is not a network and never appears here, so a release cut while an address move is awaiting its network's redeploy still advertises the addresses each live network actually runs.
+- Only per-network manifests are published. `deployments/expected.json` — the fresh-deploy address set that CI and the genesis builder verify against (see `DEPLOYMENTS.md`) — is not a network and never appears here (it ships separately as `dotns-genesis-addresses.json`), so a release cut while an address move is awaiting its network's redeploy still advertises the addresses each live network actually runs.
 - `LabelStoreBeacon` and `UserStoreBeacon` appear when deployed but are not network-stable, because the `StoreFactory` initialiser deploys them. Read them from the factory rather than pinning them.
 
 ## `release-manifest.json`

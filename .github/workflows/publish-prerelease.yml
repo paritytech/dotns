@@ -159,6 +159,8 @@ jobs:
           for tld in $DOTNS_TLDS; do
             DOTNS_TLD="$tld" bash scripts/genesis/build-genesis.sh release
           done
+          # The address set every genesis above carries, which the builder asserted.
+          cp deployments/expected.json release/dotns-genesis-addresses.json
 
       - name: Extract ABIs
         run: |
@@ -257,6 +259,7 @@ jobs:
             for tld in $DOTNS_TLDS; do
               echo "- [dotns-genesis-${tld}.json]($ASSET_BASE/dotns-genesis-${tld}.json) - pallet-revive genesis, \`.${tld}\` TLD, for .${tld} networks only."
             done
+            echo "- [dotns-genesis-addresses.json]($ASSET_BASE/dotns-genesis-addresses.json) - the addresses those genesis files carry."
           } >> release-body.md
 
       - name: ABI diff since previous release
@@ -309,6 +312,7 @@ jobs:
             echo "release-manifest.json"
             echo "codehashes.json"
             echo "abi-diff.json"
+            echo "dotns-genesis-addresses.json"
             for tld in $DOTNS_TLDS; do echo "dotns-genesis-${tld}.json"; done
           } | sort > "$RUNNER_TEMP/wanted-assets.txt"
           if ! diff -u "$RUNNER_TEMP/wanted-assets.txt" "$RUNNER_TEMP/actual-assets.txt"; then
