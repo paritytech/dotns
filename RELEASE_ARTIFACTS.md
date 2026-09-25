@@ -11,6 +11,7 @@ What each release publishes, what the files guarantee, and how to consume them.
 | `release-manifest.json` | What this release contains, machine readable |
 | `codehashes.json` | Stripped-metadata hash of each contract's built runtime bytecode |
 | `abi-diff.json` | Selector-level ABI changes since the previous release, machine readable |
+| `dotns-genesis-<tld>.json` | pallet-revive genesis with DotNS deployed, one per TLD (`testnet` for previewnet, `paseo` for Paseo Asset Hub Next V2) |
 | `dotns-abis-<tag>.zip` | The same files in one archive |
 
 Every JSON asset is attached to the release individually, at the top level, with no folder. The zip holds the ABIs under `abis/` plus `deployments.json`, `release-manifest.json`, and `codehashes.json` at its root; `abi-diff.json` is generated together with the release body and attached individually.
