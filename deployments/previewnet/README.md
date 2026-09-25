@@ -1,7 +1,7 @@
 # previewnet
 
 The Product Preview Network's Asset Hub (`wss://previewnet.substrate.dev/asset-hub`,
-ETH RPC `https://previewnet.substrate.dev/eth-rpc`), TLD `.dot`. Deployed from a v0.8.0
+ETH RPC `https://previewnet.substrate.dev/eth-rpc`), TLD `.testnet`. Deployed from a v0.8.0
 genesis, so every address matches the fresh-deploy set in `deployments/expected.json`.
 
 The chain id is `420420417`, the same as `paseo-assethub`: pallet-revive testnets share it,
