@@ -29,10 +29,10 @@ jobs:
     # Gated: this job reads the genesis owner key, which lives only on the `releases`
     # environment, so every run waits for a reviewer's approval there.
     environment: releases
-    # Baked into the genesis registry, so it decides which networks the artifact suits.
-    # Job-level: five steps name the file derived from it and must not disagree.
+    # One genesis per TLD, since the TLD is baked into the registry: `.testnet` for previewnet,
+    # `.paseo` for Paseo Asset Hub Next V2. Job-level: several steps name the files it yields.
     env:
-      DOTNS_TLD: testnet
+      DOTNS_TLDS: testnet paseo
     steps:
       # On workflow_dispatch the tag does not exist yet; the release step creates it
       # from the branch this run was started on. Read through an env var rather than
@@ -151,7 +151,12 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
           FACTORY_DEPLOYER_KEY: ${{ secrets.FACTORY_DEPLOYER_KEY }}
           DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
-        run: bash scripts/genesis/build-genesis.sh release
+        run: |
+          for tld in $DOTNS_TLDS; do
+            DOTNS_TLD="$tld" bash scripts/genesis/build-genesis.sh release
+          done
+          # The address set every genesis above carries, which the builder asserted.
+          cp deployments/expected.json release/dotns-genesis-addresses.json
 
       - name: Extract ABIs
         run: |
@@ -188,7 +193,7 @@ jobs:
           TAG="$RELEASE_TAG"
           cd release
           zip -r "../dotns-abis-${TAG}.zip" abis/ deployments.json release-manifest.json \
-            codehashes.json "dotns-genesis-${DOTNS_TLD}.json"
+            codehashes.json dotns-genesis-*.json
 
       - name: Generate release body
         env:
@@ -253,8 +258,13 @@ jobs:
             echo "Pallet-revive genesis state, for a chain that should carry DotNS from block zero"
             echo "rather than deploying it afterwards."
             echo ""
-            echo "- [dotns-genesis-${DOTNS_TLD}.json]($ASSET_BASE/dotns-genesis-${DOTNS_TLD}.json) — registry initialised with the **\`.${DOTNS_TLD}\` TLD**, so it suits **${DOTNS_TLD} networks only** (this is what previewnet uses). Not for a production chain."
-            echo "- A chain booted from this genesis carries the fresh-deploy address set: \`deployments/expected.json\` in the repository at this tag. [deployments.json]($ASSET_BASE/deployments.json) records the live networks instead, and the two can differ where a live network has moved a contract."
+            for tld in $DOTNS_TLDS; do
+              echo "- [dotns-genesis-${tld}.json]($ASSET_BASE/dotns-genesis-${tld}.json) - registry initialised with the **\`.${tld}\` TLD**, so it suits **.${tld} networks only**. Not for a production chain."
+            done
+            echo ""
+            echo "Previewnet uses \`.testnet\`, Paseo Asset Hub Next V2 uses \`.paseo\`."
+            echo ""
+            echo "- [dotns-genesis-addresses.json]($ASSET_BASE/dotns-genesis-addresses.json) - the address set a chain booted from any of these genesis files carries. [deployments.json]($ASSET_BASE/deployments.json) records the live networks instead, and the two can differ where a live network has moved a contract."
           } >> release-body.md
 
           # `gh release view` with no tag resolves through /releases/latest, which skips
@@ -302,7 +312,7 @@ jobs:
             release/release-manifest.json
             release/codehashes.json
             release/abi-diff.json
-            release/dotns-genesis-${{ env.DOTNS_TLD }}.json
+            release/dotns-genesis-*.json
           body_path: release-body.md
           draft: true
           prerelease: false
@@ -322,7 +332,8 @@ jobs:
             echo "release-manifest.json"
             echo "codehashes.json"
             echo "abi-diff.json"
-            echo "dotns-genesis-${DOTNS_TLD}.json"
+            echo "dotns-genesis-addresses.json"
+            for tld in $DOTNS_TLDS; do echo "dotns-genesis-${tld}.json"; done
           } | sort > "$RUNNER_TEMP/wanted-assets.txt"
           if ! diff -u "$RUNNER_TEMP/wanted-assets.txt" "$RUNNER_TEMP/actual-assets.txt"; then
             echo "::error::Draft release $TAG does not match the expected asset set; delete the draft and re-run."

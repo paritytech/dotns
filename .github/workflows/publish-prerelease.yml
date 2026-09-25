@@ -29,10 +29,10 @@ jobs:
     # Gated: this job reads the genesis owner key, which lives only on the `releases`
     # environment, so every run waits for a reviewer's approval there.
     environment: releases
-    # Baked into the genesis registry, so it decides which networks the artifact suits.
-    # Job-level: five steps name the file derived from it and must not disagree.
+    # One genesis per TLD, since the TLD is baked into the registry: `.testnet` for previewnet,
+    # `.paseo` for Paseo Asset Hub Next V2. Job-level: several steps name the files it yields.
     env:
-      DOTNS_TLD: testnet
+      DOTNS_TLDS: testnet paseo
     steps:
       # On workflow_dispatch the tag does not exist yet; the release step creates it
       # from the branch this run was started on. Read through an env var rather than
@@ -155,7 +155,12 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
           FACTORY_DEPLOYER_KEY: ${{ secrets.FACTORY_DEPLOYER_KEY }}
           DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
-        run: bash scripts/genesis/build-genesis.sh release
+        run: |
+          for tld in $DOTNS_TLDS; do
+            DOTNS_TLD="$tld" bash scripts/genesis/build-genesis.sh release
+          done
+          # The address set every genesis above carries, which the builder asserted.
+          cp deployments/expected.json release/dotns-genesis-addresses.json
 
       - name: Extract ABIs
         run: |
@@ -194,7 +199,7 @@ jobs:
           TAG="$RELEASE_TAG"
           cd release
           zip -r "../dotns-abis-${TAG}.zip" abis/ release-manifest.json codehashes.json \
-            "dotns-genesis-${DOTNS_TLD}.json"
+            dotns-genesis-*.json
 
       - name: Generate release body
         env:
@@ -251,7 +256,10 @@ jobs:
             echo "not the previous live deployment's."
             echo ""
             echo "- **Release contents:** [release-manifest.json]($ASSET_BASE/release-manifest.json)"
-            echo "- [dotns-genesis-${DOTNS_TLD}.json]($ASSET_BASE/dotns-genesis-${DOTNS_TLD}.json) — pallet-revive genesis, \`.${DOTNS_TLD}\` TLD, for ${DOTNS_TLD} networks only."
+            for tld in $DOTNS_TLDS; do
+              echo "- [dotns-genesis-${tld}.json]($ASSET_BASE/dotns-genesis-${tld}.json) - pallet-revive genesis, \`.${tld}\` TLD, for .${tld} networks only."
+            done
+            echo "- [dotns-genesis-addresses.json]($ASSET_BASE/dotns-genesis-addresses.json) - the addresses those genesis files carry."
           } >> release-body.md
 
       - name: ABI diff since previous release
@@ -285,7 +293,7 @@ jobs:
             release/release-manifest.json
             release/codehashes.json
             release/abi-diff.json
-            release/dotns-genesis-${{ env.DOTNS_TLD }}.json
+            release/dotns-genesis-*.json
           body_path: release-body.md
           draft: true
           prerelease: true
@@ -304,7 +312,8 @@ jobs:
             echo "release-manifest.json"
             echo "codehashes.json"
             echo "abi-diff.json"
-            echo "dotns-genesis-${DOTNS_TLD}.json"
+            echo "dotns-genesis-addresses.json"
+            for tld in $DOTNS_TLDS; do echo "dotns-genesis-${tld}.json"; done
           } | sort > "$RUNNER_TEMP/wanted-assets.txt"
           if ! diff -u "$RUNNER_TEMP/wanted-assets.txt" "$RUNNER_TEMP/actual-assets.txt"; then
             echo "::error::Draft pre-release $TAG does not match the expected asset set; delete the draft and re-run."

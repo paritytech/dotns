@@ -11,13 +11,15 @@ What each release publishes, what the files guarantee, and how to consume them.
 | `release-manifest.json` | What this release contains, machine readable |
 | `codehashes.json` | Stripped-metadata hash of each contract's built runtime bytecode |
 | `abi-diff.json` | Selector-level ABI changes since the previous release, machine readable |
+| `dotns-genesis-<tld>.json` | pallet-revive genesis with DotNS deployed, one per TLD (`testnet` for previewnet, `paseo` for Paseo Asset Hub Next V2) |
+| `dotns-genesis-addresses.json` | The addresses a chain booted from those genesis files carries, a copy of `deployments/expected.json` |
 | `dotns-abis-<tag>.zip` | The same files in one archive |
 
-Every JSON asset is attached to the release individually, at the top level, with no folder. The zip holds the ABIs under `abis/` plus `deployments.json`, `release-manifest.json`, and `codehashes.json` at its root; `abi-diff.json` is generated together with the release body and attached individually.
+Every JSON asset is attached to the release individually, at the top level, with no folder. The zip holds the ABIs under `abis/` plus `deployments.json`, `release-manifest.json`, `codehashes.json`, and the `dotns-genesis-*.json` files at its root; `abi-diff.json` is generated together with the release body and attached individually.
 
 The release surface is decided in `.github/abi-contracts.txt` so a contract reaches consumers only when it is listed there.
 
-**Pre-releases carry no addresses.** A pre-release is cut in order to be deployed, so at that point the recorded addresses still belong to the previous deployment of different code. Publishing them under that tag would break the one thing `version` is for, namely that a release's addresses and its ABIs came from the same release. A pre-release therefore ships the ABIs, `release-manifest.json`, `codehashes.json`, and `abi-diff.json`, and the addresses arrive with the release that follows the deployment. `codehashes.json` is on the pre-release deliberately: deploys run from pre-release tags, and an upgrade diffs its build against the previous release's copy before touching a live network.
+**Pre-releases carry no addresses.** A pre-release is cut in order to be deployed, so at that point the recorded addresses still belong to the previous deployment of different code. Publishing them under that tag would break the one thing `version` is for, namely that a release's addresses and its ABIs came from the same release. A pre-release therefore ships the ABIs, `release-manifest.json`, `codehashes.json`, `abi-diff.json`, and the genesis files, whose addresses are this commit's own fresh deploy; the live addresses arrive with the release that follows the deployment. `codehashes.json` is on the pre-release deliberately: deploys run from pre-release tags, and an upgrade diffs its build against the previous release's copy before touching a live network.
 
 `deployments.json` and `release-manifest.json` were also added after this repository had already published releases, so an older release carries only the per-contract ABIs and the zip. That is expected rather than broken, and it cannot be corrected: releases here are immutable, so no asset can be attached after publication. Treat either file being missing as "this release predates it, or is a pre-release" and fall back, or pin a release you have checked.
 
@@ -44,7 +46,7 @@ The release surface is decided in `.github/abi-contracts.txt` so a contract reac
 - One entry can serve more than one live network. `paseo-assethub` is the deployment that both previewnet and Paseo Asset Hub Next V2 run, because every network deployed through the shared CREATE3 factory lands on the same addresses. So expect entries named after deployments, not after every chain you might connect to.
 - The names under `contracts` (`DotnsRegistrar`, `PopRules`) do not change, and a name always means the same contract. Your code can depend on that.
 - Addresses are copied from the manifest verbatim, which the deploy pipeline writes EIP-55 checksummed. Compare them case-insensitively rather than relying on the casing.
-- Only per-network manifests are published. `deployments/expected.json` — the fresh-deploy address set that CI and the genesis builder verify against (see `DEPLOYMENTS.md`) — is not a network and never appears here, so a release cut while an address move is awaiting its network's redeploy still advertises the addresses each live network actually runs.
+- Only per-network manifests are published. `deployments/expected.json` — the fresh-deploy address set that CI and the genesis builder verify against (see `DEPLOYMENTS.md`) — is not a network and never appears here (it ships separately as `dotns-genesis-addresses.json`), so a release cut while an address move is awaiting its network's redeploy still advertises the addresses each live network actually runs.
 - `LabelStoreBeacon` and `UserStoreBeacon` appear when deployed but are not network-stable, because the `StoreFactory` initialiser deploys them. Read them from the factory rather than pinning them.
 
 ## `release-manifest.json`
