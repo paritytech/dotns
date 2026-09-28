@@ -19,9 +19,7 @@ import {Vm} from "forge-std/Vm.sol";
 ///      preceded by the same check at each of its callers, so it is reached through them and has no
 ///      test of its own.
 contract DotnsPopControllerLegacyTests is BaseDotns {
-    // ---------------------------------------------------------------------------------------------
     // Selectors and interfaces
-    // ---------------------------------------------------------------------------------------------
 
     function test_legacy_selectors_are_pinned() public pure {
         assertEq(
@@ -64,9 +62,7 @@ contract DotnsPopControllerLegacyTests is BaseDotns {
         );
     }
 
-    // ---------------------------------------------------------------------------------------------
     // Legacy entrypoints have the same effect as their replacements
-    // ---------------------------------------------------------------------------------------------
 
     function test_reserveLiteName_matches_issueDeviceName() public {
         _rootReservePersonhoodName(
@@ -194,10 +190,8 @@ contract DotnsPopControllerLegacyTests is BaseDotns {
         assertEq(_countEvents(logs, keccak256("PersonhoodNameIssued(bytes32,address,string)")), 1);
     }
 
-    // ---------------------------------------------------------------------------------------------
     // Label errors: legacy entrypoints revert with the legacy errors, replacements with the new
     // ones
-    // ---------------------------------------------------------------------------------------------
 
     /// @notice `_issueDeviceName`, shape check: a label with no separator.
     function test_device_name_shape_error_on_both_paths() public {
@@ -300,9 +294,7 @@ contract DotnsPopControllerLegacyTests is BaseDotns {
         );
     }
 
-    // ---------------------------------------------------------------------------------------------
     // Errors the legacy entrypoints share with their replacements
-    // ---------------------------------------------------------------------------------------------
 
     function test_non_root_callers_are_rejected_on_both_paths() public {
         IDotnsPopController.DeviceNameIssuance memory issuance =
@@ -437,9 +429,7 @@ contract DotnsPopControllerLegacyTests is BaseDotns {
         );
     }
 
-    // ---------------------------------------------------------------------------------------------
     // Every reservation-queue exit emits an event
-    // ---------------------------------------------------------------------------------------------
 
     function test_claim_emits_claimed_and_evicts_every_other_waiter() public {
         _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
@@ -530,9 +520,7 @@ contract DotnsPopControllerLegacyTests is BaseDotns {
         assertEq(_countEvents(logs, keccak256("ReservationRelinquished(bytes32,address)")), 0);
     }
 
-    // ---------------------------------------------------------------------------------------------
     // Helpers
-    // ---------------------------------------------------------------------------------------------
 
     function _combined(
         string memory deviceLabel,
