@@ -10,8 +10,8 @@ import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolReg
 
 /// @title DeployPopSystem
 /// @notice Fourth stage. Deploys the PoP-specific proxies: the resolver that
-///         holds chat keys and lite/full links, and the controller that drives
-///         lite-person and full-person issuance. Both bind to the protocol
+///         holds chat keys and device links, and the controller that issues
+///         device names and personhood names. Both bind to the protocol
 ///         registry `DeployPolicy` deployed.
 /// @custom:security-contact admin@parity.io
 contract DeployPopSystem is BaseDeployer {

@@ -460,8 +460,8 @@ contract DotnsNameEscrow is
         // Nothing to settle: return before touching `claimed`. That flag is what `redeem` reads to
         // decide whether the holder has already been paid for the name, so setting it here would
         // make a zero-amount `withdraw`, which pays nothing and emits nothing, silently forfeit
-        // the holder's right to recover their own name for no consideration at all. Free PopFull
-        // and PopLite registrations seed exactly these positions, and `withdraw` is the step the
+        // the holder's right to recover their own name for no consideration at all. Free Personhood
+        // and Devicehood registrations seed exactly these positions, and `withdraw` is the step the
         // old contract required before a name could be recycled, so that is a path holders will
         // take.
         if (owed == 0) return;

@@ -169,7 +169,7 @@ contract DotnsProtocolRegistryDeclarationTests is BaseDotns {
         assertEq(registry.expectedCodehash(DotnsConstants.REGISTRAR), bytes32(0));
     }
 
-    /// @notice `version()` on every DotNS contract mirrors the registry's declared release, so
+    /// @notice `version()` on every dotNS contract mirrors the registry's declared release, so
     ///         the whole network answers with one synchronised value: empty before the first
     ///         declaration, the declared tag after, with no per-contract bookkeeping. Sampled
     ///         across every mirror the fixture deploys, including a claimed user store.

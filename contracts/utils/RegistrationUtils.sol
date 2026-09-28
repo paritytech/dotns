@@ -12,7 +12,7 @@ import {DotnsConstants} from "./DotnsConstants.sol";
 /// @title DotNS Registration Utilities Library
 /// @notice Single canonical implementation of the "mint + forward-registry + store-write"
 ///         triad used by every DotNS registration flow.
-/// @dev Exists so that every controller (public commit-reveal, PoP gateway, future
+/// @dev Exists so that every controller (public commit-reveal, gateway path, future
 ///      privileged flows) calls the same sequence. Without this library each controller
 ///      re-implements the sequence, and the implementations drift.
 /// @dev Scope: this library is deliberately minimal. It only performs the steps

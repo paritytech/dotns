@@ -36,7 +36,7 @@ contract DotnsReverseResolver is
     ///      that no reverse name is set.
     mapping(address owner => string name) private reverseNames;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
@@ -103,8 +103,8 @@ contract DotnsReverseResolver is
         return stored;
     }
 
-    /// @notice Resolves the node a name maps to, whether tokenised or a lite subname.
-    /// @dev A lite name is `stem` beneath its numeric container, so it hashes as a subnode; any
+    /// @notice Resolves the node a name maps to, whether tokenised or a device-name subname.
+    /// @dev A device name is `stem` beneath its numeric container, so it hashes as a subnode; any
     ///      other name hashes as a second-level label under the TLD. Ownership of either is read
     ///      through the registry, which delegates a tokenised name to the registrar and holds a
     ///      subname directly.
@@ -112,8 +112,8 @@ contract DotnsReverseResolver is
     /// @return node The node the name resolves to.
     function _nodeOf(string memory label) internal view returns (bytes32 node) {
         bytes32 tldNode = protocolRegistry.tldNode();
-        if (StringUtils.isLitePersonLabelMemory(label)) {
-            return SubnodeUtils.liteSubnodeOf(tldNode, label);
+        if (StringUtils.isDeviceLabelMemory(label)) {
+            return SubnodeUtils.deviceSubnodeOf(tldNode, label);
         }
         node = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(label));
     }
@@ -144,7 +144,7 @@ contract DotnsReverseResolver is
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
+    ///         registry so every dotNS contract reports one synchronised value.
     /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
     ///      `version()` selector for ABI compatibility. It reports the network's declaration,
     ///      not this contract's build; per-contract identity is the codehash declared on the

@@ -3,14 +3,14 @@
 pragma solidity ^0.8.34;
 
 /// @title IDotnsPopResolver
-/// @notice Resolver for per-name records produced by the PoP username flow.
+/// @notice Resolver for per-name records produced by the dotNS gateway pallet.
 /// @dev Holds three record kinds:
 ///      - Chat key: ECDH public-key bytes used for end-to-end encrypted messaging.
-///      - Lite link: for a full-person node, the labelhash of the lite-person
-///        username it was minted from (when the link was made).
-///      - Full claim: reverse index mapping a lite labelhash to the full-person
-///        node it was promoted to. Mirrors `liteLink` on every write so a
-///        caller that holds a lite labelhash can resolve the full-person node
+///      - Device link: for a personhood-name node, the labelhash of the device name it
+///        was linked to when it was issued.
+///      - Personhood link: reverse index mapping a device-name labelhash to the
+///        personhood-name node it is linked to. Mirrors `deviceLink` on every write so a
+///        caller that holds a device-name labelhash can resolve the personhood name
 ///        without scanning events.
 ///
 ///      Lives separately from the per-user `LabelStore` so that the store can remain
@@ -29,10 +29,10 @@ interface IDotnsPopResolver {
     /// @param chatKey The new chat key bytes.
     event ChatKeyUpdated(bytes32 indexed node, bytes chatKey);
 
-    /// @notice Emitted when a full-person node's lite link is set or updated.
-    /// @param fullNode The full-person node carrying the link.
-    /// @param liteLabelhash The labelhash of the linked lite-person username.
-    event LiteLinkUpdated(bytes32 indexed fullNode, bytes32 indexed liteLabelhash);
+    /// @notice Emitted when a personhood name's device link is set or updated.
+    /// @param personhoodNode The personhood-name node carrying the link.
+    /// @param deviceLabelhash The labelhash of the linked device name.
+    event DeviceLinkUpdated(bytes32 indexed personhoodNode, bytes32 indexed deviceLabelhash);
 
     /// @notice Thrown when the caller is not the authorised PoP controller.
     /// @param caller The address that attempted the write.
@@ -53,35 +53,34 @@ interface IDotnsPopResolver {
     /// @param chatKey ECDH public key bytes (pallet-side type is `[u8; 65]`).
     function setChatKey(bytes32 node, bytes calldata chatKey) external;
 
-    /// @notice Sets the lite-person link for a full-person `node`.
+    /// @notice Sets the device link for a personhood-name node.
     /// @dev Callable only by the authorised PoP controller, otherwise
     ///      @custom:reverts NotPopController. Overwrites any previous link. When overwriting, the
-    ///      stale inverse entry is nulled so both the forward (`liteLink`) and reverse
-    ///      (`fullClaim`) indices remain consistent: re-linking the same `fullNode` to a new
-    ///      `liteLabelhash` clears `fullClaim(oldLite)`, and re-linking the same `liteLabelhash`
-    ///      to a new `fullNode` clears `liteLink(oldFull)`. The invariant
-    ///      `fullClaim(liteLink(node)) == node` always holds after the call. Emits
-    ///      @custom:emits LiteLinkUpdated on every successful write.
-    /// @param fullNode The full-person node carrying the link.
-    /// @param liteLabelhash The labelhash of the linked lite-person username.
-    function setLiteLink(bytes32 fullNode, bytes32 liteLabelhash) external;
+    ///      stale inverse entry is nulled so both the forward (`deviceLink`) and reverse
+    ///      (`personhoodLink`) indices remain consistent: re-linking the same `personhoodNode` to a
+    ///      new `deviceLabelhash` clears `personhoodLink(oldDevice)`, and re-linking the same
+    ///      `deviceLabelhash` to a new `personhoodNode` clears `deviceLink(oldPersonhood)`. The
+    ///      invariant `personhoodLink(deviceLink(node)) == node` always holds after the call. Emits
+    ///      @custom:emits DeviceLinkUpdated on every successful write.
+    /// @param personhoodNode The personhood-name node carrying the link.
+    /// @param deviceLabelhash The labelhash of the linked device name.
+    function setDeviceLink(bytes32 personhoodNode, bytes32 deviceLabelhash) external;
 
     /// @notice Returns the chat key associated with a node.
     /// @param node The node to query.
     /// @return chatKey The stored chat key bytes, or empty if unset.
     function chatKey(bytes32 node) external view returns (bytes memory chatKey);
 
-    /// @notice Returns the lite-person labelhash linked to a full-person node.
-    /// @param fullNode The full-person node to query.
-    /// @return liteLabelhash The linked lite-person labelhash, or zero if unset.
-    function liteLink(bytes32 fullNode) external view returns (bytes32 liteLabelhash);
+    /// @notice Returns the device-name labelhash linked to a personhood-name node.
+    /// @param personhoodNode The personhood-name node to query.
+    /// @return deviceLabelhash The linked device-name labelhash, or zero if unset.
+    function deviceLink(bytes32 personhoodNode) external view returns (bytes32 deviceLabelhash);
 
-    /// @notice Returns the full-person node a given lite label has claimed.
-    /// @dev Reverse of @custom:function liteLink. Written by the same `setLiteLink` call so the
-    ///      two directions stay in lockstep. Returns zero when the lite label
-    ///      has never been linked to a full claim.
-    /// @param liteLabelhash The labelhash of the lite-person username to query.
-    /// @return fullNode The full-person node claimed from this lite label, or
-    ///         zero if unset.
-    function fullClaim(bytes32 liteLabelhash) external view returns (bytes32 fullNode);
+    /// @notice Returns the personhood-name node a device name is linked to.
+    /// @dev Reverse of @custom:function deviceLink. Written by the same `setDeviceLink` call so the
+    ///      two directions stay in lockstep. Returns zero when the device name has never been
+    ///      linked to a personhood name.
+    /// @param deviceLabelhash The labelhash of the device name to query.
+    /// @return personhoodNode The linked personhood-name node, or zero if unset.
+    function personhoodLink(bytes32 deviceLabelhash) external view returns (bytes32 personhoodNode);
 }

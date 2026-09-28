@@ -69,14 +69,16 @@ interface IDotnsCostModelRegistry {
     function current() external view returns (IDotnsPricing model);
 
     /// @notice Prices a base length at the current version.
-    /// @param baseLength Digit-stripped length of the label being priced.
+    /// @param baseLength Base length of the label being priced: its length as written, less a
+    ///        device name's suffix.
     /// @return weiPrice Registration cost in wei at the current version.
     function priceForBaseLength(uint256 baseLength) external view returns (uint256 weiPrice);
 
     /// @notice Prices a base length at a specific version.
     /// @dev @custom:reverts UnknownVersion when no model is registered for `version`.
     /// @param version The version to price against.
-    /// @param baseLength Digit-stripped length of the label being priced.
+    /// @param baseLength Base length of the label being priced: its length as written, less a
+    ///        device name's suffix.
     /// @return weiPrice Registration cost in wei at that version.
     function priceForBaseLengthAtVersion(
         uint256 version,

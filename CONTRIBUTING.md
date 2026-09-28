@@ -118,12 +118,12 @@ Example query paths. Each row starts from a small set of known contracts; every 
 
 | Lookup | Path |
 | --- | --- |
-| Lite labelhash => full-person node | Protocol registry => PoP resolver => `fullClaim(liteLabelhash)` |
-| Full-person node => lite labelhash | Protocol registry => PoP resolver => `liteLink(fullNode)` |
+| Device-name labelhash => personhood-name node | Protocol registry => PoP resolver => `personhoodLink(deviceLabelhash)` |
+| Personhood-name node => device-name labelhash | Protocol registry => PoP resolver => `deviceLink(personhoodNode)` |
 | Node => chat key | Protocol registry => PoP resolver => `chatKey(node)` |
 | Node or tokenId => registered label | Protocol registry => registrar => `labelOf(uint256(node))` |
-| Base stem => gateway-reservation state | Protocol registry => PoP controller => `isReservedForClaim(baseLabel)` |
-| Base stem => cross-flow reservation state | Protocol registry => PopRules => `isBaseNameReserved(baseLabel)` |
+| Base name => gateway-reservation state | Protocol registry => PoP controller => `isReservedForClaim(label)` |
+| Base name => cross-flow reservation state | Protocol registry => PopRules => `isBaseNameReserved(baseName)` |
 | Node => ERC721 owner | Protocol registry => registrar => `ownerOf(uint256(node))` |
 | Subnode => forward-registry owner | Protocol registry => registry => `owner(subnode)` |
 | Node => forward address record | Protocol registry => forward resolver => address record |

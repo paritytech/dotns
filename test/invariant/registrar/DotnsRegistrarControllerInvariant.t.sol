@@ -31,15 +31,15 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
 
         vm.deal(address(handler), 1000 ether);
 
-        handler.addActor(ed, IPopRules.PopStatus.PopFull);
-        handler.addActor(leonardo, IPopRules.PopStatus.PopLite);
+        handler.addActor(ed, IPopRules.PopStatus.Personhood);
+        handler.addActor(leonardo, IPopRules.PopStatus.Devicehood);
         handler.addActor(tiago, IPopRules.PopStatus.NoStatus);
 
         // Additional actors for richer multi-user transfer chains.
         address alice = _createUser("alice");
         address bob = _createUser("bob");
-        handler.addActor(alice, IPopRules.PopStatus.PopFull);
-        handler.addActor(bob, IPopRules.PopStatus.PopLite);
+        handler.addActor(alice, IPopRules.PopStatus.Personhood);
+        handler.addActor(bob, IPopRules.PopStatus.Devicehood);
 
         targetContract(address(handler));
 

@@ -23,20 +23,20 @@ contract PopRulesTests is BaseDotns {
         assertEq(classificationMessage, "Reserved for Governance");
     }
 
-    function test_classify_poplite() public view {
+    function test_classify_devicehood() public view {
         (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
             popRules.classifyName("lights.01");
 
-        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.PopLite));
-        assertEq(classificationMessage, "Requires Lite personhood verification");
+        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.Devicehood));
+        assertEq(classificationMessage, "Requires devicehood");
     }
 
-    function test_classify_popfull() public view {
+    function test_classify_personhood() public view {
         (IPopRules.PopStatus classificationStatus, string memory classificationMessage) =
             popRules.classifyName("alicebob");
 
-        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.PopFull));
-        assertEq(classificationMessage, "Requires Full personhood verification");
+        assertEq(uint256(classificationStatus), uint256(IPopRules.PopStatus.Personhood));
+        assertEq(classificationMessage, "Requires personhood");
     }
 
     function test_classify_nostatus() public view {
@@ -59,10 +59,10 @@ contract PopRulesTests is BaseDotns {
     ///      these is measured as written: `andrew1` is seven characters and `andrew123` is nine.
     function test_classify_accepts_any_flat_digit_count() public view {
         (IPopRules.PopStatus oneDigit,) = popRules.classifyName("andrew1");
-        assertEq(uint256(oneDigit), uint256(IPopRules.PopStatus.PopFull));
+        assertEq(uint256(oneDigit), uint256(IPopRules.PopStatus.Personhood));
 
         (IPopRules.PopStatus twoDigits,) = popRules.classifyName("andrew01");
-        assertEq(uint256(twoDigits), uint256(IPopRules.PopStatus.PopFull));
+        assertEq(uint256(twoDigits), uint256(IPopRules.PopStatus.Personhood));
 
         (IPopRules.PopStatus threeDigits,) = popRules.classifyName("andrew123");
         assertEq(uint256(threeDigits), uint256(IPopRules.PopStatus.NoStatus));
@@ -75,32 +75,36 @@ contract PopRulesTests is BaseDotns {
         assertEq(uint256(webThree), uint256(IPopRules.PopStatus.Reserved));
 
         (IPopRules.PopStatus interior,) = popRules.classifyName("micha3l");
-        assertEq(uint256(interior), uint256(IPopRules.PopStatus.PopFull));
+        assertEq(uint256(interior), uint256(IPopRules.PopStatus.Personhood));
     }
 
-    /// @dev A lite label's suffix is fixed by its shape, so a wrong digit count fails the shape
+    /// @dev A device name's suffix is fixed by its shape, so a wrong digit count fails the shape
     ///      check rather than the count check and never reaches classification.
-    function test_classify_reverts_for_a_lite_suffix_of_the_wrong_length() public {
+    function test_classify_reverts_for_a_device_suffix_of_the_wrong_length() public {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPopRules.PopError.selector,
-                "Name must be a lowercase ASCII DNS label or a lite label"
+                "Name must be a lowercase ASCII DNS label or a device name"
             )
         );
         popRules.classifyName("andrew.1");
     }
 
-    /// @dev The gateway's suffix is not part of the name the candidate chose, so a lite label
+    /// @dev The gateway's suffix is not part of the name the candidate chose, so a device name
     ///      prices as its stem, while its flat spelling is a different, longer name. The flat
     ///      launch model charges one deposit at every length, so the rule is only observable on
     ///      a length-sensitive curve; this switches to the scarcity model to see it.
-    function test_a_lite_suffix_prices_as_its_stem() public {
+    function test_a_device_suffix_prices_as_its_stem() public {
         vm.startPrank(owner);
         costModelRegistry.register(IDotnsPricing(address(scarcityPricing)));
         costModelRegistry.setCurrentVersion(scarcityPricing.version());
         vm.stopPrank();
 
-        assertEq(popRules.price("andrew.01"), popRules.price("andrew"), "lite prices as its stem");
+        assertEq(
+            popRules.price("andrew.01"),
+            popRules.price("andrew"),
+            "a device name prices as its stem"
+        );
         assertTrue(
             popRules.price("andrew01") != popRules.price("andrew"),
             "the flat spelling is a longer name"
@@ -108,14 +112,14 @@ contract PopRulesTests is BaseDotns {
     }
 
     function test_verified_person_pays_the_deposit_for_premium() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
         assertEq(popRules.priceWithCheck("alicebob", ed).price, BASE_DEPOSIT);
         assertEq(popRules.priceWithCheck("lights", ed).price, BASE_DEPOSIT);
     }
 
     function test_transfer_reprices_at_own_length() public {
-        _grantPopFull(leonardo);
+        _grantPersonhood(leonardo);
 
         assertEq(popRules.transferFloor("lights", leonardo, tiago), BASE_DEPOSIT);
         assertEq(popRules.transferFloor("lights", leonardo, leonardo), 0);
@@ -128,40 +132,36 @@ contract PopRulesTests is BaseDotns {
         popRules.priceWithCheck("hello", ed);
     }
 
-    function test_price_with_check_revert_full_needed() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPopRules.PopError.selector, "Requires Full personhood verification"
-            )
-        );
+    function test_price_with_check_revert_personhood_needed() public {
+        vm.expectRevert(abi.encodeWithSelector(IPopRules.PopError.selector, "Requires personhood"));
         popRules.priceWithCheck("alicebob", ed);
     }
 
-    function test_popfull_user_can_access_poplite_name() public {
-        _grantPopFull(ed);
+    function test_personhood_user_can_access_devicehood_name() public {
+        _grantPersonhood(ed);
 
         IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck("lights.01", ed);
 
-        assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.PopLite));
-        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.PopFull));
+        assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.Devicehood));
+        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.Personhood));
         assertEq(priceMetadata.price, BASE_DEPOSIT);
     }
 
-    function test_poplite_user_can_access_nostatus_name() public {
-        _grantPopLite(ed);
+    function test_devicehood_user_can_access_nostatus_name() public {
+        _grantDevicehood(ed);
 
         IPopRules.PriceWithMeta memory priceMetadata =
             popRules.priceWithCheck("longnamehere.01", ed);
 
         assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.NoStatus));
-        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.PopLite));
+        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.Devicehood));
         assertEq(priceMetadata.price, BASE_DEPOSIT);
     }
 
     function test_base_reservation_blocks_others() public {
         // Authorise this test contract as a registrar controller so it may call
-        // reserveBaseName (gated by DotnsRegistrar.controllers). Passes the stem
-        // directly per the stems-only public boundary.
+        // reserveBaseName (gated by DotnsRegistrar.controllers). Passes the base name
+        // directly, as the public boundary takes base names only.
         _authoriseTestAsController();
 
         popRules.reserveBaseName("lights", leonardo);
@@ -175,7 +175,7 @@ contract PopRulesTests is BaseDotns {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPopRules.PopError.selector, "Base name reserved for original Lite registrant"
+                IPopRules.PopError.selector, "Reserved for a device-name holder's personhood claim"
             )
         );
         popRules.priceWithCheck("lights", tiago);
@@ -194,7 +194,7 @@ contract PopRulesTests is BaseDotns {
 
     function test_short_names_closed_reverts_direct_path() public {
         _setShortNames(false);
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         vm.expectRevert(
             abi.encodeWithSelector(IPopRules.PopError.selector, "Short names are not for sale")
         );
@@ -211,14 +211,14 @@ contract PopRulesTests is BaseDotns {
 
     function test_open_band_priced_while_short_names_closed() public {
         _setShortNames(false);
-        _grantPopLite(ed);
+        _grantDevicehood(ed);
         // longnamehere is 12 characters, so the switch never gates it.
         assertEq(popRules.priceWithCheck("longnamehere", ed).price, BASE_DEPOSIT);
     }
 
     function test_enabling_short_names_opens_the_market() public {
         _setShortNames(false);
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         _setShortNames(true);
         assertEq(popRules.priceWithCheck("alicebob", ed).price, BASE_DEPOSIT);
     }
@@ -268,10 +268,10 @@ contract PopRulesTests is BaseDotns {
     }
 
     function test_transferFloor_matches_model() public {
-        // A PopFull sender handing a NoStatus name to a NoStatus recipient pays the name's own
+        // A Personhood sender handing a NoStatus name to a NoStatus recipient pays the name's own
         // price, which is the registered model's amount for its base length.
         string memory label = "longnamehere";
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         uint256 floor = popRules.transferFloor(label, ed, leonardo);
         assertEq(floor, costModelRegistry.priceForBaseLength(bytes(label).length));
     }

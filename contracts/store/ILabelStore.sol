@@ -5,12 +5,12 @@ pragma solidity ^0.8.34;
 import {IDotnsStore} from "./IDotnsStore.sol";
 
 /// @title ILabelStore
-/// @notice Interface for the per-user DotNS label store.
+/// @notice Interface for the per-user dotNS label store.
 /// @dev The `LabelStore` is the protocol-managed half of the per-user storage pair:
 ///      write-only by the registrar, an authorised controller or the registry, read-only by
 ///      everyone else, and permanently locked per `labelhash` on first write. It
 ///      holds registration records only; every other per-name category (reverse,
-///      content, forward address, chat key, lite link) lives on a dedicated
+///      content, forward address, chat key, device link) lives on a dedicated
 ///      resolver, not here.
 /// @custom:security-contact admin@parity.io
 interface ILabelStore is IDotnsStore {

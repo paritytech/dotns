@@ -175,19 +175,19 @@ contract DotnsRegistrarController is
         uint256 tokenId = uint256(node);
         bool isReclaim = registrar.exists(tokenId);
 
-        string memory stem = rules.stripDigits(registration.label);
-        bool stemCanonical = stem.isSingleLabelMemory();
+        string memory baseName = rules.stripDigits(registration.label);
+        bool baseNameCanonical = baseName.isSingleLabelMemory();
         // Reclaim hands the name back from a prior occupant who may hold a sibling-controller's
-        // stem reservation, which is garbage once the name moves on, so clear it. Non-reclaim
+        // base-name reservation, which is garbage once the name moves on, so clear it. Non-reclaim
         // paths intentionally leave an existing reservation in place: the slot belongs to the
         // sibling controller that wrote it (e.g. the PoP queue head stamp), and clearing it from
         // here would brick that controller's release and advance paths.
-        if (stemCanonical && isReclaim) {
-            (address reservationOwner,) = rules.getBaseNameReservation(stem);
+        if (baseNameCanonical && isReclaim) {
+            (address reservationOwner,) = rules.getBaseNameReservation(baseName);
             address expectedOwner =
                 IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId).recipient;
             if (reservationOwner != address(0) && reservationOwner == expectedOwner) {
-                rules.releaseReservationForReclaim(stem, expectedOwner);
+                rules.releaseReservationForReclaim(baseName, expectedOwner);
             }
         }
 

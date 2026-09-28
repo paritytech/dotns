@@ -13,7 +13,7 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 
 **Type:** runtime limitation.
 
-Substrate Root cannot deploy a contract on behalf of an account it does not control, so a per-user `LabelStore` cannot be created at the moment a Pop-gateway issuance writes the name. The controller stamps a pending-claim entry instead, and the user settles it later by calling `claimLabelStore` once from their own address. Pending-claim entries carry a bounded TTL and `expirePendingClaim` is permissionless, so the slot frees itself if a user never claims.
+Substrate Root cannot deploy a contract on behalf of an account it does not control, so a per-user `LabelStore` cannot be created at the moment a gateway-path issuance writes the name. The controller stamps a pending-claim entry instead, and the user settles it later by calling `claimLabelStore` once from their own address. Pending-claim entries carry a bounded TTL and `expirePendingClaim` is permissionless, so the slot frees itself if a user never claims.
 
 **Workaround:** `claimLabelStore` (user-signed) settles the whole pending pile and deploys the store.
 
@@ -25,7 +25,7 @@ See [README → DotnsPopController](./README.md#early-testnet-quirk-labelstore-d
 
 **Type:** current implementation.
 
-The Pop gateway does not write a dedicated user-status mapping. It materialises the PoP flow through gateway-issued labels, PoP resolver records, and reservation queue state; user tier checks for public pricing read status from the personhood precompile and context, not from stored state.
+The gateway path does not write a dedicated user-status mapping. It materialises that path through gateway-issued labels, PoP resolver records, and reservation queue state; user tier checks for public pricing read status from the personhood precompile and context, not from stored state.
 
 **Resolution:** a dedicated status mapping could be added if a use case requires it; the current design is deliberate, not a defect.
 

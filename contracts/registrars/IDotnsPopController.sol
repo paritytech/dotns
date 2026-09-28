@@ -5,54 +5,53 @@ pragma solidity ^0.8.34;
 import {IDotnsController} from "./IDotnsController.sol";
 
 /// @title IDotnsPopController
-/// @notice Interface for the dedicated PoP controller orchestrating lite-person and full-person
-/// username issuance on behalf of the PoP gateway.
+/// @notice Interface for the dedicated PoP controller that issues device names and personhood
+/// names on behalf of the dotNS gateway pallet.
 /// @dev Deliberately disjoint from @custom:contract IDotnsRegistrarController. The two
 /// controllers coexist on @custom:contract DotnsRegistrar via its multi-controller affordance
-/// and neither imports the other. A full-person username collides through the registrar's ERC721
-/// availability check (first-to-mint wins); a lite username is not a token, so it collides through
+/// and neither imports the other. A personhood name collides through the registrar's ERC721
+/// availability check (first-to-mint wins); a device name is not a token, so it collides through
 /// @custom:function IDotnsRegistry.recordExists at its stem-under-container node
-/// (@custom:reverts LiteNameAlreadyIssued). Reservation queuing for `reservedBaseLabel`
-/// mirrors its live head into PopRules, so a queued stem also blocks the public
+/// (@custom:reverts DeviceNameAlreadyIssued). Reservation queuing for `reservedLabel`
+/// mirrors its live head into PopRules, so a queued base name also blocks the public
 /// commit-reveal flow, which reads that slot when it prices a name.
 ///
 /// Label formats:
-/// Lite-person usernames (first argument to @custom:function reserveBaseName and the
-/// `liteLabel` of a `LinkKind.LiteUsername` link) are a stem of lowercase ASCII letters, a
-/// separator, then exactly two digits (e.g. `joseph.42`) per
-/// @custom:function StringUtils.isLitePersonLabel. The stem is stricter than a DNS label
-/// because the name a person chooses is restricted to letters; a stem short enough to
-/// be governance-reserved is rejected by classification, not by the shape. The label is stored in
-/// the form the gateway sends, which is the canonical form of the name, so nothing here
-/// normalises it.
-/// Full-person usernames (the `label` of @custom:function registerBaseName and the
-/// optional `reservedBaseLabel` of @custom:function reserveBaseName) are lowercase ASCII
-/// letters only, per @custom:function StringUtils.isPersonLabel (e.g. `alice`). That is the
-/// same rule a lite stem follows and is stricter than a DNS label: no hyphens and no interior
-/// digits, because a full-person name is also a name a person chose. A separator marks a lite
-/// label and is rejected everywhere else, so only the gateway can create a dotted name; a
+/// Device names (the `label` of @custom:function issueDeviceName and the `deviceLabel` of a
+/// `LinkKind.DeviceName` link) are a stem of lowercase ASCII letters, a separator, then exactly
+/// two digits (e.g. `joseph.42`) per @custom:function StringUtils.isDeviceLabel. The stem is
+/// stricter than a DNS label because the name a person chooses is restricted to letters; a stem
+/// short enough to be governance-reserved is rejected by classification, not by the shape. The
+/// label is stored in the form the gateway sends, which is the canonical form of the name, so
+/// nothing here normalises it.
+/// Personhood names (the `label` of @custom:function issuePersonhoodName and the optional
+/// `reservedLabel` of @custom:function issueDeviceNameWithReservation) are lowercase ASCII
+/// letters only, per @custom:function StringUtils.isPersonhoodLabel (e.g. `alice`). That is the
+/// same rule a device-name stem follows and is stricter than a DNS label: no hyphens and no
+/// interior digits, because a personhood name is also a name a person chose. A separator marks a
+/// device name and is rejected everywhere else, so only the gateway can create a dotted name; a
 /// digit suffix on its own is not exclusive, since a public label may carry one directly.
-/// Cross-flow priority on the base stem is arbitrated by
+/// Cross-flow priority on the base name is arbitrated by
 /// @custom:function IPopRules.reserveBaseNameForPop.
 /// @custom:security-contact admin@parity.io
 interface IDotnsPopController is IDotnsController {
-    /// @notice Discriminant for the `Link` union supplied to `registerBaseName`.
-    /// @dev Selects the chat-key source for the full-person username. Orthogonal to whether
-    /// the registration is a claim or standalone; that is derived from on-chain reservation
-    /// state. `None` means the caller supplies a fresh chat key in `link.chatKey`.
-    /// `LiteUsername` means the full-person username is linked to a prior lite-person
-    /// username (`link.liteLabel`) and inherits its chat key.
+    /// @notice Discriminant for the `Link` union supplied to `issuePersonhoodName`.
+    /// @dev Selects the chat-key source for the personhood name. Orthogonal to whether the
+    /// issuance is a claim or standalone; that is derived from on-chain reservation state. `None`
+    /// means the caller supplies a fresh chat key in `link.chatKey`. `DeviceName` means the
+    /// personhood name is linked to a prior device name (`link.deviceLabel`) and inherits its chat
+    /// key. The member order is part of the ABI: the gateway pallet encodes `DeviceName` as `1`.
     enum LinkKind {
         None,
-        LiteUsername
+        DeviceName
     }
 
-    /// @notice Tagged union selecting the chat-key source for a full-person registration.
-    /// @param liteLabel Lite-person `stem.NN` label (only read when `kind == LiteUsername`).
+    /// @notice Tagged union selecting the chat-key source for a personhood-name issuance.
+    /// @param deviceLabel Device name `stem.NN` (only read when `kind == DeviceName`).
     /// @param chatKey Chat key bytes (only read when `kind == None`).
     struct Link {
         LinkKind kind;
-        string liteLabel;
+        string deviceLabel;
         bytes chatKey;
     }
 
@@ -83,7 +82,7 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Deferred per-user binding of a freshly minted name to its `LabelStore`.
     /// @dev Recorded by the gateway path when the user has no `LabelStore`. The binding later
     /// settles via @custom:function settlePendingClaims, which deploys the store from a signed
-    /// origin and writes the stashed label. PoP-resolver records (chat key, lite link) are
+    /// origin and writes the stashed label. PoP-resolver records (chat key, device link) are
     /// persisted eagerly at mint time on @custom:contract IDotnsPopResolver, not at settlement,
     /// so the resolver carries the full identity record regardless of whether the user has
     /// settled their Store. A user accumulates one entry per deferred name: the Root gateway path
@@ -91,71 +90,69 @@ interface IDotnsPopController is IDotnsController {
     /// keeps stashing entries until a signed-origin @custom:function settlePendingClaims deploys
     /// the store and settles the entries. Each entry's deadline is measured from its own
     /// `mintedAt` against `reservationDuration`.
-    /// @param label Bare label without the TLD, which is appended at settlement time. A lite
-    /// claim carries its separator, so this is not always a single DNS label.
+    /// @param label Bare label without the TLD, which is appended at settlement time. A device
+    /// name carries its separator, so this is not always a single DNS label.
     /// @param mintedAt Timestamp of the originating mint.
     struct PendingClaim {
         string label;
         uint64 mintedAt;
     }
 
-    /// @notice Lite-person registration payload.
+    /// @notice Device-name issuance payload.
     /// @dev Single struct so the gateway can ABI-encode one tuple as the cross-chain payload
     /// and the contract decodes it directly out of `msg.data`. All fields are required;
     /// `chatKey` may be empty bytes to skip the resolver write.
-    /// @param liteLabel Lite-person `stem.NN` label being minted.
+    /// @param label Device name `stem.NN` being issued.
     /// @param user Beneficiary account on this chain.
     /// @param chatKey Chat-key bytes persisted on the PoP resolver. Empty leaves the slot unset.
-    struct LiteRegistration {
-        string liteLabel;
+    struct DeviceNameIssuance {
+        string label;
         address user;
         bytes chatKey;
     }
 
-    /// @notice Lite-person registration combined with an optional base-name reservation.
-    /// @dev `BaseReservation` is a @custom:struct LiteRegistration plus a base-label reservation
-    /// slot, expressed as composition rather than duplicated fields so internal helpers can
-    /// consume the lite leg via `params.lite` without unpacking. The lite leg always runs;
-    /// the reservation leg only runs when `reservedBaseLabel` is non-empty.
-    /// @param lite Lite-person registration request; see LiteRegistration.
-    /// @param reservedBaseLabel Base label to enqueue for a later full-person claim. Empty
-    /// string skips the reservation leg.
-    struct BaseReservation {
-        LiteRegistration lite;
-        string reservedBaseLabel;
+    /// @notice Device-name issuance combined with an optional personhood-name reservation.
+    /// @dev Composition of a @custom:struct DeviceNameIssuance and a reservation slot, so
+    /// internal helpers consume the issuance via `params.issuance` without unpacking. The issuance
+    /// always runs; the reservation only runs when `reservedLabel` is non-empty.
+    /// @param issuance Device-name issuance request; see DeviceNameIssuance.
+    /// @param reservedLabel Personhood name to enqueue for a later claim. Empty string skips the
+    /// reservation.
+    struct DeviceNameIssuanceWithReservation {
+        DeviceNameIssuance issuance;
+        string reservedLabel;
     }
 
-    /// @notice Base-name reservation payload for the split gateway flow.
-    /// @dev This is the reservation-only primitive. The lite username mint is handled by
-    /// @custom:function reserveLiteName, and LabelStore settlement is handled by
+    /// @notice Personhood-name reservation payload.
+    /// @dev The reservation-only primitive. Device-name issuance is handled by
+    /// @custom:function issueDeviceName, and LabelStore settlement by
     /// @custom:function settlePendingClaims.
     /// @param user Beneficiary account that will hold the reservation.
-    /// @param reservedBaseLabel Base label to enqueue for a later full-person claim.
-    struct BaseNameReservation {
+    /// @param label Personhood name to enqueue for a later claim.
+    struct PersonhoodNameReservation {
         address user;
-        string reservedBaseLabel;
+        string label;
     }
 
-    /// @notice Full-person registration payload.
-    /// @param label Base DNS label being minted.
+    /// @notice Personhood-name issuance payload.
+    /// @param label Personhood name being issued.
     /// @param user Beneficiary account on this chain.
     /// @param link Chat-key source for the new entry; see @custom:struct Link.
-    struct FullRegistration {
+    struct PersonhoodNameIssuance {
         string label;
         address user;
         Link link;
     }
 
-    /// @notice Emitted when a lite-person username is registered via the PoP gateway.
-    event LiteNameReserved(bytes32 indexed labelhash, address indexed user, string label);
+    /// @notice Emitted when the gateway pallet issues a device name.
+    event DeviceNameIssued(bytes32 indexed labelhash, address indexed user, string label);
 
-    /// @notice Emitted when a full-person username is claimed out of an existing reservation.
-    event BaseNameClaimed(bytes32 indexed labelhash, address indexed user, string label);
+    /// @notice Emitted when the gateway pallet issues a personhood name.
+    /// @dev Fires whether or not the user held a reservation for it; a claim of the live
+    /// reservation also @custom:emits ReservationClaimed.
+    event PersonhoodNameIssued(bytes32 indexed labelhash, address indexed user, string label);
 
-    /// @notice Emitted when a standalone full-person username is registered via the PoP gateway.
-    event StandaloneNameRegistered(bytes32 indexed labelhash, address indexed user, string label);
-
-    /// @notice Emitted when a reservation entry is added to the queue for a base name.
+    /// @notice Emitted when a reservation entry is added to the queue for a personhood name.
     /// @param position Position in the queue at the time of joining (0 = active holder).
     event ReservationQueued(
         bytes32 indexed reservedLabelhash, address indexed user, uint64 position
@@ -164,11 +161,19 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Emitted when a reservation entry is removed due to expiry.
     event ReservationExpired(bytes32 indexed reservedLabelhash, address indexed user);
 
-    /// @notice Emitted when a user voluntarily relinquishes their reservation.
+    /// @notice Emitted when a user's own reservation entry is dropped: an explicit relinquish, a
+    /// standalone personhood-name issuance, or a re-reservation that moves the user to another
+    /// queue.
     event ReservationRelinquished(bytes32 indexed reservedLabelhash, address indexed user);
 
-    /// @notice Emitted when a full-person username is linked to a lite-person username.
-    event LiteToFullLinked(bytes32 indexed fullLabelhash, bytes32 indexed liteLabelhash);
+    /// @notice Emitted when the holder of a queue's live head claims the reserved name.
+    event ReservationClaimed(bytes32 indexed reservedLabelhash, address indexed user);
+
+    /// @notice Emitted for each waiter removed from a queue when its head is claimed.
+    event ReservationEvicted(bytes32 indexed reservedLabelhash, address indexed user);
+
+    /// @notice Emitted when a personhood name is linked to a device name.
+    event DeviceNameLinked(bytes32 indexed personhoodLabelhash, bytes32 indexed deviceLabelhash);
 
     /// @notice Emitted when the reservation duration is updated.
     event ReservationDurationSet(uint64 duration);
@@ -197,7 +202,7 @@ interface IDotnsPopController is IDotnsController {
 
     /// @notice Emitted when a reservation queue's head transitions to a new user, either via
     /// expiry of the prior head or via the explicit relinquish path.
-    /// @param labelhash Base-label hash whose queue head changed.
+    /// @param labelhash Personhood-name hash whose queue head changed.
     /// @param newHead Address now holding the head slot.
     event ReservationHeadAdvanced(bytes32 indexed labelhash, address indexed newHead);
 
@@ -206,20 +211,22 @@ interface IDotnsPopController is IDotnsController {
     ///      and reading `msg.sender` under one traps.
     error NotRoot();
 
-    /// @notice Thrown when a supplied lite-person label does not match `stem.NN`.
-    error InvalidLiteLabel();
+    /// @notice Thrown when a supplied device name does not match `stem.NN`, or its stem is
+    /// governance-reserved.
+    error InvalidDeviceLabel();
 
-    /// @notice Thrown when a supplied base label is not a canonical DNS label.
-    error InvalidBaseLabel();
+    /// @notice Thrown when a supplied personhood name is not lowercase ASCII letters only, or
+    /// classifies outside what the gateway may issue or reserve.
+    error InvalidPersonhoodLabel();
 
-    /// @notice Thrown when a reserved base label already has an owner on the registrar, so the
-    /// queued reservation could never be redeemed at mint time.
-    error BaseNameAlreadyRegistered();
+    /// @notice Thrown when a personhood name to reserve already has an owner on the registrar, so
+    /// the queued reservation could never be claimed.
+    error PersonhoodNameUnavailable();
 
-    /// @notice Thrown when a lite username is issued again while its subname already exists.
-    /// @dev A lite name is issued once; re-issuing it would rehome the identity to a new owner and
-    ///      overwrite its records, so an existing subname is rejected rather than reassigned.
-    error LiteNameAlreadyIssued();
+    /// @notice Thrown when a device name is issued again while its subname already exists.
+    /// @dev A device name is issued once; re-issuing it would rehome the identity to a new owner
+    ///      and overwrite its records, so an existing subname is rejected rather than reassigned.
+    error DeviceNameAlreadyIssued();
 
     /// @notice Thrown when a supplied chat key is non-empty and not exactly 65 bytes long.
     /// @dev Mirrors the resolver's `InvalidChatKeyLength` so the controller surfaces a
@@ -236,87 +243,84 @@ interface IDotnsPopController is IDotnsController {
     /// @notice Thrown when attempting to enqueue a user who already has an active reservation.
     error AlreadyReserved(address user, bytes32 labelhash);
 
-    /// @notice Thrown when someone tries to mint a base label in standalone mode while another user
-    /// holds the live head-of-queue reservation.
+    /// @notice Thrown when someone tries to issue a personhood name standalone while another user
+    /// holds the live head-of-queue reservation for it.
     error NotHolder(address user, bytes32 labelhash);
 
-    /// @notice Thrown when a lite-link inheritance does not match the registrar-side owner
-    /// of the lite label.
-    /// @dev Prevents identity hijack by ensuring the registrant on the full-name leg actually
-    /// holds the prior lite identity whose chat key is being inherited.
+    /// @notice Thrown when a device link names a device name the registrant does not own.
+    /// @dev Prevents identity hijack by ensuring the registrant of the personhood name actually
+    /// holds the device name whose chat key is being inherited.
     /// @param user Registrant supplied by the gateway.
-    /// @param liteLabelhash Lite label whose ownership did not match.
-    error LiteLabelNotOwnedByUser(address user, bytes32 liteLabelhash);
+    /// @param deviceLabelhash Device name whose ownership did not match.
+    error DeviceNameNotOwned(address user, bytes32 deviceLabelhash);
 
     /// @notice Thrown when @custom:function setReservationDuration is called with a value below
     /// the protocol minimum.
     /// @param duration Caller-supplied duration, in seconds.
     error ReservationDurationTooLow(uint64 duration);
 
-    /// @notice Registers a lite-person username on behalf of the supplied user
-    /// and optionally enqueues a reservation for a base name they intend to
-    /// claim as a full person later.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
-    /// lite leg validates the `stem.NN` shape and requires the label to classify outside the
-    /// governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel), and rejects a
+    /// @notice Issues a device name to the supplied user and optionally enqueues a reservation
+    /// for a personhood name they intend to claim later.
+    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The issuance
+    /// validates the `stem.NN` shape and requires the label to classify outside the
+    /// governance-reserved tier (otherwise @custom:reverts InvalidDeviceLabel), and rejects a
     /// supplied chat key whose length is neither zero nor `CHAT_KEY_LENGTH`
     /// (otherwise @custom:reverts InvalidChatKey). On a warm-path mint (user already has a
-    /// `LabelStore`) it @custom:emits LiteNameReserved and @custom:emits NameRegistered;
-    /// on a cold-path mint it @custom:emits LiteNameReserved and
+    /// `LabelStore`) it @custom:emits DeviceNameIssued and @custom:emits NameRegistered;
+    /// on a cold-path mint it @custom:emits DeviceNameIssued and
     /// @custom:emits PendingClaimStashed, with @custom:emits NameRegistered deferred to
-    /// @custom:function settlePendingClaims when the claim settles. The base-name leg only runs
-    /// when `reservedBaseLabel` is non-empty: it requires a letters-only person label, which is
-    /// therefore also a true base label (otherwise @custom:reverts InvalidBaseLabel), and
-    /// with no owner on the registrar (otherwise @custom:reverts BaseNameAlreadyRegistered),
-    /// since a name that already has an owner could never be claimed. This validation runs
-    /// before both the lite mint and any queue mutation, so an already-registered
-    /// `reservedBaseLabel` aborts the whole call and the candidate receives no lite username
-    /// either; callers should validate the reserved label before attesting rather than relying
-    /// on this revert. It then advances the
-    /// head past expired entries (@custom:emits ReservationExpired for each one),
-    /// removes the user from any prior queue position so a single user holds at most one live
-    /// reservation across all labels, and enqueues a fresh entry
+    /// @custom:function settlePendingClaims when the claim settles. The reservation only runs
+    /// when `reservedLabel` is non-empty: it requires a letters-only personhood label
+    /// (otherwise @custom:reverts InvalidPersonhoodLabel) with no owner on the registrar
+    /// (otherwise @custom:reverts PersonhoodNameUnavailable), since a name that already has an
+    /// owner could never be claimed. This validation runs before both the issuance and any queue
+    /// mutation, so an already-registered `reservedLabel` aborts the whole call and the candidate
+    /// receives no device name either; callers should validate the reserved label before
+    /// attesting rather than relying on this revert. It then advances the head past expired
+    /// entries (@custom:emits ReservationExpired for each one), removes the user from any prior
+    /// queue position (@custom:emits ReservationRelinquished) so a single user holds at most one
+    /// live reservation across all labels, and enqueues a fresh entry
     /// (@custom:emits ReservationQueued). The enqueue rejects with @custom:reverts
     /// AlreadyReserved when the user already holds a reservation that was not cleared by the
     /// prior removal and with @custom:reverts QueueFull when the per-label queue has reached
-    /// `MAX_RESERVATION_QUEUE`. Cross-chain callers pass the ABI-encoded reservation tuple as
-    /// the call's payload, which Solidity decodes directly.
-    /// @param params Reservation request; see @custom:struct BaseReservation.
-    function reserveBaseName(BaseReservation calldata params) external;
+    /// `MAX_RESERVATION_QUEUE`. Cross-chain callers pass the ABI-encoded tuple as the call's
+    /// payload, which Solidity decodes directly.
+    /// @param params Issuance and reservation request; see
+    /// @custom:struct DeviceNameIssuanceWithReservation.
+    function issueDeviceNameWithReservation(DeviceNameIssuanceWithReservation calldata params)
+        external;
 
-    /// @notice Enqueues only the full/base-name reservation for a user.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot).
-    /// This is the second step of the split
-    /// gateway flow: @custom:function reserveLiteName mints the lite username first, then this
-    /// function reserves the full/base label in a separate transaction so proof-size stays below
-    /// per-call limits. Reverts with @custom:reverts InvalidBaseLabel when the label is empty,
-    /// is not lowercase ASCII letters (so a hyphen or any digit rejects it), or is
-    /// governance-reserved, and with
-    /// @custom:reverts BaseNameAlreadyRegistered when the label already has an owner on the
-    /// registrar and so could never be claimed. The caller remains agnostic about
-    /// backend batching; it simply exposes a small retryable primitive.
-    /// @param params Reservation request; see @custom:struct BaseNameReservation.
-    function reserveBaseNameOnly(BaseNameReservation calldata params) external;
+    /// @notice Enqueues only a personhood-name reservation for a user.
+    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). This is the
+    /// second step of the split gateway flow: @custom:function issueDeviceName issues the device
+    /// name first, then this function reserves the personhood name in a separate transaction so
+    /// proof-size stays below per-call limits. Reverts with @custom:reverts InvalidPersonhoodLabel
+    /// when the label is empty, is not lowercase ASCII letters (so a hyphen or any digit rejects
+    /// it), or is governance-reserved, and with @custom:reverts PersonhoodNameUnavailable when the
+    /// label already has an owner on the registrar and so could never be claimed. Moving the user
+    /// out of a prior queue @custom:emits ReservationRelinquished. The caller remains agnostic
+    /// about backend batching; it simply exposes a small retryable primitive.
+    /// @param params Reservation request; see @custom:struct PersonhoodNameReservation.
+    function reservePersonhoodName(PersonhoodNameReservation calldata params) external;
 
-    /// @notice Registers a lite-person username on behalf of the supplied
-    /// user without touching the base-name reservation queue.
+    /// @notice Issues a device name to the supplied user without touching the reservation queue.
     /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
     /// supplied label must satisfy the `stem.NN` shape and must classify outside the
-    /// governance-reserved tier (otherwise @custom:reverts InvalidLiteLabel); a supplied chat
+    /// governance-reserved tier (otherwise @custom:reverts InvalidDeviceLabel); a supplied chat
     /// key whose length is neither zero nor `CHAT_KEY_LENGTH` reverts
-    /// @custom:reverts InvalidChatKey before mint and resolver writes run. A username that has
-    /// already been issued reverts @custom:reverts LiteNameAlreadyIssued. On a warm-path mint
-    /// @custom:emits LiteNameReserved and @custom:emits NameRegistered. On a cold-path
-    /// mint @custom:emits LiteNameReserved and @custom:emits PendingClaimStashed, with
+    /// @custom:reverts InvalidChatKey before mint and resolver writes run. A device name that has
+    /// already been issued reverts @custom:reverts DeviceNameAlreadyIssued. On a warm-path mint
+    /// @custom:emits DeviceNameIssued and @custom:emits NameRegistered. On a cold-path
+    /// mint @custom:emits DeviceNameIssued and @custom:emits PendingClaimStashed, with
     /// @custom:emits NameRegistered deferred to @custom:function settlePendingClaims when the
-    /// claim settles. Cross-chain callers pass the ABI-encoded lite-registration tuple as the
-    /// call's payload, which Solidity decodes directly.
-    /// @param params Registration request; see @custom:struct LiteRegistration.
-    function reserveLiteName(LiteRegistration calldata params) external;
+    /// claim settles. Cross-chain callers pass the ABI-encoded issuance tuple as the call's
+    /// payload, which Solidity decodes directly.
+    /// @param params Issuance request; see @custom:struct DeviceNameIssuance.
+    function issueDeviceName(DeviceNameIssuance calldata params) external;
 
     /// @notice Whether this controller issued `label` as a PoP identity.
-    /// @dev Keyed by text, so it answers about a name rather than about a node. A lite label is
-    /// issued as a subname (`joseph` beneath its numeric container `42`) and a full-person label as
+    /// @dev Keyed by text, so it answers about a name rather than about a node. A device name is
+    /// issued as a subname (`joseph` beneath its numeric container `42`) and a personhood name as
     /// a second-level name, so a caller holding a node must check that the node is the one `label`
     /// resolves to under those rules before reading this answer as being about what it holds; node
     /// identity is what names the object. Set at mint and never cleared, so it is unaffected by a
@@ -326,51 +330,50 @@ interface IDotnsPopController is IDotnsController {
     /// @return issued True when this controller issued `label`.
     function isPopIssued(string calldata label) external view returns (bool issued);
 
-    /// @notice Registers a full-person username on behalf of the supplied user.
-    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
-    /// base label must be a letters-only person label, and therefore a true base label,
-    /// (otherwise @custom:reverts InvalidBaseLabel), and the label must not
-    /// classify as governance-reserved (otherwise @custom:reverts InvalidBaseLabel). The
-    /// gateway also defers to PopRules as the single cross-flow authority: when PopRules
-    /// carries a live base-name slot held by another user (this controller's prior queue head,
-    /// or a sibling controller's write), the call reverts @custom:reverts NotHolder before any
-    /// queue mutation. Two orthogonal axes drive the state machine. The reservation
-    /// axis treats the user as claiming if and only if they hold the live head-of-queue
-    /// reservation on the base label: a claim wipes the entire queue, releases the PopRules
-    /// slot, and @custom:emits BaseNameClaimed; a non-claim silently relinquishes any
-    /// pending entry the user holds and @custom:emits StandaloneNameRegistered. Advancing
-    /// the queue head past expired entries @custom:emits ReservationExpired for each
-    /// one. The chat-key axis selects whether a fresh key is persisted on the resolver or the
-    /// new entry inherits its key from a prior lite-person username. The fresh-key branch
-    /// rejects a chat key whose length is neither zero nor `CHAT_KEY_LENGTH` (otherwise
-    /// @custom:reverts InvalidChatKey). The `LiteUsername` branch validates the lite label's
-    /// `stem.NN` shape (otherwise @custom:reverts InvalidLiteLabel), requires the registrant to
-    /// own the lite token (otherwise @custom:reverts LiteLabelNotOwnedByUser), reads the lite
-    /// node's chat key from the resolver and copies it across; if the lite node carries no chat
-    /// key the inherited value is empty and the full node's chat-key write is silently skipped
-    /// (the `LiteToFullLinked` event still fires). @custom:emits LiteToFullLinked
-    /// alongside the registration event. On a warm-path mint the event order is
-    /// @custom:emits NameRegistered first (from the inner mint), then
-    /// @custom:emits BaseNameClaimed or @custom:emits StandaloneNameRegistered, then
-    /// @custom:emits LiteToFullLinked when applicable. On a cold-path mint
-    /// @custom:emits PendingClaimStashed replaces the initial @custom:emits NameRegistered;
-    /// the deferred @custom:emits NameRegistered fires later from @custom:function
-    /// settlePendingClaims. Cross-chain callers pass the ABI-encoded full-registration tuple as
-    /// the call's payload, which Solidity decodes directly.
-    /// @param params Registration request; see @custom:struct FullRegistration.
-    function registerBaseName(FullRegistration calldata params) external;
+    /// @notice Issues a personhood name to the supplied user.
+    /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The label must
+    /// be a letters-only personhood label (otherwise @custom:reverts InvalidPersonhoodLabel), and
+    /// must not classify as governance-reserved or as a device-name shape (otherwise
+    /// @custom:reverts InvalidPersonhoodLabel). The gateway also defers to PopRules as the single
+    /// cross-flow authority: when PopRules carries a live base-name slot held by another user (this
+    /// controller's prior queue head, or a sibling controller's write), the call reverts
+    /// @custom:reverts NotHolder before any queue mutation. Two orthogonal axes drive the state
+    /// machine. The reservation axis treats the user as claiming if and only if they hold the live
+    /// head-of-queue reservation on the label: a claim wipes the entire queue
+    /// (@custom:emits ReservationEvicted for every other waiter), releases the PopRules slot, and
+    /// @custom:emits ReservationClaimed; a non-claim drops any pending entry the user holds
+    /// (@custom:emits ReservationRelinquished). Either way the issuance
+    /// @custom:emits PersonhoodNameIssued. Advancing the queue head past expired entries
+    /// @custom:emits ReservationExpired for each one. The chat-key axis selects whether a fresh key
+    /// is persisted on the resolver or the new entry inherits its key from a prior device name.
+    /// The fresh-key branch rejects a chat key whose length is neither zero nor `CHAT_KEY_LENGTH`
+    /// (otherwise @custom:reverts InvalidChatKey). The `DeviceName` branch validates the device
+    /// name's `stem.NN` shape (otherwise @custom:reverts InvalidDeviceLabel), requires the
+    /// registrant to own the device name in the registry (otherwise
+    /// @custom:reverts DeviceNameNotOwned), reads its chat key from the resolver and copies it
+    /// across; if the device name carries no chat key the inherited value is empty and the
+    /// personhood name's chat-key write is silently skipped (the `DeviceNameLinked` event still
+    /// fires). @custom:emits DeviceNameLinked alongside the issuance event. On a warm-path mint
+    /// the event order is @custom:emits NameRegistered first (from the inner mint), then
+    /// @custom:emits PersonhoodNameIssued, then @custom:emits DeviceNameLinked when applicable. On
+    /// a cold-path mint @custom:emits PendingClaimStashed replaces the initial
+    /// @custom:emits NameRegistered; the deferred @custom:emits NameRegistered fires later from
+    /// @custom:function settlePendingClaims. Cross-chain callers pass the ABI-encoded issuance
+    /// tuple as the call's payload, which Solidity decodes directly.
+    /// @param params Issuance request; see @custom:struct PersonhoodNameIssuance.
+    function issuePersonhoodName(PersonhoodNameIssuance calldata params) external;
 
     /// @notice Permissionlessly removes expired entries from the head of a reservation queue.
     /// @dev Permissionless on purpose: anyone (typically a UI or a bot) can poke a stale queue
     /// so the next live head takes over without waiting for the next gateway call. Validates
-    /// `reservedBaseLabel` as a letters-only person label (otherwise
-    /// @custom:reverts InvalidBaseLabel)
-    /// and @custom:emits ReservationExpired for every expired entry reaped from the
-    /// head. A label carrying a digit or a hyphen is not a person label and
-    /// @custom:reverts InvalidBaseLabel, as does a lite label, since a separator is not one
+    /// `label` as a letters-only personhood label (otherwise @custom:reverts
+    /// InvalidPersonhoodLabel) and @custom:emits ReservationExpired for every expired entry reaped
+    /// from the head. A label carrying a digit or a hyphen is not a personhood label and
+    /// @custom:reverts InvalidPersonhoodLabel, as does a device name, since a separator is not one
     /// either. Only a letters-only label reaches the queue, and one that was never reserved
     /// resolves to an empty queue so the call is a no-op.
-    function expireReservation(string calldata reservedBaseLabel) external;
+    /// @param label Personhood name whose queue is reaped.
+    function expireReservation(string calldata label) external;
 
     /// @notice Lets the caller voluntarily drop their own active reservation.
     /// @dev Reverts with @custom:reverts NoActiveReservation when the caller holds no live
@@ -381,9 +384,10 @@ interface IDotnsPopController is IDotnsController {
     function relinquishReservation() external;
 
     /// @notice Returns whether a label currently has a live reservation at the queue head.
-    /// @dev Validates `reservedBaseLabel` as a letters-only person label (otherwise
-    /// @custom:reverts InvalidBaseLabel) before inspecting the queue.
-    function isReservedForClaim(string calldata reservedBaseLabel)
+    /// @dev Validates `label` as a letters-only personhood label (otherwise
+    /// @custom:reverts InvalidPersonhoodLabel) before inspecting the queue.
+    /// @param label Personhood name whose queue is inspected.
+    function isReservedForClaim(string calldata label)
         external
         view
         returns (bool reserved, address holder);
@@ -398,7 +402,7 @@ interface IDotnsPopController is IDotnsController {
     /// the queue is empty; active entries occupy `[head, tail)`. Exposed on the interface
     /// because invariant tests and off-chain consumers use it to enumerate
     /// live queue state without scanning storage.
-    /// @param labelhash Keccak-256 of the base label whose queue is being read.
+    /// @param labelhash Keccak-256 of the personhood name whose queue is being read.
     /// @return head Index of the live queue head.
     /// @return tail Index one past the last queued entry.
     function reservationMeta(bytes32 labelhash) external view returns (uint64 head, uint64 tail);
@@ -407,7 +411,7 @@ interface IDotnsPopController is IDotnsController {
     /// @dev Sparse storage: a zero `entryOwner` means the slot was relinquished, expired and
     /// reaped, or never written. Callers pair this with @custom:function reservationMeta to walk
     /// the live window `[head, tail)`.
-    /// @param labelhash Keccak-256 of the base label whose queue is being read.
+    /// @param labelhash Keccak-256 of the personhood name whose queue is being read.
     /// @param index Queue index to look up.
     /// @return entryOwner Owner of the slot (zero if empty/relinquished).
     /// @return joinedAt Timestamp the entry was enqueued (only meaningful when
@@ -430,14 +434,14 @@ interface IDotnsPopController is IDotnsController {
         view
         returns (UserReservation memory reservation);
 
-    /// @notice Returns the base label a reservation queue is keyed under.
+    /// @notice Returns the personhood name a reservation queue is keyed under.
     /// @dev Reverse lookup from the `bytes32` queue key to its label string, so a consumer that
     /// observed a queue by labelhash (for example from a reservation event) can recover the
     /// human-readable label without holding its preimage. Returns an empty string when no
     /// reservation was ever enqueued under `labelhash`.
-    /// @param labelhash Keccak-256 of the base label.
-    /// @return baseLabel The base label string, or empty when unknown.
-    function reservedBaseLabelOf(bytes32 labelhash) external view returns (string memory baseLabel);
+    /// @param labelhash Keccak-256 of the personhood name.
+    /// @return label The personhood name, or empty when unknown.
+    function reservedLabelOf(bytes32 labelhash) external view returns (string memory label);
 
     /// @notice Returns the window, in seconds, after which a queue or pending-claim entry lapses.
     /// @dev Governance-configurable via @custom:function setReservationDuration. Read by the lens

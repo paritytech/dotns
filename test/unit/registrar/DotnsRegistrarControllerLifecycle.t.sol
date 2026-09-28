@@ -20,15 +20,15 @@ import {ReentrantOverpaymentAttacker} from "../../helpers/ReentrantOverpaymentAt
 ///         and reentrancy guarding.
 contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
     /// @dev The subject is the reclaim path, not the tier: release to escrow, withdraw, let the
-    ///      redeem window elapse, then a new owner reclaims. PopFull because `lights01` is
-    ///      measured whole at eight characters and no public label reaches PopLite.
+    ///      redeem window elapse, then a new owner reclaims. Personhood because `lights01` is
+    ///      measured whole at eight characters and no public label reaches Devicehood.
     function test_register_reclaim_succeeds_for_new_owner() public {
         string memory label = "lights01";
 
         address originalOwner = ed;
         address newOwner = leonardo;
-        _grantPopFull(originalOwner);
-        _grantPopFull(newOwner);
+        _grantPersonhood(originalOwner);
+        _grantPersonhood(newOwner);
 
         _commitAndRegister(label, originalOwner, true);
 
@@ -69,10 +69,10 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         dotnsRegistrarController.register{value: registrationPrice}(registration);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), newOwner);
-        // A public registration reserves no stem, so reclaim has no slot to take over and none
+        // A public registration reserves no base name, so reclaim has no slot to take over and none
         // to garbage-collect.
         (bool isReserved,,) = popRules.isBaseNameReserved(popRules.stripDigits(label));
-        assertFalse(isReserved, "no stem reserved by either registration");
+        assertFalse(isReserved, "no base name reserved by either registration");
     }
 
     function test_register_cross_payer_charges_max_not_sum_of_price_and_reach() public {
@@ -80,7 +80,7 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         address payer = leonardo;
         address nameOwner = ed;
 
-        _grantPopFull(payer);
+        _grantPersonhood(payer);
         _grantNoStatus(nameOwner);
 
         uint256 ownerPrice = popRules.priceWithoutCheck(label, nameOwner).price;
@@ -124,7 +124,7 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         address payer = leonardo;
         address nameOwner = ed;
 
-        _grantPopFull(payer);
+        _grantPersonhood(payer);
         _grantNoStatus(nameOwner);
 
         uint256 ownerPrice = popRules.priceWithoutCheck(label, nameOwner).price;
@@ -200,7 +200,7 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
     function test_register_creates_funded_position_for_self_registration() public {
         string memory label = BASE_LABEL_A;
         address nameOwner = ed;
-        _grantPopFull(nameOwner);
+        _grantPersonhood(nameOwner);
 
         IDotnsRegistrarController.Registration memory registration =
             IDotnsRegistrarController.Registration({
@@ -347,7 +347,7 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         string memory firstLabel = "primary01";
         string memory secondLabel = "secondary01";
 
-        _grantPopLite(ed);
+        _grantDevicehood(ed);
 
         _commitAndRegister(firstLabel, ed, true);
         assertEq(dotnsReverseResolver.nameOf(ed), string.concat(firstLabel, ".dot"));

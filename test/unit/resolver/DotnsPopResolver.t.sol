@@ -31,26 +31,26 @@ contract DotnsPopResolverTests is BaseDotns {
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), _validChatKey(0x04));
     }
 
-    function test_setLiteLink_writes_and_emits() public {
-        bytes32 fullNode = _nodeOf("alice");
-        bytes32 liteLabelhash = keccak256(bytes("alice42"));
+    function test_setDeviceLink_writes_and_emits() public {
+        bytes32 personhoodNode = _nodeOf("alice");
+        bytes32 deviceLabelhash = keccak256(bytes("alice42"));
 
         vm.prank(address(dotnsPopController));
         vm.expectEmit(true, true, false, false);
-        emit IDotnsPopResolver.LiteLinkUpdated(fullNode, liteLabelhash);
-        dotnsPopResolver.setLiteLink(fullNode, liteLabelhash);
+        emit IDotnsPopResolver.DeviceLinkUpdated(personhoodNode, deviceLabelhash);
+        dotnsPopResolver.setDeviceLink(personhoodNode, deviceLabelhash);
         // Both directions must be populated by a single write: forward
-        // (full => lite) and reverse (lite => full). The reverse index is what
-        // downstream consumers (Nova) use to answer "given this lite username,
-        // which full name did they claim?".
-        assertEq(dotnsPopResolver.liteLink(fullNode), liteLabelhash);
-        assertEq(dotnsPopResolver.fullClaim(liteLabelhash), fullNode);
+        // (personhood => device) and reverse (device => personhood). The reverse index is what
+        // downstream consumers (Nova) use to answer "given this device name,
+        // which personhood name did they claim?".
+        assertEq(dotnsPopResolver.deviceLink(personhoodNode), deviceLabelhash);
+        assertEq(dotnsPopResolver.personhoodLink(deviceLabelhash), personhoodNode);
     }
 
-    function test_setLiteLink_reverts_for_unauthorised_caller() public {
+    function test_setDeviceLink_reverts_for_unauthorised_caller() public {
         vm.prank(ed);
         vm.expectRevert(abi.encodeWithSelector(IDotnsPopResolver.NotPopController.selector, ed));
-        dotnsPopResolver.setLiteLink(_nodeOf("alice"), keccak256(bytes("alice42")));
+        dotnsPopResolver.setDeviceLink(_nodeOf("alice"), keccak256(bytes("alice42")));
     }
 
     function test_setChatKey_accepts_zero_node_as_passthrough() public {
@@ -67,11 +67,11 @@ contract DotnsPopResolverTests is BaseDotns {
         assertEq(dotnsPopResolver.chatKey(bytes32(0)), key);
     }
 
-    function test_setLiteLink_accepts_zero_inputs_as_passthrough() public {
+    function test_setDeviceLink_accepts_zero_inputs_as_passthrough() public {
         vm.prank(address(dotnsPopController));
-        dotnsPopResolver.setLiteLink(bytes32(0), bytes32(0));
-        assertEq(dotnsPopResolver.liteLink(bytes32(0)), bytes32(0));
-        assertEq(dotnsPopResolver.fullClaim(bytes32(0)), bytes32(0));
+        dotnsPopResolver.setDeviceLink(bytes32(0), bytes32(0));
+        assertEq(dotnsPopResolver.deviceLink(bytes32(0)), bytes32(0));
+        assertEq(dotnsPopResolver.personhoodLink(bytes32(0)), bytes32(0));
     }
 
     function test_rotating_pop_controller_changes_authorised_writer() public {
@@ -174,156 +174,156 @@ contract DotnsPopResolverTests is BaseDotns {
         dotnsPopResolver.setChatKey(_nodeOf("alice42"), key);
     }
 
-    function test_setLiteLink_same_full_node_relink_clears_old_reverse() public {
-        bytes32 fullA = _nodeOf("alice");
-        bytes32 liteX = keccak256(bytes("alice42"));
-        bytes32 liteY = keccak256(bytes("alice99"));
+    function test_setDeviceLink_same_personhood_node_relink_clears_old_reverse() public {
+        bytes32 personhoodA = _nodeOf("alice");
+        bytes32 deviceX = keccak256(bytes("alice42"));
+        bytes32 deviceY = keccak256(bytes("alice99"));
 
         vm.startPrank(address(dotnsPopController));
-        dotnsPopResolver.setLiteLink(fullA, liteX);
-        dotnsPopResolver.setLiteLink(fullA, liteY);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceX);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceY);
         vm.stopPrank();
         // Old reverse must be cleared so downstream consumers stop resolving
-        // `liteX` to `fullA`.
-        assertEq(dotnsPopResolver.fullClaim(liteX), bytes32(0));
+        // `deviceX` to `personhoodA`.
+        assertEq(dotnsPopResolver.personhoodLink(deviceX), bytes32(0));
         // New pair round-trips cleanly.
-        assertEq(dotnsPopResolver.liteLink(fullA), liteY);
-        assertEq(dotnsPopResolver.fullClaim(liteY), fullA);
+        assertEq(dotnsPopResolver.deviceLink(personhoodA), deviceY);
+        assertEq(dotnsPopResolver.personhoodLink(deviceY), personhoodA);
     }
 
-    function test_setLiteLink_same_lite_relink_clears_old_forward() public {
-        bytes32 fullA = _nodeOf("alice");
-        bytes32 fullB = _nodeOf("bob");
-        bytes32 liteX = keccak256(bytes("alice42"));
+    function test_setDeviceLink_same_device_relink_clears_old_forward() public {
+        bytes32 personhoodA = _nodeOf("alice");
+        bytes32 personhoodB = _nodeOf("bob");
+        bytes32 deviceX = keccak256(bytes("alice42"));
 
         vm.startPrank(address(dotnsPopController));
-        dotnsPopResolver.setLiteLink(fullA, liteX);
-        dotnsPopResolver.setLiteLink(fullB, liteX);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceX);
+        dotnsPopResolver.setDeviceLink(personhoodB, deviceX);
         vm.stopPrank();
-        // Old forward must be cleared so `fullA` no longer claims `liteX`.
-        assertEq(dotnsPopResolver.liteLink(fullA), bytes32(0));
+        // Old forward must be cleared so `personhoodA` no longer claims `deviceX`.
+        assertEq(dotnsPopResolver.deviceLink(personhoodA), bytes32(0));
         // New pair round-trips.
-        assertEq(dotnsPopResolver.liteLink(fullB), liteX);
-        assertEq(dotnsPopResolver.fullClaim(liteX), fullB);
+        assertEq(dotnsPopResolver.deviceLink(personhoodB), deviceX);
+        assertEq(dotnsPopResolver.personhoodLink(deviceX), personhoodB);
     }
 
-    function test_setLiteLink_idempotent_relink_keeps_both_indices() public {
-        bytes32 fullA = _nodeOf("alice");
-        bytes32 liteX = keccak256(bytes("alice42"));
+    function test_setDeviceLink_idempotent_relink_keeps_both_indices() public {
+        bytes32 personhoodA = _nodeOf("alice");
+        bytes32 deviceX = keccak256(bytes("alice42"));
 
         vm.startPrank(address(dotnsPopController));
-        dotnsPopResolver.setLiteLink(fullA, liteX);
-        dotnsPopResolver.setLiteLink(fullA, liteX);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceX);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceX);
         vm.stopPrank();
         // Writing the same pair twice must not accidentally delete either
-        // side: the `oldLite == liteLabelhash` and `oldFull == fullNode`
+        // side: the `oldDevice == deviceLabelhash` and `oldPersonhood == personhoodNode`
         // guards in the implementation are the things under test here.
-        assertEq(dotnsPopResolver.liteLink(fullA), liteX);
-        assertEq(dotnsPopResolver.fullClaim(liteX), fullA);
+        assertEq(dotnsPopResolver.deviceLink(personhoodA), deviceX);
+        assertEq(dotnsPopResolver.personhoodLink(deviceX), personhoodA);
     }
 
-    function test_setLiteLink_chain_returns_to_original_without_drift() public {
-        bytes32 fullA = _nodeOf("alice");
-        bytes32 liteX = keccak256(bytes("alice42"));
-        bytes32 liteY = keccak256(bytes("alice99"));
+    function test_setDeviceLink_chain_returns_to_original_without_drift() public {
+        bytes32 personhoodA = _nodeOf("alice");
+        bytes32 deviceX = keccak256(bytes("alice42"));
+        bytes32 deviceY = keccak256(bytes("alice99"));
 
         vm.startPrank(address(dotnsPopController));
-        dotnsPopResolver.setLiteLink(fullA, liteX);
-        dotnsPopResolver.setLiteLink(fullA, liteY);
-        dotnsPopResolver.setLiteLink(fullA, liteX);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceX);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceY);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceX);
         vm.stopPrank();
         // After A -> X -> Y -> X, only the (A, X) pair survives.
-        assertEq(dotnsPopResolver.liteLink(fullA), liteX);
-        assertEq(dotnsPopResolver.fullClaim(liteX), fullA);
-        assertEq(dotnsPopResolver.fullClaim(liteY), bytes32(0));
+        assertEq(dotnsPopResolver.deviceLink(personhoodA), deviceX);
+        assertEq(dotnsPopResolver.personhoodLink(deviceX), personhoodA);
+        assertEq(dotnsPopResolver.personhoodLink(deviceY), bytes32(0));
     }
 
-    function test_setLiteLink_cross_chain_no_drift() public {
-        bytes32 fullA = _nodeOf("alice");
-        bytes32 fullB = _nodeOf("bob");
-        bytes32 liteX = keccak256(bytes("alice42"));
+    function test_setDeviceLink_cross_chain_no_drift() public {
+        bytes32 personhoodA = _nodeOf("alice");
+        bytes32 personhoodB = _nodeOf("bob");
+        bytes32 deviceX = keccak256(bytes("alice42"));
 
         vm.startPrank(address(dotnsPopController));
-        dotnsPopResolver.setLiteLink(fullA, liteX);
-        dotnsPopResolver.setLiteLink(fullB, liteX);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceX);
+        dotnsPopResolver.setDeviceLink(personhoodB, deviceX);
         vm.stopPrank();
         // A must no longer appear as a claimant of anything, only B.
-        assertEq(dotnsPopResolver.liteLink(fullA), bytes32(0));
-        assertEq(dotnsPopResolver.liteLink(fullB), liteX);
-        assertEq(dotnsPopResolver.fullClaim(liteX), fullB);
+        assertEq(dotnsPopResolver.deviceLink(personhoodA), bytes32(0));
+        assertEq(dotnsPopResolver.deviceLink(personhoodB), deviceX);
+        assertEq(dotnsPopResolver.personhoodLink(deviceX), personhoodB);
     }
 
-    function test_setLiteLink_quadrangle_clears_both_stale_inverses() public {
-        bytes32 fullA = _nodeOf("alice");
-        bytes32 fullB = _nodeOf("bob");
-        bytes32 liteX = keccak256(bytes("alice42"));
-        bytes32 liteY = keccak256(bytes("bob42"));
+    function test_setDeviceLink_quadrangle_clears_both_stale_inverses() public {
+        bytes32 personhoodA = _nodeOf("alice");
+        bytes32 personhoodB = _nodeOf("bob");
+        bytes32 deviceX = keccak256(bytes("alice42"));
+        bytes32 deviceY = keccak256(bytes("bob42"));
 
         vm.startPrank(address(dotnsPopController));
-        dotnsPopResolver.setLiteLink(fullA, liteX);
-        dotnsPopResolver.setLiteLink(fullB, liteY);
-        dotnsPopResolver.setLiteLink(fullA, liteY);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceX);
+        dotnsPopResolver.setDeviceLink(personhoodB, deviceY);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceY);
         vm.stopPrank();
         // After (A,X), (B,Y), (A,Y): only (A,Y) remains. B's forward link
         // and X's reverse link must both be cleared.
-        assertEq(dotnsPopResolver.liteLink(fullA), liteY);
-        assertEq(dotnsPopResolver.liteLink(fullB), bytes32(0));
-        assertEq(dotnsPopResolver.fullClaim(liteY), fullA);
-        assertEq(dotnsPopResolver.fullClaim(liteX), bytes32(0));
+        assertEq(dotnsPopResolver.deviceLink(personhoodA), deviceY);
+        assertEq(dotnsPopResolver.deviceLink(personhoodB), bytes32(0));
+        assertEq(dotnsPopResolver.personhoodLink(deviceY), personhoodA);
+        assertEq(dotnsPopResolver.personhoodLink(deviceX), bytes32(0));
     }
 
-    function test_setLiteLink_with_zero_lite_is_passthrough() public {
-        bytes32 fullA = _nodeOf("alice");
+    function test_setDeviceLink_with_zero_device_is_passthrough() public {
+        bytes32 personhoodA = _nodeOf("alice");
         // Pin current behaviour for the zero-hash edge: the setter does not
-        // revert on a zero `liteLabelhash` and writes both indices at the
+        // revert on a zero `deviceLabelhash` and writes both indices at the
         // zero key. Any future validator that rejects zero inputs lands
         // here as a failing assertion.
         vm.prank(address(dotnsPopController));
-        dotnsPopResolver.setLiteLink(fullA, bytes32(0));
+        dotnsPopResolver.setDeviceLink(personhoodA, bytes32(0));
 
-        assertEq(dotnsPopResolver.liteLink(fullA), bytes32(0));
-        assertEq(dotnsPopResolver.fullClaim(bytes32(0)), fullA);
+        assertEq(dotnsPopResolver.deviceLink(personhoodA), bytes32(0));
+        assertEq(dotnsPopResolver.personhoodLink(bytes32(0)), personhoodA);
     }
 
-    function test_setLiteLink_long_chain_invariant_holds_at_every_step() public {
-        // Ten sequential re-links of the same `fullNode` to fresh lite
+    function test_setDeviceLink_long_chain_invariant_holds_at_every_step() public {
+        // Ten sequential re-links of the same `personhoodNode` to fresh device-name
         // labelhashes. At each step the forward and reverse indices must
-        // round-trip for the current pair, and the previous lite's reverse
+        // round-trip for the current pair, and the previous device name's reverse
         // entry must have been cleared.
-        bytes32 fullA = _nodeOf("alice");
-        bytes32 previousLite = bytes32(0);
+        bytes32 personhoodA = _nodeOf("alice");
+        bytes32 previousDevice = bytes32(0);
 
         vm.startPrank(address(dotnsPopController));
         for (uint256 i = 1; i <= 10; i++) {
-            bytes32 currentLite = keccak256(abi.encodePacked("alice", i));
-            dotnsPopResolver.setLiteLink(fullA, currentLite);
+            bytes32 currentDevice = keccak256(abi.encodePacked("alice", i));
+            dotnsPopResolver.setDeviceLink(personhoodA, currentDevice);
             // Current pair round-trips.
-            assertEq(dotnsPopResolver.liteLink(fullA), currentLite);
-            assertEq(dotnsPopResolver.fullClaim(currentLite), fullA);
+            assertEq(dotnsPopResolver.deviceLink(personhoodA), currentDevice);
+            assertEq(dotnsPopResolver.personhoodLink(currentDevice), personhoodA);
             // Previous reverse entry was nulled.
-            if (previousLite != bytes32(0)) {
-                assertEq(dotnsPopResolver.fullClaim(previousLite), bytes32(0));
+            if (previousDevice != bytes32(0)) {
+                assertEq(dotnsPopResolver.personhoodLink(previousDevice), bytes32(0));
             }
 
-            previousLite = currentLite;
+            previousDevice = currentDevice;
         }
         vm.stopPrank();
     }
 
-    function test_setLiteLink_old_lite_reads_zero_after_relink() public {
-        // Integration-shaped assertion: a consumer that cached the old lite
-        // hash and later queries `fullClaim` must see `bytes32(0)`, not a
-        // stale fullNode.
-        bytes32 fullA = _nodeOf("alice");
-        bytes32 liteX = keccak256(bytes("alice42"));
-        bytes32 liteY = keccak256(bytes("alice99"));
+    function test_setDeviceLink_old_device_reads_zero_after_relink() public {
+        // Integration-shaped assertion: a consumer that cached the old device-name
+        // hash and later queries `personhoodLink` must see `bytes32(0)`, not a
+        // stale personhoodNode.
+        bytes32 personhoodA = _nodeOf("alice");
+        bytes32 deviceX = keccak256(bytes("alice42"));
+        bytes32 deviceY = keccak256(bytes("alice99"));
 
         vm.startPrank(address(dotnsPopController));
-        dotnsPopResolver.setLiteLink(fullA, liteX);
-        dotnsPopResolver.setLiteLink(fullA, liteY);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceX);
+        dotnsPopResolver.setDeviceLink(personhoodA, deviceY);
         vm.stopPrank();
 
-        assertEq(dotnsPopResolver.fullClaim(liteX), bytes32(0));
+        assertEq(dotnsPopResolver.personhoodLink(deviceX), bytes32(0));
     }
     // 65-byte chat-key helper now lives on BaseDotns as `_validChatKey`.
 }

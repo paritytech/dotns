@@ -23,7 +23,7 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 /// controller's pending queue, ownership from the registry, chat keys and links from the PoP
 /// resolver, and label classification from PopRules. The registry is the single ownership
 /// authority: it delegates a tokenised name to the registrar and owns a subname directly, so a
-/// lite username, which is a subname, resolves the same way as a full-person name. Living outside
+/// device name, which is a subname, resolves the same way as a personhood name. Living outside
 /// the controller keeps the controller within the contract-size limit. Deployed as a plain
 /// contract through the CREATE3 factory, so its address is deterministic and it can be redeployed
 /// on a read change without touching stored state.
@@ -47,7 +47,7 @@ contract DotnsPopLens is IDotnsPopLens {
     }
 
     /// @inheritdoc IDotnsPopLens
-    function liteNamesOf(
+    function namesOf(
         address user,
         uint256 offset,
         uint256 limit
@@ -57,31 +57,12 @@ contract DotnsPopLens is IDotnsPopLens {
         override
         returns (Name[] memory names)
     {
-        return _pageNames(user, offset, limit, true);
+        return _pageNames(user, offset, limit);
     }
 
     /// @inheritdoc IDotnsPopLens
-    function fullNamesOf(
-        address user,
-        uint256 offset,
-        uint256 limit
-    )
-        external
-        view
-        override
-        returns (Name[] memory names)
-    {
-        return _pageNames(user, offset, limit, false);
-    }
-
-    /// @inheritdoc IDotnsPopLens
-    function liteNameCountOf(address user) external view override returns (uint256 count) {
-        return _countNames(user, true);
-    }
-
-    /// @inheritdoc IDotnsPopLens
-    function fullNameCountOf(address user) external view override returns (uint256 count) {
-        return _countNames(user, false);
+    function nameCountOf(address user) external view override returns (uint256 count) {
+        return _countNames(user);
     }
 
     /// @inheritdoc IDotnsPopLens
@@ -90,8 +71,8 @@ contract DotnsPopLens is IDotnsPopLens {
         // label from the node alone, and classification must see the label before the detail is
         // returned.
         NameDetail memory detail = _detail(_nodeOf(name), name);
-        // Holding the label means holding its labelhash, so the lite-to-full link resolves here.
-        detail.fullClaim = _popResolver().fullClaim(LabelUtils.labelhash(name));
+        // Holding the label means holding its labelhash, so the personhood link resolves here.
+        detail.personhoodLink = _popResolver().personhoodLink(LabelUtils.labelhash(name));
         return detail;
     }
 
@@ -100,10 +81,11 @@ contract DotnsPopLens is IDotnsPopLens {
         // No label is supplied: the node cannot recover a pending subname's label, so it stays
         // empty.
         NameDetail memory detail = _detail(node, "");
-        // The node cannot be inverted to a labelhash, so `fullClaim` resolves only when the label
-        // is independently recoverable (a settled name whose label the registrar returns).
+        // The node cannot be inverted to a labelhash, so `personhoodLink` resolves only when the
+        // label is independently recoverable (a settled name whose label the registrar returns).
         if (bytes(detail.label).length != 0) {
-            detail.fullClaim = _popResolver().fullClaim(LabelUtils.labelhashMemory(detail.label));
+            detail.personhoodLink =
+                _popResolver().personhoodLink(LabelUtils.labelhashMemory(detail.label));
         }
         return detail;
     }
@@ -116,29 +98,26 @@ contract DotnsPopLens is IDotnsPopLens {
         profile.reservationLabelhash = controller.userReservation(user).labelhash;
     }
 
-    /// @notice Whether `label` belongs in the lite listing (`wantLite`) or the full listing.
-    /// @dev Two questions and one guard the caller already applied. Whether a name is an identity
-    /// at all is provenance, so each listing is gated on
+    /// @notice Whether `label` belongs in the listing: a name the gateway issued.
+    /// @dev Whether a name is an identity at all is provenance, so the listing is gated on
     /// @custom:function IDotnsPopController.isPopIssued: characters alone would admit a public
-    /// registration spelled `joseph42`, which reads as a full-person name and is not one. Which
-    /// kind of identity it is, lite or full, is spelling: a lite name carries its separator and a
-    /// full-person name does not, and provenance covers both. A lite name is a subname and a
-    /// full-person name is a tokenised second-level name, and the callers resolve ownership through
-    /// the registry, which covers both, so both listings reach their names. Provenance is keyed by
-    /// text, so a subname a `user` created under a name they own does not enter a listing unless
-    /// the controller issued it. The two listings together cover the names the gateway issued and
-    /// `user` holds, one kind each, rather than everything the account holds.
-    function _belongsToListing(string memory label, bool wantLite) internal view returns (bool) {
+    /// registration spelled `joseph42`, which reads as a personhood name and is not one. The
+    /// label shape then confirms it is one of the two kinds the gateway issues, a device name with
+    /// its separator or a personhood name without one. A device name is a subname and a
+    /// personhood name is a tokenised second-level name, and the callers resolve ownership through
+    /// the registry, which covers both. Provenance is keyed by text, so a subname a `user` created
+    /// under a name they own does not enter the listing unless the controller issued it.
+    function _belongsToListing(string memory label) internal view returns (bool) {
         if (!_controller().isPopIssued(label)) return false;
-        return wantLite ? label.isLitePersonLabelMemory() : label.isSingleLabelMemory();
+        return label.isDeviceLabelMemory() || label.isSingleLabelMemory();
     }
 
-    /// @notice Counts the names currently owned by `user` that belong to the requested listing.
+    /// @notice Counts the gateway-issued names currently owned by `user`.
     /// @dev Walks the user's `LabelStore` (settled names) then their pending claims, keeping only
     /// entries that belong to the listing and are still owned by `user` on the registrar. A pending
     /// entry already written into the store by a sibling flow is skipped so it is not counted
     /// twice.
-    function _countNames(address user, bool wantLite) internal view returns (uint256 count) {
+    function _countNames(address user) internal view returns (uint256 count) {
         string memory tld = _protocolRegistry.tld();
         address store = _storeFactory().getLabelStore(user);
 
@@ -152,7 +131,7 @@ contract DotnsPopLens is IDotnsPopLens {
                 // The store keys ownership by node and provenance by text separately; bind them so
                 // a row whose key is not its own text's node is neither counted nor listed.
                 if (node != _nodeOf(label)) continue;
-                if (_belongsToListing(label, wantLite)) ++count;
+                if (_belongsToListing(label)) ++count;
             }
         }
 
@@ -160,14 +139,14 @@ contract DotnsPopLens is IDotnsPopLens {
         uint256 pending = queue.length;
         for (uint256 j; j < pending; ++j) {
             string memory label = queue[j].label;
-            if (!_belongsToListing(label, wantLite)) continue;
+            if (!_belongsToListing(label)) continue;
             bytes32 node = _nodeOf(label);
             if (store != address(0) && ILabelStore(store).isLocked(node)) continue;
             if (_ownedBy(node, user)) ++count;
         }
     }
 
-    /// @notice Returns a page of `user`'s owned names belonging to the requested listing.
+    /// @notice Returns a page of `user`'s owned gateway-issued names.
     /// @dev Same ownership-verified walk as @custom:function _countNames, in the same order
     /// (store then pending), skipping the first `offset` matches and returning up to `limit`
     /// entries. `limit` is clamped to `DotnsConstants.MAX_PAGE_SIZE` to bound the memory and the
@@ -175,8 +154,7 @@ contract DotnsPopLens is IDotnsPopLens {
     function _pageNames(
         address user,
         uint256 offset,
-        uint256 limit,
-        bool wantLite
+        uint256 limit
     )
         internal
         view
@@ -202,7 +180,7 @@ contract DotnsPopLens is IDotnsPopLens {
                 // Bind the row's node key to its own text, so a row whose key is not its text's
                 // node is neither counted nor listed.
                 if (node != _nodeOf(label)) continue;
-                if (!_belongsToListing(label, wantLite)) continue;
+                if (!_belongsToListing(label)) continue;
                 if (seen++ < offset) continue;
                 page[filled++] = Name({node: node, label: label, settled: true, deadline: 0});
             }
@@ -213,7 +191,7 @@ contract DotnsPopLens is IDotnsPopLens {
         uint64 duration = _controller().reservationDuration();
         for (uint256 j; j < pending && filled < limit; ++j) {
             string memory label = queue[j].label;
-            if (!_belongsToListing(label, wantLite)) continue;
+            if (!_belongsToListing(label)) continue;
             bytes32 node = _nodeOf(label);
             if (store != address(0) && ILabelStore(store).isLocked(node)) continue;
             if (!_ownedBy(node, user)) continue;
@@ -240,11 +218,12 @@ contract DotnsPopLens is IDotnsPopLens {
 
     /// @notice Gathers a name's record from the registrar, PoP resolver, and PopRules.
     /// @dev Reads defensively so an unminted or unsettled name yields zeroed fields instead of
-    /// reverting. `fullClaim` is left for the caller because it needs the labelhash, which is
-    /// recoverable from the label string but not from the node alone. `tier` classifies the label
-    /// shape, so `knownLabel` supplies the label for a pending subname the node cannot recover,
-    /// letting classification run before the detail is returned; it is ignored when the label is
-    /// otherwise recoverable, and an empty `knownLabel` leaves an unrecoverable label unclassified.
+    /// reverting. `personhoodLink` is left for the caller because it needs the labelhash, which is
+    /// recoverable from the label string but not from the node alone. `requiredTier` classifies the
+    /// label shape, so `knownLabel` supplies the label for a pending subname the node cannot
+    /// recover, letting classification run before the detail is returned; it is ignored when the
+    /// label is otherwise recoverable, and an empty `knownLabel` leaves an unrecoverable label
+    /// unclassified.
     /// @param node The name's node.
     /// @param knownLabel Label the caller already holds, used only when the node cannot recover it.
     function _detail(
@@ -282,12 +261,12 @@ contract DotnsPopLens is IDotnsPopLens {
             try _popRules().classifyName(detail.label) returns (
                 IPopRules.PopStatus tier, string memory
             ) {
-                detail.tier = tier;
+                detail.requiredTier = tier;
             } catch {}
         }
         IDotnsPopResolver resolver = _popResolver();
         detail.chatKey = resolver.chatKey(node);
-        detail.liteLink = resolver.liteLink(node);
+        detail.deviceLink = resolver.deviceLink(node);
     }
 
     /// @notice Reads a bounded page of `user`'s pending claims from the controller.
@@ -316,15 +295,15 @@ contract DotnsPopLens is IDotnsPopLens {
         return IDotnsRegistry(_protocolRegistry.get(DotnsConstants.REGISTRY));
     }
 
-    /// @notice Derives the node a name resolves to, whether tokenised or a lite subname.
-    /// @dev A lite name is `stem` beneath its numeric container, so it hashes as a subnode; any
+    /// @notice Derives the node a name resolves to, whether tokenised or a device-name subname.
+    /// @dev A device name is `stem` beneath its numeric container, so it hashes as a subnode; any
     /// other name hashes as a second-level label under the TLD.
     /// @param label Bare label without the TLD, e.g. `alice` or `alice.01`.
     /// @return node The node the name resolves to.
     function _nodeOf(string memory label) internal view returns (bytes32 node) {
         bytes32 tldNode = _protocolRegistry.tldNode();
-        if (label.isLitePersonLabelMemory()) {
-            return SubnodeUtils.liteSubnodeOf(tldNode, label);
+        if (label.isDeviceLabelMemory()) {
+            return SubnodeUtils.deviceSubnodeOf(tldNode, label);
         }
         node = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(label));
     }

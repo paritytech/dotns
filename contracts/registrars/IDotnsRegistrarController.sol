@@ -157,8 +157,8 @@ interface IDotnsRegistrarController is IDotnsController {
     /// `priceWithCheck` but applies it directly via @custom:reverts OwnerStatusInsufficient
     /// when the owner's recorded tier does not meet the label's required tier, and still
     /// rejects governance-reserved labels with @custom:reverts GovernanceReserved and live
-    /// cross-user stem reservations with @custom:reverts NameReserved. The cross-payer charge is
-    /// the owner-side registration price; the path applies no separate transfer friction. The
+    /// cross-user base-name reservations with @custom:reverts NameReserved. The cross-payer charge
+    /// is the owner-side registration price; the path applies no separate transfer friction. The
     /// charge routes to the escrow protocol fee pot while seeding a zero-amount deposit slot so
     /// the release lifecycle stays reachable. The reveal prices the name at the committed
     /// `pricingVersion`, so a model change between commit and reveal leaves the amount unchanged,

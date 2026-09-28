@@ -51,7 +51,7 @@ contract StoreIntegrationTest is BaseDotns {
     }
 
     function test_pop_controller_registration_writes_label_store() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
         string memory base = BASE_LABEL_A;
         // DotnsPopResolver.setChatKey requires exactly 65 bytes (uncompressed ECDSA pubkey).
@@ -61,8 +61,10 @@ contract StoreIntegrationTest is BaseDotns {
             chatKey[i] = bytes1(uint8(i + 1));
         }
 
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: base, user: ed, link: _linkFresh(chatKey)})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: base, user: ed, link: _linkFresh(chatKey)
+            })
         );
 
         vm.prank(ed);

@@ -29,8 +29,9 @@ contract DotnsScarcityPricing is IDotnsPricing {
     /// @dev Carries the curve invariants: the base fee and floor are both strictly positive, the
     ///      floor does not exceed the base fee, and the base fee stays within
     ///      `type(uint256).max / 512` so the multiplication below nine characters cannot overflow.
-    ///      An all-digit label such as "42" strips to base length 0 and reaches the 2**9
-    /// multiplier, which sets the /512 ceiling. Any breach triggers @custom:reverts PricingError.
+    ///      A base length of 0 reaches the 2**9 multiplier, which sets the /512 ceiling: no label
+    ///      measures zero, but the pricing function accepts any length. Any breach triggers
+    ///      @custom:reverts PricingError.
     /// @param baseFeeValue Base fee D in wei.
     /// @param minPriceValue Price floor F in wei.
     constructor(uint256 baseFeeValue, uint256 minPriceValue) {

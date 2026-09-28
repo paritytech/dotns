@@ -43,7 +43,7 @@ interface IDotnsRegistrar is IERC721 {
     error InvalidLabel();
 
     /// @notice Thrown when a transfer or a transfer-fee quote targets a soulbound name.
-    /// @dev Soulbound names are minted through the PoP gateway and are permanently
+    /// @dev Soulbound names are minted through the dotNS gateway pallet and are permanently
     /// non-transferable. Raised by the `_update` transfer gate and by
     /// @custom:function quoteTransferFee.
     error NameSoulbound(uint256 tokenId);
@@ -109,7 +109,7 @@ interface IDotnsRegistrar is IERC721 {
     /// cleared. A `true` result means every transfer overload reverts with
     /// @custom:reverts NameSoulbound and @custom:function quoteTransferFee reverts likewise.
     /// @param tokenId The name's token id.
-    /// @return soulbound True when the name was minted through the PoP gateway.
+    /// @return soulbound True when the name was minted through the gateway pallet.
     function isSoulbound(uint256 tokenId) external view returns (bool soulbound);
 
     /// @notice Returns whether a given token id has been minted.
@@ -117,7 +117,7 @@ interface IDotnsRegistrar is IERC721 {
 
     /// @notice Adds an authorised controller.
     /// @dev Typed against the baseline `IDotnsController` (not a concrete subtype) so a single
-    /// authorisation surface accepts every controller flavour (commit-reveal, PoP gateway,
+    /// authorisation surface accepts every controller flavour (commit-reveal, gateway path,
     /// future variants) without per-flavour setters. Owner-gated (otherwise
     /// @custom:reverts OwnableUnauthorizedAccount); emits @custom:emits ControllerAdded on
     /// success.
