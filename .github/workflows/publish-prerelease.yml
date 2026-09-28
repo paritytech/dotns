@@ -260,6 +260,8 @@ jobs:
               echo "- [dotns-genesis-${tld}.json]($ASSET_BASE/dotns-genesis-${tld}.json) - pallet-revive genesis, \`.${tld}\` TLD, for .${tld} networks only."
             done
             echo "- [dotns-genesis-addresses.json]($ASSET_BASE/dotns-genesis-addresses.json) - the addresses those genesis files carry."
+            echo ""
+            echo "Previewnet uses \`.testnet\`, Paseo Asset Hub Next V2 uses \`.paseo\`."
           } >> release-body.md
 
       - name: ABI diff since previous release
