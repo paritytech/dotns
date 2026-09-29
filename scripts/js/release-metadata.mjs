@@ -5,16 +5,20 @@
 //   changelog  --current <file> [--previous <file>]      release-note lines about address changes
 //              [--previous-tag <name>]
 //   changedset --previous <codehashes.json>              contracts whose built code differs, one per line
-//   abidiff    --current <dir> [--previous <dir>]        selector-level ABI diff for the release body
+//   pulls      --repo <owner/name> --base <ref>          pull requests merged since <ref>, as JSON
+//              --head <ref> --out <file>                 for `abidiff --pulls`
+//   abidiff    --current <dir> [--previous <dir>]        ABI diff for the release body
 //              [--previous-tag <name>] [--json <file>]
+//              [--pulls <file>]
 //   verify     --network <folder> --rpc <url> [--tag <TAG>]  check a committed manifest against a chain
 //
-// `build` and `changelog` run in both publish workflows; `validate` runs on pull requests, so a
-// broken manifest fails there rather than at release time. `verify` stays out of the release
-// path, which must work without reaching a chain; with `--tag` it also checks the chain's
-// declared protocol version and code identity. `changedset` names exactly what a release
-// changed, for upgrade tooling (which lives outside this repository) and for humans. No
-// dependencies: `cast` does the chain reads and the hashing.
+// `build`, `pulls` and `abidiff` run in both publish workflows, and `changelog` in the release
+// one. `validate` runs on pull requests, so a broken manifest fails there rather than at release
+// time. `verify` stays out of the release path, which must work without reaching a chain; with
+// `--tag` it also checks the chain's declared protocol version and code identity. `changedset`
+// names exactly what a release changed, for upgrade tooling (which lives outside this
+// repository) and for humans. No dependencies: `cast` does the chain reads and the hashing, and
+// `gh` reads the pull requests.
 
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -340,8 +344,8 @@ function readAbiDir(dir) {
 
 // Selector-level diff of one contract's ABI. A struct gaining a field is the case that
 // motivated this: same function name, different selector, an old caller gets a bare revert. So
-// "changed" (same name, different signature set) is the highest-severity class and is reported
-// before pure additions and removals.
+// "changed" (same name, different signature set) is kept apart from plain additions and
+// removals, and `abidiff` lists it first among the breaking changes.
 function diffAbi(previous, current) {
   const before = signaturesByKind(previous);
   const after = signaturesByKind(current);
@@ -384,71 +388,288 @@ function diffAbi(previous, current) {
   return result;
 }
 
-// Markdown fragment for the release body plus a machine-readable JSON asset. Prints "no
-// changes" rather than nothing, so absence is a statement and not a gap; a missing previous
-// release degrades the same way rather than failing the release.
+// The pull request template's "Breaking Changes" block has some fixed lines: two checkboxes and
+// a bold "Breaking changes:" label. They are not part of what the author wrote, so they are
+// removed before the text is used.
+const BREAKING_LABEL_LINE = /^\s*\*\*Breaking changes:?\*\*\s*$/i;
+const BREAKING_TEMPLATE_LINES = [
+  /^\s*[-*]\s*\[[ xX]\]\s*No breaking changes\s*$/i,
+  /^\s*[-*]\s*\[[ xX]\]\s*Breaking changes documented below\s*$/i,
+  BREAKING_LABEL_LINE,
+];
+
+// Returns the breaking change a pull request declares, or null if it declares none.
+//
+// The text is read from the "Breaking Changes" heading (or the bold "Breaking changes:" label)
+// down to the next heading, without the template's fixed lines. A pull request is also treated
+// as breaking when any of these is true, even if it has no text:
+//   * its title uses the conventional-commit `!`, like `feat!:` or `feat(store)!:`
+//   * it has the `breaking` label
+//   * the "Breaking change" or "Breaking changes documented below" box is ticked
+// Any one signal is enough. Missing a real breaking change in the release notes costs far more
+// than listing one that turns out to be harmless, so no single signal is trusted to be the only
+// one. A pull request with a signal but no text is still listed, with a note saying so.
+function declaredBreaking(pr) {
+  const body = String(pr.body ?? "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/<!--[\s\S]*?-->/g, "");
+  const lines = body.split("\n");
+  const isHeading = (line) => /^\s{0,3}#{1,6}\s/.test(line);
+  // The heading has to say exactly "Breaking change(s)", so "Non-breaking changes" is not it.
+  const isBreakingHeading = (line) => /^\s{0,3}#{1,6}\s+breaking changes?:?\s*$/i.test(line);
+  const start = lines.findIndex(
+    (line) => isBreakingHeading(line) || BREAKING_LABEL_LINE.test(line),
+  );
+  let notes = "";
+  if (start !== -1) {
+    const rest = lines.slice(start + 1);
+    const end = rest.findIndex(isHeading);
+    notes = (end === -1 ? rest : rest.slice(0, end))
+      .filter((line) => !BREAKING_TEMPLATE_LINES.some((pattern) => pattern.test(line)))
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    // Authors often write a placeholder instead of leaving the block empty.
+    if (/^(none|n\/?a|no|-+|no breaking changes)\.?$/i.test(notes)) notes = "";
+  }
+  const ticked = (label) => new RegExp(`^\\s*[-*]\\s*\\[[xX]\\]\\s*${label}\\s*$`, "im").test(body);
+  const flagged =
+    /^[a-z]+(\([^)]*\))?!:/i.test(pr.title ?? "") ||
+    (pr.labels ?? []).includes("breaking") ||
+    ticked("Breaking change") ||
+    ticked("Breaking changes documented below");
+  if (!notes && !flagged) return null;
+  return { number: pr.number, title: pr.title, url: pr.url, notes };
+}
+
+function declaredBreakingChanges(path) {
+  const prs = JSON.parse(readFileSync(resolve(process.cwd(), path), "utf8"));
+  if (!Array.isArray(prs)) fail(`${path} is not a list of pull requests; write it with \`pulls\``);
+  return prs
+    .map(declaredBreaking)
+    .filter(Boolean)
+    .sort((a, b) => a.number - b.number);
+}
+
+// One list item per pull request. Its text is indented so that any lists or paragraphs the
+// author wrote stay inside that item.
+function declaredLines({ number, title, url, notes }) {
+  const body = notes
+    ? notes.split("\n").map((line) => (line === "" ? "" : `  ${line}`))
+    : ["  Marked as breaking; the description gives no details."];
+  return [`- [#${number}](${url}) ${title}`, ...body];
+}
+
+// Writes the "ABI changes" part of the release body, and the same data as JSON. The most
+// important changes come first:
+//   1. Breaking changes: what pull requests declared, then changed function signatures,
+//      removed functions, contracts no longer published, and changed or removed events.
+//   2. New contracts, new functions and new events.
+//   3. Custom errors. A changed error only changes how a revert is decoded, not whether a call
+//      works.
+// "Breaking" means something that used to work stops working: a call now reverts, or an
+// indexer stops receiving an event. Pull requests can also declare behaviour changes that no
+// ABI shows, which is why their text is included.
+//
+// When there is nothing to report, it says so, so an empty section is never mistaken for a
+// missing one. A previous release without ABIs is reported the same way instead of failing.
 function abidiff(args) {
   if (!args.current) fail("abidiff needs --current <dir>");
   const previousTag = args["previous-tag"] ?? "the previous release";
-  const lines = [];
   const report = { previousTag: args["previous-tag"] ?? null, contracts: {} };
+  const declared = args.pulls ? declaredBreakingChanges(args.pulls) : [];
+  if (args.pulls) report.declaredBreaking = declared;
+
+  const breaking = {
+    functionsChanged: [],
+    functionsRemoved: [],
+    contractsRemoved: [],
+    events: [],
+  };
+  const added = { contracts: [], functions: [], events: [] };
+  const errors = [];
+  const code = (text) => `\`${text}\``;
+  const signatureList = (list) => list.map(code).join(", ") || "(none)";
 
   if (!args.previous) {
-    lines.push("", "No earlier release carries ABIs to diff against.");
     report.previousUnavailable = true;
   } else {
     const currentAbis = readAbiDir(resolve(process.cwd(), args.current));
     const previousAbis = readAbiDir(resolve(process.cwd(), args.previous));
-    const changedLines = [];
-    const otherLines = [];
-    for (const [name, abi] of currentAbis) {
+    for (const name of [...currentAbis.keys()].sort()) {
       const previousAbi = previousAbis.get(name);
       if (!previousAbi) {
-        otherLines.push(`- \`${name}\`: new contract`);
+        added.contracts.push(`- ${code(name)}`);
         report.contracts[name] = { newContract: true };
         continue;
       }
-      const diff = diffAbi(previousAbi, abi);
+      const diff = diffAbi(previousAbi, currentAbis.get(name));
       if (Object.keys(diff).length === 0) continue;
       report.contracts[name] = diff;
-      for (const [kind, { changed, added, removed }] of Object.entries(diff)) {
-        for (const entry of changed) {
-          changedLines.push(
-            `- \`${name}\`: ${kind} \`${entry.name}\` changed signature: ` +
-              `${entry.was.map((s) => `\`${s}\``).join(", ") || "(none)"} is now ` +
-              `${entry.now.map((s) => `\`${s}\``).join(", ") || "(none)"}`,
+      for (const [kind, entries] of Object.entries(diff)) {
+        const changedLines = entries.changed.map(
+          (entry) =>
+            `- ${code(name)}: ${code(entry.name)} changed signature: ` +
+            `${signatureList(entry.was)} is now ${signatureList(entry.now)}`,
+        );
+        const addedLines = entries.added.map((signature) => `- ${code(name)}: ${code(signature)}`);
+        const removedLines = entries.removed.map(
+          (signature) => `- ${code(name)}: ${code(signature)} removed`,
+        );
+        if (kind === "function") {
+          breaking.functionsChanged.push(...changedLines);
+          // Listed under a "Removed functions" heading, so the line needs no "removed".
+          breaking.functionsRemoved.push(
+            ...entries.removed.map((signature) => `- ${code(name)}: ${code(signature)}`),
           );
-        }
-        for (const signature of added) otherLines.push(`- \`${name}\`: ${kind} \`${signature}\` added`);
-        for (const signature of removed) {
-          otherLines.push(`- \`${name}\`: ${kind} \`${signature}\` removed`);
+          added.functions.push(...addedLines);
+        } else if (kind === "event") {
+          breaking.events.push(...changedLines, ...removedLines);
+          added.events.push(...addedLines);
+        } else {
+          errors.push(
+            ...changedLines,
+            ...entries.added.map((signature) => `- ${code(name)}: ${code(signature)} added`),
+            ...removedLines,
+          );
         }
       }
     }
-    for (const name of previousAbis.keys()) {
+    for (const name of [...previousAbis.keys()].sort()) {
       if (!currentAbis.has(name)) {
-        otherLines.push(`- \`${name}\`: no longer published`);
+        breaking.contractsRemoved.push(`- ${code(name)}`);
         report.contracts[name] = { removedContract: true };
       }
     }
+  }
 
+  const breakingParts = [
+    [
+      "**Declared in pull requests.** These can include behaviour changes an ABI does not show:",
+      declared.flatMap(declaredLines),
+    ],
+    [
+      "**Changed function signatures.** Existing callers get a bare revert until they update:",
+      breaking.functionsChanged,
+    ],
+    ["**Removed functions.** Calls to these now revert:", breaking.functionsRemoved],
+    [
+      "**Contracts no longer published.** Their ABIs are not in this release:",
+      breaking.contractsRemoved,
+    ],
+    [
+      "**Changed or removed events.** Indexers and listeners filtering on the old signature " +
+        "stop receiving them:",
+      breaking.events,
+    ],
+  ].filter(([, items]) => items.length > 0);
+  const otherParts = [
+    ["### New contracts", null, added.contracts],
+    ["### New functions", null, added.functions],
+    ["### New events", null, added.events],
+    [
+      "### Errors",
+      "Custom errors change how a revert decodes, not whether a call succeeds:",
+      errors,
+    ],
+  ].filter(([, , items]) => items.length > 0);
+  const abiChanged =
+    Object.values(breaking).some((items) => items.length > 0) || otherParts.length > 0;
+
+  const lines = [];
+  if (!args.previous && !args["previous-tag"]) {
+    lines.push("", "No earlier release carries ABIs to diff against.");
+  } else {
     lines.push("", `## ABI changes since ${previousTag}`, "");
-    if (changedLines.length + otherLines.length === 0) {
-      lines.push(`No ABI changes since ${previousTag}.`);
-    } else {
-      if (changedLines.length > 0) {
-        lines.push(
-          "**Changed signatures.** Existing callers of these get a bare revert until updated:",
-          ...changedLines,
-          "",
-        );
-      }
-      lines.push(...otherLines);
+    if (breakingParts.length > 0) {
+      lines.push("### Breaking changes", "");
+      for (const [intro, items] of breakingParts) lines.push(intro, ...items, "");
     }
+    if (!args.previous) {
+      lines.push(
+        declared.length > 0
+          ? `${previousTag} has no ABIs to compare with, so only the breaking changes that ` +
+              "pull requests declared are listed."
+          : `${previousTag} has no ABIs to compare with.`,
+      );
+    } else if (!abiChanged) {
+      lines.push(`No ABI changes since ${previousTag}.`);
+    }
+    for (const [heading, intro, items] of otherParts) {
+      lines.push(heading, "", ...(intro ? [intro, ""] : []), ...items, "");
+    }
+    while (lines.at(-1) === "") lines.pop();
   }
 
   if (args.json) writeJson(resolve(process.cwd(), args.json), report);
   console.log(lines.join("\n"));
+}
+
+// Runs `gh api` with a jq filter and parses the result. The filter keeps each response small.
+// A full comparison, with its list of changed files, could be too big for execFileSync.
+function ghApi(path, jq) {
+  let output;
+  try {
+    output = execFileSync("gh", ["api", path, "--jq", jq], {
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (err) {
+    const detail = (err.stderr || err.message || "").toString().trim().split("\n")[0];
+    fail(`gh api ${path} failed: ${detail}`);
+  }
+  try {
+    return JSON.parse(output);
+  } catch {
+    fail(`gh api ${path} did not return JSON`);
+  }
+}
+
+// Writes the pull requests merged between two refs to a JSON file, for `abidiff --pulls`. It
+// lists every commit in `base...head`, then asks GitHub which merged pull request each commit
+// came from. All network calls happen here, so `abidiff` only ever reads files.
+//
+// Every pull request is read, not only the ones labelled `breaking`. A breaking change that is
+// left out of the release notes is costly for the people who integrate with us, and a label is
+// easy to forget. The cost is one API call per commit. For a release of a few hundred commits
+// that is quick and well within the API rate limit. If releases grow to thousands of commits,
+// or this step gets slow, look for a cheaper approach, such as a pull request check that makes
+// the `breaking` label and the description agree, and then read only the labelled ones.
+//
+// Any failed read stops the release. Notes that silently miss a breaking change are worse than
+// a step that has to be re-run.
+function pulls(args) {
+  const { repo, base, head, out } = args;
+  if (!repo || !base || !head || !out) fail("pulls needs --repo, --base, --head and --out");
+  const range = `${encodeURIComponent(base)}...${encodeURIComponent(head)}`;
+  const shas = [];
+  let total = null;
+  for (let page = 1; total === null || shas.length < total; page += 1) {
+    const result = ghApi(
+      `repos/${repo}/compare/${range}?per_page=100&page=${page}`,
+      "{total: .total_commits, shas: [.commits[].sha]}",
+    );
+    total = result.total;
+    if (result.shas.length === 0) break;
+    shas.push(...result.shas);
+  }
+  // If the list is short or has repeats, some pull requests would be missed without a warning.
+  if (shas.length !== total || new Set(shas).size !== total) {
+    fail(`${base}...${head} has ${total} commits but ${new Set(shas).size} could be listed`);
+  }
+  const merged = new Map();
+  for (const sha of shas) {
+    const prs = ghApi(
+      `repos/${repo}/commits/${sha}/pulls`,
+      "[.[] | select(.merged_at != null) | " +
+        "{number, title, url: .html_url, labels: [.labels[].name], body}]",
+    );
+    for (const pr of prs) merged.set(pr.number, pr);
+  }
+  const list = [...merged.values()].sort((a, b) => a.number - b.number);
+  writeJson(resolve(process.cwd(), out), list);
+  log(`${list.length} merged pull request(s) across ${shas.length} commit(s) since ${base}`);
 }
 
 // `--addresses false` omits deployments.json. A pre-release is cut to be deployed, so the
@@ -782,6 +1003,7 @@ if (mode === "build") build(args);
 else if (mode === "validate") validate();
 else if (mode === "changelog") changelog(args);
 else if (mode === "changedset") changedset(args);
+else if (mode === "pulls") pulls(args);
 else if (mode === "abidiff") abidiff(args);
 else if (mode === "verify") verify(args);
 else {
@@ -789,7 +1011,9 @@ else {
     "usage: release-metadata.mjs build --tag <TAG> [--out <dir>] | validate | " +
       "changelog --current <file> [--previous <file>] [--previous-tag <name>] | " +
       "changedset --previous <codehashes.json> | " +
-      "abidiff --current <dir> [--previous <dir>] [--previous-tag <name>] [--json <file>] | " +
+      "pulls --repo <owner/name> --base <ref> --head <ref> --out <file> | " +
+      "abidiff --current <dir> [--previous <dir>] [--previous-tag <name>] [--json <file>] " +
+      "[--pulls <file>] | " +
       "verify --network <folder> --rpc <url> [--tag <TAG>]",
   );
 }
