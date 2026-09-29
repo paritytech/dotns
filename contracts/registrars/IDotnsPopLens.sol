@@ -32,8 +32,8 @@ interface IDotnsPopLens {
     /// resolver, and PopRules in one read.
     /// @dev Computed on read; not stored. Never reverts on an unminted or unsettled name: absent
     /// fields read as zero or empty. `requiredTier` classifies the label shape (the tier the name
-    /// requires), not the owner's proof. `personhoodLink` is keyed by the device-name labelhash,
-    /// which cannot be recovered from a node alone, so it is populated by
+    /// requires), not the owner's proof. `personhoodNode` is looked up by the device-name
+    /// labelhash, which cannot be recovered from a node alone, so it is populated by
     /// @custom:function nameDetail and left zero by @custom:function nameDetailByNode unless the
     /// label is independently resolvable.
     /// @param node namehash of the name.
@@ -43,8 +43,9 @@ interface IDotnsPopLens {
     /// @param settled Whether the label is written into the current owner's `LabelStore`.
     /// @param requiredTier PopRules classification of the label.
     /// @param chatKey Chat-key bytes recorded on the PoP resolver for the node.
-    /// @param deviceLink For a personhood name, the linked device-name labelhash; zero otherwise.
-    /// @param personhoodLink For a device name, the linked personhood-name node; zero otherwise or
+    /// @param deviceLabelhash For a personhood name, the linked device-name labelhash; zero
+    /// otherwise.
+    /// @param personhoodNode For a device name, the linked personhood-name node; zero otherwise or
     /// when unresolvable from a node.
     struct NameDetail {
         bytes32 node;
@@ -54,8 +55,8 @@ interface IDotnsPopLens {
         bool settled;
         IPopRules.PopStatus requiredTier;
         bytes chatKey;
-        bytes32 deviceLink;
-        bytes32 personhoodLink;
+        bytes32 deviceLabelhash;
+        bytes32 personhoodNode;
     }
 
     /// @notice An account-level summary of PoP state, gathered in one read.
@@ -118,14 +119,14 @@ interface IDotnsPopLens {
     /// @notice Returns the full on-chain record for a name given its label string.
     /// @dev Resolves the node internally, so a caller holding only the string needs no namehash
     /// implementation. Never reverts on an unknown name: absent fields read as zero or empty.
-    /// This overload can populate `personhoodLink` because it holds the label and so its labelhash.
+    /// This overload can populate `personhoodNode` because it holds the label and so its labelhash.
     /// @param name Bare label without the TLD. A device name carries its separator and resolves
     /// here too, to its stem beneath its numeric container.
     /// @return detail The name's record; see @custom:struct NameDetail.
     function nameDetail(string calldata name) external view returns (NameDetail memory detail);
 
     /// @notice Returns the full on-chain record for a name given its node.
-    /// @dev The node cannot be inverted to its labelhash, so `personhoodLink` is populated only
+    /// @dev The node cannot be inverted to its labelhash, so `personhoodNode` is populated only
     /// when the label is independently resolvable from the node and reads zero otherwise; every
     /// other field is resolved directly. Never reverts on an unknown node.
     /// @param node namehash of the name.

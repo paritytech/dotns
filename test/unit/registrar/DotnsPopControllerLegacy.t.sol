@@ -597,8 +597,8 @@ contract DotnsPopControllerLegacyTests is BaseDotns {
                 dotnsPopResolver.chatKey(personhoodNode)
             ),
             abi.encode(
-                dotnsPopResolver.deviceLink(personhoodNode),
-                dotnsPopResolver.personhoodLink(keccak256(bytes(deviceLabel))),
+                dotnsPopResolver.deviceLabelhashOf(personhoodNode),
+                dotnsPopResolver.personhoodNodeOf(keccak256(bytes(deviceLabel))),
                 dotnsPopController.userReservation(user),
                 reserved,
                 holder,

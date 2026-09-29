@@ -72,7 +72,7 @@ contract DotnsPopLens is IDotnsPopLens {
         // returned.
         NameDetail memory detail = _detail(_nodeOf(name), name);
         // Holding the label means holding its labelhash, so the personhood link resolves here.
-        detail.personhoodLink = _popResolver().personhoodLink(LabelUtils.labelhash(name));
+        detail.personhoodNode = _popResolver().personhoodNodeOf(LabelUtils.labelhash(name));
         return detail;
     }
 
@@ -81,11 +81,11 @@ contract DotnsPopLens is IDotnsPopLens {
         // No label is supplied: the node cannot recover a pending subname's label, so it stays
         // empty.
         NameDetail memory detail = _detail(node, "");
-        // The node cannot be inverted to a labelhash, so `personhoodLink` resolves only when the
+        // The node cannot be inverted to a labelhash, so `personhoodNode` resolves only when the
         // label is independently recoverable (a settled name whose label the registrar returns).
         if (bytes(detail.label).length != 0) {
-            detail.personhoodLink =
-                _popResolver().personhoodLink(LabelUtils.labelhashMemory(detail.label));
+            detail.personhoodNode =
+                _popResolver().personhoodNodeOf(LabelUtils.labelhashMemory(detail.label));
         }
         return detail;
     }
@@ -218,7 +218,7 @@ contract DotnsPopLens is IDotnsPopLens {
 
     /// @notice Gathers a name's record from the registrar, PoP resolver, and PopRules.
     /// @dev Reads defensively so an unminted or unsettled name yields zeroed fields instead of
-    /// reverting. `personhoodLink` is left for the caller because it needs the labelhash, which is
+    /// reverting. `personhoodNode` is left for the caller because it needs the labelhash, which is
     /// recoverable from the label string but not from the node alone. `requiredTier` classifies the
     /// label shape, so `knownLabel` supplies the label for a pending subname the node cannot
     /// recover, letting classification run before the detail is returned; it is ignored when the
@@ -266,7 +266,7 @@ contract DotnsPopLens is IDotnsPopLens {
         }
         IDotnsPopResolver resolver = _popResolver();
         detail.chatKey = resolver.chatKey(node);
-        detail.deviceLink = resolver.deviceLink(node);
+        detail.deviceLabelhash = resolver.deviceLabelhashOf(node);
     }
 
     /// @notice Reads a bounded page of `user`'s pending claims from the controller.

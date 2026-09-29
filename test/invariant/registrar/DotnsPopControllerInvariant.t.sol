@@ -248,8 +248,8 @@ contract DotnsPopControllerInvariant is BaseDotns {
             bytes32 deviceLabelhash = handler.claimedDeviceLabelhashes(i);
             bytes32 personhoodNode = handler.claimedPersonhoodNodes(i);
 
-            bytes32 currentPersonhoodForDevice = dotnsPopResolver.personhoodLink(deviceLabelhash);
-            bytes32 currentDeviceForPersonhood = dotnsPopResolver.deviceLink(personhoodNode);
+            bytes32 currentPersonhoodForDevice = dotnsPopResolver.personhoodNodeOf(deviceLabelhash);
+            bytes32 currentDeviceForPersonhood = dotnsPopResolver.deviceLabelhashOf(personhoodNode);
 
             // Either the pair is still live on both sides, or both sides
             // have been cleared. Anything else is a partial overwrite.
@@ -257,13 +257,13 @@ contract DotnsPopControllerInvariant is BaseDotns {
                 assertEq(
                     currentDeviceForPersonhood,
                     deviceLabelhash,
-                    "live personhoodLink but deviceLink drifted"
+                    "live personhoodNodeOf but deviceLabelhashOf drifted"
                 );
             } else if (currentDeviceForPersonhood == deviceLabelhash) {
                 assertEq(
                     currentPersonhoodForDevice,
                     personhoodNode,
-                    "live deviceLink but personhoodLink drifted"
+                    "live deviceLabelhashOf but personhoodNodeOf drifted"
                 );
             }
             // Else: both sides were overwritten. Covered by the stale
@@ -271,35 +271,37 @@ contract DotnsPopControllerInvariant is BaseDotns {
         }
     }
 
-    /// @notice No stale `deviceLink`: for every touched personhoodNode, a non-zero
-    ///         deviceLink value round-trips through `personhoodLink` back to the same
-    ///         personhoodNode. A drifting deviceLink is the corruption footprint this
+    /// @notice No stale `deviceLabelhashOf`: for every touched personhoodNode, a non-zero
+    ///         device labelhash round-trips through `personhoodNodeOf` back to the same
+    ///         personhoodNode. A drifting device labelhash is the corruption footprint this
     ///         invariant guards against.
-    function invariant_no_stale_deviceLink() public view {
+    function invariant_no_stale_deviceLabelhash() public view {
         uint256 n = handler.claimedCount();
         for (uint256 i = 0; i < n; i++) {
             bytes32 personhoodNode = handler.claimedPersonhoodNodes(i);
-            bytes32 currentDevice = dotnsPopResolver.deviceLink(personhoodNode);
+            bytes32 currentDevice = dotnsPopResolver.deviceLabelhashOf(personhoodNode);
             if (currentDevice == bytes32(0)) continue;
             assertEq(
-                dotnsPopResolver.personhoodLink(currentDevice), personhoodNode, "stale deviceLink"
+                dotnsPopResolver.personhoodNodeOf(currentDevice),
+                personhoodNode,
+                "stale deviceLabelhashOf"
             );
         }
     }
 
-    /// @notice No stale `personhoodLink`: symmetric to `invariant_no_stale_deviceLink`,
-    ///         every claimed deviceLabelhash with a non-zero personhoodLink round-trips
-    ///         through `deviceLink` back to the same deviceLabelhash.
-    function invariant_no_stale_personhoodLink() public view {
+    /// @notice No stale `personhoodNodeOf`: symmetric to `invariant_no_stale_deviceLabelhash`,
+    ///         every claimed deviceLabelhash with a non-zero personhood node round-trips
+    ///         through `deviceLabelhashOf` back to the same deviceLabelhash.
+    function invariant_no_stale_personhoodNode() public view {
         uint256 n = handler.claimedCount();
         for (uint256 i = 0; i < n; i++) {
             bytes32 deviceLabelhash = handler.claimedDeviceLabelhashes(i);
-            bytes32 currentPersonhood = dotnsPopResolver.personhoodLink(deviceLabelhash);
+            bytes32 currentPersonhood = dotnsPopResolver.personhoodNodeOf(deviceLabelhash);
             if (currentPersonhood == bytes32(0)) continue;
             assertEq(
-                dotnsPopResolver.deviceLink(currentPersonhood),
+                dotnsPopResolver.deviceLabelhashOf(currentPersonhood),
                 deviceLabelhash,
-                "stale personhoodLink"
+                "stale personhoodNodeOf"
             );
         }
     }

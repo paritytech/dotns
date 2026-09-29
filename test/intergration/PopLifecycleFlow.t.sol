@@ -34,7 +34,7 @@ contract PopLifecycleFlow is BaseDotns {
         _issueDeviceThenClaimPersonhood(ed);
 
         bytes32 deviceLabelhash = LabelUtils.labelhashMemory(DEVICE_LABEL);
-        bytes32 personhoodNode = dotnsPopResolver.personhoodLink(deviceLabelhash);
+        bytes32 personhoodNode = dotnsPopResolver.personhoodNodeOf(deviceLabelhash);
         assertTrue(personhoodNode != bytes32(0), "device name has no personhood claim");
 
         address owner = IERC721(address(dotnsRegistrar)).ownerOf(uint256(personhoodNode));
@@ -60,8 +60,8 @@ contract PopLifecycleFlow is BaseDotns {
         assertEq(dotnsRegistry.owner(personhoodNode), ed);
         assertEq(dotnsRegistrar.labelOf(personhoodTokenId), PERSONHOOD_LABEL_A);
         assertEq(dotnsPopResolver.chatKey(personhoodNode), CHAT_KEY);
-        assertEq(dotnsPopResolver.deviceLink(personhoodNode), deviceLabelhash);
-        assertEq(dotnsPopResolver.personhoodLink(deviceLabelhash), personhoodNode);
+        assertEq(dotnsPopResolver.deviceLabelhashOf(personhoodNode), deviceLabelhash);
+        assertEq(dotnsPopResolver.personhoodNodeOf(deviceLabelhash), personhoodNode);
         assertTrue(dotnsRegistrar.isSoulbound(personhoodTokenId));
 
         // The name is fully usable by its owner: records and subnames work.
@@ -89,7 +89,7 @@ contract PopLifecycleFlow is BaseDotns {
         assertEq(dotnsRegistry.owner(personhoodNode), ed);
         // PoP-layer records and the owner's continued control are untouched by the blocked move.
         assertEq(dotnsPopResolver.chatKey(personhoodNode), CHAT_KEY);
-        assertEq(dotnsPopResolver.personhoodLink(deviceLabelhash), personhoodNode);
+        assertEq(dotnsPopResolver.personhoodNodeOf(deviceLabelhash), personhoodNode);
         assertEq(dotnsContentResolver.contenthash(personhoodNode), CONTENT_HASH_A);
         assertEq(dotnsRegistry.owner(subnode), leonardo);
 

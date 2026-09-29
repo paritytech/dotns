@@ -126,12 +126,12 @@ contract DotnsPopResolver is
     }
 
     /// @inheritdoc IDotnsPopResolver
-    function deviceLink(bytes32 personhoodNode) external view override returns (bytes32) {
+    function deviceLabelhashOf(bytes32 personhoodNode) external view override returns (bytes32) {
         return _deviceLinks[personhoodNode];
     }
 
     /// @inheritdoc IDotnsPopResolver
-    function personhoodLink(bytes32 deviceLabelhash) external view override returns (bytes32) {
+    function personhoodNodeOf(bytes32 deviceLabelhash) external view override returns (bytes32) {
         return _personhoodNodes[deviceLabelhash];
     }
 

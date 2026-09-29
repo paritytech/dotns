@@ -6,10 +6,10 @@ pragma solidity ^0.8.34;
 /// @notice Resolver for per-name records produced by the dotNS gateway pallet.
 /// @dev Holds three record kinds:
 ///      - Chat key: ECDH public-key bytes used for end-to-end encrypted messaging.
-///      - Device link: for a personhood-name node, the labelhash of the device name it
-///        was linked to when it was issued.
-///      - Personhood link: reverse index mapping a device-name labelhash to the
-///        personhood-name node it is linked to. Mirrors `deviceLink` on every write so a
+///      - Device link (`deviceLabelhashOf`): for a personhood-name node, the labelhash of the
+///        device name it was linked to when it was issued.
+///      - Personhood link (`personhoodNodeOf`): reverse index mapping a device-name labelhash to
+///        the personhood-name node it is linked to. Mirrors `deviceLabelhashOf` on every write so a
 ///        caller that holds a device-name labelhash can resolve the personhood name
 ///        without scanning events.
 ///
@@ -56,12 +56,12 @@ interface IDotnsPopResolver {
     /// @notice Sets the device link for a personhood-name node.
     /// @dev Callable only by the authorised PoP controller, otherwise
     ///      @custom:reverts NotPopController. Overwrites any previous link. When overwriting, the
-    ///      stale inverse entry is nulled so both the forward (`deviceLink`) and reverse
-    ///      (`personhoodLink`) indices remain consistent: re-linking the same `personhoodNode` to a
-    ///      new `deviceLabelhash` clears `personhoodLink(oldDevice)`, and re-linking the same
-    ///      `deviceLabelhash` to a new `personhoodNode` clears `deviceLink(oldPersonhood)`. The
-    ///      invariant `personhoodLink(deviceLink(node)) == node` always holds after the call. Emits
-    ///      @custom:emits DeviceLinkUpdated on every successful write.
+    ///      stale inverse entry is nulled so both the forward (`deviceLabelhashOf`) and reverse
+    ///      (`personhoodNodeOf`) indices remain consistent: re-linking the same `personhoodNode` to
+    ///      a new `deviceLabelhash` clears `personhoodNodeOf(oldDevice)`, and re-linking the same
+    ///      `deviceLabelhash` to a new `personhoodNode` clears `deviceLabelhashOf(oldPersonhood)`.
+    ///      The invariant `personhoodNodeOf(deviceLabelhashOf(node)) == node` always holds after
+    ///      the call. Emits @custom:emits DeviceLinkUpdated on every successful write.
     /// @param personhoodNode The personhood-name node carrying the link.
     /// @param deviceLabelhash The labelhash of the linked device name.
     function setDeviceLink(bytes32 personhoodNode, bytes32 deviceLabelhash) external;
@@ -74,13 +74,19 @@ interface IDotnsPopResolver {
     /// @notice Returns the device-name labelhash linked to a personhood-name node.
     /// @param personhoodNode The personhood-name node to query.
     /// @return deviceLabelhash The linked device-name labelhash, or zero if unset.
-    function deviceLink(bytes32 personhoodNode) external view returns (bytes32 deviceLabelhash);
+    function deviceLabelhashOf(bytes32 personhoodNode)
+        external
+        view
+        returns (bytes32 deviceLabelhash);
 
     /// @notice Returns the personhood-name node a device name is linked to.
-    /// @dev Reverse of @custom:function deviceLink. Written by the same `setDeviceLink` call so the
-    ///      two directions stay in lockstep. Returns zero when the device name has never been
-    ///      linked to a personhood name.
+    /// @dev Reverse of @custom:function deviceLabelhashOf. Written by the same `setDeviceLink` call
+    ///      so the two directions stay in lockstep. Returns zero when the device name has never
+    ///      been linked to a personhood name.
     /// @param deviceLabelhash The labelhash of the device name to query.
     /// @return personhoodNode The linked personhood-name node, or zero if unset.
-    function personhoodLink(bytes32 deviceLabelhash) external view returns (bytes32 personhoodNode);
+    function personhoodNodeOf(bytes32 deviceLabelhash)
+        external
+        view
+        returns (bytes32 personhoodNode);
 }

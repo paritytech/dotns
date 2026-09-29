@@ -66,8 +66,8 @@ contract PopControllerHandler is Test {
 
     /// @notice Personhood nodes minted through successful claims, captured alongside
     ///         the device-name labelhash they were linked against. Used by the
-    ///         personhoodLink/deviceLink inverse invariant: for each entry,
-    ///         personhoodLink(deviceLabelhash) == node.
+    ///         personhoodNodeOf/deviceLabelhashOf inverse invariant: for each entry,
+    ///         personhoodNodeOf(deviceLabelhash) == node.
     bytes32[] public claimedPersonhoodNodes;
     /// @notice Device-name labelhashes paired index-for-index with `claimedPersonhoodNodes`.
     bytes32[] public claimedDeviceLabelhashes;

@@ -118,8 +118,8 @@ Example query paths. Each row starts from a small set of known contracts; every 
 
 | Lookup | Path |
 | --- | --- |
-| Device-name labelhash => personhood-name node | Protocol registry => PoP resolver => `personhoodLink(deviceLabelhash)` |
-| Personhood-name node => device-name labelhash | Protocol registry => PoP resolver => `deviceLink(personhoodNode)` |
+| Device-name labelhash => personhood-name node | Protocol registry => PoP resolver => `personhoodNodeOf(deviceLabelhash)` |
+| Personhood-name node => device-name labelhash | Protocol registry => PoP resolver => `deviceLabelhashOf(personhoodNode)` |
 | Node => chat key | Protocol registry => PoP resolver => `chatKey(node)` |
 | Node or tokenId => registered label | Protocol registry => registrar => `labelOf(uint256(node))` |
 | Base name => gateway-reservation state | Protocol registry => PoP controller => `isReservedForClaim(label)` |

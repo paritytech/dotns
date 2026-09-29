@@ -154,7 +154,9 @@ contract DotnsPopControllerTests is BaseDotns {
 
         bytes32 personhoodNode = _nodeOf(PERSONHOOD_LABEL_A);
         assertEq(dotnsPopResolver.chatKey(personhoodNode), deviceChatKey);
-        assertEq(dotnsPopResolver.deviceLink(personhoodNode), keccak256(bytes(DEVICE_LABEL_A)));
+        assertEq(
+            dotnsPopResolver.deviceLabelhashOf(personhoodNode), keccak256(bytes(DEVICE_LABEL_A))
+        );
     }
 
     function test_issuePersonhoodName_claim_wipes_entire_queue() public {
@@ -220,7 +222,9 @@ contract DotnsPopControllerTests is BaseDotns {
         _assertEventEmittedOnce(logs, keccak256("ReservationRelinquished(bytes32,address)"));
 
         bytes32 personhoodNode = _nodeOf(PERSONHOOD_LABEL_B);
-        assertEq(dotnsPopResolver.deviceLink(personhoodNode), keccak256(bytes(DEVICE_LABEL_A)));
+        assertEq(
+            dotnsPopResolver.deviceLabelhashOf(personhoodNode), keccak256(bytes(DEVICE_LABEL_A))
+        );
 
         (bool reserved,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(reserved);
@@ -2061,13 +2065,13 @@ contract DotnsPopControllerTests is BaseDotns {
         assertTrue(personhood.settled);
         assertTrue(personhood.requiredTier == IPopRules.PopStatus.Personhood);
         assertEq(personhood.chatKey, deviceChatKey);
-        assertEq(personhood.deviceLink, keccak256(bytes(DEVICE_LABEL_A)));
+        assertEq(personhood.deviceLabelhash, keccak256(bytes(DEVICE_LABEL_A)));
         // A base label is never a device-name labelhash, so no promoted node is keyed under it.
-        assertEq(personhood.personhoodLink, bytes32(0));
+        assertEq(personhood.personhoodNode, bytes32(0));
 
         // Holding the device name lets nameDetail recover the promoted personhood node.
         IDotnsPopLens.NameDetail memory device = dotnsPopLens.nameDetail(DEVICE_LABEL_A);
-        assertEq(device.personhoodLink, personhoodNode);
+        assertEq(device.personhoodNode, personhoodNode);
 
         // A settled device name that was never promoted carries no personhood claim, and the
         // by-node overload leaves it zero.
@@ -2076,20 +2080,20 @@ contract DotnsPopControllerTests is BaseDotns {
         IDotnsPopLens.NameDetail memory coldByNode =
             dotnsPopLens.nameDetailByNode(_deviceNodeOf(DEVICE_LABEL_C));
         assertTrue(coldByNode.exists);
-        assertEq(coldByNode.personhoodLink, bytes32(0));
+        assertEq(coldByNode.personhoodNode, bytes32(0));
 
         // Unknown name and node never revert and return a zeroed record.
         IDotnsPopLens.NameDetail memory unknownName = dotnsPopLens.nameDetail("nothingxx");
         assertFalse(unknownName.exists);
         assertEq(unknownName.owner, address(0));
         assertEq(bytes(unknownName.label).length, 0);
-        assertEq(unknownName.personhoodLink, bytes32(0));
+        assertEq(unknownName.personhoodNode, bytes32(0));
 
         IDotnsPopLens.NameDetail memory unknownNode =
             dotnsPopLens.nameDetailByNode(bytes32(uint256(0xdead)));
         assertFalse(unknownNode.exists);
         assertEq(unknownNode.owner, address(0));
-        assertEq(unknownNode.personhoodLink, bytes32(0));
+        assertEq(unknownNode.personhoodNode, bytes32(0));
     }
 
     /// @notice `nameDetail` classifies a cold-path device name before it settles, not only after.
