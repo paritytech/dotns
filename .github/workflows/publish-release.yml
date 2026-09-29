@@ -16,9 +16,6 @@ on:
 
 permissions:
   contents: write
-  # The release notes list the breaking changes that pull requests declare, so the job has to
-  # read the pull requests merged since the previous release.
-  pull-requests: read
 
 # Two runs for the same version would race to attach assets to the same draft. On a
 # dispatch `github.ref_name` is the branch, so key on the requested version instead.
@@ -287,30 +284,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # The previous published release's ABIs come from its zip. Comparing with them lists
-          # every selector change in the body, breaking ones first. The most important one is a
-          # function that keeps its name but changes its signature, because an old caller then
-          # gets a bare revert. If the previous release has no zip, the body says there is
-          # nothing to compare with, and the release goes on.
-          #
-          # The pull requests merged since that release are read as well, so the breaking
-          # changes they describe (the "Breaking Changes" block of the pull request template)
-          # are listed first. If that read fails, this step fails. Notes that silently miss a
-          # breaking change are worse than a step that has to be re-run.
+          # The previous published release's ABIs come from its zip; diffing against them
+          # announces every selector change in the body, most importantly a same-name
+          # signature change, which an old caller experiences as a bare revert. A previous
+          # release without the zip degrades to "no diff" rather than failing the release.
           PREV=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)
-          diff_args=()
-          if [ -n "$PREV" ]; then
-            bun scripts/js/release-metadata.mjs pulls --repo "$GITHUB_REPOSITORY" \
-              --base "$PREV" --head "$GITHUB_SHA" --out "$RUNNER_TEMP/pulls.json"
-            diff_args=(--previous-tag "$PREV" --pulls "$RUNNER_TEMP/pulls.json")
-            if gh release download "$PREV" --repo "$GITHUB_REPOSITORY" \
-              --pattern 'dotns-abis-*.zip' --dir prev-abis >/dev/null 2>&1; then
-              unzip -q -o prev-abis/dotns-abis-*.zip -d prev-abis
-              diff_args+=(--previous prev-abis/abis)
-            fi
+          prev_args=()
+          if [ -n "$PREV" ] && gh release download "$PREV" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'dotns-abis-*.zip' --dir prev-abis >/dev/null 2>&1; then
+            unzip -q -o prev-abis/dotns-abis-*.zip -d prev-abis
+            prev_args=(--previous prev-abis/abis --previous-tag "$PREV")
           fi
           bun scripts/js/release-metadata.mjs abidiff --current release/abis \
-            "${diff_args[@]}" --json release/abi-diff.json >> release-body.md
+            "${prev_args[@]}" --json release/abi-diff.json >> release-body.md
 
       - name: Create draft release with artifacts
         uses: softprops/action-gh-release@v2
