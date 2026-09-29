@@ -166,15 +166,67 @@ function stripCborMetadata(name, hex) {
   return `0x${code.slice(0, stripped * 2)}`;
 }
 
+// The metadata at the end is not the only metadata in the code. A contract that deploys other
+// contracts (with `new`, for example) carries a copy of their creation code, and each copy ends
+// with that contract's own metadata. StoreFactory is an example: it contains LabelStore's
+// creation code, so a comment-only edit to LabelStore changes a few bytes inside StoreFactory.
+//
+// To ignore that, the hash (digest) inside each embedded metadata block is set to zeros. The
+// code keeps its length, so nothing else moves, and the compiler version bytes are kept. A real
+// change to an embedded contract's code, or to the compiler, still changes the hash.
+//
+// A block is found by its exact shape, not by where it sits: {"ipfs": <34-byte hash>, "solc":
+// <3-byte version>} followed by its length, 0x0033. That is what solc writes with foundry's
+// default `bytecode_hash = "ipfs"`. The older `bzzr1` shape is handled too. With
+// `bytecode_hash = "none"` there is no hash to clear. Normal code does not contain these exact
+// bytes by chance, and a match only counts if it starts on a whole byte.
+const EMBEDDED_METADATA_SHAPES = [
+  { prefix: "a264697066735822", digestHexLength: 68, suffix: "0033" },
+  { prefix: "a265627a7a72315820", digestHexLength: 64, suffix: "0032" },
+];
+
+function zeroEmbeddedMetadataDigests(hex) {
+  let code = hex.toLowerCase();
+  for (const { prefix, digestHexLength, suffix } of EMBEDDED_METADATA_SHAPES) {
+    const shape = new RegExp(
+      `${prefix}[0-9a-f]{${digestHexLength}}64736f6c6343[0-9a-f]{6}${suffix}`,
+      "g",
+    );
+    const zeros = "0".repeat(digestHexLength);
+    let match;
+    while ((match = shape.exec(code)) !== null) {
+      // `code` starts with "0x", so every byte starts at an even index. A match at an odd index
+      // starts in the middle of a byte, so it is not a real block. Keep searching from the next
+      // character.
+      if (match.index % 2 !== 0) {
+        shape.lastIndex = match.index + 1;
+        continue;
+      }
+      const digestStart = match.index + prefix.length;
+      code = code.slice(0, digestStart) + zeros + code.slice(digestStart + digestHexLength);
+    }
+  }
+  return code;
+}
+
 // keccak256 via `cast keccak`, keeping the script dependency-free like the chain reads.
 function keccakHex(hex) {
   return cast(["keccak", hex]);
 }
 
+// Saved in codehashes.json as `hashScheme`, so that `changedset` can hash the current build the
+// same way the previous file was hashed. Comparing hashes made in two different ways would show
+// changes that are not there.
+//   1: the metadata at the end is removed. Files written before `hashScheme` existed use this.
+//   2: the same, and the hashes inside embedded metadata are set to zeros as well.
+// Both give the same result for a contract that does not deploy other contracts.
+const HASH_SCHEME = 2;
+const HASH_SCHEMES = [1, 2];
+
 // Stripped-metadata hash of each deployable contract's built runtime bytecode. These are
 // artifact-side hashes for comparing builds with builds (the changed-set); they are never
 // compared against on-chain hashes, which live in a different domain (see `verify`).
-function builtCodehashes() {
+function builtCodehashes(scheme = HASH_SCHEME) {
   const { contracts } = classifyContracts(readContractNames());
   const hashes = {};
   for (const name of contracts) {
@@ -183,7 +235,8 @@ function builtCodehashes() {
     );
     const runtime = artefact?.deployedBytecode?.object;
     if (!runtime || runtime === "0x") fail(`${name}: no deployed bytecode in the artefact`);
-    hashes[name] = keccakHex(stripCborMetadata(name, runtime));
+    const stripped = stripCborMetadata(name, runtime);
+    hashes[name] = keccakHex(scheme >= 2 ? zeroEmbeddedMetadataDigests(stripped) : stripped);
   }
   return hashes;
 }
@@ -216,7 +269,23 @@ function changedset(args) {
   const previous = JSON.parse(readFileSync(resolve(process.cwd(), args.previous), "utf8"));
   const previousHashes = previous?.hashes;
   if (!previousHashes) fail(`${args.previous} has no 'hashes' map`);
-  const current = builtCodehashes();
+  // Hash the build the same way the previous file was hashed. Otherwise a change in how the
+  // hash is computed would look like a change in the code.
+  const scheme = previous.hashScheme ?? 1;
+  if (!HASH_SCHEMES.includes(scheme)) {
+    fail(
+      `${args.previous} uses hashScheme ${scheme}; this script knows ${HASH_SCHEMES.join(", ")}`,
+    );
+  }
+  if (scheme < HASH_SCHEME) {
+    // Printed to stderr, because stdout is the list that upgrade tooling reads.
+    console.error(
+      `[release-metadata] ${args.previous} uses hashScheme ${scheme}, so this build is hashed ` +
+        `the same way. A contract that deploys other contracts with \`new\` is listed if any ` +
+        `contract it deploys changed at all, even if only a comment changed.`,
+    );
+  }
+  const current = builtCodehashes(scheme);
   // Union, not just the current set: a contract only in the previous release was removed and a
   // contract only in this one is new. Neither is coverable by an in-place upgrade, so both must
   // surface and force the coverage gate to refuse rather than dropping out of the diff.
@@ -413,6 +482,7 @@ function build(args) {
   // pre-release tags, and an upgrade diffs its build against the previous release's file.
   writeJson(join(outDir, "codehashes.json"), {
     version: tag,
+    hashScheme: HASH_SCHEME,
     build: buildInputs(),
     hashes: builtCodehashes(),
   });

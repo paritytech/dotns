@@ -68,12 +68,14 @@ The release surface is decided in `.github/abi-contracts.txt` so a contract reac
 ```json
 {
   "version": "v1.2.3",
+  "hashScheme": 2,
   "build": { "solcVersion": "0.8.34+commit...", "optimizer": {}, "viaIr": true, "evmVersion": "cancun", "foundryLockSha256": "..." },
   "hashes": { "DotnsRegistrar": "0x..." }
 }
 ```
 
-- `hashes` maps each deployable contract to the keccak256 of its built runtime bytecode with the trailing CBOR metadata stripped, so a comment-only edit does not read as a code change. Comparing two releases' files tells you exactly which contracts a release changed; an upgrade must cover that whole set before the release may be declared on a network (see `DEPLOYMENT_CHECKLIST.md`).
+- `hashes` maps each deployable contract to the keccak256 of its built runtime bytecode with the trailing CBOR metadata stripped, so a comment-only edit does not read as a code change. A contract that deploys other contracts with `new` (such as `StoreFactory`) also contains their creation code, and each copy ends with that contract's own metadata. The hash inside those copies is set to zeros before hashing, so a comment-only edit to `LabelStore` does not make `StoreFactory` look changed either. Comparing two releases' files tells you exactly which contracts a release changed; an upgrade must cover that whole set before the release may be declared on a network (see `DEPLOYMENT_CHECKLIST.md`).
+- `hashScheme` says how `hashes` were computed. `2` is the method described above. `1` skips the zeroing of embedded metadata, and files without `hashScheme` (from releases made before it was added) use it. The two only give different hashes for contracts that deploy other contracts with `new`, so only compare two files that use the same scheme. `release-metadata.mjs changedset` does this for you: it hashes the current build with the previous file's scheme.
 - These are artifact-side hashes, for comparing builds with builds. A deployed contract hashes differently on chain (its bytecode carries the metadata and any immutable values), so compare this file against another release's copy of it.
 - `build` records the toolchain inputs. The same source under a different toolchain hashes differently, and that difference is a real code change on chain, so treat the hashes as comparable only alongside their build inputs.
 
