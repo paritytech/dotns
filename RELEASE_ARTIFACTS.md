@@ -81,11 +81,9 @@ The release surface is decided in `.github/abi-contracts.txt` so a contract reac
 
 ## `abi-diff.json`
 
-The machine-readable form of the "ABI changes since ..." section of the release body: per contract, the functions, events, and errors added, removed, or changed since the previous release, at selector level. A **changed signature** entry is the one to alert on: the name still exists but the selector moved (a struct parameter gained a field, say), so an un-updated caller gets a bare revert with no data. Contracts new to the release or no longer published are flagged as such. When no earlier release carries ABIs to diff against, the file says so instead of guessing.
+The full, machine-readable ABI diff behind the release body: per contract, the functions, events, and errors added, removed, or changed since the previous release, at selector level. A **changed signature** entry is the one to alert on: the name still exists but the selector moved (a struct parameter gained a field, say), so an un-updated caller gets a bare revert with no data. Contracts new to the release or no longer published are flagged as such. When no earlier release carries ABIs to diff against, the file says so instead of guessing.
 
-`declaredBreaking` is present when the release read its pull requests. It lists every pull request merged since the previous release that declares a breaking change, with its `number`, `title`, `url`, and `notes`. `notes` is the text from the "Breaking Changes" block of its description. It is empty when the pull request is only marked as breaking, by a `!` in its title, the `breaking` label, or a ticked breaking-change box. These entries can describe behaviour changes that no ABI shows.
-
-The release body puts the most important changes first. **Breaking changes** come first: the ones pull requests declared, then changed function signatures, removed functions, contracts no longer published, and changed or removed events (an indexer that filters on the old signature stops receiving them). New contracts, new functions, and new events come next. Custom errors come last, because a changed error only changes how a revert is decoded, not whether a call works.
+The release body is a short summary of this file. Under "Breaking ABI changes since ..." it lists only the changes that break an existing caller or indexer, one line each: changed function signatures, removed functions, contracts no longer published, then changed or removed events. Additions, new contracts, and custom errors are in a collapsed block with a count. A contract `Foo` and its interface `IFoo` usually carry the same change, so the body lists it once, under `IFoo`, which is what callers bind to. A change that only `Foo` has is still listed. This file always has every contract, both halves of a pair included.
 
 ## Stability
 
@@ -137,7 +135,7 @@ key that owns every contract in it. The environment holds:
 Creating a `v*` tag is itself restricted to the dotns team by the `release tags` ruleset, so a
 release takes two distinct human actions: cutting the tag, and approving the run it starts.
 
-`deployments.json`, `release-manifest.json`, and `codehashes.json` are generated during the release by `scripts/js/release-metadata.mjs build`, from the committed deployment manifests and the build that just ran; `abi-diff.json` comes from `abidiff` against the previous release's published ABIs, plus the descriptions of the pull requests merged since it, which `release-metadata.mjs pulls` reads (so both publish workflows have `pull-requests: read`). Neither is committed: an address stored in two tracked files eventually disagrees with itself, so `deployments/<network>/<chain-id>.json` is the only tracked copy.
+`deployments.json`, `release-manifest.json`, and `codehashes.json` are generated during the release by `scripts/js/release-metadata.mjs build`, from the committed deployment manifests and the build that just ran; `abi-diff.json` comes from `abidiff` against the previous release's published ABIs. Neither is committed: an address stored in two tracked files eventually disagrees with itself, so `deployments/<network>/<chain-id>.json` is the only tracked copy.
 
 That file holds exactly one address per contract, the current one. Each deploy overwrites the entries it produces, so it tracks only the latest deployment for a network and never a history of them; previous address sets exist only in this repository's git history. It also carries no implementation addresses behind the UUPS proxies, and no record of which commit was deployed.
 
