@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspoplens"><a class="header" href="#dotnspoplens">DotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/19200fca6251b6fe3bf231ed564491c9ea81955a/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/fe96bfe970216260410506082451e47aeed87eac/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsPopLens.sol/interface.IDotnsPopLens.html">IDotnsPopLens</a></p>
 <p><strong>Title:</strong>
@@ -282,7 +282,7 @@ account's holdings, so gas grows with them. Call it off-chain.</p>
 <p>Returns the full on-chain record for a name given its label string.</p>
 <p>Resolves the node internally, so a caller holding only the string needs no namehash
 implementation. Never reverts on an unknown name: absent fields read as zero or empty.
-This overload can populate <code>personhoodLink</code> because it holds the label and so its labelhash.</p>
+This overload can populate <code>personhoodNode</code> because it holds the label and so its labelhash.</p>
 <pre><code class="language-solidity">function nameDetail(string calldata name) external view override returns (NameDetail memory);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -297,7 +297,7 @@ This overload can populate <code>personhoodLink</code> because it holds the labe
 </div>
 <h3 id="namedetailbynode"><a class="header" href="#namedetailbynode">nameDetailByNode</a></h3>
 <p>Returns the full on-chain record for a name given its node.</p>
-<p>The node cannot be inverted to its labelhash, so <code>personhoodLink</code> is populated only
+<p>The node cannot be inverted to its labelhash, so <code>personhoodNode</code> is populated only
 when the label is independently resolvable from the node and reads zero otherwise; every
 other field is resolved directly. Never reverts on an unknown node.</p>
 <pre><code class="language-solidity">function nameDetailByNode(bytes32 node) external view override returns (NameDetail memory);
@@ -374,7 +374,7 @@ record returns the zero address, so a missing name yields false and the read sta
 <h3 id="_detail"><a class="header" href="#_detail">_detail</a></h3>
 <p>Gathers a name's record from the registrar, PoP resolver, and PopRules.</p>
 <p>Reads defensively so an unminted or unsettled name yields zeroed fields instead of
-reverting. <code>personhoodLink</code> is left for the caller because it needs the labelhash, which is
+reverting. <code>personhoodNode</code> is left for the caller because it needs the labelhash, which is
 recoverable from the label string but not from the node alone. <code>requiredTier</code> classifies the
 label shape, so <code>knownLabel</code> supplies the label for a pending subname the node cannot
 recover, letting classification run before the detail is returned; it is ignored when the

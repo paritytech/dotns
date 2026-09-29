@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspoplens"><a class="header" href="#idotnspoplens">IDotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/19200fca6251b6fe3bf231ed564491c9ea81955a/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/fe96bfe970216260410506082451e47aeed87eac/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopLens</p>
 <p>Read-only view over PoP identity data, composed from the controller, the registrar,
@@ -260,7 +260,7 @@ account's holdings, so gas grows with them. Call it off-chain.</p>
 <p>Returns the full on-chain record for a name given its label string.</p>
 <p>Resolves the node internally, so a caller holding only the string needs no namehash
 implementation. Never reverts on an unknown name: absent fields read as zero or empty.
-This overload can populate <code>personhoodLink</code> because it holds the label and so its labelhash.</p>
+This overload can populate <code>personhoodNode</code> because it holds the label and so its labelhash.</p>
 <pre><code class="language-solidity">function nameDetail(string calldata name) external view returns (NameDetail memory detail);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -275,7 +275,7 @@ This overload can populate <code>personhoodLink</code> because it holds the labe
 </div>
 <h3 id="namedetailbynode"><a class="header" href="#namedetailbynode">nameDetailByNode</a></h3>
 <p>Returns the full on-chain record for a name given its node.</p>
-<p>The node cannot be inverted to its labelhash, so <code>personhoodLink</code> is populated only
+<p>The node cannot be inverted to its labelhash, so <code>personhoodNode</code> is populated only
 when the label is independently resolvable from the node and reads zero otherwise; every
 other field is resolved directly. Never reverts on an unknown node.</p>
 <pre><code class="language-solidity">function nameDetailByNode(bytes32 node) external view returns (NameDetail memory detail);
@@ -333,8 +333,8 @@ zero for a settled name.</p>
 resolver, and PopRules in one read.</p>
 <p>Computed on read; not stored. Never reverts on an unminted or unsettled name: absent
 fields read as zero or empty. <code>requiredTier</code> classifies the label shape (the tier the name
-requires), not the owner's proof. <code>personhoodLink</code> is keyed by the device-name labelhash,
-which cannot be recovered from a node alone, so it is populated by</p>
+requires), not the owner's proof. <code>personhoodNode</code> is looked up by the device-name
+labelhash, which cannot be recovered from a node alone, so it is populated by</p>
 <p><strong>Note:</strong>
 function: nameDetail and left zero by @custom:function nameDetailByNode unless the
 label is independently resolvable.</p>
@@ -346,8 +346,8 @@ label is independently resolvable.</p>
     bool settled;
     IPopRules.PopStatus requiredTier;
     bytes chatKey;
-    bytes32 deviceLink;
-    bytes32 personhoodLink;
+    bytes32 deviceLabelhash;
+    bytes32 personhoodNode;
 }
 </code></pre>
 <p><strong>Properties</strong></p>
@@ -359,8 +359,8 @@ label is independently resolvable.</p>
 <tr><td><code>settled</code></td><td><code>bool</code></td><td>Whether the label is written into the current owner's <code>LabelStore</code>.</td></tr>
 <tr><td><code>requiredTier</code></td><td><code>IPopRules.PopStatus</code></td><td>PopRules classification of the label.</td></tr>
 <tr><td><code>chatKey</code></td><td><code>bytes</code></td><td>Chat-key bytes recorded on the PoP resolver for the node.</td></tr>
-<tr><td><code>deviceLink</code></td><td><code>bytes32</code></td><td>For a personhood name, the linked device-name labelhash; zero otherwise.</td></tr>
-<tr><td><code>personhoodLink</code></td><td><code>bytes32</code></td><td>For a device name, the linked personhood-name node; zero otherwise or when unresolvable from a node.</td></tr>
+<tr><td><code>deviceLabelhash</code></td><td><code>bytes32</code></td><td>For a personhood name, the linked device-name labelhash; zero otherwise.</td></tr>
+<tr><td><code>personhoodNode</code></td><td><code>bytes32</code></td><td>For a device name, the linked personhood-name node; zero otherwise or when unresolvable from a node.</td></tr>
 </tbody></table>
 </div>
 <h3 id="popprofile"><a class="header" href="#popprofile">PopProfile</a></h3>
