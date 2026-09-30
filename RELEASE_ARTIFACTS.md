@@ -68,18 +68,22 @@ The release surface is decided in `.github/abi-contracts.txt` so a contract reac
 ```json
 {
   "version": "v1.2.3",
+  "hashScheme": 2,
   "build": { "solcVersion": "0.8.34+commit...", "optimizer": {}, "viaIr": true, "evmVersion": "cancun", "foundryLockSha256": "..." },
   "hashes": { "DotnsRegistrar": "0x..." }
 }
 ```
 
-- `hashes` maps each deployable contract to the keccak256 of its built runtime bytecode with the trailing CBOR metadata stripped, so a comment-only edit does not read as a code change. Comparing two releases' files tells you exactly which contracts a release changed; an upgrade must cover that whole set before the release may be declared on a network (see `DEPLOYMENT_CHECKLIST.md`).
+- `hashes` maps each deployable contract to the keccak256 of its built runtime bytecode with the trailing CBOR metadata stripped, so a comment-only edit does not read as a code change. A contract that deploys other contracts with `new` (such as `StoreFactory`) also contains their creation code, and each copy ends with that contract's own metadata. The hash inside those copies is set to zeros before hashing, so a comment-only edit to `LabelStore` does not make `StoreFactory` look changed either. Comparing two releases' files tells you exactly which contracts a release changed; an upgrade must cover that whole set before the release may be declared on a network (see `DEPLOYMENT_CHECKLIST.md`).
+- `hashScheme` says how `hashes` were computed. `2` is the method described above. `1` skips the zeroing of embedded metadata, and files without `hashScheme` (from releases made before it was added) use it. The two only give different hashes for contracts that deploy other contracts with `new`, so only compare two files that use the same scheme. `release-metadata.mjs changedset` does this for you: it hashes the current build with the previous file's scheme.
 - These are artifact-side hashes, for comparing builds with builds. A deployed contract hashes differently on chain (its bytecode carries the metadata and any immutable values), so compare this file against another release's copy of it.
 - `build` records the toolchain inputs. The same source under a different toolchain hashes differently, and that difference is a real code change on chain, so treat the hashes as comparable only alongside their build inputs.
 
 ## `abi-diff.json`
 
-The machine-readable form of the "ABI changes since ..." section of the release body: per contract, the functions, events, and errors added, removed, or changed since the previous release, at selector level. A **changed signature** entry is the one to alert on: the name still exists but the selector moved (a struct parameter gained a field, say), so an un-updated caller gets a bare revert with no data. Contracts new to the release or no longer published are flagged as such. When no earlier release carries ABIs to diff against, the file says so instead of guessing.
+The full, machine-readable ABI diff behind the release body: per contract, the functions, events, and errors added, removed, or changed since the previous release, at selector level. A **changed signature** entry is the one to alert on: the name still exists but the selector moved (a struct parameter gained a field, say), so an un-updated caller gets a bare revert with no data. Contracts new to the release or no longer published are flagged as such. When no earlier release carries ABIs to diff against, the file says so instead of guessing.
+
+The release body is a short summary of this file. Under "Breaking ABI changes since ..." it lists only the changes that break an existing caller or indexer, one line each: changed function signatures, removed functions, contracts no longer published, then changed or removed events. Additions, new contracts, and custom errors are in a collapsed block with a count. A contract and the interfaces it implements usually carry the same change, so the body lists it once, under the interface that declares it, which is what callers bind to. Which published ABIs a contract inherits from is read from the build, not guessed from names, so `DotnsFlatPricing` is matched with `IDotnsPricing` too. A change that only the contract has is still listed. This file always has every contract, both the contract and its interfaces included.
 
 ## Stability
 

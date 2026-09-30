@@ -182,6 +182,11 @@ jobs:
           find release/abis -maxdepth 1 -type f -printf '%f\n' | sort > release/expected-assets.txt
           echo "Extracted $(wc -l < release/expected-assets.txt) ABIs"
 
+          # Record which published ABIs each contract inherits from, read from the same build.
+          # The ABI diff step uses it to list a change once, under the interface that declares
+          # it, even when the names do not match. Kept out of release/, since it is not an asset.
+          bun scripts/js/release-metadata.mjs bases --out "$RUNNER_TEMP/abi-bases.json"
+
       # Addresses come from the committed deployment manifests, the same files the
       # deployment pipeline in dotns-releases measures a live deploy against. A consumer
       # that only has the release needs them to reach any contract at all.
@@ -296,7 +301,8 @@ jobs:
             prev_args=(--previous prev-abis/abis --previous-tag "$PREV")
           fi
           bun scripts/js/release-metadata.mjs abidiff --current release/abis \
-            "${prev_args[@]}" --json release/abi-diff.json >> release-body.md
+            "${prev_args[@]}" --bases "$RUNNER_TEMP/abi-bases.json" \
+            --json release/abi-diff.json >> release-body.md
 
       - name: Create draft release with artifacts
         uses: softprops/action-gh-release@v2
