@@ -186,6 +186,11 @@ jobs:
           find release/abis -maxdepth 1 -type f -printf '%f\n' | sort > release/expected-assets.txt
           echo "Extracted $(wc -l < release/expected-assets.txt) ABIs"
 
+          # Record which published ABIs each contract inherits from, read from the same build.
+          # The ABI diff step uses it to list a change once, under the interface that declares
+          # it, even when the names do not match. Kept out of release/, since it is not an asset.
+          bun scripts/js/release-metadata.mjs bases --out "$RUNNER_TEMP/abi-bases.json"
+
       # No addresses: a pre-release is cut to be deployed, so the recorded addresses still
       # belong to the previous deployment of different code. Publishing them under this tag
       # would break the promise that a release's addresses and ABIs come from the same release.
@@ -280,7 +285,8 @@ jobs:
             prev_args=(--previous prev-abis/abis --previous-tag "$PREV")
           fi
           bun scripts/js/release-metadata.mjs abidiff --current release/abis \
-            "${prev_args[@]}" --json release/abi-diff.json >> release-body.md
+            "${prev_args[@]}" --bases "$RUNNER_TEMP/abi-bases.json" \
+            --json release/abi-diff.json >> release-body.md
 
       - name: Create draft pre-release with artifacts
         uses: softprops/action-gh-release@v2

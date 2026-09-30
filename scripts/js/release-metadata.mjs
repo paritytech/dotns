@@ -5,12 +5,15 @@
 //   changelog  --current <file> [--previous <file>]      release-note lines about address changes
 //              [--previous-tag <name>]
 //   changedset --previous <codehashes.json>              contracts whose built code differs, one per line
+//   bases      --out <file>                              published ABIs each contract inherits from
 //   abidiff    --current <dir> [--previous <dir>]        selector-level ABI diff for the release body
 //              [--previous-tag <name>] [--json <file>]
+//              [--bases <file>]
 //   verify     --network <folder> --rpc <url> [--tag <TAG>]  check a committed manifest against a chain
 //
-// `build` and `changelog` run in both publish workflows; `validate` runs on pull requests, so a
-// broken manifest fails there rather than at release time. `verify` stays out of the release
+// `build`, `bases` and `abidiff` run in both publish workflows, and `changelog` in the release
+// one. `validate` runs on pull requests, so a broken manifest fails there rather than at release
+// time. `verify` stays out of the release
 // path, which must work without reaching a chain; with `--tag` it also checks the chain's
 // declared protocol version and code identity. `changedset` names exactly what a release
 // changed, for upgrade tooling (which lives outside this repository) and for humans. No
@@ -384,6 +387,87 @@ function diffAbi(previous, current) {
   return result;
 }
 
+// For each published ABI, the other published ABIs it inherits from, nearest first. This comes
+// from the build itself, not from names, so a contract is matched with its interface whatever
+// they are called. For example, DotnsFlatPricing implements IDotnsPricing. Bases that are not
+// published ABIs are skipped, because the release body can only point at ABIs that ship in the
+// release.
+//
+// A contract's artifact lists its bases as AST ids. Ids only mean something inside the compiler
+// run that made them, and an incremental `forge build` can leave artifacts from several runs in
+// out/. So each artifact is matched to the build info of its own run (foundry.toml keeps
+// `build_info = true`), and its base ids are turned into names there.
+function publishedBases() {
+  const buildInfoDir = join(ROOT, "out", "build-info");
+  if (!existsSync(buildInfoDir)) {
+    fail(`${buildInfoDir} not found; foundry.toml needs \`build_info = true\`, then forge build`);
+  }
+  // For each compiler run: contract id -> { name, path }.
+  const runs = readdirSync(buildInfoDir)
+    .filter((file) => file.endsWith(".json"))
+    .map((file) => {
+      const info = JSON.parse(readFileSync(join(buildInfoDir, file), "utf8"));
+      const byId = new Map();
+      for (const [path, source] of Object.entries(info?.output?.sources ?? {})) {
+        for (const node of source?.ast?.nodes ?? []) {
+          if (node.nodeType === "ContractDefinition") byId.set(node.id, { name: node.name, path });
+        }
+      }
+      return byId;
+    });
+
+  const published = readContractNames();
+  const publishedSet = new Set(published);
+  const bases = {};
+  for (const name of published) {
+    const path = join(ROOT, "out", `${name}.sol`, `${name}.json`);
+    if (!existsSync(path)) {
+      fail(`${path} not found; run forge build, or check .github/abi-contracts.txt`);
+    }
+    const artefact = JSON.parse(readFileSync(path, "utf8"));
+    const def = artefact?.ast?.nodes?.find(
+      (node) => node.nodeType === "ContractDefinition" && node.name === name,
+    );
+    if (!def) fail(`${path} has no AST for ${name}; foundry.toml needs \`ast = true\``);
+    // The run that built this artifact is the one that has this contract, in this file, under
+    // the same id.
+    const run = runs.find((byId) => {
+      const known = byId.get(def.id);
+      return known?.name === name && known.path === artefact.ast.absolutePath;
+    });
+    if (!run) {
+      fail(`no build info in out/build-info matches ${name}; run forge clean && forge build`);
+    }
+    // The first id is the contract itself.
+    const found = (def.linearizedBaseContracts ?? [])
+      .slice(1)
+      .map((id) => run.get(id)?.name)
+      .filter((base) => base && publishedSet.has(base));
+    if (found.length > 0) bases[name] = found;
+  }
+  return bases;
+}
+
+function writeBases(args) {
+  if (!args.out) fail("bases needs --out <file>");
+  const bases = publishedBases();
+  writeJson(resolve(process.cwd(), args.out), bases);
+  log(`${Object.keys(bases).length} published ABI(s) inherit from another published ABI`);
+}
+
+function readBases(path) {
+  const bases = JSON.parse(readFileSync(resolve(process.cwd(), path), "utf8"));
+  const valid =
+    bases &&
+    typeof bases === "object" &&
+    !Array.isArray(bases) &&
+    Object.values(bases).every((list) => Array.isArray(list));
+  if (!valid) {
+    fail(`${path} does not map contract names to lists of bases; write it with \`bases\``);
+  }
+  return bases;
+}
+
 // Order of the lines in the release body. Breaking changes are the ones that stop an existing
 // caller or indexer from working. The rest are grouped after them.
 const BREAKING_GROUPS = [
@@ -409,10 +493,12 @@ const OTHER_GROUPS = [
 // changed or removed events. Everything else (additions, new contracts, custom errors) goes in a
 // collapsed block with a count. The JSON always has the full diff for every contract.
 //
-// A contract `Foo` and its interface `IFoo` usually publish the same functions and events, so
-// one change would be listed twice. A line for `Foo` is left out when `IFoo` has exactly the same
-// line, because callers bind to the interface. A change that only `Foo` has is still listed.
-// This is the same `Foo` and `IFoo` pairing that `.github/abi-contracts.txt` uses.
+// A contract and the interfaces it implements usually publish the same functions and events, so
+// one change would be listed several times. `--bases` (written by `bases`) says which published
+// ABIs each contract inherits from. A contract's line is left out when one of those bases has
+// exactly the same line, so the change is listed once, under the interface that declares it,
+// which is what callers bind to. A change that only the contract has is still listed. Without
+// `--bases`, every contract is listed on its own.
 //
 // When there is nothing to report, it says so, so an empty section is never mistaken for a
 // missing one. A previous release without ABIs is reported the same way instead of failing.
@@ -484,20 +570,35 @@ function abidiff(args) {
       }
     }
 
-    // Leave out a contract's line when its interface has the same one. A whole contract that
-    // was added or removed together with its interface becomes one line naming both.
+    // Leave out a contract's line when one of its bases has the same one. A contract that is new
+    // together with its bases is named on its base's line instead. That is the furthest base
+    // that is also new, which has no new base of its own, so the whole family ends up on one
+    // line. A removed contract is not in the current build, so its bases are not known and it
+    // keeps its own line.
+    const bases = args.bases ? readBases(args.bases) : {};
     const byChange = new Map(entries.map((entry) => [`${entry.contract} ${entry.change}`, entry]));
+    const isContractLine = (entry) =>
+      entry.group === "contractAdded" || entry.group === "contractRemoved";
     const shown = entries.filter((entry) => {
-      const partner = byChange.get(`I${entry.contract} ${entry.change}`);
-      if (!partner) return true;
-      if (entry.group === "contractAdded" || entry.group === "contractRemoved") {
-        partner.names = [partner.contract, entry.contract];
+      const covering = (bases[entry.contract] ?? []).filter((base) =>
+        byChange.has(`${base} ${entry.change}`),
+      );
+      if (covering.length === 0) return true;
+      if (isContractLine(entry)) {
+        const home = byChange.get(`${covering.at(-1)} ${entry.change}`);
+        home.names = [...(home.names ?? [home.contract]), entry.contract];
       }
       return false;
     });
+    const nameList = (names) => {
+      const quoted = names.map(code);
+      return quoted.length > 1
+        ? `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)}`
+        : quoted[0];
+    };
     const line = (entry) =>
-      entry.group === "contractAdded" || entry.group === "contractRemoved"
-        ? `- ${(entry.names ?? [entry.contract]).map(code).join(" and ")}: ` +
+      isContractLine(entry)
+        ? `- ${nameList(entry.names ?? [entry.contract])}: ` +
           (entry.names && entry.group === "contractAdded" ? "new contracts" : entry.text)
         : `- ${entry.text}`;
     const inOrder = (groups) =>
@@ -859,6 +960,7 @@ if (mode === "build") build(args);
 else if (mode === "validate") validate();
 else if (mode === "changelog") changelog(args);
 else if (mode === "changedset") changedset(args);
+else if (mode === "bases") writeBases(args);
 else if (mode === "abidiff") abidiff(args);
 else if (mode === "verify") verify(args);
 else {
@@ -866,7 +968,9 @@ else {
     "usage: release-metadata.mjs build --tag <TAG> [--out <dir>] | validate | " +
       "changelog --current <file> [--previous <file>] [--previous-tag <name>] | " +
       "changedset --previous <codehashes.json> | " +
-      "abidiff --current <dir> [--previous <dir>] [--previous-tag <name>] [--json <file>] | " +
+      "bases --out <file> | " +
+      "abidiff --current <dir> [--previous <dir>] [--previous-tag <name>] [--json <file>] " +
+      "[--bases <file>] | " +
       "verify --network <folder> --rpc <url> [--tag <TAG>]",
   );
 }
