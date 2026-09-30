@@ -186,9 +186,9 @@ This open source code is provided for research, experimentation, and developer e
 <p>Parity doesn’t deploy the code but may update it based on community feedback.</p>
 <p>If you experience problems with any product or service that was built on or deployed from this code, you should contact the third party who deployed the code in its amended form, not Parity.</p>
 </blockquote>
-<h1 id="dotns"><a class="header" href="#dotns">Dotns</a></h1>
+<h1 id="dotns"><a class="header" href="#dotns">dotNS</a></h1>
 <p>Smart contracts for registering .dot names on Polkadot.</p>
-<p>DotNS is a naming system for Polkadot. An account can register a .dot name, receive an ERC721 token that represents ownership of that name, attach records to it (addresses, text, content hashes, chat keys), and create subnames beneath it. Two independent issuance paths coexist on the same underlying registrar: a public commit-reveal path for anyone who wants a name, and a gateway path, driven by the <a href="index.html#dotnspopcontroller">dotNS gateway pallet</a> in the Asset Hub runtime, that issues device names and personhood names on behalf of verified users. Every piece of state the protocol surfaces is readable through public view functions on the chain itself, so a client needs only a node and a small set of well-known contract addresses to answer any question about the system.</p>
+<p>dotNS is a naming system for Polkadot. An account can register a .dot name, receive an ERC721 token that represents ownership of that name, attach records to it (addresses, text, content hashes, chat keys), and create subnames beneath it. Two independent issuance paths coexist on the same underlying registrar: a public commit-reveal path for anyone who wants a name, and a gateway path, driven by the <a href="index.html#dotnspopcontroller">dotNS gateway pallet</a> in the Asset Hub runtime, that issues device names and personhood names on behalf of verified users. Every piece of state the protocol surfaces is readable through public view functions on the chain itself, so a client needs only a node and a small set of well-known contract addresses to answer any question about the system.</p>
 <h2 id="diagrams"><a class="header" href="#diagrams">Diagrams</a></h2>
 <h3 id="system-diagram"><a class="header" href="#system-diagram">System diagram</a></h3>
 <p><img src="./diagrams/system.png" alt="System diagram" /></p>
@@ -268,9 +268,9 @@ This open source code is provided for research, experimentation, and developer e
 <p>Once <code>redeemableUntil</code> passes, <code>reclaim</code> is permissionless through the ordinary commit-reveal path, whether or not the previous holder ever withdrew. If the position still holds value, reclaim settles it: the amount is credited to the previous holder's pull-payment balance and stays claimable with no deadline. The value follows the departing holder; the name does not wait for them. Cross-paid registrations seed zero-amount positions, so those names have nothing to withdraw and nothing to settle.</p>
 <p>Gateway-issued (soulbound) names never enter this lifecycle. Releasing a name transfers it into escrow custody, and a soulbound name reverts on any transfer, so it holds no position and has no release, redeem, or reclaim path. It stays with the person who earned it.</p>
 <h3 id="cost-model-versioning"><a class="header" href="#cost-model-versioning">Cost-model versioning</a></h3>
-<p>D and F are fixed for the life of a pricing model. Changing either means deploying a fresh model with the new values and registering it, at which point it becomes the current version; there is no live setter that edits the numbers in place. Governance can also point the current version back at an earlier registered model to roll a change back. An in-flight registration prices at the version it committed to, so a model change between commit and reveal leaves its cost unchanged.</p>
+<p>A pricing model's values are fixed for its life: the flat model's deposit, or the scarcity candidate's base fee D and floor F. Changing them means deploying a fresh model with the new values and registering it, at which point it becomes the current version; there is no live setter that edits the numbers in place. Governance can also point the current version back at an earlier registered model to roll a change back. An in-flight registration prices at the version it committed to, so a model change between commit and reveal leaves its cost unchanged.</p>
 <h3 id="what-governance-controls"><a class="header" href="#what-governance-controls">What governance controls</a></h3>
-<p>Governance sets D and F to whatever values it chooses. The contracts hold them coherent and nothing more: D above zero, F above zero and no greater than D, and D within a ceiling that keeps the six-character multiplication from overflowing. There is no cap on how high or low D goes and no limit on how fast it moves, so any rate limit or advance notice comes from the governance process rather than from these contracts. Governance also opens or closes the short-name market with the switch, tunes the release cooldown within its one-hour bound, sets the redeem window between 1 and 30 days, and sets the gateway's reservation duration. None of these controls lets governance seize, reassign, or destroy a name anyone already holds.</p>
+<p>Governance chooses a model's values when it deploys one, and the contracts hold them coherent and nothing more: a flat deposit above zero; for the scarcity candidate, D and F above zero, F no greater than D, and D within a ceiling that keeps the multiplication below nine characters from overflowing. Beyond these checks there is no cap on how high or low the amounts go and no limit on how fast they move, so any rate limit or advance notice comes from the governance process rather than from these contracts. Governance also opens or closes the short-name market with the switch, tunes the release cooldown within its one-hour bound, sets the redeem window between 1 and 30 days, and sets the gateway's reservation duration. None of these controls lets governance seize, reassign, or destroy a name anyone already holds.</p>
 <h3 id="refund-ledgers"><a class="header" href="#refund-ledgers">Refund ledgers</a></h3>
 <p>The escrow keeps two separate pull-payment ledgers. One has no cooldown and serves as the fallback when a registration overpayment cannot be pushed back to the sender inline. The other gives every credit its own cooldown clock and holds transfer-fee overpayments. A deposit unlocked by releasing a funded name lands on the no-cooldown ledger; its delay comes instead from the position's own <code>withdrawAvailableAt</code> stamp, so once <code>withdraw</code> lands the credit is immediately pullable. Clients enumerate pending refunds through the escrow's public views, which page under a fixed cap so discovery stays bounded.</p>
 <p>Clients that need the exact moment a released name becomes registrable should read <code>redeemableUntil</code> from <code>getReleasePosition</code> rather than polling <code>available</code>.</p>
@@ -287,7 +287,7 @@ This open source code is provided for research, experimentation, and developer e
 <p>A device name is where the labelhash and the node diverge. <code>michael.01</code> is registered as the subname <code>michael</code> beneath the numeric container <code>01</code>, so its node is <code>namehash(namehash(tldNode, keccak256("01")), keccak256("michael"))</code>. Its labelhash, as the PoP controller and the PoP resolver use it, is <code>keccak256("michael.01")</code> over the whole text. That value is no step of the device name's node, and neither can be computed from the other without the label.</p>
 <p>Hashing is one-way: the text of a name cannot be recovered from its node or its labelhash, which is why <code>LabelStore</code> keeps it (see <a href="index.html#storefactory-labelstore-and-userstore">StoreFactory, LabelStore, and UserStore</a>). Base name and base length are defined under <a href="index.html#base-length-and-the-digit-rule">Base length and the digit rule</a>; a device name's stem is the letters before its <code>.NN</code> suffix.</p>
 <h3 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller">DotnsRegistrarController</a></h3>
-<p>Commit-reveal controller for the public registration path. A caller first submits a commitment hash, waits out the minimum commitment age, then reveals the registration parameters alongside the payment. The controller validates the commitment, routes price and eligibility through PopRules, and orchestrates every side effect of a successful registration: the mint on the registrar, the forward wire-up on the registry, the reverse record on the reverse resolver, the immutable Store write, and any refund owed on overpayment. Acceptable input is a single DNS label of at least the minimum-length policy; shorter labels revert with <code>LabelTooShort</code>. Labels classified as governance-reserved revert with <code>GovernanceReserved</code>; a label whose base name another user holds reverts with <code>NameReserved</code>. On the cross-payer path the owner's recorded PoP tier must meet the label's required tier, so verified-payer-for-unverified-owner sponsorship is rejected with <code>OwnerStatusInsufficient</code> and the direct-path personhood guarantee carries over to sponsored registrations.</p>
+<p>Commit-reveal controller for the public registration path. A caller first submits a commitment hash, waits out the minimum commitment age, then reveals the registration parameters alongside the payment. The controller validates the commitment, routes price and eligibility through PopRules, and orchestrates every side effect of a successful registration: the mint on the registrar, the forward wire-up on the registry, the reverse record on the reverse resolver, the immutable Store write, and any refund owed on overpayment. Acceptable input is a single DNS label of at least the minimum-length policy; shorter labels revert with <code>LabelTooShort</code>. On the cross-payer path, a governance-reserved label reverts with <code>GovernanceReserved</code> and a label whose base name another user holds with <code>NameReserved</code>; the direct path rejects both through PopRules' price check with a <code>PopError</code>. On the cross-payer path the owner's recorded PoP tier must meet the label's required tier, so verified-payer-for-unverified-owner sponsorship is rejected with <code>OwnerStatusInsufficient</code> and the direct-path personhood guarantee carries over to sponsored registrations.</p>
 <h3 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h3>
 <p>Dedicated controller for the gateway path. Its caller is the dotNS gateway pallet (<code>DotnsGateway</code>), a pallet in the Asset Hub runtime maintained in the <a href="https://github.com/paritytech/individuality-community/tree/main/pallets/dotns-gateway">individuality-community</a> repository. The pallet verifies a user's devicehood (an attester reservation) or personhood (a ring-membership proof), then calls this controller through a dispatcher contract. The controller lives behind its own UUPS proxy with its own storage and is registered on the registrar via addController alongside the commit-reveal controller. Its gated entry points are callable only under a substrate Root origin, which the controller verifies itself by reading <code>originIsRoot</code> from the revive System precompile.</p>
 <p>Today the gateway path does not write a standalone user-status mapping. It materialises that path through gateway-issued labels, PoP resolver records, and reservation queue state; user tier checks for public pricing still come from the personhood precompile/context read.</p>
@@ -296,14 +296,14 @@ This open source code is provided for research, experimentation, and developer e
 <p>Each personhood name carries a head/tail-indexed reservation queue with a capacity of MAX_RESERVATION_QUEUE and a governance-configurable reservationDuration. The queue head is mirrored into PopRules on every head transition (enqueue-from-empty, expiry-driven promotion, non-expiry head removal, claim-wipes-queue), so the public commit-reveal flow sees the same cross-flow lock through its existing PopRules price check. The gateway path is symmetric: issuePersonhoodName consults the live PopRules slot before mint and rejects with <code>NotHolder</code> when another user holds the base name, so PopRules is the single cross-flow authority in both directions. issuePersonhoodName additionally rejects device-name-classified and governance-reserved labels with <code>InvalidPersonhoodLabel</code>. Every exit from a queue emits an event (<code>ReservationClaimed</code>, <code>ReservationEvicted</code>, <code>ReservationRelinquished</code>, <code>ReservationExpired</code>), so an indexer can rebuild the queues from events alone. Expiry advancement is permissionless: anyone can call expireReservation to garbage-collect a stale head, which is what the pallet does on its own cadence.</p>
 <p>The gateway pallet binds three deprecated entrypoints, reserveLiteName, reserveBaseName and registerBaseName, through <code>IDotnsPopControllerLegacy</code>. Each forwards to issueDeviceName, issueDeviceNameWithReservation and issuePersonhoodName respectively with the same selector it always had, and its label errors are <code>InvalidLiteLabel</code> and <code>InvalidBaseLabel</code>, the ones the pallet decodes. New integrations use the current entrypoints.</p>
 <h4 id="early-testnet-quirk-labelstore-deployment"><a class="header" href="#early-testnet-quirk-labelstore-deployment">Early testnet quirk: LabelStore deployment</a></h4>
-<p>Pop-gateway issuances mint the name and persist its label, but LabelStore deployment is deferred for users who have not yet interacted with the protocol from their own address. The current pallet-revive runtime does not let substrate Root deploy contracts on behalf of an account it does not control, so the per-user LabelStore cannot be created at the moment the gateway writes. The controller stamps a pending-claim entry instead, and settlement writes the label into the owner's store, deploying the store on the first write. Settlement is permissionless via settlePendingClaims: the owner settles their own store, or after the claim window anyone settles a given owner's entry and pays the cost. Settlement always writes the label rather than dropping the entry, so a pending name is never stranded. When the runtime supports root-origin contract deployment, the deferred path collapses to a no-op and the issuance flow becomes one transaction end-to-end. This is a runtime limitation, not a protocol design choice.</p>
+<p>Pop-gateway issuances mint the name and persist its label, but LabelStore deployment is deferred for users who have not yet interacted with the protocol from their own address. The current pallet-revive runtime does not let substrate Root deploy contracts on behalf of an account it does not control, so the per-user LabelStore cannot be created at the moment the gateway writes. The controller stamps a pending-claim entry instead, and settlement writes the label into the owner's store, deploying the store on the first write. Settlement is permissionless via settlePendingClaims: the owner settles their own store, or anyone settles a given owner's entries at any time and pays the cost. Settlement always writes the label rather than dropping the entry, so a pending name is never stranded. When the runtime supports root-origin contract deployment, the deferred path collapses to a no-op and the issuance flow becomes one transaction end-to-end. This is a runtime limitation, not a protocol design choice.</p>
 <p>Deferred settlement has no transfer-pricing consequence, because gateway-issued names are soulbound and cannot be transferred at all. The transfer-floor price is derived by reading the label from the sender's LabelStore, so a name held before its label is settled would have no readable label to price against; making gateway names non-transferable removes that path entirely rather than relying on settlement to close it.</p>
 <h3 id="dotnsregistrar"><a class="header" href="#dotnsregistrar">DotnsRegistrar</a></h3>
 <p>ERC721-backed registrar that tokenises second-level names: a name's tokenId is <code>uint256(node)</code> (see <a href="index.html#identifiers">Identifiers</a>). Minting is restricted to every address in the controllers mapping; the mapping is owner-gated through addController and removeController. Every other contract in the system that needs to check "is this address authorised to drive name state?" consults this mapping rather than keeping a parallel list, which is what lets multiple controllers coexist on the same registrar without per-contract configuration changes.</p>
 <p>The registrar owns transferability. A name is marked soulbound at mint when the caller is the address registered under POP_CONTROLLER, so only the gateway path can issue a soulbound name and no other controller can lock a public one. The marker is set once and never cleared, and isSoulbound reports it. The transfer hook rejects every transfer of a soulbound name, including a move to the holder's own address and a release into escrow, so a gateway-issued name can never leave its holder's wallet. Only the mint is exempt, because the marker is set just after it.</p>
 <h3 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h3>
-<p>Forward registry mapping node to (owner, resolver) and supporting subnode creation. When a base name is minted on the registrar, the matching controller wires the node to the new owner through this registry. Privileged node wiring defers to the same controllers mapping on the registrar, so both controllers can write without the registry tracking controllers of its own.</p>
-<p>Subnames are created by the base-name owner. A subname carries its own (owner, resolver) and can in turn carry subnames, so the registry is the place the name hierarchy actually lives. Nesting is bounded by the whole path rather than by a depth counter: the dotted parent path a caller submits is capped at 255 octets. That is a protocol limit rather than the RFC 1035 figure it resembles, since the RFC bound counts a wire-format name including its length bytes and its TLD. Each level of a subname is stored as its full dotted name in the owner's LabelStore, and that row cannot be deleted, so an uncapped path would let a parent owner write an arbitrarily long permanent row into an address they chose.</p>
+<p>Forward registry mapping node to (owner, resolver) and supporting subnode creation. When a second-level name is minted on the registrar, the matching controller wires the node to the new owner through this registry. Privileged node wiring defers to the same controllers mapping on the registrar, so both controllers can write without the registry tracking controllers of its own.</p>
+<p>Subnames are created by the parent name's owner. A subname carries its own (owner, resolver) and can in turn carry subnames, so the registry is the place the name hierarchy actually lives. Nesting is bounded by the whole path rather than by a depth counter: the dotted parent path a caller submits is capped at 255 octets. That is a protocol limit rather than the RFC 1035 figure it resembles, since the RFC bound counts a wire-format name including its length bytes and its TLD. Each level of a subname is stored as its full dotted name in the owner's LabelStore, and that row cannot be deleted, so an uncapped path would let a parent owner write an arbitrarily long permanent row into an address they chose.</p>
 <p>The registry exposes isAuthorised(node, account) as the canonical check for whether an address may manage a node: the stored owner for a subname, or the ERC-721 holder, a single-token approvee, or an operator-for-all on the registrar for a tokenised name. Sibling contracts consult this view so a single registrar-level approval delegates management across the protocol rather than each contract maintaining its own approval list.</p>
 <h3 id="poprules"><a class="header" href="#poprules">PopRules</a></h3>
 <p>PoP-aware name classification and pricing. Classification reads the label's <strong>base length</strong> and whether the label carries the gateway's separator, then maps to one of four tiers: NoStatus (base length 9 or more, open to anyone at the cost-model price), Personhood (base length 6-8, requires proof of personhood), Devicehood (a separated <code>stem.NN</code> device name whose stem is 6-8 characters, issued by the gateway to accounts with devicehood), and Reserved (base length 5 or fewer, governed by the protocol).</p>
@@ -331,12 +331,12 @@ This open source code is provided for research, experimentation, and developer e
 </div>
 <p>A separated label reaches the chain only through the gateway path: the public path requires a single DNS label, which admits no separator. That is what reserves the dotted space to the gateway path, and it is why a reader cannot take the separator alone as proof of personhood for an arbitrary string. The controller publishes <code>isPopIssued(label)</code> for that.</p>
 <p>Tier assignment is read on every pricing call, not stored: PopRules queries the alias-accounts personhood precompile at DotnsConstants.PERSONHOOD with the dotns context (bytes32("dotns")), and translates the returned status byte into a PopStatus (0=NoStatus, 1=Devicehood, 2=Personhood; the precompile itself names them None, Lite and Full). Unknown tier bytes collapse to NoStatus, so a future precompile addition fails closed rather than silently being treated as a higher tier. There is no on-chain self-attestation; users obtain personhood off-chain through the People-chain ring proof and the alias-accounts pallet propagates the result via XCM.</p>
-<p>Classification is not the same thing as effective holder context. A long label such as andrewsays is always a NoStatus-tier label by shape, but it may be held by a Personhood, Devicehood, or NoStatus account. Consumers that need to know what rules apply to that live name should combine three reads: classify the label, query the registrar owner, then query the owner's dotns-context PoP status through the precompile or gateway-written state. The escrow position is the economic qualifier: if the token has an active release position with a non-zero amount, it came through the refundable NoStatus deposit path; if no such deposit exists, a verified holder can own the same long label without it being deposit-backed. In other words, andrewsays does not become a Personhood-tier label when a Personhood account owns it, but the owner can still hold personhood for transfer pricing, reverse resolution, and UI display.</p>
-<p>Name grants are the exception path for users or organisations that need to register without satisfying the live PoP tier check. DotNS still does not accept self-attestation: the contracts only consume PoP status from the personhood precompile, and a user cannot set or prove their own status inside DotNS. Instead, <code>DotnsNameWhitelist</code> binds a specific label to a specific beneficiary, and registerReserved mints it at zero base cost, bypassing the PoP pricing gate while still using the normal commit-reveal and availability checks. Only governance issues a grant: every admin action on the whitelist requires a substrate Root dispatch, so no key can grant a name, the contract owner included. A Root dispatch can also mint a reserved name directly, without a grant. That covers the whitelist path; the registrar's controller set and the protocol registry's keys are still owner-managed, so an owner retains other routes to the same outcome.</p>
+<p>Classification is not the same thing as effective holder context. A long label such as andrewsays is always a NoStatus-tier label by shape, but it may be held by a Personhood, Devicehood, or NoStatus account. Consumers that need to know what rules apply to that live name should combine three reads: classify the label, query the registrar owner, then query the owner's dotns-context PoP status through the precompile (<code>PopRules.popStatusOf</code>). The escrow position is the economic qualifier: if the token has an active release position with a non-zero amount, it came through the refundable NoStatus deposit path; if no such deposit exists, a verified holder can own the same long label without it being deposit-backed. In other words, andrewsays does not become a Personhood-tier label when a Personhood account owns it, but the owner can still hold personhood for transfer pricing, reverse resolution, and UI display.</p>
+<p>Name grants are the exception path for users or organisations that need to register without satisfying the live PoP tier check. dotNS still does not accept self-attestation: the contracts only consume PoP status from the personhood precompile, and a user cannot set or prove their own status inside dotNS. Instead, <code>DotnsNameWhitelist</code> binds a specific label to a specific beneficiary, and registerReserved mints it at zero base cost, bypassing the PoP pricing gate while still using the normal commit-reveal and availability checks. Only governance issues a grant: every admin action on the whitelist requires a substrate Root dispatch, so no key can grant a name, the contract owner included. A Root dispatch can also mint a reserved name directly, without a grant. That covers the whitelist path; the registrar's controller set and the protocol registry's keys are still owner-managed, so an owner retains other routes to the same outcome.</p>
 <p>A grant is deliberately narrow. It names one label rather than permitting any available name, it names the address the name must mint to, and it is spent by that mint, so it cannot seed a second registration. The gate reads the intended owner rather than the caller, so a relayer may submit the registration on the beneficiary's behalf; the name still lands on the beneficiary. The reserved path writes no reverse record, because the submitter is not necessarily the beneficiary and setReverseName overwrites unconditionally; the owner claims their own primary afterwards through claimReverseRecord.</p>
 <p>A grant is a governance action. <code>grantName</code> is Root-only, so on a production network it is proposed and decided on-chain as a referendum, and on a test network it is a sudo-dispatched call. See <a href="./DEPLOYMENTS.html#name-grants-whitelisting">Name grants</a> for the dispatch.</p>
 <p>A grant does not register a name or bypass ownership rules; it only permits the named address to register that one label without a PoP status.</p>
-<p>PopRules also holds the cross-flow reservation table, keyed by base name. The PoP controller writes it on every reservation-queue head transition: it takes a base name directly and rejects the update when the slot is held by a different user, so the caller's local queue bookkeeping never silently diverges from the PopRules state. The commit-reveal controller has a second write path, gated on a Devicehood price; since Devicehood is the separated form and the public path cannot submit one, that path never fires.</p>
+<p>PopRules also holds the cross-flow reservation table, keyed by base name. The PoP controller writes it on every reservation-queue head transition: it takes a base name directly and rejects the update when the slot is held by a different user, so the caller's local queue bookkeeping never silently diverges from the PopRules state. The commit-reveal controller writes no reservation: it reads the slot when it prices a name, and clears a reclaimed name's stale slot. <code>reserveBaseName</code> is the write path for any other authorised controller, bounded to base lengths 6 to 8.</p>
 <p>Two read paths, priceWithCheck and priceWithoutCheck, are what the public flow consults. Both look the reservation up by base name, and only a separated label is shortened to reach one. So a live entry on <code>andrew</code> blocks <code>andrew</code> and <code>andrew.01</code>, while <code>andrew01</code> is a different name and is unaffected. Reservations run for 12 weeks by default.</p>
 <h3 id="dotnsreverseresolver"><a class="header" href="#dotnsreverseresolver">DotnsReverseResolver</a></h3>
 <p>Reverse records mapping an address to its primary name, with two write paths. The first, setReverseName, is the controller-only seeder: on the paid registration path, when the registrant asks for a default primary, registers under their own key, and has no existing primary, the commit-reveal controller calls this entry point. All three conditions matter, because this entry point overwrites unconditionally. The grant-gated reserved path never calls it: the submitter there is not necessarily the beneficiary, so writing would let a third party relabel another address. Writes through this path are restricted to the addresses registered under CONTROLLER and REGISTRAR on the protocol registry. The second, claimReverseRecord, is the self-service path open to any current name owner: the caller hands in a label and the resolver checks that registrar.ownerOf(namehash(label)) equals the caller before overwriting their reverse entry. Past ownership is never sufficient; the registrar is the single source of truth for the gate.</p>
@@ -354,10 +354,10 @@ This open source code is provided for research, experimentation, and developer e
 <h3 id="dotnsresolver"><a class="header" href="#dotnsresolver">DotnsResolver</a></h3>
 <p>Stores forward-resolution address records per node. This is the conventional "name to address" lookup: a client has a .dot name and wants to know the Ethereum address behind it. Writes require node ownership; reads are open.</p>
 <h3 id="dotnspopresolver"><a class="header" href="#dotnspopresolver">DotnsPopResolver</a></h3>
-<p>Per-node resolver for records produced by the gateway path. Three record kinds. The chat key is ECDH public-key bytes keyed by node; it is written by the PoP controller when it issues a device name and during any personhood issuance that inherits from a prior device name, and is what gives verified users an on-chain discovery channel for end-to-end encrypted messaging. The two link directions take and return different identifiers. <code>deviceLabelhashOf(personhoodNode)</code> answers "which device name is this personhood name linked to?": it takes a personhood-name node and returns a device-name labelhash. <code>personhoodNodeOf(deviceLabelhash)</code> is the reverse direction, "which personhood name is this device name linked to?": it takes a device-name labelhash, the hash of the full <code>stem.NN</code> text (see <a href="index.html#identifiers">Identifiers</a>), and returns a personhood-name node. The forward and reverse links are written by the same call, so they stay in lockstep; downstream consumers that look up by device name (Nova's pallet, for one) resolve the personhood name without scanning events.</p>
+<p>Per-node resolver for records produced by the gateway path. Three record kinds. The chat key is ECDH public-key bytes keyed by node; it is written by the PoP controller when it issues a device name and during any personhood issuance, either inherited from a prior device name or supplied fresh in the payload, and is what gives verified users an on-chain discovery channel for end-to-end encrypted messaging. The two link directions take and return different identifiers. <code>deviceLabelhashOf(personhoodNode)</code> answers "which device name is this personhood name linked to?": it takes a personhood-name node and returns a device-name labelhash. <code>personhoodNodeOf(deviceLabelhash)</code> is the reverse direction, "which personhood name is this device name linked to?": it takes a device-name labelhash, the hash of the full <code>stem.NN</code> text (see <a href="index.html#identifiers">Identifiers</a>), and returns a personhood-name node. The forward and reverse links are written by the same call, so they stay in lockstep; downstream consumers that look up by device name (Nova's pallet, for one) resolve the personhood name without scanning events.</p>
 <p>Writer authorisation is dynamic: the PoP controller address is fetched from the protocol registry on every write. Rotating the PoP controller is a single set call on the protocol registry with no resolver upgrade required.</p>
 <h3 id="dotnsprotocolregistry"><a class="header" href="#dotnsprotocolregistry">DotnsProtocolRegistry</a></h3>
-<p>On-chain lookup table mapping well-known bytes32 keys (declared in DotnsConstants) to contract addresses. Every DotNS contract resolves its siblings through this registry at runtime.</p>
+<p>On-chain lookup table mapping well-known bytes32 keys (declared in DotnsConstants) to contract addresses. Every dotNS contract resolves its siblings through this registry at runtime.</p>
 <p>Without it, each contract would store direct addresses to every contract it calls. An upgrade that changes one address would require a separate owner transaction for every contract that references it. The protocol registry reduces this to one: update the key in the registry, and every caller picks up the new address on its next call. The indirection also means a governance-driven rotation of, say, the PoP controller does not break any consumer that has already been deployed.</p>
 <p>The registered keys include REGISTRAR, CONTROLLER, REGISTRY, REVERSE_RESOLVER, RESOLVER, CONTENT_RESOLVER, POP_RULES, STORE_FACTORY, POP_CONTROLLER, POP_RESOLVER, and NAME_ESCROW. Multicall3 is not among them: it is a generic call forwarder rather than a protocol component, and registry membership is a trust signal protocol contracts read. Its address comes from the deployment manifest.</p>
 <h3 id="multicall3"><a class="header" href="#multicall3">Multicall3</a></h3>
@@ -394,9 +394,9 @@ This open source code is provided for research, experimentation, and developer e
 <li><a href="contracts/deploy/Create3Factory.sol/contract.Create3Factory.html">Create3Factory</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="create3factory"><a class="header" href="#create3factory">Create3Factory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/deploy/Create3Factory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/deploy/Create3Factory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-Dotns CREATE3 Factory</p>
+dotNS CREATE3 Factory</p>
 <p>Permissionless wrapper around Solady's audited CREATE3 library.</p>
 <p>Anyone may call @custom:function deploy. CREATE3 addresses are a pure function of
 <code>(factory_address, salt)</code> — the caller never enters the derivation — so caller-gating
@@ -405,7 +405,7 @@ cross-chain ownership-coordination burden and lets CI keys, ops keys, and recove
 all coexist without ownership transfers.
 An occupied salt is handled by the caller. <code>BaseDeployer._deployCreate3</code> adopts an occupied
 address only when the occupant's runtime code is the artefact that run would have deployed,
-and <code>DOTNS_SALT_VERSION</code> moves the DotNS address set to fresh addresses when it is not.</p>
+and <code>DOTNS_SALT_VERSION</code> moves the dotNS address set to fresh addresses when it is not.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
@@ -493,11 +493,11 @@ artefact lookup rather than land a useless deployment.</p>
 <li><a href="contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="contracts/escrow/DotnsNameEscrow.sol//contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
-Dotns Name Escrow</p>
+dotNS Name Escrow</p>
 <p>Holds refundable deposits for registered names and manages the release/reclaim
 lifecycle. @custom:security-contact admin@parity.io</p>
 <h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
@@ -1088,7 +1088,7 @@ The selector can be obtained in Solidity with <code>IERC721Receiver.onERC721Rece
 </code></pre>
 <h3 id="version"><a class="header" href="#version">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -1131,9 +1131,9 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-Dotns Name Escrow Interface</p>
+dotNS Name Escrow Interface</p>
 <p>Escrows refundable deposits for registered names and manages the release lifecycle.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
@@ -1911,7 +1911,7 @@ reset earlier entries' clocks. Recipients claim entries individually or in batch
 <li><a href="contracts/external/personhood/IPersonhood.sol/interface.IPersonhood.html">IPersonhood</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ipersonhood"><a class="header" href="#ipersonhood">IPersonhood</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/external/personhood/IPersonhood.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/external/personhood/IPersonhood.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IPersonhood - Proof of Personhood Precompile</p>
 <p>Query personhood status of an account.</p>
@@ -1969,7 +1969,7 @@ If we add more types in the future, the existing ones remain unchanged.</p>
 <li><a href="contracts/external/revive/ISystem.sol/interface.ISystem.html">ISystem</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="isystem"><a class="header" href="#isystem">ISystem</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/external/revive/ISystem.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/external/revive/ISystem.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 ISystem</p>
 <p>Minimal subset of revive's System precompile, vendored from
@@ -2003,11 +2003,11 @@ than reverting, on a non-Root origin.</p>
 <li><a href="contracts/pop/PopRules.sol/contract.PopRules.html">PopRules</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnscostmodelregistry"><a class="header" href="#dotnscostmodelregistry">DotnsCostModelRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/pop/DotnsCostModelRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/pop/DotnsCostModelRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Ownable, <a href="contracts/pop/DotnsCostModelRegistry.sol//contracts/pop/IDotnsCostModelRegistry.sol/interface.IDotnsCostModelRegistry.html">IDotnsCostModelRegistry</a></p>
 <p><strong>Title:</strong>
-DotNS Cost Model Registry</p>
+dotNS Cost Model Registry</p>
 <p>Keeps every registered cost model addressable by version and tracks the current one.</p>
 <p>Holds only pointers, so it stays a plain owner-gated contract. <code>PopRules</code> resolves it once
 through <code>DotnsConstants.COST_MODEL</code> and prices the current version for fresh reads and a
@@ -2107,11 +2107,11 @@ CurrentModelSet.</p>
 <tr><td><code>weiPrice</code></td><td><code>uint256</code></td><td>Registration cost in wei at that version.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsflatpricing"><a class="header" href="#dotnsflatpricing">DotnsFlatPricing</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/pop/DotnsFlatPricing.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/pop/DotnsFlatPricing.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/pop/DotnsFlatPricing.sol//contracts/pop/IDotnsPricing.sol/interface.IDotnsPricing.html">IDotnsPricing</a></p>
 <p><strong>Title:</strong>
-DotNS Flat Pricing</p>
+dotNS Flat Pricing</p>
 <p>Prices every registration at a single deposit, whatever the base length.</p>
 <p>The launch cost model: one constant amount for any name the bands admit, so a nine-plus
 character name costs the same flat deposit and shorter names stay gated by <code>PopRules</code>. The
@@ -2170,11 +2170,11 @@ changes it.</p>
 <tr><td><code>modelVersion</code></td><td><code>uint256</code></td><td>Identifier derived from the model form and its parameters.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsscarcitypricing"><a class="header" href="#dotnsscarcitypricing">DotnsScarcityPricing</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/pop/DotnsScarcityPricing.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/pop/DotnsScarcityPricing.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/pop/DotnsScarcityPricing.sol//contracts/pop/IDotnsPricing.sol/interface.IDotnsPricing.html">IDotnsPricing</a></p>
 <p><strong>Title:</strong>
-DotNS Scarcity Pricing</p>
+dotNS Scarcity Pricing</p>
 <p>Prices a registration on a geometric scarcity curve driven by base length.</p>
 <p>The curve doubles the base fee for each character below nine and halves it for each
 character from nine upward, never below the floor. The base fee is the curve's value at
@@ -2251,9 +2251,9 @@ floor changes it.</p>
 <tr><td><code>modelVersion</code></td><td><code>uint256</code></td><td>Identifier derived from the model form and its parameters.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscostmodelregistry"><a class="header" href="#idotnscostmodelregistry">IDotnsCostModelRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/pop/IDotnsCostModelRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/pop/IDotnsCostModelRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-DotNS Cost Model Registry</p>
+dotNS Cost Model Registry</p>
 <p>Holds every cost model the protocol has run and names the current one.</p>
 <p>The address registered under <code>DotnsConstants.COST_MODEL</code> points here, set once and never
 repointed. Changing the live curve registers a new model, which adds its version and moves
@@ -2411,9 +2411,9 @@ the version a name prices at cannot move after the commitment is made.</p>
 <tr><td><code>revealed</code></td><td><code>uint256</code></td><td>The version supplied at reveal.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspricing"><a class="header" href="#idotnspricing">IDotnsPricing</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/pop/IDotnsPricing.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/pop/IDotnsPricing.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-DotNS Pricing Cost Model</p>
+dotNS Pricing Cost Model</p>
 <p>Prices a registration from the base length of its label alone.</p>
 <p>The seam between name policy and the wei amount a registration costs. <code>PopRules</code> and the
 public commit-reveal controller keep the classification, reservation, and tier rules; the
@@ -2465,7 +2465,7 @@ release declaration (<code>protocolVersion()</code> on the protocol registry).</
 <tr><td><code>reason</code></td><td><code>string</code></td><td>Human-readable explanation of the failed invariant.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for dotNS</p>
 <p>Proof of personhood interface defining dotNS price calculation, PoP-tier requirements,
@@ -2487,11 +2487,12 @@ given length; personhood only unlocks the premium band.</p>
 security-contact: admin@parity.io</p>
 <h2 id="functions-10"><a class="header" href="#functions-10">Functions</a></h2>
 <h3 id="classifyname"><a class="header" href="#classifyname">classifyName</a></h3>
-<p>Classifies a name into a required PoP tier per DotNS naming rules.</p>
+<p>Classifies a name into a required PoP tier per dotNS naming rules.</p>
 <p>Pure; inputs are the label bytes only. Callers use the returned tier to decide which
 pricing and verification branch applies. A label that is neither a single lowercase
-ASCII DNS label nor a device name triggers @custom:reverts PopError; a trailing-digit
-suffix of any length is accepted and classified by the length it leaves.</p>
+ASCII DNS label nor a device name triggers @custom:reverts PopError. Trailing digits in
+an ordinary label count towards its length; only a device name's separator and suffix
+are removed before it is classified.</p>
 <pre><code class="language-solidity">function classifyName(string calldata name)
     external
     pure
@@ -2569,7 +2570,7 @@ refresh and writes into an empty or expired slot emit @custom:emits BaseNameRese
 <p>Writes or refreshes a reservation for a base name.</p>
 <p>Gateway-driven reservation path used by the PoP controller. Only a controller in the
 registrar's <code>controllers</code> set may call this, otherwise @custom:reverts NotRegistry.
-Does not apply the device-name length window that @custom:function reserveBaseName
+Does not apply the 6-8 base-length window that @custom:function reserveBaseName
 enforces, but does require the input to be canonical with no trailing digits; a
 non-canonical label or one with trailing digits triggers @custom:reverts PopError. If
 the slot is already live and held by a different user, @custom:reverts PopError so the
@@ -3024,7 +3025,7 @@ user through the reservation table.</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="poprules-1"><a class="header" href="#poprules-1">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/pop/PopRules.sol//contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -3056,7 +3057,7 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">mapping(string baseName =&gt; Reservation reservation) public reservations
 </code></pre>
 <h3 id="protocolregistry-1"><a class="header" href="#protocolregistry-1">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="shortnamesenabled"><a class="header" href="#shortnamesenabled">shortNamesEnabled</a></h3>
@@ -3109,11 +3110,12 @@ ShortNamesEnabledUpdated.</p>
 </tbody></table>
 </div>
 <h3 id="classifyname-1"><a class="header" href="#classifyname-1">classifyName</a></h3>
-<p>Classifies a name into a required PoP tier per DotNS naming rules.</p>
+<p>Classifies a name into a required PoP tier per dotNS naming rules.</p>
 <p>Pure; inputs are the label bytes only. Callers use the returned tier to decide which
 pricing and verification branch applies. A label that is neither a single lowercase
-ASCII DNS label nor a device name triggers @custom:reverts PopError; a trailing-digit
-suffix of any length is accepted and classified by the length it leaves.</p>
+ASCII DNS label nor a device name triggers @custom:reverts PopError. Trailing digits in
+an ordinary label count towards its length; only a device name's separator and suffix
+are removed before it is classified.</p>
 <pre><code class="language-solidity">function classifyName(string calldata name)
     external
     pure
@@ -3618,7 +3620,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <h3 id="version-4"><a class="header" href="#version-4">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -3638,7 +3640,7 @@ registry.</p>
 <p>Writes or refreshes a reservation for a base name.</p>
 <p>Gateway-driven reservation path used by the PoP controller. Only a controller in the
 registrar's <code>controllers</code> set may call this, otherwise @custom:reverts NotRegistry.
-Does not apply the device-name length window that @custom:function reserveBaseName
+Does not apply the 6-8 base-length window that @custom:function reserveBaseName
 enforces, but does require the input to be canonical with no trailing digits; a
 non-canonical label or one with trailing digits triggers @custom:reverts PopError. If
 the slot is already live and held by a different user, @custom:reverts PopError so the
@@ -3754,7 +3756,7 @@ validation of its own so each public entry can layer additional eligibility chec
 <li><a href="contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspopcontroller-1"><a class="header" href="#dotnspopcontroller-1">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/registrars/DotnsPopController.sol//contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a>, <a href="contracts/registrars/DotnsPopController.sol//contracts/registrars/IDotnsPopControllerLegacy.sol/interface.IDotnsPopControllerLegacy.html">IDotnsPopControllerLegacy</a></p>
 <p><strong>Title:</strong>
@@ -3828,7 +3830,7 @@ state has been committed.</p>
 </code></pre>
 <h2 id="state-variables-3"><a class="header" href="#state-variables-3">State Variables</a></h2>
 <h3 id="protocolregistry-2"><a class="header" href="#protocolregistry-2">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="_reservationmeta"><a class="header" href="#_reservationmeta">_reservationMeta</a></h3>
@@ -3870,10 +3872,8 @@ governance via <code>setReservationDuration</code>.</p>
 <h3 id="_pendingclaimqueue"><a class="header" href="#_pendingclaimqueue">_pendingClaimQueue</a></h3>
 <p>Per-user pile of deferred names awaiting a <code>LabelStore</code>.</p>
 <p>The mint origin cannot deploy a <code>LabelStore</code>, so deferred names accumulate here until a
-signed-origin</p>
-<p><strong>Note:</strong>
-function: settlePendingClaims deploys the store and writes the stashed labels. Each
-entry's deadline is measured from its own <code>mintedAt</code> against <code>reservationDuration</code>.</p>
+signed-origin @custom:function settlePendingClaims deploys the store and writes the stashed
+labels. Entries never lapse; <code>mintedAt</code> only feeds the advisory deadline the lens reports.</p>
 <pre><code class="language-solidity">mapping(address user =&gt; PendingClaim[] queue) internal _pendingClaimQueue
 </code></pre>
 <h3 id="_popissued"><a class="header" href="#_popissued">_popIssued</a></h3>
@@ -4327,7 +4327,8 @@ the live window <code>[head, tail)</code>.</p>
 <h3 id="pendingclaims"><a class="header" href="#pendingclaims">pendingClaims</a></h3>
 <p>Returns a paginated slice of a user's pending claims in queue order.</p>
 <p>An empty array means the user has no pending claims at <code>offset</code>. Each entry carries
-its <code>mintedAt</code>; the settlement deadline is <code>mintedAt + reservationDuration</code>. An <code>offset</code>
+its <code>mintedAt</code>; <code>mintedAt + reservationDuration</code> is an advisory settlement deadline, and
+the entry stays settleable after it. An <code>offset</code>
 past the end returns an empty array rather than reverting, and a page holds at most
 <code>DotnsConstants.MAX_PAGE_SIZE</code> entries.</p>
 <pre><code class="language-solidity">function pendingClaims(
@@ -4435,7 +4436,7 @@ reservation was ever enqueued under <code>labelhash</code>.</p>
 </code></pre>
 <h3 id="version-5"><a class="header" href="#version-5">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -4710,7 +4711,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspoplens"><a class="header" href="#dotnspoplens">DotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/DotnsPopLens.sol//contracts/registrars/IDotnsPopLens.sol/interface.IDotnsPopLens.html">IDotnsPopLens</a></p>
 <p><strong>Title:</strong>
@@ -4863,18 +4864,19 @@ because it scans the account's holdings. Never reverts.</p>
 <p>Whether a name is an identity at all is provenance, so the listing is gated on</p>
 <p><strong>Note:</strong>
 function: IDotnsPopController.isPopIssued: characters alone would admit a public
-registration spelled <code>joseph42</code>, which reads as a personhood name and is not one. The
-label shape then confirms it is one of the two kinds the gateway issues, a device name with
-its separator or a personhood name without one. A device name is a subname and a
-personhood name is a tokenised second-level name, and the callers resolve ownership through
-the registry, which covers both. Provenance is keyed by text, so a subname a <code>user</code> created
-under a name they own does not enter the listing unless the controller issued it.</p>
+registration spelled <code>joseph42</code>, which passes the single-label shape check yet was never
+issued by the gateway. The label shape then confirms it is one of the two kinds the gateway
+issues, a device name with its separator or a personhood name without one. A device name is
+a subname and a personhood name is a tokenised second-level name, and the callers resolve
+ownership through the registry, which covers both. Provenance is keyed by text, so a
+subname a <code>user</code> created under a name they own does not enter the listing unless the
+controller issued it.</p>
 <pre><code class="language-solidity">function _belongsToListing(string memory label) internal view returns (bool);
 </code></pre>
 <h3 id="_countnames"><a class="header" href="#_countnames">_countNames</a></h3>
 <p>Counts the gateway-issued names currently owned by <code>user</code>.</p>
 <p>Walks the user's <code>LabelStore</code> (settled names) then their pending claims, keeping only
-entries that belong to the listing and are still owned by <code>user</code> on the registrar. A pending
+entries that belong to the listing and are still owned by <code>user</code> in the registry. A pending
 entry already written into the store by a sibling flow is skipped so it is not counted
 twice.</p>
 <pre><code class="language-solidity">function _countNames(address user) internal view returns (uint256 count);
@@ -4902,11 +4904,11 @@ record returns the zero address, so a missing name yields false and the read sta
 <pre><code class="language-solidity">function _ownedBy(bytes32 node, address user) internal view returns (bool);
 </code></pre>
 <h3 id="_detail"><a class="header" href="#_detail">_detail</a></h3>
-<p>Gathers a name's record from the registrar, PoP resolver, and PopRules.</p>
+<p>Gathers a name's record from the registry, registrar, PoP resolver, and PopRules.</p>
 <p>Reads defensively so an unminted or unsettled name yields zeroed fields instead of
 reverting. <code>personhoodNode</code> is left for the caller because it needs the labelhash, which is
 recoverable from the label string but not from the node alone. <code>requiredTier</code> classifies the
-label shape, so <code>knownLabel</code> supplies the label for a pending subname the node cannot
+label shape, so <code>knownLabel</code> supplies the label for an unsettled name the node cannot
 recover, letting classification run before the detail is returned; it is ignored when the
 label is otherwise recoverable, and an empty <code>knownLabel</code> leaves an unrecoverable label
 unclassified.</p>
@@ -4974,11 +4976,11 @@ other name hashes as a second-level label under the TLD.</p>
 <pre><code class="language-solidity">function _popRules() internal view returns (IPopRules);
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrar-1"><a class="header" href="#dotnsregistrar-1">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="contracts/registrars/DotnsRegistrar.sol//contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
-Dotns Registrar</p>
+dotNS Registrar</p>
 <p>ERC721-backed registrar implementing permanent name ownership.</p>
 <p>Deliberately policy-free on pricing, reservations, and PoP gating; those live in the
 controllers and @custom:contract IPopRules. The registrar owns transferability itself: publicly
@@ -4999,7 +5001,7 @@ oz-retyped-from: mapping(IDotnsRegistrarController =&gt; bool)</p>
 <pre><code class="language-solidity">mapping(IDotnsController controller =&gt; bool exists) public controllers
 </code></pre>
 <h3 id="protocolregistry-4"><a class="header" href="#protocolregistry-4">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <p>Used to resolve sibling contract addresses (store factory, controller, registry)
 without storing individual references.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
@@ -5191,7 +5193,7 @@ in the same call.</p>
 </code></pre>
 <h3 id="version-6"><a class="header" href="#version-6">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -5350,11 +5352,11 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrarcontroller-1"><a class="header" href="#dotnsregistrarcontroller-1">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, ReentrancyGuardTransient, <a href="contracts/registrars/DotnsRegistrarController.sol//contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
-Dotns Registrar Controller</p>
+dotNS Registrar Controller</p>
 <p>Allocates top-level labels using a commit reveal scheme.</p>
 <p>Orchestrates allocation, PoP validation, pricing enforcement, forward registry
 wiring, default reverse resolution, and immutable store writing.
@@ -5391,7 +5393,7 @@ from this stamp.</p>
 <pre><code class="language-solidity">mapping(bytes32 hash =&gt; uint256 version) public committedPricingVersion
 </code></pre>
 <h3 id="protocolregistry-5"><a class="header" href="#protocolregistry-5">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap-4"><a class="header" href="#__gap-4">__gap</a></h3>
@@ -5574,7 +5576,7 @@ wires forward registry, optionally sets the reverse record, and writes the owner
 Store.</p>
 <p>On a fresh mint the triad of mint + forward-registry + store-write is delegated
 to @custom:function RegistrationUtils.registerAndStore, the single canonical implementation
-shared across every DotNS registration flow. On a reclaim the mint step is skipped (the
+shared across every dotNS registration flow. On a reclaim the mint step is skipped (the
 escrow has already moved custody) and only the registry wiring and store write run.
 Reverse-record setting and the priced-registration event stay here because they are
 commit-reveal-specific policy.</p>
@@ -5595,7 +5597,7 @@ commit-reveal-specific policy.</p>
 </code></pre>
 <h3 id="version-7"><a class="header" href="#version-7">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -5622,7 +5624,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscontroller"><a class="header" href="#idotnscontroller">IDotnsController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/IDotnsController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/IDotnsController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC165</p>
 <p><strong>Title:</strong>
@@ -5636,7 +5638,7 @@ which concrete controller interface a given address implements.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/IDotnsPopController.sol//contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -5983,9 +5985,10 @@ reservation was ever enqueued under <code>labelhash</code>.</p>
 </tbody></table>
 </div>
 <h3 id="reservationduration-1"><a class="header" href="#reservationduration-1">reservationDuration</a></h3>
-<p>Returns the window, in seconds, after which a queue or pending-claim entry lapses.</p>
-<p>Governance-configurable via @custom:function setReservationDuration. Read by the lens
-to compute each pending claim's settlement deadline.</p>
+<p>Returns the window, in seconds, after which a reservation-queue entry lapses.</p>
+<p>Governance-configurable via @custom:function setReservationDuration. Pending claims do
+not lapse; the lens adds this window to each claim's <code>mintedAt</code> to report an advisory
+settlement deadline.</p>
 <pre><code class="language-solidity">function reservationDuration() external view returns (uint64 duration);
 </code></pre>
 <p><strong>Returns</strong></p>
@@ -6056,7 +6059,8 @@ still holds unsettled entries, in which case they call again. Emits the same</p>
 <h3 id="pendingclaims-1"><a class="header" href="#pendingclaims-1">pendingClaims</a></h3>
 <p>Returns a paginated slice of a user's pending claims in queue order.</p>
 <p>An empty array means the user has no pending claims at <code>offset</code>. Each entry carries
-its <code>mintedAt</code>; the settlement deadline is <code>mintedAt + reservationDuration</code>. An <code>offset</code>
+its <code>mintedAt</code>; <code>mintedAt + reservationDuration</code> is an advisory settlement deadline, and
+the entry stays settleable after it. An <code>offset</code>
 past the end returns an empty array rather than reverting, and a page holds at most
 <code>DotnsConstants.MAX_PAGE_SIZE</code> entries.</p>
 <pre><code class="language-solidity">function pendingClaims(
@@ -6363,8 +6367,8 @@ so the resolver carries the full identity record regardless of whether the user 
 settled their Store. A user accumulates one entry per deferred name: the Root gateway path
 cannot deploy a <code>LabelStore</code> (contract creation is forbidden from the Root origin), so it
 keeps stashing entries until a signed-origin @custom:function settlePendingClaims deploys
-the store and settles the entries. Each entry's deadline is measured from its own
-<code>mintedAt</code> against <code>reservationDuration</code>.</p>
+the store and settles the entries. Entries never lapse and can be settled at any time;
+<code>mintedAt + reservationDuration</code> is only the advisory deadline the lens reports.</p>
 <pre><code class="language-solidity">struct PendingClaim {
     string label;
     uint64 mintedAt;
@@ -6462,7 +6466,7 @@ key. The member order is part of the ABI: the gateway pallet encodes <code>Devic
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopcontrollerlegacy"><a class="header" href="#idotnspopcontrollerlegacy">IDotnsPopControllerLegacy</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/IDotnsPopControllerLegacy.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/IDotnsPopControllerLegacy.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopControllerLegacy</p>
 <p>Deprecated PoP controller entrypoints, kept with their original selectors for callers
@@ -6524,14 +6528,15 @@ reverts: InvalidPersonhoodLabel.</p>
 <pre><code class="language-solidity">error InvalidBaseLabel();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspoplens"><a class="header" href="#idotnspoplens">IDotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopLens</p>
 <p>Read-only view over PoP identity data, composed from the controller, the registrar,
 the store factory, the PoP resolver, and PopRules.</p>
 <p>Holds no state of its own beyond the protocol registry it resolves siblings through, and
 takes no part in issuance. It exists so the query surface lives outside the controller, which
-keeps the controller within the contract-size limit and keeps ownership on the registrar.</p>
+keeps the controller within the contract-size limit. Ownership is read from the registry, which
+covers device-name subnames and tokenised names alike.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions-18"><a class="header" href="#functions-18">Functions</a></h2>
@@ -6655,8 +6660,8 @@ because it scans the account's holdings. Never reverts.</p>
 <p>One row in a per-account name listing: the name and the node used to look it up.</p>
 <p>Computed on read; not stored. <code>settled</code> is false while the name still sits in the
 temporary pending-claim queue and true once its label is written into a <code>LabelStore</code>.
-<code>deadline</code> is the pending settlement deadline (<code>mintedAt + reservationDuration</code>) and is
-zero for a settled name.</p>
+<code>deadline</code> is an advisory settlement deadline (<code>mintedAt + reservationDuration</code>) and is
+zero for a settled name; a pending claim stays settleable after it.</p>
 <pre><code class="language-solidity">struct Name {
     bytes32 node;
     string label;
@@ -6667,21 +6672,28 @@ zero for a settled name.</p>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td>namehash of the name; the key for chat-key, link, and detail lookups.</td></tr>
-<tr><td><code>label</code></td><td><code>string</code></td><td>Full name string.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Bare label without the TLD; a device name carries its separator.</td></tr>
 <tr><td><code>settled</code></td><td><code>bool</code></td><td>Whether the label is written into a <code>LabelStore</code>.</td></tr>
-<tr><td><code>deadline</code></td><td><code>uint64</code></td><td>Pending settlement deadline, or zero when settled.</td></tr>
+<tr><td><code>deadline</code></td><td><code>uint64</code></td><td>Advisory settlement deadline for a pending claim, or zero when settled.</td></tr>
 </tbody></table>
 </div>
 <h3 id="namedetail-2"><a class="header" href="#namedetail-2">NameDetail</a></h3>
-<p>The full on-chain record for a single name, gathered from the registrar, the PoP
-resolver, and PopRules in one read.</p>
+<p>The full on-chain record for a single name, gathered from the registry, the
+registrar, the PoP resolver, and PopRules in one read.</p>
 <p>Computed on read; not stored. Never reverts on an unminted or unsettled name: absent
 fields read as zero or empty. <code>requiredTier</code> classifies the label shape (the tier the name
 requires), not the owner's proof. <code>personhoodNode</code> is looked up by the device-name
 labelhash, which cannot be recovered from a node alone, so it is populated by</p>
-<p><strong>Note:</strong>
-function: nameDetail and left zero by @custom:function nameDetailByNode unless the
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: nameDetail and left zero by @custom:function nameDetailByNode unless the
 label is independently resolvable.</p>
+</li>
+<li>
+<p>function: nameDetailByNode reads a name whose claim is unsettled.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">struct NameDetail {
     bytes32 node;
     string label;
@@ -6697,9 +6709,9 @@ label is independently resolvable.</p>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td>namehash of the name.</td></tr>
-<tr><td><code>label</code></td><td><code>string</code></td><td>Full name string, or empty when the name is unminted or its claim is unsettled.</td></tr>
-<tr><td><code>owner</code></td><td><code>address</code></td><td>Current registrar owner, or the zero address when the name does not exist.</td></tr>
-<tr><td><code>exists</code></td><td><code>bool</code></td><td>Whether the name is minted.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Bare label without the TLD. Empty when the name has no owner, or when</td></tr>
+<tr><td><code>owner</code></td><td><code>address</code></td><td>Current owner in the registry, or the zero address when the name has none.</td></tr>
+<tr><td><code>exists</code></td><td><code>bool</code></td><td>Whether the name has an owner in the registry.</td></tr>
 <tr><td><code>settled</code></td><td><code>bool</code></td><td>Whether the label is written into the current owner's <code>LabelStore</code>.</td></tr>
 <tr><td><code>requiredTier</code></td><td><code>IPopRules.PopStatus</code></td><td>PopRules classification of the label.</td></tr>
 <tr><td><code>chatKey</code></td><td><code>bytes</code></td><td>Chat-key bytes recorded on the PoP resolver for the node.</td></tr>
@@ -6727,12 +6739,12 @@ this precompile-free summary.</p>
 <tr><td><code>reservationLabelhash</code></td><td><code>bytes32</code></td><td>The personhood name the account holds a live reservation on, or zero when none.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
-Dotns Registrar</p>
-<p>ERC721-backed ownership for DotNS names with controller-gated registration.</p>
+dotNS Registrar</p>
+<p>ERC721-backed ownership for dotNS names with controller-gated registration.</p>
 <p>Intentionally minimal and policy-free. Provides ERC721 ownership for registered name
 token IDs and controller-gated registration; pricing, PoP enforcement, and flow-specific
 policy live in the controllers.</p>
@@ -7001,11 +7013,11 @@ on a plain <code>transferFrom</code>, which is why the gate is enforced here too
 <pre><code class="language-solidity">error UnsolicitedEscrowDeposit(uint256 tokenId);
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/IDotnsRegistrarController.sol//contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
-Dotns Registrar Controller</p>
+dotNS Registrar Controller</p>
 <p>Interface for registering top-level labels using a commit reveal scheme.</p>
 <p>Defines allocation only; forward resolution, reverse lookup, pricing mechanics, PoP
 validation, and store writing are handled by external contracts. Users commit a hash of
@@ -7066,12 +7078,12 @@ configured escrow address from the protocol registry (otherwise</p>
 </li>
 <li>
 <p>reverts: EscrowNotConfigured). Splits on direct vs cross-payer at
-<code>msg.sender == registration.owner</code>. The direct path runs <code>priceWithCheck</code> (personhood</p>
+<code>msg.sender == registration.owner</code>. The direct path runs <code>priceWithCheck</code> (PoP-status</p>
 </li>
 </ul>
 <ul>
 <li>reservation gate) and routes the charge to a refundable escrow deposit owned by
-<code>registration.owner</code>. The cross-payer path skips the personhood revert in
+<code>registration.owner</code>. The cross-payer path skips the PoP-status revert in
 <code>priceWithCheck</code> but applies it directly via @custom:reverts OwnerStatusInsufficient
 when the owner's recorded tier does not meet the label's required tier, and still
 rejects governance-reserved labels with @custom:reverts GovernanceReserved and live
@@ -7267,14 +7279,14 @@ grant and never writes a reverse record.</p>
 <li><a href="contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsprotocolregistry-1"><a class="header" href="#dotnsprotocolregistry-1">DotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsProtocolRegistry.sol//contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></p>
 <p><strong>Title:</strong>
-Dotns Protocol Registry</p>
+dotNS Protocol Registry</p>
 <p><strong>Author:</strong>
 Parity</p>
-<p>Upgradeable address registry for all DotNS protocol contracts, and the authority for
+<p>Upgradeable address registry for all dotNS protocol contracts, and the authority for
 the network's top-level domain.</p>
 <p>Single source of truth for sibling-contract lookups. All siblings resolve each other via
 well-known <code>bytes32</code> constants in <code>DotnsConstants</code> rather than holding direct addresses,
@@ -7412,7 +7424,7 @@ emits: ProtocolVersionSet.</p>
 </code></pre>
 <h3 id="version-8"><a class="header" href="#version-8">version</a></h3>
 <p>Returns the declared release, mirroring <code>protocolVersion</code> under the historical
-<code>version()</code> selector every DotNS contract exposes.</p>
+<code>version()</code> selector every dotNS contract exposes.</p>
 <p>Sibling contracts mirror the same stored value by reading it from here, so
 <code>version()</code> answers identically network-wide; this contract is where the value
 lives, so it reads its own storage.</p>
@@ -7458,11 +7470,11 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistry-1"><a class="header" href="#dotnsregistry-1">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsRegistry.sol//contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
-Dotns Registry</p>
+dotNS Registry</p>
 <p><strong>Author:</strong>
 Parity</p>
 <p>Upgradeable on-chain registry for hierarchical name ownership and resolution.</p>
@@ -7476,7 +7488,7 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">mapping(bytes32 node =&gt; Record record) private records
 </code></pre>
 <h3 id="protocolregistry-7"><a class="header" href="#protocolregistry-7">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap-6"><a class="header" href="#__gap-6">__gap</a></h3>
@@ -7533,7 +7545,7 @@ reverts: NotAuthorised. The new owner address must be non-zero, otherwise</p>
     returns (bytes32 subnode);
 </code></pre>
 <h3 id="setowner"><a class="header" href="#setowner">setOwner</a></h3>
-<p>Creates or resets a node record for a tokenised base registration.</p>
+<p>Creates or resets a node record for a tokenised second-level registration.</p>
 <p>Restricted to the registrar's controllers, otherwise @custom:reverts NotAuthorised.
 <code>newOwner</code> must be non-zero (otherwise @custom:reverts NotAllowed) and must match
 the ERC-721 owner reported by the registrar (otherwise</p>
@@ -7677,7 +7689,7 @@ reconfiguration on each addition.</p>
 </code></pre>
 <h3 id="version-9"><a class="header" href="#version-9">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -7700,12 +7712,12 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p><strong>Author:</strong>
 Parity</p>
-<p>Interface for the DotNS protocol-level address registry.</p>
+<p>Interface for the dotNS protocol-level address registry.</p>
 <p>Single source of truth for sibling lookups. Contracts resolve each other via well-known
 <code>bytes32</code> constants in <code>DotnsConstants</code> so an upgrade or rewire only mutates the
 registry, never the consumers. The registry also holds the network's top-level domain,
@@ -7847,7 +7859,7 @@ emits: ExpectedCodehashSet.</p>
 <pre><code class="language-solidity">error InvalidProtocolVersion();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistry"><a class="header" href="#idotnsregistry">IDotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsRegistry</p>
 <p><strong>Author:</strong>
@@ -7915,7 +7927,7 @@ success.</p>
 <pre><code class="language-solidity">function setSubnodeResolver(SubnodeResolverRecord calldata record) external;
 </code></pre>
 <h3 id="setowner-1"><a class="header" href="#setowner-1">setOwner</a></h3>
-<p>Creates or resets a node record for a tokenised base registration.</p>
+<p>Creates or resets a node record for a tokenised second-level registration.</p>
 <p>Restricted to the registrar's controllers, otherwise @custom:reverts NotAuthorised.
 <code>newOwner</code> must be non-zero (otherwise @custom:reverts NotAllowed) and must match
 the ERC-721 owner reported by the registrar (otherwise</p>
@@ -8110,11 +8122,11 @@ path.</p>
 <li><a href="contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnscontentresolver-1"><a class="header" href="#dotnscontentresolver-1">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsContentResolver.sol//contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
-Dotns Content Resolver</p>
+dotNS Content Resolver</p>
 <p>Implements <code>IDotnsContentResolver</code> interface with content hash, text records, and
 operator approvals.</p>
 <p>Writes are gated on the registry's authorisation for the node (owner or registrar-level
@@ -8138,7 +8150,7 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">mapping(address owner =&gt; mapping(address operator =&gt; bool approved)) private operators
 </code></pre>
 <h3 id="protocolregistry-8"><a class="header" href="#protocolregistry-8">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap-7"><a class="header" href="#__gap-7">__gap</a></h3>
@@ -8173,7 +8185,7 @@ setup completes.</p>
 </div>
 <h3 id="setcontenthash"><a class="header" href="#setcontenthash">setContenthash</a></h3>
 <p>Sets the content hash for a node.</p>
-<p>The caller must own the node in the DotNS registry or be an approved operator,
+<p>The caller must own the node in the dotNS registry or be an approved operator,
 otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an
 IPFS CID); the resolver stores them as-is and never interprets the payload. Emits</p>
 <p><strong>Note:</strong>
@@ -8202,7 +8214,7 @@ emits: ContentHashUpdated on every successful write.</p>
 </div>
 <h3 id="settext"><a class="header" href="#settext">setText</a></h3>
 <p>Sets a text record for a node.</p>
-<p>The caller must own the node in the DotNS registry or be an approved operator,
+<p>The caller must own the node in the dotNS registry or be an approved operator,
 otherwise @custom:reverts NotAuthorised. Text records are arbitrary key/value strings
 (e.g. <code>avatar</code>, <code>url</code>, <code>description</code>). Emits @custom:emits TextUpdated on every
 successful write.</p>
@@ -8290,7 +8302,7 @@ local-operator checks run before the cross-contract registry call.</p>
 </div>
 <h3 id="version-10"><a class="header" href="#version-10">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -8316,7 +8328,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspopresolver-1"><a class="header" href="#dotnspopresolver-1">DotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsPopResolver.sol//contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html">IDotnsPopResolver</a></p>
 <p><strong>Title:</strong>
@@ -8485,7 +8497,7 @@ been linked to a personhood name.</p>
 </div>
 <h3 id="version-11"><a class="header" href="#version-11">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -8515,12 +8527,12 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsresolver-1"><a class="header" href="#dotnsresolver-1">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsResolver.sol//contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
-Dotns Resolver</p>
-<p>Stores forward-resolution address records for DotNS nodes</p>
+dotNS Resolver</p>
+<p>Stores forward-resolution address records for dotNS nodes</p>
 <p>Writes are gated on node ownership in the forward registry, not on a
 privileged writer address. Address records describe where a name points
 and only the current node owner has the authority to set that target.</p>
@@ -8528,7 +8540,7 @@ and only the current node owner has the authority to set that target.</p>
 security-contact: admin@parity.io</p>
 <h2 id="state-variables-10"><a class="header" href="#state-variables-10">State Variables</a></h2>
 <h3 id="protocolregistry-10"><a class="header" href="#protocolregistry-10">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap-9"><a class="header" href="#__gap-9">__gap</a></h3>
@@ -8618,7 +8630,7 @@ upgrade or rewire is picked up automatically without a resolver upgrade.</p>
 </div>
 <h3 id="version-12"><a class="header" href="#version-12">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -8641,11 +8653,11 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsreverseresolver-1"><a class="header" href="#dotnsreverseresolver-1">DotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsReverseResolver.sol//contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></p>
 <p><strong>Title:</strong>
-Dotns Reverse Resolver</p>
+dotNS Reverse Resolver</p>
 <p>Resolves an address to its associated name under the network TLD.</p>
 <p>Writes are gated on a fixed writer address resolved from the protocol
 registry (the registrar or its controller), not on node ownership.
@@ -8801,11 +8813,11 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscontentresolver"><a class="header" href="#idotnscontentresolver">IDotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-Dotns Content Resolver</p>
+dotNS Content Resolver</p>
 <p>Defines storage and retrieval for content hash, text records, and operator approvals for
-DotNS nodes. @dev Content hash and text records point to off-chain content such as IPFS CIDs or
+dotNS nodes. @dev Content hash and text records point to off-chain content such as IPFS CIDs or
 future schemes; interpretation is handled off-chain. Operator approvals allow
 third parties to manage records on behalf of the owner.</p>
 <p><strong>Note:</strong>
@@ -8813,7 +8825,7 @@ security-contact: admin@parity.io</p>
 <h2 id="functions-29"><a class="header" href="#functions-29">Functions</a></h2>
 <h3 id="setcontenthash-1"><a class="header" href="#setcontenthash-1">setContenthash</a></h3>
 <p>Sets the content hash for a node.</p>
-<p>The caller must own the node in the DotNS registry or be an approved operator,
+<p>The caller must own the node in the dotNS registry or be an approved operator,
 otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an
 IPFS CID); the resolver stores them as-is and never interprets the payload. Emits</p>
 <p><strong>Note:</strong>
@@ -8842,7 +8854,7 @@ emits: ContentHashUpdated on every successful write.</p>
 </div>
 <h3 id="settext-1"><a class="header" href="#settext-1">setText</a></h3>
 <p>Sets a text record for a node.</p>
-<p>The caller must own the node in the DotNS registry or be an approved operator,
+<p>The caller must own the node in the dotNS registry or be an approved operator,
 otherwise @custom:reverts NotAuthorised. Text records are arbitrary key/value strings
 (e.g. <code>avatar</code>, <code>url</code>, <code>description</code>). Emits @custom:emits TextUpdated on every
 successful write.</p>
@@ -8942,7 +8954,7 @@ idempotent writes that do not change the stored value.</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopresolver"><a class="header" href="#idotnspopresolver">IDotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopResolver</p>
 <p>Resolver for per-name records produced by the dotNS gateway pallet.</p>
@@ -9099,10 +9111,10 @@ been linked to a personhood name.</p>
 <tr><td><code>length</code></td><td><code>uint256</code></td><td>The length of the payload that was rejected.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsresolver"><a class="header" href="#idotnsresolver">IDotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-Dotns Resolver</p>
-<p>Defines forward-resolution address records for DotNS nodes.</p>
+dotNS Resolver</p>
+<p>Defines forward-resolution address records for dotNS nodes.</p>
 <p>Forward-address records describe where a name points. Authority therefore
 follows node ownership in the forward registry, not a privileged writer.</p>
 <p><strong>Note:</strong>
@@ -9158,9 +9170,9 @@ write.</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsreverseresolver"><a class="header" href="#idotnsreverseresolver">IDotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-Dotns Reverse Resolver</p>
+dotNS Reverse Resolver</p>
 <p>Interface for writing and reading reverse name records for addresses.</p>
 <p>Reverse records bind to an EOA rather than a registry node. Two write paths exist:
 a registrar-only setter used by the controller during reserved registration, and a
@@ -9257,12 +9269,12 @@ when the address no longer owns the name pointed to by the stored record.</p>
 <li><a href="contracts/store/UserStore.sol/contract.UserStore.html">UserStore</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsstore"><a class="header" href="#idotnsstore">IDotnsStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/store/IDotnsStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/store/IDotnsStore.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsStore</p>
-<p>Baseline interface implemented by every per-user DotNS store.</p>
+<p>Baseline interface implemented by every per-user dotNS store.</p>
 <p>Marker interface shared by <code>ILabelStore</code> (protocol-written, labels-only) and
-<code>IUserStore</code> (user-written, generic key/value). Every DotNS store type binds
+<code>IUserStore</code> (user-written, generic key/value). Every dotNS store type binds
 to exactly one user forever, so <code>owner()</code> is the single shared surface.
 Identity of a store is proven by its position in the <code>StoreFactory</code> mapping,
 not by interface probing; the factory is the canonical source of truth.</p>
@@ -9282,7 +9294,7 @@ and immutable thereafter.</p>
 <tr><td><code>owner_</code></td><td><code>address</code></td><td>The bound user address.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="ilabelstore"><a class="header" href="#ilabelstore">ILabelStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/store/ILabelStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/store/ILabelStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/ILabelStore.sol//contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></p>
 <p><strong>Title:</strong>
@@ -9531,10 +9543,10 @@ for the same labelhash fails with this error regardless of caller or session.</p
 <tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>The conflicting labelhash.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="istorefactory"><a class="header" href="#istorefactory">IStoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/store/IStoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/store/IStoreFactory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStoreFactory</p>
-<p>Interface for the DotNS per-user store factory.</p>
+<p>Interface for the dotNS per-user store factory.</p>
 <p>Owns two <code>UpgradeableBeacon</code> instances; one for <code>LabelStore</code> (protocol-managed),
 one for <code>UserStore</code> (user-claimed). Each user may acquire at most one of each,
 forever. There is no transfer, no redeploy, no additional store type.</p>
@@ -9857,7 +9869,7 @@ upgrade.</p>
 <pre><code class="language-solidity">error ImplementationBindingMismatch();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="iuserstore"><a class="header" href="#iuserstore">IUserStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/store/IUserStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/store/IUserStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/IUserStore.sol//contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></p>
 <p><strong>Title:</strong>
@@ -10092,7 +10104,7 @@ snapshotted. @param value The prior value that was just superseded.</p>
 <tr><td><code>timestamp</code></td><td><code>uint256</code></td><td>Block timestamp at the moment of supersession.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="labelstore"><a class="header" href="#labelstore">LabelStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/store/LabelStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/store/LabelStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, <a href="contracts/store/LabelStore.sol//contracts/store/ILabelStore.sol/interface.ILabelStore.html">ILabelStore</a></p>
 <p><strong>Title:</strong>
@@ -10355,12 +10367,12 @@ registry.</p>
 <pre><code class="language-solidity">function _onlyAuthorisedProtocol() internal view;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="storefactory"><a class="header" href="#storefactory">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/store/StoreFactory.sol//contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
 StoreFactory</p>
-<p>Factory for the two per-user DotNS store types, sharing one factory contract and two
+<p>Factory for the two per-user dotNS store types, sharing one factory contract and two
 beacons. @dev Each user may acquire AT MOST two stores, ever:</p>
 <ul>
 <li>a <code>LabelStore</code>, deployed via <code>deployLabelStoreFor</code> by the owner or a store writer
@@ -10653,7 +10665,7 @@ under this factory's claim calldata. Delegates to
 </div>
 <h3 id="version-15"><a class="header" href="#version-15">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -10703,7 +10715,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <tr><td><code>slice</code></td><td><code>address[]</code></td><td>Result slice; empty when <code>offset &gt;= source.length</code>.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="userstore"><a class="header" href="#userstore">UserStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/store/UserStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/store/UserStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, <a href="contracts/store/UserStore.sol//contracts/store/IUserStore.sol/interface.IUserStore.html">IUserStore</a></p>
 <p><strong>Title:</strong>
@@ -10949,7 +10961,7 @@ and immutable thereafter.</p>
 </div>
 <h3 id="version-16"><a class="header" href="#version-16">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the
@@ -10980,7 +10992,7 @@ answers with the same "never declared" empty string instead of reverting.</p>
 <li><a href="contracts/utils/SystemUtils.sol/library.SystemUtils.html">SystemUtils</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Constants</p>
 <p>Protocol-level invariants shared across dotNS contracts.</p>
@@ -11215,10 +11227,10 @@ forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant NAME_WHITELIST = bytes32("nameWhitelist")
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="labelutils"><a class="header" href="#labelutils">LabelUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/utils/LabelUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/utils/LabelUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-DotNS Label Utilities Library</p>
-<p>Canonical keccak labelhash and namehash helpers shared by every DotNS contract that
+dotNS Label Utilities Library</p>
+<p>Canonical keccak labelhash and namehash helpers shared by every dotNS contract that
 derives node identifiers from user-supplied labels.</p>
 <p>Exists so that the identical inline-assembly keccak sequences don't need to
 live in every controller, registrar, or resolver. Every caller that maps a
@@ -11332,7 +11344,7 @@ an empty return as a "do not trust this record" signal.</p>
 <tr><td><code>fullName</code></td><td><code>string</code></td><td>Stored full name to strip.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="multicall3-2"><a class="header" href="#multicall3-2">Multicall3</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/utils/Multicall3.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/utils/Multicall3.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Multicall3</p>
 <p><strong>Authors:</strong>
@@ -11536,11 +11548,11 @@ Michael Elliot, Joshua Levine, Nick Johnson, Andreas Bigger, Matt Solomon</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="registrationutils"><a class="header" href="#registrationutils">RegistrationUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-DotNS Registration Utilities Library</p>
+dotNS Registration Utilities Library</p>
 <p>Single canonical implementation of the "mint + forward-registry + store-write"
-triad used by every DotNS registration flow.</p>
+triad used by every dotNS registration flow.</p>
 <p>Exists so that every controller (public commit-reveal, gateway path, future
 privileged flows) calls the same sequence. Without this library each controller
 re-implements the sequence, and the implementations drift.</p>
@@ -11629,7 +11641,7 @@ callers; kept in memory for the lifetime of one <code>registerAndStore</code>.</
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="storeauth"><a class="header" href="#storeauth">StoreAuth</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/utils/StoreAuth.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/utils/StoreAuth.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 StoreAuth</p>
 <p>Decides which protocol components may act on a user's store.</p>
@@ -11674,7 +11686,7 @@ controller on a registration or a gateway name, and the registry on a subname.</
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>protocolRegistry</code></td><td><code>address</code></td><td>The canonical DotNS protocol registry.</td></tr>
+<tr><td><code>protocolRegistry</code></td><td><code>address</code></td><td>The canonical dotNS protocol registry.</td></tr>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address being checked, normally <code>msg.sender</code>.</td></tr>
 </tbody></table>
 </div>
@@ -11683,11 +11695,11 @@ controller on a registration or a gateway name, and the registry on a subname.</
 <tr><td><code>authorised</code></td><td><code>bool</code></td><td>True if <code>caller</code> is the registrar, an authorised controller, or the registry.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="storeutils"><a class="header" href="#storeutils">StoreUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/utils/StoreUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/utils/StoreUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-DotNS Store Utilities Library</p>
+dotNS Store Utilities Library</p>
 <p>Canonical helpers for protocol writes into per-user <code>LabelStore</code> instances.</p>
-<p>One auth rule, one write path. Every DotNS consumer (controller, registrar,
+<p>One auth rule, one write path. Every dotNS consumer (controller, registrar,
 registry, PoP controller) funnels label writes through <code>writeNewLabel</code> so
 authorisation, deploy-on-first-use and conflict handling are identical across flows.</p>
 <p><strong>Note:</strong>
@@ -11756,7 +11768,7 @@ re-registration by a previous holder, and a transfer back to one, working.</p>
 <tr><td><code>existing</code></td><td><code>string</code></td><td>The label already stored under <code>labelhash</code>.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="stringutils"><a class="header" href="#stringutils">StringUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/utils/StringUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/utils/StringUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 String Utilities Library</p>
 <p>Provides string manipulation utilities for dotNS contracts.</p>
@@ -12059,7 +12071,7 @@ Useful for converting short strings stored in bytes32 back to string type.</p>
 <tr><td><code>&lt;none&gt;</code></td><td><code>string</code></td><td>The extracted string (up to 32 characters).</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="subnodeutils"><a class="header" href="#subnodeutils">SubnodeUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/utils/SubnodeUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/utils/SubnodeUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Subnode Utilities Library</p>
 <p>General-purpose helpers for registering names that live as subnodes of another name,
@@ -12185,10 +12197,10 @@ argument list, mirroring @custom:struct RegistrationUtils.RegistrationContext.</
 <tr><td><code>persist</code></td><td><code>bool</code></td><td>Whether the registry should index the subnode into the owner's <code>LabelStore</code>.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="systemutils"><a class="header" href="#systemutils">SystemUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/utils/SystemUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/utils/SystemUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 SystemUtils</p>
-<p>Shared access to revive's System precompile for DotNS contracts.</p>
+<p>Shared access to revive's System precompile for dotNS contracts.</p>
 <p>Canonical wrapper around <code>ISystem</code> at <code>DotnsConstants.REVIVE_SYSTEM</code>, so the precompile
 address and interface are wired in one place rather than duplicated per consumer.</p>
 <p><strong>Note:</strong>
@@ -12211,7 +12223,7 @@ rather than reverting on a non-Root origin.</p>
 <li><a href="contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsnamewhitelist"><a class="header" href="#dotnsnamewhitelist">DotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/whitelist/DotnsNameWhitelist.sol//contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></p>
 <p><strong>Title:</strong>
@@ -12237,7 +12249,7 @@ for the whitelist's lifetime.</p>
 security-contact: admin@parity.io</p>
 <h2 id="state-variables-15"><a class="header" href="#state-variables-15">State Variables</a></h2>
 <h3 id="protocolregistry-18"><a class="header" href="#protocolregistry-18">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="maxclaimants"><a class="header" href="#maxclaimants">maxClaimants</a></h3>
@@ -12321,7 +12333,7 @@ protocol registry the node derivation reads the TLD from.</p>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>initialOwner</code></td><td><code>address</code></td><td>Address that owns the contract once initialised.</td></tr>
-<tr><td><code>registry</code></td><td><code>IDotnsProtocolRegistry</code></td><td>Protocol registry all DotNS contracts resolve through.</td></tr>
+<tr><td><code>registry</code></td><td><code>IDotnsProtocolRegistry</code></td><td>Protocol registry all dotNS contracts resolve through.</td></tr>
 </tbody></table>
 </div>
 <h3 id="setmaxclaimants"><a class="header" href="#setmaxclaimants">setMaxClaimants</a></h3>
@@ -12797,7 +12809,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsnamewhitelist"><a class="header" href="#idotnsnamewhitelist">IDotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsNameWhitelist</p>
 <p>Interface for the pre-launch name whitelist. A name is Open until governance either

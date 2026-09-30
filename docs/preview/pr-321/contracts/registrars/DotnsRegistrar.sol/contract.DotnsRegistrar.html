@@ -180,11 +180,11 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrar"><a class="header" href="#dotnsregistrar">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="/contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
-Dotns Registrar</p>
+dotNS Registrar</p>
 <p>ERC721-backed registrar implementing permanent name ownership.</p>
 <p>Deliberately policy-free on pricing, reservations, and PoP gating; those live in the
 controllers and @custom:contract IPopRules. The registrar owns transferability itself: publicly
@@ -205,7 +205,7 @@ oz-retyped-from: mapping(IDotnsRegistrarController =&gt; bool)</p>
 <pre><code class="language-solidity">mapping(IDotnsController controller =&gt; bool exists) public controllers
 </code></pre>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <p>Used to resolve sibling contract addresses (store factory, controller, registry)
 without storing individual references.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
@@ -397,7 +397,7 @@ in the same call.</p>
 </code></pre>
 <h3 id="version"><a class="header" href="#version">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the

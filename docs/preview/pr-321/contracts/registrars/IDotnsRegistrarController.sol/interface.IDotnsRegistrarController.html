@@ -180,11 +180,11 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
-Dotns Registrar Controller</p>
+dotNS Registrar Controller</p>
 <p>Interface for registering top-level labels using a commit reveal scheme.</p>
 <p>Defines allocation only; forward resolution, reverse lookup, pricing mechanics, PoP
 validation, and store writing are handled by external contracts. Users commit a hash of
@@ -245,12 +245,12 @@ configured escrow address from the protocol registry (otherwise</p>
 </li>
 <li>
 <p>reverts: EscrowNotConfigured). Splits on direct vs cross-payer at
-<code>msg.sender == registration.owner</code>. The direct path runs <code>priceWithCheck</code> (personhood</p>
+<code>msg.sender == registration.owner</code>. The direct path runs <code>priceWithCheck</code> (PoP-status</p>
 </li>
 </ul>
 <ul>
 <li>reservation gate) and routes the charge to a refundable escrow deposit owned by
-<code>registration.owner</code>. The cross-payer path skips the personhood revert in
+<code>registration.owner</code>. The cross-payer path skips the PoP-status revert in
 <code>priceWithCheck</code> but applies it directly via @custom:reverts OwnerStatusInsufficient
 when the owner's recorded tier does not meet the label's required tier, and still
 rejects governance-reserved labels with @custom:reverts GovernanceReserved and live

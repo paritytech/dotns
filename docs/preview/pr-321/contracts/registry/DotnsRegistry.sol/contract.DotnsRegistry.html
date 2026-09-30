@@ -180,11 +180,11 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
-Dotns Registry</p>
+dotNS Registry</p>
 <p><strong>Author:</strong>
 Parity</p>
 <p>Upgradeable on-chain registry for hierarchical name ownership and resolution.</p>
@@ -198,7 +198,7 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">mapping(bytes32 node =&gt; Record record) private records
 </code></pre>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
@@ -255,7 +255,7 @@ reverts: NotAuthorised. The new owner address must be non-zero, otherwise</p>
     returns (bytes32 subnode);
 </code></pre>
 <h3 id="setowner"><a class="header" href="#setowner">setOwner</a></h3>
-<p>Creates or resets a node record for a tokenised base registration.</p>
+<p>Creates or resets a node record for a tokenised second-level registration.</p>
 <p>Restricted to the registrar's controllers, otherwise @custom:reverts NotAuthorised.
 <code>newOwner</code> must be non-zero (otherwise @custom:reverts NotAllowed) and must match
 the ERC-721 owner reported by the registrar (otherwise</p>
@@ -399,7 +399,7 @@ reconfiguration on each addition.</p>
 </code></pre>
 <h3 id="version"><a class="header" href="#version">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the

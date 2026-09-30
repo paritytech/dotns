@@ -180,12 +180,12 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsresolver"><a class="header" href="#dotnsresolver">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
-Dotns Resolver</p>
-<p>Stores forward-resolution address records for DotNS nodes</p>
+dotNS Resolver</p>
+<p>Stores forward-resolution address records for dotNS nodes</p>
 <p>Writes are gated on node ownership in the forward registry, not on a
 privileged writer address. Address records describe where a name points
 and only the current node owner has the authority to set that target.</p>
@@ -193,7 +193,7 @@ and only the current node owner has the authority to set that target.</p>
 security-contact: admin@parity.io</p>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
 <h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
-<p>Protocol-level address registry for all DotNS contracts.</p>
+<p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
@@ -283,7 +283,7 @@ upgrade or rewire is picked up automatically without a resolver upgrade.</p>
 </div>
 <h3 id="version"><a class="header" href="#version">version</a></h3>
 <p>Returns the release this network declares it runs, read live from the protocol
-registry so every DotNS contract reports one synchronised value.</p>
+registry so every dotNS contract reports one synchronised value.</p>
 <p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
 <code>version()</code> selector for ABI compatibility. It reports the network's declaration,
 not this contract's build; per-contract identity is the codehash declared on the

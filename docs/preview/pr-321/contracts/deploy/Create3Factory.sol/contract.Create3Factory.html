@@ -180,9 +180,9 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="create3factory"><a class="header" href="#create3factory">Create3Factory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/deploy/Create3Factory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/deploy/Create3Factory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
-Dotns CREATE3 Factory</p>
+dotNS CREATE3 Factory</p>
 <p>Permissionless wrapper around Solady's audited CREATE3 library.</p>
 <p>Anyone may call @custom:function deploy. CREATE3 addresses are a pure function of
 <code>(factory_address, salt)</code> — the caller never enters the derivation — so caller-gating
@@ -191,7 +191,7 @@ cross-chain ownership-coordination burden and lets CI keys, ops keys, and recove
 all coexist without ownership transfers.
 An occupied salt is handled by the caller. <code>BaseDeployer._deployCreate3</code> adopts an occupied
 address only when the occupant's runtime code is the artefact that run would have deployed,
-and <code>DOTNS_SALT_VERSION</code> moves the DotNS address set to fresh addresses when it is not.</p>
+and <code>DOTNS_SALT_VERSION</code> moves the dotNS address set to fresh addresses when it is not.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>

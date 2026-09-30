@@ -180,14 +180,14 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsprotocolregistry"><a class="header" href="#dotnsprotocolregistry">DotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></p>
 <p><strong>Title:</strong>
-Dotns Protocol Registry</p>
+dotNS Protocol Registry</p>
 <p><strong>Author:</strong>
 Parity</p>
-<p>Upgradeable address registry for all DotNS protocol contracts, and the authority for
+<p>Upgradeable address registry for all dotNS protocol contracts, and the authority for
 the network's top-level domain.</p>
 <p>Single source of truth for sibling-contract lookups. All siblings resolve each other via
 well-known <code>bytes32</code> constants in <code>DotnsConstants</code> rather than holding direct addresses,
@@ -325,7 +325,7 @@ emits: ProtocolVersionSet.</p>
 </code></pre>
 <h3 id="version"><a class="header" href="#version">version</a></h3>
 <p>Returns the declared release, mirroring <code>protocolVersion</code> under the historical
-<code>version()</code> selector every DotNS contract exposes.</p>
+<code>version()</code> selector every dotNS contract exposes.</p>
 <p>Sibling contracts mirror the same stored value by reading it from here, so
 <code>version()</code> answers identically network-wide; this contract is where the value
 lives, so it reads its own storage.</p>

@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspoplens"><a class="header" href="#dotnspoplens">DotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/202ad638dd04a4ab1042ab2fc26f7bd6c4ad97a2/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b4761812185deba345d4cf70242f04ff049582b6/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsPopLens.sol/interface.IDotnsPopLens.html">IDotnsPopLens</a></p>
 <p><strong>Title:</strong>
@@ -333,18 +333,19 @@ because it scans the account's holdings. Never reverts.</p>
 <p>Whether a name is an identity at all is provenance, so the listing is gated on</p>
 <p><strong>Note:</strong>
 function: IDotnsPopController.isPopIssued: characters alone would admit a public
-registration spelled <code>joseph42</code>, which reads as a personhood name and is not one. The
-label shape then confirms it is one of the two kinds the gateway issues, a device name with
-its separator or a personhood name without one. A device name is a subname and a
-personhood name is a tokenised second-level name, and the callers resolve ownership through
-the registry, which covers both. Provenance is keyed by text, so a subname a <code>user</code> created
-under a name they own does not enter the listing unless the controller issued it.</p>
+registration spelled <code>joseph42</code>, which passes the single-label shape check yet was never
+issued by the gateway. The label shape then confirms it is one of the two kinds the gateway
+issues, a device name with its separator or a personhood name without one. A device name is
+a subname and a personhood name is a tokenised second-level name, and the callers resolve
+ownership through the registry, which covers both. Provenance is keyed by text, so a
+subname a <code>user</code> created under a name they own does not enter the listing unless the
+controller issued it.</p>
 <pre><code class="language-solidity">function _belongsToListing(string memory label) internal view returns (bool);
 </code></pre>
 <h3 id="_countnames"><a class="header" href="#_countnames">_countNames</a></h3>
 <p>Counts the gateway-issued names currently owned by <code>user</code>.</p>
 <p>Walks the user's <code>LabelStore</code> (settled names) then their pending claims, keeping only
-entries that belong to the listing and are still owned by <code>user</code> on the registrar. A pending
+entries that belong to the listing and are still owned by <code>user</code> in the registry. A pending
 entry already written into the store by a sibling flow is skipped so it is not counted
 twice.</p>
 <pre><code class="language-solidity">function _countNames(address user) internal view returns (uint256 count);
@@ -372,11 +373,11 @@ record returns the zero address, so a missing name yields false and the read sta
 <pre><code class="language-solidity">function _ownedBy(bytes32 node, address user) internal view returns (bool);
 </code></pre>
 <h3 id="_detail"><a class="header" href="#_detail">_detail</a></h3>
-<p>Gathers a name's record from the registrar, PoP resolver, and PopRules.</p>
+<p>Gathers a name's record from the registry, registrar, PoP resolver, and PopRules.</p>
 <p>Reads defensively so an unminted or unsettled name yields zeroed fields instead of
 reverting. <code>personhoodNode</code> is left for the caller because it needs the labelhash, which is
 recoverable from the label string but not from the node alone. <code>requiredTier</code> classifies the
-label shape, so <code>knownLabel</code> supplies the label for a pending subname the node cannot
+label shape, so <code>knownLabel</code> supplies the label for an unsettled name the node cannot
 recover, letting classification run before the detail is returned; it is ignored when the
 label is otherwise recoverable, and an empty <code>knownLabel</code> leaves an unrecoverable label
 unclassified.</p>
