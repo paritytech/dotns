@@ -1578,8 +1578,8 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
 
-    function test_settle_on_expiry_by_third_party_writes_label() public {
-        // Age never gates settlement: a claim warped past its reservation deadline still settles
+    function test_settle_after_reservation_duration_by_third_party_writes_label() public {
+        // Age never gates settlement: a claim warped past `reservationDuration` still settles
         // in full. A third party drives the settlement, the store is deployed for the beneficiary,
         // the label is written, the queue empties, the beneficiary leaves the enumeration set, and
         // the settler is recorded on the event.
@@ -1782,9 +1782,9 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(empty.length, 0);
     }
 
-    function test_settle_at_exact_expiry_boundary_writes_label() public {
-        // Age is irrelevant to settlement: at the exact reservation deadline the claim still
-        // settles and writes its label rather than being treated as forfeit.
+    function test_settle_at_exactly_reservation_duration_writes_label() public {
+        // Age is irrelevant to settlement: exactly `reservationDuration` after the mint the claim
+        // still settles and writes its label rather than being treated as forfeit.
         _grantPersonhood(ed);
         _rootIssueDeviceName(
             IDotnsPopController.DeviceNameIssuance({
@@ -1963,8 +1963,8 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_namesOf_lists_issued_names_with_settlement_state() public {
-        // Settled names read back from the store; a pending gateway name reads from the queue with
-        // a live deadline; an untouched account returns an empty list and a zero count.
+        // Settled names read back from the store; a pending gateway name reads from the queue; an
+        // untouched account returns an empty list and a zero count.
         _grantPersonhood(ed);
         _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "");
         _rootIssuePersonhoodName(
@@ -1985,7 +1985,6 @@ contract DotnsPopControllerTests is BaseDotns {
         IDotnsPopLens.Name memory edDevice = _nameWithNode(edNames, _deviceNodeOf(DEVICE_LABEL_A));
         assertEq(edDevice.label, DEVICE_LABEL_A);
         assertTrue(edDevice.settled);
-        assertEq(edDevice.deadline, 0);
         IDotnsPopLens.Name memory edPersonhood = _nameWithNode(edNames, _nodeOf(PERSONHOOD_LABEL_A));
         assertEq(edPersonhood.label, PERSONHOOD_LABEL_A);
         assertTrue(edPersonhood.settled);
@@ -1996,7 +1995,6 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(leoNames[0].node, _deviceNodeOf(DEVICE_LABEL_C));
         assertEq(leoNames[0].label, DEVICE_LABEL_C);
         assertFalse(leoNames[0].settled);
-        assertGt(leoNames[0].deadline, 0);
         assertEq(dotnsPopLens.nameCountOf(leonardo), 1);
 
         assertEq(dotnsPopLens.namesOf(tiago, 0, type(uint256).max).length, 0);

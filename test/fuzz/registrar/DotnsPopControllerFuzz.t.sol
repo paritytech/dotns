@@ -224,7 +224,7 @@ contract DotnsPopControllerFuzz is BaseDotns {
         vm.warp(uint256(mintedAt) + uint256(elapsed));
 
         // Stores always settle: settlement writes the label into the store whether or not the
-        // reservation deadline has passed, so age never strands a claim.
+        // claim is older than `reservationDuration`, so age never strands a claim.
         vm.prank(ed);
         (uint256 settledCount, bool moreRemaining) =
             dotnsPopController.settlePendingClaims(ed, type(uint256).max);

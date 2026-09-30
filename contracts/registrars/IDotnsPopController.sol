@@ -88,8 +88,7 @@ interface IDotnsPopController is IDotnsController {
     /// settled their Store. A user accumulates one entry per deferred name: the Root gateway path
     /// cannot deploy a `LabelStore` (contract creation is forbidden from the Root origin), so it
     /// keeps stashing entries until a signed-origin @custom:function settlePendingClaims deploys
-    /// the store and settles the entries. Entries never lapse and can be settled at any time;
-    /// `mintedAt + reservationDuration` is only the advisory deadline the lens reports.
+    /// the store and settles the entries. Entries never lapse and can be settled at any time.
     /// @param label Bare label without the TLD, which is appended at settlement time. A device
     /// name carries its separator, so this is not always a single DNS label.
     /// @param mintedAt Timestamp of the originating mint.
@@ -445,8 +444,7 @@ interface IDotnsPopController is IDotnsController {
 
     /// @notice Returns the window, in seconds, after which a reservation-queue entry lapses.
     /// @dev Governance-configurable via @custom:function setReservationDuration. Pending claims do
-    /// not lapse; the lens adds this window to each claim's `mintedAt` to report an advisory
-    /// settlement deadline.
+    /// not lapse.
     /// @return duration Reservation duration in seconds.
     function reservationDuration() external view returns (uint64 duration);
 
@@ -488,9 +486,8 @@ interface IDotnsPopController is IDotnsController {
 
     /// @notice Returns a paginated slice of a user's pending claims in queue order.
     /// @dev An empty array means the user has no pending claims at `offset`. Each entry carries
-    /// its `mintedAt`; `mintedAt + reservationDuration` is an advisory settlement deadline, and
-    /// the entry stays settleable after it. An `offset`
-    /// past the end returns an empty array rather than reverting, and a page holds at most
+    /// its `mintedAt`, and every entry stays settleable whatever its age. An `offset` past the end
+    /// returns an empty array rather than reverting, and a page holds at most
     /// `DotnsConstants.MAX_PAGE_SIZE` entries.
     /// @param user Account whose pending claims are read.
     /// @param offset Start index into the queue.

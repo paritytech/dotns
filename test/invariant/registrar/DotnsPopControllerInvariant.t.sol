@@ -371,10 +371,10 @@ contract DotnsPopControllerInvariant is BaseDotns {
     ///         subname whose settled label lives in the owner's store. Either is settled or still
     ///         staged in the owner's pending queue, so a minted name is never left in neither
     /// place.
-    /// @dev The stranded case the old model allowed, a lapsed entry swept out of the queue with
-    ///      nothing written, is now unreachable: settlement always writes the label regardless of
-    ///      the reservation deadline. A deployed store and a pending claim are mutually exclusive
-    /// in this suite, so a device name whose owner holds a store has necessarily been settled.
+    /// @dev A pending entry is never dropped without its label being written: settlement always
+    ///      writes the label, whatever the claim's age. A deployed store and a pending claim are
+    ///      mutually exclusive in this suite, so a device name whose owner holds a store has
+    ///      necessarily been settled.
     function invariant_settled_names_written_and_never_stranded() public view {
         uint256 n = handler.mintedDeviceTokenCount();
         for (uint256 i = 0; i < n; i++) {

@@ -135,7 +135,7 @@ contract DotnsPopController is
     /// @notice Per-user pile of deferred names awaiting a `LabelStore`.
     /// @dev The mint origin cannot deploy a `LabelStore`, so deferred names accumulate here until a
     /// signed-origin @custom:function settlePendingClaims deploys the store and writes the stashed
-    /// labels. Entries never lapse; `mintedAt` only feeds the advisory deadline the lens reports.
+    /// labels. Entries never lapse and can be settled at any time.
     mapping(address user => PendingClaim[] queue) internal _pendingClaimQueue;
 
     /// @notice Labels this controller minted, keyed by the bare label without the TLD.

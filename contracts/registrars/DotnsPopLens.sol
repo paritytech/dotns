@@ -183,13 +183,12 @@ contract DotnsPopLens is IDotnsPopLens {
                 if (node != _nodeOf(label)) continue;
                 if (!_belongsToListing(label)) continue;
                 if (seen++ < offset) continue;
-                page[filled++] = Name({node: node, label: label, settled: true, deadline: 0});
+                page[filled++] = Name({node: node, label: label, settled: true});
             }
         }
 
         IDotnsPopController.PendingClaim[] memory queue = _pendingClaims(user);
         uint256 pending = queue.length;
-        uint64 duration = _controller().reservationDuration();
         for (uint256 j; j < pending && filled < limit; ++j) {
             string memory label = queue[j].label;
             if (!_belongsToListing(label)) continue;
@@ -197,9 +196,7 @@ contract DotnsPopLens is IDotnsPopLens {
             if (store != address(0) && ILabelStore(store).isLocked(node)) continue;
             if (!_ownedBy(node, user)) continue;
             if (seen++ < offset) continue;
-            page[filled++] = Name({
-                node: node, label: label, settled: false, deadline: queue[j].mintedAt + duration
-            });
+            page[filled++] = Name({node: node, label: label, settled: false});
         }
 
         if (filled == limit) return page;

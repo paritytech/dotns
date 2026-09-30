@@ -16,17 +16,13 @@ interface IDotnsPopLens {
     /// @notice One row in a per-account name listing: the name and the node used to look it up.
     /// @dev Computed on read; not stored. `settled` is false while the name still sits in the
     /// temporary pending-claim queue and true once its label is written into a `LabelStore`.
-    /// `deadline` is an advisory settlement deadline (`mintedAt + reservationDuration`) and is
-    /// zero for a settled name; a pending claim stays settleable after it.
     /// @param node namehash of the name; the key for chat-key, link, and detail lookups.
     /// @param label Bare label without the TLD; a device name carries its separator.
     /// @param settled Whether the label is written into a `LabelStore`.
-    /// @param deadline Advisory settlement deadline for a pending claim, or zero when settled.
     struct Name {
         bytes32 node;
         string label;
         bool settled;
-        uint64 deadline;
     }
 
     /// @notice The full on-chain record for a single name, gathered from the registry, the
