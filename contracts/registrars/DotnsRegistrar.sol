@@ -24,7 +24,7 @@ import {IDotnsNameEscrow} from "../escrow/IDotnsNameEscrow.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
-/// @title Dotns Registrar
+/// @title dotNS Registrar
 /// @notice ERC721-backed registrar implementing permanent name ownership.
 /// @dev Deliberately policy-free on pricing, reservations, and PoP gating; those live in the
 /// controllers and @custom:contract IPopRules. The registrar owns transferability itself: publicly
@@ -50,7 +50,7 @@ contract DotnsRegistrar is
     /// @custom:oz-retyped-from mapping(IDotnsRegistrarController => bool)
     mapping(IDotnsController controller => bool exists) public controllers;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     /// @dev Used to resolve sibling contract addresses (store factory, controller, registry)
     /// without storing individual references.
     IDotnsProtocolRegistry public protocolRegistry;
@@ -225,7 +225,7 @@ contract DotnsRegistrar is
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
+    ///         registry so every dotNS contract reports one synchronised value.
     /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
     ///      `version()` selector for ABI compatibility. It reports the network's declaration,
     ///      not this contract's build; per-contract identity is the codehash declared on the

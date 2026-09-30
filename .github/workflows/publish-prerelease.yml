@@ -214,7 +214,7 @@ jobs:
           ASSET_BASE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG"
 
           cat > release-body.md << 'ENDOFBODY'
-          ## DotNS ABI Package (Pre-release)
+          ## dotNS ABI Package (Pre-release)
 
           > **This is a pre-release.** ABIs may change before the stable release.
 

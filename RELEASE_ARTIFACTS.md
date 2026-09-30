@@ -1,4 +1,4 @@
-# DotNS Release Artifacts
+# dotNS Release Artifacts
 
 What each release publishes, what the files guarantee, and how to consume them.
 
@@ -11,7 +11,7 @@ What each release publishes, what the files guarantee, and how to consume them.
 | `release-manifest.json` | What this release contains, machine readable |
 | `codehashes.json` | Stripped-metadata hash of each contract's built runtime bytecode |
 | `abi-diff.json` | Selector-level ABI changes since the previous release, machine readable |
-| `dotns-genesis-<tld>.json` | pallet-revive genesis with DotNS deployed, one per TLD (`testnet` for previewnet, `paseo` for Paseo Asset Hub Next V2) |
+| `dotns-genesis-<tld>.json` | pallet-revive genesis with dotNS deployed, one per TLD (`testnet` for previewnet, `paseo` for Paseo Asset Hub Next V2) |
 | `dotns-genesis-addresses.json` | The addresses a chain booted from those genesis files carries, a copy of `deployments/expected.json` |
 | `dotns-abis-<tag>.zip` | The same files in one archive |
 
@@ -101,7 +101,7 @@ Two ways to protect yourself. Resolve addresses through the protocol registry at
 
 ## Consuming it
 
-Prefer resolving addresses at runtime. Every DotNS contract exposes `protocolRegistry`, and `DotnsProtocolRegistry.get(key)` resolves each well-known key in `DotnsConstants`, so one address from the artifact is enough to reach the rest and the chain remains the authority. Pin the whole set only when a runtime lookup is not possible.
+Prefer resolving addresses at runtime. Every dotNS contract exposes `protocolRegistry`, and `DotnsProtocolRegistry.get(key)` resolves each well-known key in `DotnsConstants`, so one address from the artifact is enough to reach the rest and the chain remains the authority. Pin the whole set only when a runtime lookup is not possible.
 
 Note that a `deployments.json` entry states where a contract was deployed, not that it is currently the live one for a role. The registry is the only answer to that question.
 

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title DotNS Pricing Cost Model
+/// @title dotNS Pricing Cost Model
 /// @notice Prices a registration from the base length of its label alone.
 /// @dev The seam between name policy and the wei amount a registration costs. `PopRules` and the
 ///      public commit-reveal controller keep the classification, reservation, and tier rules; the

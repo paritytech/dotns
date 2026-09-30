@@ -1,6 +1,6 @@
-# Contributing to DotNS
+# Contributing to dotNS
 
-These guidelines apply to the DotNS repository ("dotns"). Contributions are welcome via issues, pull requests, reviews, and testing feedback. Protocol behaviour is documented in [README.md](./README.md) and network addresses in `deployments/<network>/<chain-id>.json`; this file is the contributor mechanics.
+These guidelines apply to the dotNS repository ("dotns"). Contributions are welcome via issues, pull requests, reviews, and testing feedback. Protocol behaviour is documented in [README.md](./README.md) and network addresses in `deployments/<network>/<chain-id>.json`; this file is the contributor mechanics.
 
 ## Types of contributing
 
@@ -74,7 +74,7 @@ Before opening a pull request:
 
 ## Feature design
 
-Treat the chain as the database. Assume no servers and no indexers. If a feature needs an offchain service to be usable, it is not a DotNS feature.
+Treat the chain as the database. Assume no servers and no indexers. If a feature needs an offchain service to be usable, it is not a dotNS feature.
 
 This has a practical implication: every feature must come with an explicit query path. A client should be able to start from a small set of known contracts and find everything it needs with a bounded number of calls. Every getter is `external view`; controllers and resolvers check authorisation on writes, never on reads; governance key rotation does not break existing read paths because consumers re-resolve their siblings through the protocol registry on every call.
 
@@ -122,7 +122,7 @@ Example query paths. Each row starts from a small set of known contracts; every 
 | Personhood-name node => device-name labelhash | Protocol registry => PoP resolver => `deviceLabelhashOf(personhoodNode)` |
 | Node => chat key | Protocol registry => PoP resolver => `chatKey(node)` |
 | Node or tokenId => registered label | Protocol registry => registrar => `labelOf(uint256(node))` |
-| Base name => gateway-reservation state | Protocol registry => PoP controller => `isReservedForClaim(label)` |
+| Personhood name => gateway-reservation state | Protocol registry => PoP controller => `isReservedForClaim(label)` |
 | Base name => cross-flow reservation state | Protocol registry => PopRules => `isBaseNameReserved(baseName)` |
 | Node => ERC721 owner | Protocol registry => registrar => `ownerOf(uint256(node))` |
 | Subnode => forward-registry owner | Protocol registry => registry => `owner(subnode)` |
@@ -191,7 +191,7 @@ Do not cache the new address in storage on the existing contract during the upgr
 
 ## Static analysis and security tooling
 
-DotNS uses automated checks (including static analysis) on pull requests.
+dotNS uses automated checks (including static analysis) on pull requests.
 
 Important caveats:
 
@@ -284,4 +284,4 @@ forge test --no-match-path 'test/fork/**'
 Be respectful and constructive.
 
 - Harassment, abuse, or aggressive behaviour is not acceptable.
-- Spam issues/PRs, or contributions unrelated to DotNS, may be closed.
+- Spam issues/PRs, or contributions unrelated to dotNS, may be closed.

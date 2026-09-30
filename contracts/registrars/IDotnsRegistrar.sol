@@ -5,8 +5,8 @@ pragma solidity ^0.8.34;
 import {IERC721} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {IDotnsController} from "./IDotnsController.sol";
 
-/// @title Dotns Registrar
-/// @notice ERC721-backed ownership for DotNS names with controller-gated registration.
+/// @title dotNS Registrar
+/// @notice ERC721-backed ownership for dotNS names with controller-gated registration.
 /// @dev Intentionally minimal and policy-free. Provides ERC721 ownership for registered name
 /// token IDs and controller-gated registration; pricing, PoP enforcement, and flow-specific
 /// policy live in the controllers.

@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 
 import {IDotnsPricing} from "./IDotnsPricing.sol";
 
-/// @title DotNS Flat Pricing
+/// @title dotNS Flat Pricing
 /// @notice Prices every registration at a single deposit, whatever the base length.
 /// @dev The launch cost model: one constant amount for any name the bands admit, so a nine-plus
 ///      character name costs the same flat deposit and shorter names stay gated by `PopRules`. The

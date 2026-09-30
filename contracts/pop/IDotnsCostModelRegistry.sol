@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 
 import {IDotnsPricing} from "./IDotnsPricing.sol";
 
-/// @title DotNS Cost Model Registry
+/// @title dotNS Cost Model Registry
 /// @notice Holds every cost model the protocol has run and names the current one.
 /// @dev The address registered under `DotnsConstants.COST_MODEL` points here, set once and never
 ///      repointed. Changing the live curve registers a new model, which adds its version and moves

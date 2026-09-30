@@ -1,10 +1,10 @@
-# DotNS Deployments
+# dotNS Deployments
 
 Current deployment addresses and developer deployment notes for dotNS contracts.
 
 ## What this file is for
 
-This file is the operational companion to the README. It explains how to run the local ETH-RPC adapter, how to deploy DotNS, where deployment manifests are written, and which addresses are currently live on the supported Paseo environments.
+This file is the operational companion to the README. It explains how to run the local ETH-RPC adapter, how to deploy dotNS, where deployment manifests are written, and which addresses are currently live on the supported Paseo environments.
 
 > For a short, do-this-in-order checklist (including how to target **any** Polkadot chain, not just the Paseo environments), see [`DEPLOYMENT_CHECKLIST.md`](./DEPLOYMENT_CHECKLIST.md).
 

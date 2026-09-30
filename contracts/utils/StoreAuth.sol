@@ -30,7 +30,7 @@ library StoreAuth {
     /// @notice Whether `caller` is a protocol component allowed to act on a user's store.
     /// @dev Ordered by how often each one writes: the registrar on every mint and transfer, a
     ///      controller on a registration or a gateway name, and the registry on a subname.
-    /// @param protocolRegistry The canonical DotNS protocol registry.
+    /// @param protocolRegistry The canonical dotNS protocol registry.
     /// @param caller The address being checked, normally `msg.sender`.
     /// @return authorised True if `caller` is the registrar, an authorised controller, or the
     ///         registry.

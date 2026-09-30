@@ -138,7 +138,7 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
         run: forge test -vv
 
-      # pallet-revive genesis, so a chain can carry DotNS from block zero rather than
+      # pallet-revive genesis, so a chain can carry dotNS from block zero rather than
       # deploying it afterwards. Built here rather than downstream: this repo owns the
       # contracts, the deploy scripts and the CREATE3 factory key that fixes every address,
       # and the artifact then ships from the same commit as the ABIs beside it.
@@ -208,7 +208,7 @@ jobs:
           ASSET_BASE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG"
 
           cat > release-body.md << 'ENDOFBODY'
-          ## DotNS ABI Package
+          ## dotNS ABI Package
 
           **Contracts**
           | Contract | ABI |
@@ -260,7 +260,7 @@ jobs:
             echo ""
             echo "### Genesis"
             echo ""
-            echo "Pallet-revive genesis state, for a chain that should carry DotNS from block zero"
+            echo "Pallet-revive genesis state, for a chain that should carry dotNS from block zero"
             echo "rather than deploying it afterwards."
             echo ""
             for tld in $DOTNS_TLDS; do

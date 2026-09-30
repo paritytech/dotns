@@ -12,9 +12,9 @@ import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 
-/// @title Dotns Protocol Registry
+/// @title dotNS Protocol Registry
 /// @author Parity
-/// @notice Upgradeable address registry for all DotNS protocol contracts, and the authority for
+/// @notice Upgradeable address registry for all dotNS protocol contracts, and the authority for
 ///         the network's top-level domain.
 /// @dev Single source of truth for sibling-contract lookups. All siblings resolve each other via
 ///      well-known `bytes32` constants in `DotnsConstants` rather than holding direct addresses,
@@ -144,7 +144,7 @@ contract DotnsProtocolRegistry is
     }
 
     /// @notice Returns the declared release, mirroring `protocolVersion` under the historical
-    ///         `version()` selector every DotNS contract exposes.
+    ///         `version()` selector every dotNS contract exposes.
     /// @dev Sibling contracts mirror the same stored value by reading it from here, so
     ///      `version()` answers identically network-wide; this contract is where the value
     ///      lives, so it reads its own storage.

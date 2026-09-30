@@ -5,7 +5,7 @@ import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {EscrowHandler} from "./EscrowHandler.t.sol";
 
-/// @title Dotns Name Escrow Invariant Suite
+/// @title dotNS Name Escrow Invariant Suite
 /// @notice Asserts solvency, custody, and recipient-locking properties of the name escrow
 ///         across randomised registration, release, withdraw, claim, and transfer flows.
 contract DotnsNameEscrowInvariantTest is BaseDotns {

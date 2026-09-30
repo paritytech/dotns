@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 
 /// @title IDotnsProtocolRegistry
 /// @author Parity
-/// @notice Interface for the DotNS protocol-level address registry.
+/// @notice Interface for the dotNS protocol-level address registry.
 /// @dev Single source of truth for sibling lookups. Contracts resolve each other via well-known
 ///      `bytes32` constants in `DotnsConstants` so an upgrade or rewire only mutates the
 ///      registry, never the consumers. The registry also holds the network's top-level domain,

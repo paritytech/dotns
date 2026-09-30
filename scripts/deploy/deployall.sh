@@ -2,7 +2,7 @@
 #
 # One-command deploy. Ensures the CREATE3 factory exists (deployed once from the
 # factory key at nonce 0, a deterministic address), then runs the full pipeline
-# reusing that factory. Because every DotNS address derives from the factory
+# reusing that factory. Because every dotNS address derives from the factory
 # address, and the factory address is the same on every fresh chain, this
 # reproduces the same address set across resets and networks.
 #

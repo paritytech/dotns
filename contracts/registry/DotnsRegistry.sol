@@ -17,7 +17,7 @@ import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
-/// @title Dotns Registry
+/// @title dotNS Registry
 /// @author Parity
 /// @notice Upgradeable on-chain registry for hierarchical name ownership and resolution.
 /// @dev Tokenised second-level nodes store `owner == address(0)` as a sentinel and defer to
@@ -30,7 +30,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice Mapping of node identifiers to records.
     mapping(bytes32 node => Record record) private records;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     uint256[50] private __gap;
@@ -316,7 +316,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
+    ///         registry so every dotNS contract reports one synchronised value.
     /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
     ///      `version()` selector for ABI compatibility. It reports the network's declaration,
     ///      not this contract's build; per-contract identity is the codehash declared on the

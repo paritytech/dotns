@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Deploys the CREATE3 factory on its own, from a dedicated single-purpose key,
-# so its address stays reproducible across chain resets. Every other DotNS
+# so its address stays reproducible across chain resets. Every other dotNS
 # address derives from the factory address, and the factory's own address is
 # nonce-derived, so a key that also runs the pipeline or upgrades cannot keep it
 # stable. Deploy it here from a key that does nothing else, then pass the printed

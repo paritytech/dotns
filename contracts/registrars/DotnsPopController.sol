@@ -99,7 +99,7 @@ contract DotnsPopController is
     /// state has been committed.
     uint256 private constant CHAT_KEY_LENGTH = 65;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @notice Per-label queue metadata (head/tail pointers).
@@ -134,9 +134,8 @@ contract DotnsPopController is
 
     /// @notice Per-user pile of deferred names awaiting a `LabelStore`.
     /// @dev The mint origin cannot deploy a `LabelStore`, so deferred names accumulate here until a
-    /// signed-origin
-    /// @custom:function settlePendingClaims deploys the store and writes the stashed labels. Each
-    /// entry's deadline is measured from its own `mintedAt` against `reservationDuration`.
+    /// signed-origin @custom:function settlePendingClaims deploys the store and writes the stashed
+    /// labels. Entries never lapse; `mintedAt` only feeds the advisory deadline the lens reports.
     mapping(address user => PendingClaim[] queue) internal _pendingClaimQueue;
 
     /// @notice Labels this controller minted, keyed by the bare label without the TLD.
@@ -622,7 +621,7 @@ contract DotnsPopController is
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
+    ///         registry so every dotNS contract reports one synchronised value.
     /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
     ///      `version()` selector for ABI compatibility. It reports the network's declaration,
     ///      not this contract's build; per-contract identity is the codehash declared on the
@@ -922,8 +921,8 @@ contract DotnsPopController is
     {
         // Letters only, matching the gateway's personhood-name rule: a personhood name is a name
         // a person chose, so it admits no digits and no hyphens. Classification does not cover
-        // this on its own, since a suffixed label with nine or more characters lands on NoStatus
-        // and would otherwise pass.
+        // this on its own: a label carrying a digit or a hyphen is measured as written, so one of
+        // six or more characters classifies as Personhood or NoStatus and would otherwise pass.
         _requirePersonhoodLabel(label.isPersonhoodLabel(), legacy);
         (labelhash, node) = LabelUtils.deriveNode(protocolRegistry.tldNode(), label);
     }

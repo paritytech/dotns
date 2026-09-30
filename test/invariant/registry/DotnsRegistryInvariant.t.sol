@@ -6,7 +6,7 @@ import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {RegistryHandler} from "./RegistryHandler.t.sol";
 
-/// @title Dotns Registry Invariant Suite
+/// @title dotNS Registry Invariant Suite
 /// @notice Asserts authorisation, persistence, and parent-reassignment properties of the
 ///         hierarchical registry across randomised registration, subnode creation, and
 ///         transfer flows.

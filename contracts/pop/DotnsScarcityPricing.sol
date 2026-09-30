@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 
 import {IDotnsPricing} from "./IDotnsPricing.sol";
 
-/// @title DotNS Scarcity Pricing
+/// @title dotNS Scarcity Pricing
 /// @notice Prices a registration on a geometric scarcity curve driven by base length.
 /// @dev The curve doubles the base fee for each character below nine and halves it for each
 ///      character from nine upward, never below the floor. The base fee is the curve's value at

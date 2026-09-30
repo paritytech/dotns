@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 
 import {CREATE3} from "solady/utils/CREATE3.sol";
 
-/// @title Dotns CREATE3 Factory
+/// @title dotNS CREATE3 Factory
 /// @notice Permissionless wrapper around Solady's audited CREATE3 library.
 /// @dev Anyone may call @custom:function deploy. CREATE3 addresses are a pure function of
 /// `(factory_address, salt)` — the caller never enters the derivation — so caller-gating
@@ -14,7 +14,7 @@ import {CREATE3} from "solady/utils/CREATE3.sol";
 ///
 /// An occupied salt is handled by the caller. `BaseDeployer._deployCreate3` adopts an occupied
 /// address only when the occupant's runtime code is the artefact that run would have deployed,
-/// and `DOTNS_SALT_VERSION` moves the DotNS address set to fresh addresses when it is not.
+/// and `DOTNS_SALT_VERSION` moves the dotNS address set to fresh addresses when it is not.
 /// @custom:security-contact admin@parity.io
 contract Create3Factory {
     /// @notice Emitted on every successful CREATE3 deployment through this factory.

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title Dotns Reverse Resolver
+/// @title dotNS Reverse Resolver
 /// @notice Interface for writing and reading reverse name records for addresses.
 /// @dev Reverse records bind to an EOA rather than a registry node. Two write paths exist:
 ///      a registrar-only setter used by the controller during reserved registration, and a

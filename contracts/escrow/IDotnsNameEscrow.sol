@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title Dotns Name Escrow Interface
+/// @title dotNS Name Escrow Interface
 /// @notice Escrows refundable deposits for registered names and manages the release lifecycle.
 /// @custom:security-contact admin@parity.io
 interface IDotnsNameEscrow {

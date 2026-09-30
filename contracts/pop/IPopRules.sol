@@ -101,11 +101,12 @@ interface IPopRules {
         address controller;
     }
 
-    /// @notice Classifies a name into a required PoP tier per DotNS naming rules.
+    /// @notice Classifies a name into a required PoP tier per dotNS naming rules.
     /// @dev Pure; inputs are the label bytes only. Callers use the returned tier to decide which
     ///      pricing and verification branch applies. A label that is neither a single lowercase
-    ///      ASCII DNS label nor a device name triggers @custom:reverts PopError; a trailing-digit
-    ///      suffix of any length is accepted and classified by the length it leaves.
+    ///      ASCII DNS label nor a device name triggers @custom:reverts PopError. Trailing digits in
+    ///      an ordinary label count towards its length; only a device name's separator and suffix
+    ///      are removed before it is classified.
     /// @param name The name label being evaluated.
     /// @return requirement Required tier for registration.
     /// @return message Explanation of the classification result.
@@ -157,7 +158,7 @@ interface IPopRules {
     /// @notice Writes or refreshes a reservation for a base name.
     /// @dev Gateway-driven reservation path used by the PoP controller. Only a controller in the
     ///      registrar's `controllers` set may call this, otherwise @custom:reverts NotRegistry.
-    ///      Does not apply the device-name length window that @custom:function reserveBaseName
+    ///      Does not apply the 6-8 base-length window that @custom:function reserveBaseName
     ///      enforces, but does require the input to be canonical with no trailing digits; a
     ///      non-canonical label or one with trailing digits triggers @custom:reverts PopError. If
     ///      the slot is already live and held by a different user, @custom:reverts PopError so the

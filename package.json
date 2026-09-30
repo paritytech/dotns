@@ -1,7 +1,7 @@
 {
   "name": "@dotns/dotns-contracts",
   "version": "2.0.0",
-  "description": "Dotns contracts",
+  "description": "dotNS contracts",
   "type": "module",
   "scripts": {
     "test": "forge test -vvvvv",

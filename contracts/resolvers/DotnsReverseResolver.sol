@@ -18,7 +18,7 @@ import {LabelUtils} from "../utils/LabelUtils.sol";
 import {SubnodeUtils} from "../utils/SubnodeUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 
-/// @title Dotns Reverse Resolver
+/// @title dotNS Reverse Resolver
 /// @notice Resolves an address to its associated name under the network TLD.
 /// @dev Writes are gated on a fixed writer address resolved from the protocol
 ///      registry (the registrar or its controller), not on node ownership.

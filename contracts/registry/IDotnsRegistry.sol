@@ -132,7 +132,7 @@ interface IDotnsRegistry {
     ///      success.
     function setSubnodeResolver(SubnodeResolverRecord calldata record) external;
 
-    /// @notice Creates or resets a node record for a tokenised base registration.
+    /// @notice Creates or resets a node record for a tokenised second-level registration.
     /// @dev Restricted to the registrar's controllers, otherwise @custom:reverts NotAuthorised.
     ///      `newOwner` must be non-zero (otherwise @custom:reverts NotAllowed) and must match
     ///      the ERC-721 owner reported by the registrar (otherwise

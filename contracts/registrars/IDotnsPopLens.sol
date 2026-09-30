@@ -9,18 +9,19 @@ import {IPopRules} from "../pop/IPopRules.sol";
 /// the store factory, the PoP resolver, and PopRules.
 /// @dev Holds no state of its own beyond the protocol registry it resolves siblings through, and
 /// takes no part in issuance. It exists so the query surface lives outside the controller, which
-/// keeps the controller within the contract-size limit and keeps ownership on the registrar.
+/// keeps the controller within the contract-size limit. Ownership is read from the registry, which
+/// covers device-name subnames and tokenised names alike.
 /// @custom:security-contact admin@parity.io
 interface IDotnsPopLens {
     /// @notice One row in a per-account name listing: the name and the node used to look it up.
     /// @dev Computed on read; not stored. `settled` is false while the name still sits in the
     /// temporary pending-claim queue and true once its label is written into a `LabelStore`.
-    /// `deadline` is the pending settlement deadline (`mintedAt + reservationDuration`) and is
-    /// zero for a settled name.
+    /// `deadline` is an advisory settlement deadline (`mintedAt + reservationDuration`) and is
+    /// zero for a settled name; a pending claim stays settleable after it.
     /// @param node namehash of the name; the key for chat-key, link, and detail lookups.
-    /// @param label Full name string.
+    /// @param label Bare label without the TLD; a device name carries its separator.
     /// @param settled Whether the label is written into a `LabelStore`.
-    /// @param deadline Pending settlement deadline, or zero when settled.
+    /// @param deadline Advisory settlement deadline for a pending claim, or zero when settled.
     struct Name {
         bytes32 node;
         string label;
@@ -28,8 +29,8 @@ interface IDotnsPopLens {
         uint64 deadline;
     }
 
-    /// @notice The full on-chain record for a single name, gathered from the registrar, the PoP
-    /// resolver, and PopRules in one read.
+    /// @notice The full on-chain record for a single name, gathered from the registry, the
+    /// registrar, the PoP resolver, and PopRules in one read.
     /// @dev Computed on read; not stored. Never reverts on an unminted or unsettled name: absent
     /// fields read as zero or empty. `requiredTier` classifies the label shape (the tier the name
     /// requires), not the owner's proof. `personhoodNode` is looked up by the device-name
@@ -37,9 +38,10 @@ interface IDotnsPopLens {
     /// @custom:function nameDetail and left zero by @custom:function nameDetailByNode unless the
     /// label is independently resolvable.
     /// @param node namehash of the name.
-    /// @param label Full name string, or empty when the name is unminted or its claim is unsettled.
-    /// @param owner Current registrar owner, or the zero address when the name does not exist.
-    /// @param exists Whether the name is minted.
+    /// @param label Bare label without the TLD. Empty when the name has no owner, or when
+    /// @custom:function nameDetailByNode reads a name whose claim is unsettled.
+    /// @param owner Current owner in the registry, or the zero address when the name has none.
+    /// @param exists Whether the name has an owner in the registry.
     /// @param settled Whether the label is written into the current owner's `LabelStore`.
     /// @param requiredTier PopRules classification of the label.
     /// @param chatKey Chat-key bytes recorded on the PoP resolver for the node.

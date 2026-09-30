@@ -101,12 +101,13 @@ contract DotnsPopLens is IDotnsPopLens {
     /// @notice Whether `label` belongs in the listing: a name the gateway issued.
     /// @dev Whether a name is an identity at all is provenance, so the listing is gated on
     /// @custom:function IDotnsPopController.isPopIssued: characters alone would admit a public
-    /// registration spelled `joseph42`, which reads as a personhood name and is not one. The
-    /// label shape then confirms it is one of the two kinds the gateway issues, a device name with
-    /// its separator or a personhood name without one. A device name is a subname and a
-    /// personhood name is a tokenised second-level name, and the callers resolve ownership through
-    /// the registry, which covers both. Provenance is keyed by text, so a subname a `user` created
-    /// under a name they own does not enter the listing unless the controller issued it.
+    /// registration spelled `joseph42`, which passes the single-label shape check yet was never
+    /// issued by the gateway. The label shape then confirms it is one of the two kinds the gateway
+    /// issues, a device name with its separator or a personhood name without one. A device name is
+    /// a subname and a personhood name is a tokenised second-level name, and the callers resolve
+    /// ownership through the registry, which covers both. Provenance is keyed by text, so a
+    /// subname a `user` created under a name they own does not enter the listing unless the
+    /// controller issued it.
     function _belongsToListing(string memory label) internal view returns (bool) {
         if (!_controller().isPopIssued(label)) return false;
         return label.isDeviceLabelMemory() || label.isSingleLabelMemory();
@@ -114,7 +115,7 @@ contract DotnsPopLens is IDotnsPopLens {
 
     /// @notice Counts the gateway-issued names currently owned by `user`.
     /// @dev Walks the user's `LabelStore` (settled names) then their pending claims, keeping only
-    /// entries that belong to the listing and are still owned by `user` on the registrar. A pending
+    /// entries that belong to the listing and are still owned by `user` in the registry. A pending
     /// entry already written into the store by a sibling flow is skipped so it is not counted
     /// twice.
     function _countNames(address user) internal view returns (uint256 count) {
@@ -216,11 +217,11 @@ contract DotnsPopLens is IDotnsPopLens {
         return _registry().owner(node) == user;
     }
 
-    /// @notice Gathers a name's record from the registrar, PoP resolver, and PopRules.
+    /// @notice Gathers a name's record from the registry, registrar, PoP resolver, and PopRules.
     /// @dev Reads defensively so an unminted or unsettled name yields zeroed fields instead of
     /// reverting. `personhoodNode` is left for the caller because it needs the labelhash, which is
     /// recoverable from the label string but not from the node alone. `requiredTier` classifies the
-    /// label shape, so `knownLabel` supplies the label for a pending subname the node cannot
+    /// label shape, so `knownLabel` supplies the label for an unsettled name the node cannot
     /// recover, letting classification run before the detail is returned; it is ignored when the
     /// label is otherwise recoverable, and an empty `knownLabel` leaves an unrecoverable label
     /// unclassified.
@@ -242,16 +243,17 @@ contract DotnsPopLens is IDotnsPopLens {
             address store = _storeFactory().getLabelStore(owner);
             bool settled = store != address(0) && ILabelStore(store).isLocked(node);
             detail.settled = settled;
-            // A tokenised name carries its label on the registrar; a subname does not, so its
-            // label is read back from the owner's store once settled. A pending subname has no
-            // recoverable label from the node alone, so it is taken from `knownLabel` when the
-            // caller supplied one.
+            // The registrar reads a tokenised name's label from the holder's store, and a subname's
+            // label is read from the owner's store directly, so either is recoverable from the node
+            // only once settled. Until then it is taken from `knownLabel` when the caller supplied
+            // one.
             if (_registrar().exists(uint256(node))) {
                 detail.label = _registrar().labelOf(uint256(node));
             } else if (settled) {
                 detail.label =
                     LabelUtils.stripTld(_protocolRegistry.tld(), ILabelStore(store).getLabel(node));
-            } else if (bytes(knownLabel).length != 0) {
+            }
+            if (bytes(detail.label).length == 0 && bytes(knownLabel).length != 0) {
                 detail.label = knownLabel;
             }
         }

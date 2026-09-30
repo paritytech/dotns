@@ -2132,6 +2132,57 @@ contract DotnsPopControllerTests is BaseDotns {
         );
     }
 
+    /// @notice `nameDetail` reports an unsettled personhood name's label and tier.
+    /// @dev The registrar reads a tokenised name's label from the holder's `LabelStore`, which a
+    ///      store-less holder does not have yet, so the lens falls back to the caller's label.
+    function test_nameDetail_reports_an_unsettled_personhood_name() public {
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: _linkFresh("")
+            })
+        );
+        assertEq(dotnsPopController.pendingClaimCountOf(ed), 1, "the claim is pending");
+
+        IDotnsPopLens.NameDetail memory detail = dotnsPopLens.nameDetail(PERSONHOOD_LABEL_A);
+        assertTrue(detail.exists, "minted before settlement");
+        assertFalse(detail.settled, "not settled yet");
+        assertEq(detail.label, PERSONHOOD_LABEL_A, "caller label supplied before settlement");
+        assertTrue(
+            detail.requiredTier == IPopRules.PopStatus.Personhood,
+            "classified as personhood before settlement"
+        );
+    }
+
+    /// @notice `nameDetailByNode` leaves an unsettled personhood name's label empty until
+    ///         settlement makes it recoverable from the node.
+    function test_nameDetailByNode_recovers_a_personhood_label_only_after_settlement() public {
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: _linkFresh("")
+            })
+        );
+        bytes32 node = _nodeOf(PERSONHOOD_LABEL_A);
+
+        IDotnsPopLens.NameDetail memory pending = dotnsPopLens.nameDetailByNode(node);
+        assertTrue(pending.exists, "minted before settlement");
+        assertFalse(pending.settled, "not settled yet");
+        assertEq(pending.label, "", "no label recoverable from the node before settlement");
+        assertTrue(
+            pending.requiredTier == IPopRules.PopStatus.NoStatus, "unclassified without a label"
+        );
+
+        vm.prank(ed);
+        dotnsPopController.settlePendingClaims(ed, type(uint256).max);
+
+        IDotnsPopLens.NameDetail memory settled = dotnsPopLens.nameDetailByNode(node);
+        assertTrue(settled.settled, "settled after draining the queue");
+        assertEq(settled.label, PERSONHOOD_LABEL_A, "label recovered after settlement");
+        assertTrue(
+            settled.requiredTier == IPopRules.PopStatus.Personhood,
+            "classified as personhood after settlement"
+        );
+    }
+
     /// @notice A store row whose node key is not its own text's node is neither counted nor listed.
     /// @dev Ownership is keyed by node and provenance by text, and the store no longer binds the
     /// two, so the listings bind them. No production path can forge such a row (the key and text

@@ -51,7 +51,7 @@ contract PopRules is
     /// @notice Maximum time a base name can be reserved.
     uint256 public constant MAX_RESERVATION_TIME = 12 weeks;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @notice Whether the public paid path may register names shorter than nine characters.
@@ -118,7 +118,7 @@ contract PopRules is
         uint256 baseLength = bytes(baseName).length;
         require(
             baseLength >= 6 && baseLength <= 8 && _countTrailingDigits(baseName) == 0,
-            PopError("Reservation baseName must be 6-8 chars with no trailing digits")
+            PopError("Reservation base name must be 6-8 chars with no trailing digits")
         );
         _writeReservation(baseName, userAddress);
     }
@@ -535,7 +535,7 @@ contract PopRules is
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
+    ///         registry so every dotNS contract reports one synchronised value.
     /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
     ///      `version()` selector for ABI compatibility. It reports the network's declaration,
     ///      not this contract's build; per-contract identity is the codehash declared on the
@@ -563,7 +563,7 @@ contract PopRules is
         _requireBaseName(baseName);
         require(
             _countTrailingDigits(baseName) == 0,
-            PopError("Reservation baseName must have no trailing digits")
+            PopError("Reservation base name must have no trailing digits")
         );
         _writeReservation(baseName, userAddress);
     }
@@ -584,7 +584,7 @@ contract PopRules is
         _requireBaseName(baseName);
         require(
             _countTrailingDigits(baseName) == 0,
-            PopError("Reservation baseName must have no trailing digits")
+            PopError("Reservation base name must have no trailing digits")
         );
         Reservation memory reservation = reservations[baseName];
         // Live reservations can only be cleared by the controller that wrote
@@ -613,7 +613,7 @@ contract PopRules is
         _requireBaseName(baseName);
         require(
             _countTrailingDigits(baseName) == 0,
-            PopError("Reservation baseName must have no trailing digits")
+            PopError("Reservation base name must have no trailing digits")
         );
         Reservation memory reservation = reservations[baseName];
         // Cross-controller release is gated on owner match rather than controller match,
