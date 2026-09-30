@@ -55,9 +55,6 @@
 
 **Breaking changes:**
 
-<!-- Whatever you write here is copied into the release notes under "Breaking changes".
-Say what stops working and what integrators need to change. Leave it empty if nothing breaks. -->
-
 ## How to test
 
 ```bash
