@@ -39,7 +39,9 @@ interface IDotnsPopLens {
     /// @param owner Current owner in the registry, or the zero address when the name has none.
     /// @param exists Whether the name has an owner in the registry.
     /// @param settled Whether the label is written into the current owner's `LabelStore`.
-    /// @param requiredTier PopRules classification of the label.
+    /// @param requiredTier PopRules classification of the label. Classification needs the label, so
+    /// this reads `NoStatus` whenever `label` is empty: for a name with no owner, and for an
+    /// unsettled claim read through @custom:function nameDetailByNode.
     /// @param chatKey Chat-key bytes recorded on the PoP resolver for the node.
     /// @param deviceLabelhash For a personhood name, the linked device-name labelhash; zero
     /// otherwise.
