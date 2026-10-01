@@ -7,20 +7,13 @@ on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+-*"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Pre-release version, e.g. v0.5.5-rc1. The tag is created from the selected branch."
-        required: true
-        type: string
 
 permissions:
   contents: write
 
-# Two runs for the same version would race to attach assets to the same draft. On a
-# dispatch `github.ref_name` is the branch, so key on the requested version instead.
+# Two runs for the same version would race to attach assets to the same draft.
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.version || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -34,19 +27,12 @@ jobs:
     env:
       DOTNS_TLDS: testnet paseo
     steps:
-      # On workflow_dispatch the tag does not exist yet; the release step creates it
-      # from the branch this run was started on. Read through an env var rather than
-      # interpolating the input into the script.
+      # The run is started by pushing the tag, so the tag already exists and is the release's
+      # identity. Only the tag push triggers this workflow: the `release tags` ruleset keeps
+      # the workflow's token from creating a `v*` tag, so a run without one could not publish.
       - name: Resolve release tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            TAG="$INPUT_VERSION"
-          else
-            TAG="$GITHUB_REF_NAME"
-          fi
+          TAG="$GITHUB_REF_NAME"
           # The suffix is restricted to characters GitHub keeps verbatim in an asset
           # name; a space, for instance, is rewritten to a dot and would fail the
           # asset check after a full build. Segmented like run.sh's semver check
@@ -56,16 +42,8 @@ jobs:
             echo "::error::Pre-release version must look like v1.2.3-rc1, got '$TAG'."
             exit 1
           fi
-          # A release created for an existing tag is cut at that tag's commit: GitHub
-          # ignores target_commitish when the tag is already there. The ABIs would come
-          # from this branch while the release pointed somewhere else.
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] \
-            && gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
-            echo "::error::Tag $TAG already exists; use a different version."
-            exit 1
-          fi
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
-          echo "Releasing $TAG from $GITHUB_REF_NAME."
+          echo "Releasing $TAG."
 
       - name: Reject a pre-published release
         env:
@@ -238,7 +216,7 @@ jobs:
           ### Usage
 
           ```ts
-          import StoreAbi from "./abis/Store.json";
+          import LabelStoreAbi from "./abis/LabelStore.json";
           import RegistrarAbi from "./abis/DotnsRegistrar.json";
           ```
           ENDOFBODY
@@ -291,8 +269,7 @@ jobs:
       - name: Create draft pre-release with artifacts
         uses: softprops/action-gh-release@v2
         with:
-          # Explicit because on workflow_dispatch there is no tag to infer; the action
-          # creates it at this run's commit.
+          # The tag that started this run; `target_commitish` is that tag's commit.
           tag_name: ${{ env.RELEASE_TAG }}
           target_commitish: ${{ github.sha }}
           files: |
