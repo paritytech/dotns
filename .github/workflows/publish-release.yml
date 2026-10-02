@@ -1,30 +1,47 @@
 name: Publish Release Package
 
-# Creating a `v*` tag is restricted to the dotns team by the `release tags` ruleset, and the
-# job below pauses on the `releases` environment for a reviewer, so a release takes two
-# distinct human actions: cutting the tag, and approving the run it starts.
+# Creating a `v*` tag is restricted to the dotns team by the `release tags` ruleset, the
+# `guard` job refuses a tag whose commit is not on master, and the gated job pauses on the
+# `releases` environment for a reviewer. A release therefore ships reviewed master code and
+# takes two distinct human actions: cutting the tag, and approving the run it starts.
 on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to release, e.g. v0.5.5. The tag is created from the selected branch."
-        required: true
-        type: string
 
 permissions:
   contents: write
 
-# Two runs for the same version would race to attach assets to the same draft. On a
-# dispatch `github.ref_name` is the branch, so key on the requested version instead.
+# Two runs for the same version would race to attach assets to the same draft.
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.version || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
+  # Runs first, with no environment and read-only access: a tag that does not point at a
+  # commit on master stops here, before a reviewer is asked to approve and before any
+  # secret is read. master only takes pull requests, which need an approving review, so
+  # this keeps every release on reviewed code.
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require the tagged commit to be on master
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::$GITHUB_REF_NAME points at $GITHUB_SHA, which is not on master. Tag a commit on master."
+            exit 1
+          fi
+          echo "$GITHUB_REF_NAME points at $GITHUB_SHA, which is on master."
+
   release:
+    needs: guard
     runs-on: ubuntu-latest
     # Gated: this job reads the genesis owner key, which lives only on the `releases`
     # environment, so every run waits for a reviewer's approval there.
@@ -34,33 +51,18 @@ jobs:
     env:
       DOTNS_TLDS: testnet paseo
     steps:
-      # On workflow_dispatch the tag does not exist yet; the release step creates it
-      # from the branch this run was started on. Read through an env var rather than
-      # interpolating the input into the script.
+      # The run is started by pushing the tag, so the tag already exists and is the release's
+      # identity. Only the tag push triggers this workflow: the `release tags` ruleset keeps
+      # the workflow's token from creating a `v*` tag, so a run without one could not publish.
       - name: Resolve release tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            TAG="$INPUT_VERSION"
-          else
-            TAG="$GITHUB_REF_NAME"
-          fi
+          TAG="$GITHUB_REF_NAME"
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Version must look like v1.2.3, got '$TAG'."
             exit 1
           fi
-          # A release created for an existing tag is cut at that tag's commit: GitHub
-          # ignores target_commitish when the tag is already there. The ABIs would come
-          # from this branch while the release pointed somewhere else.
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] \
-            && gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
-            echo "::error::Tag $TAG already exists; use a different version."
-            exit 1
-          fi
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
-          echo "Releasing $TAG from $GITHUB_REF_NAME."
+          echo "Releasing $TAG."
 
       - name: Reject a pre-published release
         env:
@@ -230,7 +232,7 @@ jobs:
           ### Usage
 
           ```ts
-          import StoreAbi from "./abis/Store.json";
+          import LabelStoreAbi from "./abis/LabelStore.json";
           import RegistrarAbi from "./abis/DotnsRegistrar.json";
           ```
           ENDOFBODY
@@ -250,6 +252,11 @@ jobs:
             echo "| Network | Chain id |"
             echo "|---------|---------:|"
             jq -r '.networks | to_entries[] | "| \(.key) | \(.value.chainId) |"' release/deployments.json
+            echo ""
+            echo "A network can still run an earlier release until it is upgraded to this one. Its protocol"
+            echo "registry's \`protocolVersion()\` returns the release it runs as bare semver (\`1.0.0\`, no \`v\`),"
+            echo "or an empty string when the network has never declared one. \`deployments:verify --tag\`"
+            echo "checks the chain against a release ([Verifying a release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$TAG/RELEASE_ARTIFACTS.md#verifying-a-release))."
             echo ""
             echo "- **Addresses:** [deployments.json]($ASSET_BASE/deployments.json)"
             echo "- **Release contents:** [release-manifest.json]($ASSET_BASE/release-manifest.json)"
@@ -307,10 +314,8 @@ jobs:
       - name: Create draft release with artifacts
         uses: softprops/action-gh-release@v2
         with:
-          # Explicit because on workflow_dispatch there is no tag to infer; the action
-          # creates it at this run's commit.
+          # The tag that started this run.
           tag_name: ${{ env.RELEASE_TAG }}
-          target_commitish: ${{ github.sha }}
           files: |
             dotns-abis-*.zip
             release/abis/*.json

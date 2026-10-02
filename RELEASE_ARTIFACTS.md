@@ -129,8 +129,8 @@ key that owns every contract in it. The environment holds:
   pair right after the toolchain is installed and fails the run on a mismatch, so a mistyped
   key dies before anything is built.
 - Required reviewers: the dotns team. Every release run pauses for one approval.
-- Deployment refs: `master` (for `workflow_dispatch`) and `v[0-9]*` tags. A dispatch started
-  from any other branch stops at the environment gate.
+- Deployment refs: `v[0-9]*` tags. Both workflows run only on a tag push, so a run from any
+  other ref stops at the environment gate.
 
 Creating a `v*` tag is itself restricted to the dotns team by the `release tags` ruleset, so a
 release takes two distinct human actions: cutting the tag, and approving the run it starts.
