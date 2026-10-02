@@ -1,8 +1,9 @@
 name: Publish Release Package
 
-# Creating a `v*` tag is restricted to the dotns team by the `release tags` ruleset, and the
-# job below pauses on the `releases` environment for a reviewer, so a release takes two
-# distinct human actions: cutting the tag, and approving the run it starts.
+# Creating a `v*` tag is restricted to the dotns team by the `release tags` ruleset, the
+# `guard` job refuses a tag whose commit is not on master, and the gated job pauses on the
+# `releases` environment for a reviewer. A release therefore ships reviewed master code and
+# takes two distinct human actions: cutting the tag, and approving the run it starts.
 on:
   push:
     tags:
@@ -17,7 +18,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Runs first, with no environment and read-only access: a tag that does not point at a
+  # commit on master stops here, before a reviewer is asked to approve and before any
+  # secret is read. master only takes pull requests, which need an approving review, so
+  # this keeps every release on reviewed code.
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require the tagged commit to be on master
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::$GITHUB_REF_NAME points at $GITHUB_SHA, which is not on master. Tag a commit on master."
+            exit 1
+          fi
+          echo "$GITHUB_REF_NAME points at $GITHUB_SHA, which is on master."
+
   release:
+    needs: guard
     runs-on: ubuntu-latest
     # Gated: this job reads the genesis owner key, which lives only on the `releases`
     # environment, so every run waits for a reviewer's approval there.
@@ -230,7 +254,8 @@ jobs:
             jq -r '.networks | to_entries[] | "| \(.key) | \(.value.chainId) |"' release/deployments.json
             echo ""
             echo "A network can still run an earlier release until it is upgraded to this one. Its protocol"
-            echo "registry's \`protocolVersion()\` returns the release it runs, and \`deployments:verify --tag\`"
+            echo "registry's \`protocolVersion()\` returns the release it runs as bare semver (\`1.0.0\`, no \`v\`),"
+            echo "or an empty string when the network has never declared one. \`deployments:verify --tag\`"
             echo "checks the chain against a release ([Verifying a release]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$TAG/RELEASE_ARTIFACTS.md#verifying-a-release))."
             echo ""
             echo "- **Addresses:** [deployments.json]($ASSET_BASE/deployments.json)"
@@ -289,9 +314,8 @@ jobs:
       - name: Create draft release with artifacts
         uses: softprops/action-gh-release@v2
         with:
-          # The tag that started this run; `target_commitish` is that tag's commit.
+          # The tag that started this run.
           tag_name: ${{ env.RELEASE_TAG }}
-          target_commitish: ${{ github.sha }}
           files: |
             dotns-abis-*.zip
             release/abis/*.json

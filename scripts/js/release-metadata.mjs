@@ -837,6 +837,8 @@ function verify(args) {
     ]).replace(/^"|"$/g, "");
     if (declaredVersion === tag) {
       console.log(`  ok   protocolVersion ${declaredVersion}`);
+    } else if (declaredVersion === "") {
+      problems.push(`chain declares no protocol version, expected '${tag}'`);
     } else {
       problems.push(`chain declares protocol version '${declaredVersion}', expected '${tag}'`);
     }
