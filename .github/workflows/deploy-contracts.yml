@@ -3,8 +3,6 @@ name: Deploy Contracts and Verify artifacts
 on:
   pull_request:
     branches: [master]
-    paths:
-      ["contracts/**", "scripts/**", "deployments/**", "**.sol", "package.json", "bun.lock"]
   push:
     branches: [master]
     paths:
@@ -21,6 +19,7 @@ concurrency:
 
 jobs:
   deploy:
+    name: Deploy Contracts
     runs-on: ubuntu-latest
 
     # Shared across steps. ACCOUNT_* is anvil test account 7 (public test keys,

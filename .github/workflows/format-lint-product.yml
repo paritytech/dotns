@@ -2,7 +2,6 @@ name: Format & Lint
 
 on:
   pull_request:
-    paths: ['src/**', 'script/**', 'test/**', '**.sol']
 
 permissions:
   contents: read
@@ -17,6 +16,7 @@ concurrency:
 
 jobs:
   check:
+    name: Format & Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
