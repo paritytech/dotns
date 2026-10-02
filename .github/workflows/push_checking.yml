@@ -14,7 +14,6 @@ name: Run Solidity Tests
 on:
   pull_request:
     branches: [master]
-    paths: ["contracts/**", "test/**", "**.sol"]
   push:
     branches: [master]
     paths: ["contracts/**", "test/**", "**.sol"]
@@ -143,6 +142,14 @@ jobs:
             echo "result=Failed - Build error" >> "$GITHUB_OUTPUT"
             echo "has_details=false" >> "$GITHUB_OUTPUT"
             exit 1
+          fi
+
+          # Pull requests run 100 invariant runs per campaign to keep the check short; pushes to
+          # master keep the ci profile's 300. No seed is fixed, so every run explores new
+          # sequences. The unit + fuzz leg runs no invariants, so this only affects the invariant
+          # leg.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            export FOUNDRY_INVARIANT_RUNS=100
           fi
 
           forge test -vv --summary ${{ matrix.kind.forge_args }} 2>&1 | tee test.log
