@@ -34,6 +34,7 @@ jobs:
     if: github.event.action != 'closed'
     name: ${{ matrix.kind.label }}
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.kind.timeout[github.event_name] }}
     strategy:
       # Each matrix kind runs on its own runner so neither has to hold the
       # other's peak memory. Don't fail-fast: surfacing both shards' results
@@ -44,9 +45,13 @@ jobs:
           - id: unit-fuzz
             label: Contract Tests (Unit + Fuzz)
             forge_args: --no-match-contract Invariant --no-match-path 'test/fork/**'
+            timeout: { pull_request: 30, push: 30 }
           - id: invariant
             label: Contract Tests (Invariant)
             forge_args: --match-contract Invariant --no-match-path 'test/fork/**'
+            # Pull requests run 100 invariant runs per campaign (about 30 minutes), master 300
+            # (about 100 minutes).
+            timeout: { pull_request: 60, push: 150 }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -213,8 +218,13 @@ jobs:
   report:
     name: Report Test Results
     needs: test
-    if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
+    # A pull request from a fork gets a read-only token, so publishing the reports and the comment
+    # would fail.
+    if: >-
+      always() && github.event_name == 'pull_request' && github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -337,6 +347,7 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event.action == 'closed'
     steps:
       - uses: actions/checkout@v4

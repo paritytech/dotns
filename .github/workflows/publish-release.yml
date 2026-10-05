@@ -135,9 +135,13 @@ jobs:
         # build emits. Preserving `cache/` keeps incremental compile fast.
         run: rm -rf out/build-info && forge build --sizes
 
+      # The ci profile, so the released commit gets the same fuzz and invariant campaign as master.
+      # Unit tests and invariants run together here, about two hours, so a stuck run stops at three.
       - name: Run tests
+        timeout-minutes: 180
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+          FOUNDRY_PROFILE: "ci"
         run: forge test -vv
 
       # pallet-revive genesis, so a chain can carry dotNS from block zero rather than

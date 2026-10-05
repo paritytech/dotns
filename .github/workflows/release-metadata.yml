@@ -25,6 +25,7 @@ jobs:
   validate:
     name: Release Metadata
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +48,7 @@ jobs:
   live-manifests-unchanged:
     name: Live Manifests Unchanged
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
