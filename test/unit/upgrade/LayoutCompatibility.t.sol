@@ -32,23 +32,6 @@ contract LayoutCompatibilityTests is Test {
         Upgrades.validateUpgrade(newContract, opts);
     }
 
-    /// @notice As @custom:function _assertCompatible, with variables renamed in place accepted.
-    /// @dev Matches the options `UpgradePopResolverAndController` passes for the resolver. A rename
-    ///      keeps the slot and type, so the diff still fails on anything that moves or retypes.
-    /// @param newContract Artefact of the implementation being upgraded to.
-    /// @param referenceContract Artefact of the snapshot of what is deployed.
-    function _assertCompatibleAllowingRenames(
-        string memory newContract,
-        string memory referenceContract
-    )
-        internal
-    {
-        Options memory opts;
-        opts.referenceContract = referenceContract;
-        opts.unsafeAllowRenames = true;
-        Upgrades.validateUpgrade(newContract, opts);
-    }
-
     function test_registry_layout_is_compatible() public {
         _assertCompatible(
             "DotnsRegistry.sol:DotnsRegistry", "DotnsRegistryOld.sol:DotnsRegistryOld"
@@ -61,8 +44,8 @@ contract LayoutCompatibilityTests is Test {
 
     function test_popResolver_layout_is_compatible() public {
         // `_liteLinks` becomes `_deviceLinks` in slot 2 and `_fullClaims` becomes
-        // `_personhoodNodes` in slot 3, types unchanged.
-        _assertCompatibleAllowingRenames(
+        // `_personhoodNodes` in slot 3, types unchanged, declared by renamed-from annotations.
+        _assertCompatible(
             "DotnsPopResolver.sol:DotnsPopResolver", "DotnsPopResolverOld.sol:DotnsPopResolverOld"
         );
     }

@@ -32,11 +32,9 @@ import {IDotnsPopResolver} from "../../contracts/resolvers/IDotnsPopResolver.sol
 ///      the two transactions is finished by running this script again.
 ///
 ///      The resolver's layout changes only by two renames in place, `_liteLinks` to `_deviceLinks`
-///      in slot 2 and `_fullClaims` to `_personhoodNodes` in slot 3, with types unchanged. They are
-///      allowed through `unsafeAllowRenames` on the resolver diff alone. The alternative,
-///      OpenZeppelin's renamed-from annotation on the two variables, edits the resolver source
-///      and with it the embedded metadata, so the deployed code would no longer reproduce the
-///      release build.
+///      in slot 2 and `_fullClaims` to `_personhoodNodes` in slot 3, with types unchanged. The
+///      resolver source declares both through OpenZeppelin's renamed-from annotation, so both
+///      diffs run with no override.
 ///
 ///      The snapshots are the implementations deployed on chain.
 ///      `scripts/shell/verify-snapshots.sh` is what holds that property, by building each snapshot
@@ -129,10 +127,9 @@ contract UpgradePopResolverAndController is BaseDeployer {
         );
     }
 
-    /// @notice Layout-diff options for the resolver: its snapshot, plus the two in-place renames.
+    /// @notice Layout-diff options for the resolver: its snapshot and nothing else.
     function _resolverOptions() internal pure returns (Options memory opts) {
         opts.referenceContract = RESOLVER_REFERENCE;
-        opts.unsafeAllowRenames = true;
     }
 
     /// @notice Layout-diff options for the controller: its snapshot and nothing else.
