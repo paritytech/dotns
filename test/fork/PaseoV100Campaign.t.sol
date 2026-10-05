@@ -22,6 +22,7 @@ contract DeclareReleaseHarness is DeclareRelease {
         Addresses memory addr = _loadAddresses();
         addr.popLens = lens;
 
+        _requireKeysMatchManifest(addr);
         _wireMissingKeys(owner, addr);
         _declareCodeIdentity(owner, addr);
         _verifyDeployment(addr, owner);
@@ -73,6 +74,19 @@ contract PaseoV100CampaignForkTest is BasePopFork {
             personhoodNode,
             "issuance and lens work end to end"
         );
+    }
+
+    /// @notice A declaration run against a manifest that still names the outgoing lens stops
+    ///         before it writes a codehash.
+    function test_declaration_refuses_a_stale_manifest() public {
+        address outgoing = _live("DotnsPopLens");
+        new UpgradePopResolverAndControllerHarness()
+            .upgrade(owner, _live("DotnsPopResolver"), _live("DotnsPopController"));
+        new RedeployPopLensHarness().redeploy(owner, address(registry), outgoing, RELEASE_TAG);
+
+        DeclareReleaseHarness declarer = new DeclareReleaseHarness();
+        vm.expectRevert(bytes("DeclareRelease: key popLens points away from the manifest"));
+        declarer.declareWithLens(owner, outgoing, RELEASE_TAG);
     }
 
     /// @notice After the first two steps alone, the v0.8.0 PoP controller still issues against the

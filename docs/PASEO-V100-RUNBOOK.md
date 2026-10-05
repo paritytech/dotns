@@ -62,7 +62,8 @@ and is triggered by labels on an open review PR into master. One step:
    executes.
 3. Before an upgrade step, the job checks the snapshots of the contracts that step upgrades
    against the chain. Proxies an earlier step upgraded have moved past their snapshots by design,
-   so the check is scoped to the step.
+   so the check is scoped to the step. A contract the step names also passes when it already runs
+   this branch's build, which is what a retry of a step that died part way finds.
 4. The job starts the local ETH-RPC adapter, broadcasts the one script, uploads the broadcast
    record and the manifest as artifacts, comments the outcome on the PR, and removes the label.
 5. Retry by re-adding the label. Manual work between steps (committing the step 4 manifest from
@@ -114,6 +115,14 @@ node scripts/js/release-metadata.mjs verify --network paseo-assethub \
 
 Any key this reports is a real finding.
 
+## The controller is not the release artefact
+
+DotnsPopController on this branch keeps `__gap` at 49, the size the live proxy's layout needs;
+the v1.0.0 tag has 50. The runtime code is the same, but the metadata trailer differs, so the
+deployed controller's `extcodehash` does not match the v1.0.0 release asset. The release verify
+compares declarations with the chain, so it stays clean. Expect the difference when diffing the
+implementation against published bytecode; mask the metadata trailer to compare code.
+
 ## The lens address
 
 A fresh deploy puts the lens at the CREATE3 address for the label `DotnsPopLens`. On Paseo that
@@ -135,7 +144,9 @@ Stop. Every step can be re-run by re-adding its label:
   version.
 - `RedeployPopLens` adopts the lens at its predicted address and skips the key writes the chain
   already holds.
-- `DeclareRelease` writes the version last, so a failure before that leaves `0.8.0` declared.
+- `DeclareRelease` first checks that every key points where the manifest says, so a run with the
+  step 4 manifest not yet committed stops before writing anything. It writes the version last, so
+  a failure before that leaves `0.8.0` declared.
 
 Do not skip ahead to `DeclareRelease` to tidy up. Declaring a release the deployment does not
 fully run is the one state the declarations cannot represent.

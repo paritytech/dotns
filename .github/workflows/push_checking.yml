@@ -210,7 +210,7 @@ jobs:
     needs: detect-fork
     if: github.event.action != 'closed' && needs.detect-fork.outputs.has_fork == 'true'
     # The fork job builds the revive ETH-RPC adapter image and runs the upgrade
-    # suite, so it is kept off the shared test runner and onto the Parity XL runner.
+    # suite in a job of its own, separate from the matrix test runners.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

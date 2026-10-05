@@ -39,6 +39,7 @@ contract DeclareRelease is WireDeployments {
 
         Addresses memory addr = _loadAddresses();
 
+        _requireKeysMatchManifest(addr);
         _wireMissingKeys(owner, addr);
         _declareCodeIdentity(owner, addr);
         _verifyDeployment(addr, owner);
@@ -56,10 +57,10 @@ contract DeclareRelease is WireDeployments {
     ///      consumers bootstrap from the manifest address, so nothing is broken by its absence
     ///      until something tries to declare against it.
     ///
-    ///      Only unset keys are written. A key pointing somewhere unexpected is left exactly as
-    ///      it is, so `_verifyDeployment` still fails on it: that is drift, and repairing it here
-    ///      would make the verification that follows tautological and hide the thing it exists to
-    ///      surface.
+    ///      Only unset keys are written. A key pointing somewhere unexpected never reaches this
+    ///      function: `_requireKeysMatchManifest` reverts on it first. That is drift, and
+    ///      repairing it here would make the verification that follows tautological and hide the
+    ///      thing it exists to surface.
     /// @param owner Account that owns the registry and broadcasts.
     /// @param addr Deployment addresses read from the manifest.
     function _wireMissingKeys(address owner, Addresses memory addr) internal {
@@ -72,6 +73,26 @@ contract DeclareRelease is WireDeployments {
             vm.broadcast(owner);
             registry.set(entries[i].key, entries[i].target);
             console.log("  wired missing key", entries[i].label, entries[i].target);
+        }
+    }
+
+    /// @notice Reverts unless every key that is set already points where the manifest says.
+    /// @dev `_declareCodeIdentity` hashes the manifest's addresses. A key that moved without the
+    ///      manifest following, such as a lens rewired by `RedeployPopLens` whose manifest was not
+    ///      committed, would otherwise get the outgoing contract's codehash declared before
+    ///      `_verifyDeployment` notices. Unset keys are left to `_wireMissingKeys`.
+    /// @param addr Deployment addresses read from the manifest.
+    function _requireKeysMatchManifest(Addresses memory addr) internal view {
+        IDotnsProtocolRegistry registry = IDotnsProtocolRegistry(addr.protocolRegistry);
+        RegistryEntry[] memory entries = _registryEntries(addr);
+        for (uint256 i; i < entries.length; ++i) {
+            address current = registry.get(entries[i].key);
+            require(
+                current == address(0) || current == entries[i].target,
+                string.concat(
+                    "DeclareRelease: key ", entries[i].label, " points away from the manifest"
+                )
+            );
         }
     }
 }
