@@ -15,8 +15,9 @@ import {
 ///         proxy from the on-disk manifest, diffs the new storage layout against the pinned
 ///         @custom:contract PopRulesOld snapshot, and swaps the implementation only when the
 ///         diff and every unsafe-pattern check pass.
-/// @dev The swap carries no behavioural change of its own: `version()` stops returning a hardcoded
-/// string and reads the protocol registry's declaration instead.
+/// @dev The swap renames `personhoodOf` to `popStatusOf` and the tiers `PopLite` and `PopFull` to
+///      `Devicehood` and `Personhood`, and rewords the revert and classification messages that
+///      named them. Classification and pricing are unchanged. No contract calls `personhoodOf`.
 ///
 ///      The snapshot is the implementation deployed on chain, not the previous release: these
 ///      proxies were upgraded in place after their last release, so a snapshot taken from a tag

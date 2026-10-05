@@ -43,9 +43,9 @@ contract UpgradePopRulesForkTest is BaseUpgradeFork {
     }
 
     /// @notice Pricing answers the same before and after.
-    /// @dev The swap carries no behavioural change, so pricing returning something different
-    ///      would mean the upgrade changed something it was not supposed to. Asserting equality
-    ///      across the swap is the cheapest way to catch that.
+    /// @dev The swap renames functions and messages and leaves pricing alone, so pricing returning
+    ///      something different would mean the upgrade changed something it was not supposed to.
+    ///      Asserting equality across the swap is the cheapest way to catch that.
     function test_upgrade_leaves_pricing_unchanged() public {
         IPopRules rules = IPopRules(proxy);
 
