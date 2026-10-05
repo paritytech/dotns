@@ -505,12 +505,12 @@ question about this network. Use an archive node, or Blockscout at
 
 ### Broadcast order
 
-The in-place upgrade to v0.8.0 has a fixed order, and nothing in the scripts enforces it: the
-protocol registry has to go first because every other contract's `version()` reads through it,
-the store migration after that because it rewires a key the declaration records, and the
-declaration last because it is a claim about the whole deployment.
-[`docs/PASEO-V080-RUNBOOK.md`](./docs/PASEO-V080-RUNBOOK.md) is the step list, with what to check
-after each one.
+The in-place upgrade to v1.0.0 has a fixed order: the PoP resolver and controller change together
+because the new controller writes links through a resolver function the old resolver lacks, and
+the old controller through one the new resolver drops; the lens goes after them
+because it reads the resolver's new getters, and the declaration goes last because it is a claim
+about the whole deployment. [`docs/PASEO-V100-RUNBOOK.md`](./docs/PASEO-V100-RUNBOOK.md) is the
+step list, with what to check after each one.
 
 ### The deployed code is not always the code in a release
 
