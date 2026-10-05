@@ -21,6 +21,11 @@ set -euo pipefail
 #   scripts/shell/verify-snapshots.sh                        # against RPC_URL
 #   RPC_URL=https://eth-rpc-paseo-next.polkadot.io ...
 #   DOTNS_NETWORK=paseo-assethub scripts/shell/verify-snapshots.sh
+#   SNAPSHOT_SUBJECTS="DotnsPopResolver DotnsPopController" ...   # only these contracts
+#
+# SNAPSHOT_SUBJECTS limits the bytecode comparison to the named contracts. Mid-campaign, every
+# proxy already upgraded has moved past its snapshot by design, so the gate before a step checks
+# only the contracts that step upgrades. Every snapshot is still built.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
@@ -50,11 +55,12 @@ echo "verify-snapshots: $manifest against $RPC_URL (chain $chain_id)"
 
 forge build >/dev/null
 
-RPC_URL="$RPC_URL" MANIFEST="$manifest" python3 - "${snapshots[@]}" <<'PY'
+RPC_URL="$RPC_URL" MANIFEST="$manifest" SNAPSHOT_SUBJECTS="${SNAPSHOT_SUBJECTS:-}" python3 - "${snapshots[@]}" <<'PY'
 import json, os, sys, time, urllib.request
 
 RPC = os.environ["RPC_URL"]
 manifest = json.load(open(os.environ["MANIFEST"]))
+only = set(os.environ["SNAPSHOT_SUBJECTS"].split())
 # EIP-1967 implementation slot.
 SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
 
@@ -108,6 +114,9 @@ for path in sys.argv[1:]:
         # their own; they are pulled in so the contract snapshots compile.
         skipped.append(snapshot)
         continue
+    if only and subject not in only:
+        skipped.append(snapshot)
+        continue
 
     artefact = f"out/{snapshot}.sol/{snapshot}.json"
     if not os.path.exists(artefact):
@@ -137,8 +146,11 @@ for path in sys.argv[1:]:
     else:
         print(f"  ok  {snapshot} == {subject} at {impl}")
 
+if only - {os.path.basename(p)[:-7] for p in sys.argv[1:]}:
+    failures.append(f"SNAPSHOT_SUBJECTS names contracts with no snapshot: {sorted(only - {os.path.basename(p)[:-7] for p in sys.argv[1:]})}")
+
 if skipped:
-    print(f"  --  {len(skipped)} snapshot(s) with no deployed counterpart: {', '.join(skipped)}")
+    print(f"  --  {len(skipped)} snapshot(s) not compared: {', '.join(skipped)}")
 
 if failures:
     print("\nverify-snapshots: FAILED", file=sys.stderr)
