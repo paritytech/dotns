@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -29,7 +30,7 @@ import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
 
-/// @title Dotns Registrar Controller
+/// @title dotNS Registrar Controller
 /// @notice Allocates top-level labels using a commit reveal scheme.
 /// @dev Orchestrates allocation, PoP validation, pricing enforcement, forward registry
 /// wiring, default reverse resolution, and immutable store writing.
@@ -92,7 +93,7 @@ contract DotnsRegistrarController is
     /// @custom:oz-renamed-from whiteList
     mapping(address account => bool retained) private __whiteListSlot;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @dev Reserved storage space to allow for layout changes in the future. The retained
@@ -198,19 +199,19 @@ contract DotnsRegistrarController is
         uint256 tokenId = uint256(node);
         bool isReclaim = registrar.exists(tokenId);
 
-        string memory stem = rules.stripDigits(registration.label);
-        bool stemCanonical = stem.isSingleLabelMemory();
+        string memory baseName = rules.stripDigits(registration.label);
+        bool baseNameCanonical = baseName.isSingleLabelMemory();
         // Reclaim hands the name back from a prior occupant who may hold a sibling-controller's
-        // stem reservation, which is garbage once the name moves on, so clear it. Non-reclaim
+        // base-name reservation, which is garbage once the name moves on, so clear it. Non-reclaim
         // paths intentionally leave an existing reservation in place: the slot belongs to the
         // sibling controller that wrote it (e.g. the PoP queue head stamp), and clearing it from
         // here would brick that controller's release and advance paths.
-        if (stemCanonical && isReclaim) {
-            (address reservationOwner,) = rules.getBaseNameReservation(stem);
+        if (baseNameCanonical && isReclaim) {
+            (address reservationOwner,) = rules.getBaseNameReservation(baseName);
             address expectedOwner =
                 IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId).recipient;
             if (reservationOwner != address(0) && reservationOwner == expectedOwner) {
-                rules.releaseReservationForReclaim(stem, expectedOwner);
+                rules.releaseReservationForReclaim(baseName, expectedOwner);
             }
         }
 
@@ -416,7 +417,7 @@ contract DotnsRegistrarController is
     /// Store.
     /// @dev On a fresh mint the triad of mint + forward-registry + store-write is delegated
     /// to @custom:function RegistrationUtils.registerAndStore, the single canonical implementation
-    /// shared across every DotNS registration flow. On a reclaim the mint step is skipped (the
+    /// shared across every dotNS registration flow. On a reclaim the mint step is skipped (the
     /// escrow has already moved custody) and only the registry wiring and store write run.
     /// Reverse-record setting and the priced-registration event stay here because they are
     /// commit-reveal-specific policy.
@@ -467,7 +468,7 @@ contract DotnsRegistrarController is
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
+    ///         registry so every dotNS contract reports one synchronised value.
     /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
     ///      `version()` selector for ABI compatibility. It reports the network's declaration,
     ///      not this contract's build; per-contract identity is the codehash declared on the

@@ -10,9 +10,9 @@ import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 
-import {IDotnsPopResolver} from "./IDotnsPopResolver.sol";
-import {IDotnsProtocolRegistryOld} from "../registry/IDotnsProtocolRegistryOld.sol";
-import {DotnsConstantsOld} from "../utils/DotnsConstantsOld.sol";
+import {IDotnsPopResolverOld} from "./IDotnsPopResolverOld.sol";
+import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
+import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title DotnsPopResolverOld
 /// @notice Per-node resolver holding records produced by the PoP username flow.
@@ -26,10 +26,10 @@ contract DotnsPopResolverOld is
     UUPSUpgradeable,
     OwnableUpgradeable,
     ERC165Upgradeable,
-    IDotnsPopResolver
+    IDotnsPopResolverOld
 {
     /// @notice Protocol-level address registry used to resolve the authorised writer.
-    IDotnsProtocolRegistryOld public protocolRegistry;
+    IDotnsProtocolRegistry public protocolRegistry;
 
     /// @notice Stored chat-key bytes keyed by node.
     mapping(bytes32 node => bytes chatKey) private _chatKeys;
@@ -67,14 +67,21 @@ contract DotnsPopResolverOld is
     ///      setup needs because the authorised writer is resolved dynamically through
     ///      `POP_CONTROLLER`. Emits @custom:emits OwnershipTransferred when `msg.sender` is
     ///      recorded as the initial owner and @custom:emits Initialized once setup completes.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used for writer resolution.
-    function initialize(IDotnsProtocolRegistryOld registry) external initializer {
-        __Ownable_init(msg.sender);
+    function initialize(
+        address initialOwner,
+        IDotnsProtocolRegistry registry
+    )
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
     }
 
-    /// @inheritdoc IDotnsPopResolver
+    /// @inheritdoc IDotnsPopResolverOld
     function setChatKey(
         bytes32 node,
         bytes calldata chatKeyBytes
@@ -88,7 +95,7 @@ contract DotnsPopResolverOld is
         emit ChatKeyUpdated(node, chatKeyBytes);
     }
 
-    /// @inheritdoc IDotnsPopResolver
+    /// @inheritdoc IDotnsPopResolverOld
     function setLiteLink(
         bytes32 fullNode,
         bytes32 liteLabelhash
@@ -110,39 +117,41 @@ contract DotnsPopResolverOld is
         emit LiteLinkUpdated(fullNode, liteLabelhash);
     }
 
-    /// @inheritdoc IDotnsPopResolver
+    /// @inheritdoc IDotnsPopResolverOld
     function chatKey(bytes32 node) external view override returns (bytes memory) {
         return _chatKeys[node];
     }
 
-    /// @inheritdoc IDotnsPopResolver
+    /// @inheritdoc IDotnsPopResolverOld
     function liteLink(bytes32 fullNode) external view override returns (bytes32) {
         return _liteLinks[fullNode];
     }
 
-    /// @inheritdoc IDotnsPopResolver
+    /// @inheritdoc IDotnsPopResolverOld
     function fullClaim(bytes32 liteLabelhash) external view override returns (bytes32) {
         return _fullClaims[liteLabelhash];
     }
 
-    /// @notice Returns implementation version.
-    /// @dev Bumped on every upgrade. Used by deployment scripts as a
-    ///      post-upgrade assertion target.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every DotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
 
     /// @inheritdoc ERC165Upgradeable
     function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        return
-            interfaceId == type(IDotnsPopResolver).interfaceId
-                || super.supportsInterface(interfaceId);
+        return interfaceId == type(IDotnsPopResolverOld).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     /// @notice Internal check enforcing PoP-controller-only access.
     function _onlyPopController() internal view {
-        address popController = protocolRegistry.get(DotnsConstantsOld.POP_CONTROLLER);
+        address popController = protocolRegistry.get(DotnsConstants.POP_CONTROLLER);
         require(msg.sender == popController, NotPopController(msg.sender));
     }
 

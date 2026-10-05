@@ -13,7 +13,7 @@ import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {DeploymentNetwork} from "./DeploymentNetwork.sol";
 
 /// @title BaseDeployer
-/// @notice Shared base for the DotNS deploy pipeline. Each concrete stage
+/// @notice Shared base for the dotNS deploy pipeline. Each concrete stage
 ///         script reads the manifest from disk (populated by prior stages),
 ///         deploys its own proxies in its own forge-script process, and writes
 ///         the updated manifest back.
@@ -30,7 +30,7 @@ abstract contract BaseDeployer is Script {
     ///         successive calls within the same run.
     string internal constant MANIFEST_OBJECT_KEY = "dotns.manifest";
 
-    /// @notice Namespace for all DotNS CREATE3 salts.
+    /// @notice Namespace for all dotNS CREATE3 salts.
     /// @dev Do not include the chain ID: the deployment goal is identical
     ///      addresses for identical bytecode and constructor data on every
     ///      chain. Bump this value only when intentionally moving the whole
@@ -189,12 +189,15 @@ abstract contract BaseDeployer is Script {
     ///      registry pointer here, the owner in the caller's ownership assertions, and the
     ///      beacons, which the initialiser mints and a squatter therefore chooses.
     ///      `LabelStore` and `UserStore` carry no immutables, so their runtime code compares
-    ///      exactly.
+    ///      exactly, up to the trailing CBOR metadata. That trailer hashes the sources, comments
+    ///      included, so a release that only rewords a store's documentation leaves the deployed
+    ///      code identical and the trailer different; every comparison here masks it.
     /// @dev The beacon contracts themselves are pinned by codehash first. Without that, the
     ///      checks below only prove that whatever sits at those addresses answered `owner()` and
     ///      `implementation()` the way this stage wanted at verification time; a bespoke contract
     ///      can do that and return something else afterwards. `UpgradeableBeacon` carries no
-    ///      immutables, so its code compares exactly and the topology cannot be faked.
+    ///      immutables, so its code compares exactly, metadata aside, and the topology cannot be
+    ///      faked.
     /// @dev Beacon ownership is asserted too. `upgradeLabelStoreImplementation` is `onlyOwner` on
     ///      the factory and the beacons are constructed as owned by it, so a beacon owned by
     ///      anything else leaves every store on the network following an implementation the
@@ -217,9 +220,15 @@ abstract contract BaseDeployer is Script {
         address labelBeacon = IStoreFactory(storeFactory).labelStoreBeacon();
         address userBeacon = IStoreFactory(storeFactory).userStoreBeacon();
 
-        bytes32 beaconCodehash = keccak256(vm.getDeployedCode(BEACON_ARTEFACT));
-        require(labelBeacon.codehash == beaconCodehash, "LabelStoreBeacon: unexpected beacon code");
-        require(userBeacon.codehash == beaconCodehash, "UserStoreBeacon: unexpected beacon code");
+        bytes32 beaconCodehash = _codehashSansMetadata(vm.getDeployedCode(BEACON_ARTEFACT));
+        require(
+            _codehashSansMetadata(labelBeacon.code) == beaconCodehash,
+            "LabelStoreBeacon: unexpected beacon code"
+        );
+        require(
+            _codehashSansMetadata(userBeacon.code) == beaconCodehash,
+            "UserStoreBeacon: unexpected beacon code"
+        );
 
         require(
             UpgradeableBeacon(labelBeacon).owner() == storeFactory,
@@ -231,17 +240,34 @@ abstract contract BaseDeployer is Script {
         );
 
         require(
-            UpgradeableBeacon(labelBeacon).implementation().codehash
-                == keccak256(vm.getDeployedCode("LabelStore.sol:LabelStore")),
+            _codehashSansMetadata(UpgradeableBeacon(labelBeacon).implementation().code)
+                == _codehashSansMetadata(vm.getDeployedCode("LabelStore.sol:LabelStore")),
             "LabelStoreBeacon: unexpected implementation"
         );
         require(
-            UpgradeableBeacon(userBeacon).implementation().codehash
-                == keccak256(vm.getDeployedCode("UserStore.sol:UserStore")),
+            _codehashSansMetadata(UpgradeableBeacon(userBeacon).implementation().code)
+                == _codehashSansMetadata(vm.getDeployedCode("UserStore.sol:UserStore")),
             "UserStoreBeacon: unexpected implementation"
         );
 
         console.log("  ok  store beacons and implementations");
+    }
+
+    /// @notice Hash of runtime code with its trailing CBOR metadata removed.
+    /// @dev The last two bytes give the metadata length. Code too short to carry a trailer, or
+    ///      whose declared trailer exceeds it, is hashed whole, so a malformed occupant still
+    ///      fails the comparison instead of reverting here.
+    /// @param code Runtime code.
+    /// @return codehash keccak256 of the code without the metadata trailer.
+    function _codehashSansMetadata(bytes memory code) internal pure returns (bytes32 codehash) {
+        uint256 length = code.length;
+        if (length >= 2) {
+            uint256 trailer = (uint256(uint8(code[length - 2])) << 8) | uint8(code[length - 1]);
+            if (trailer + 2 <= length) length -= trailer + 2;
+        }
+        assembly ("memory-safe") {
+            codehash := keccak256(add(code, 0x20), length)
+        }
     }
 
     /// @notice Deploys a UUPS implementation and ERC1967 proxy through CREATE3
@@ -250,7 +276,7 @@ abstract contract BaseDeployer is Script {
     /// @dev Full OZ upgrade-safety validation runs on every call. The helper
     ///      exists so every stage script shares one canonical deploy shape
     ///      rather than repeating the validation, broadcast, label, and log
-    ///      sequence. Salts are derived from a stable DotNS namespace plus the
+    ///      sequence. Salts are derived from a stable dotNS namespace plus the
     ///      manifest label, so addresses stay the same across chains as long as
     ///      the deployer, bytecode, constructor args, and label remain stable.
     /// @param owner Broadcasting account; becomes the proxy owner.
@@ -335,9 +361,34 @@ abstract contract BaseDeployer is Script {
         internal
         returns (address deployed)
     {
+        deployed = _broadcastDeployCreate3(
+            owner, artefact, constructorData, label, _create3Salt(label, "contract")
+        );
+    }
+
+    /// @notice Deploys a non-upgradeable contract with CREATE3 at an explicit salt in a broadcast
+    ///         scope, labels it, and records it in the manifest.
+    /// @dev For a contract whose default salt is already spent on the target network, so its
+    ///      replacement needs an address of its own.
+    /// @param owner Broadcasting account.
+    /// @param artefact Fully-qualified artefact name.
+    /// @param constructorData ABI-encoded constructor arguments.
+    /// @param label Trace / manifest identifier.
+    /// @param salt CREATE3 salt to deploy at.
+    /// @return deployed Address of the deployed contract.
+    function _broadcastDeployCreate3(
+        address owner,
+        string memory artefact,
+        bytes memory constructorData,
+        string memory label,
+        bytes32 salt
+    )
+        internal
+        returns (address deployed)
+    {
         vm.startBroadcast(owner);
         _activeBroadcaster = owner;
-        (deployed,) = _deployCreate3(artefact, constructorData, _create3Salt(label, "contract"));
+        (deployed,) = _deployCreate3(artefact, constructorData, salt);
         _activeBroadcaster = address(0);
         vm.stopBroadcast();
         vm.label(deployed, label);
@@ -347,7 +398,7 @@ abstract contract BaseDeployer is Script {
     /// @notice Ensures the CREATE3 factory exists and primes it as the in-memory
     ///         override for the remainder of this process, reusing a pre-deployed
     ///         factory when one is configured.
-    /// @dev Every DotNS address is a pure function of the factory address and a
+    /// @dev Every dotNS address is a pure function of the factory address and a
     ///      stable salt, and the factory address is `keccak(deployer, nonce)`. A
     ///      fresh `new Create3Factory()` from a key whose nonce is not fixed
     ///      therefore lands at a new address and shifts every downstream CREATE3
@@ -399,7 +450,7 @@ abstract contract BaseDeployer is Script {
             "  Its address depends on the deployer nonce and is NOT reproducible across chain"
         );
         console.log(
-            "  resets. To pin every DotNS address, set CREATE3_FACTORY (or run deploy:all)."
+            "  resets. To pin every dotNS address, set CREATE3_FACTORY (or run deploy:all)."
         );
         _adoptCreate3Factory(factory);
     }

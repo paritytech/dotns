@@ -26,20 +26,22 @@ contract DotnsPopControllerFuzz is BaseDotns {
         return StringUtils.uintToString(value);
     }
 
-    function testFuzz_reserveBaseName_accepts_any_two_digit_suffix(uint8 suffix) public {
+    function testFuzz_issueDeviceNameWithReservation_accepts_any_two_digit_suffix(uint8 suffix)
+        public
+    {
         suffix = uint8(bound(uint256(suffix), 0, 99));
         string memory label = string.concat("joseph", ".", _twoDigitDecimal(uint256(suffix)));
 
-        // Lite-tier label requires ed to hold PopLite (or PopFull) status so the
+        // Device-name label requires ed to hold Devicehood (or Personhood) status so the
         // `priceWithCheck` guard inside the controller accepts the reservation.
-        _grantPopLite(ed);
+        _grantDevicehood(ed);
 
         _reservePop(ed, label, "", "");
 
-        assertEq(dotnsRegistry.owner(_liteNodeOf(label)), ed);
+        assertEq(dotnsRegistry.owner(_deviceNodeOf(label)), ed);
     }
 
-    function testFuzz_reserveBaseName_persists_chat_key_exact_bytes(
+    function testFuzz_issueDeviceNameWithReservation_persists_chat_key_exact_bytes(
         uint8 suffix,
         bytes1 keySeed,
         bool useKey
@@ -49,12 +51,12 @@ contract DotnsPopControllerFuzz is BaseDotns {
         suffix = uint8(bound(uint256(suffix), 0, 99));
         string memory label = string.concat("joseph", ".", _twoDigitDecimal(uint256(suffix)));
 
-        _grantPopLite(ed);
+        _grantDevicehood(ed);
 
         bytes memory chatKey = useKey ? _validChatKey(keySeed) : bytes("");
         _reservePop(ed, label, chatKey, "");
 
-        bytes32 node = _liteNodeOf(label);
+        bytes32 node = _deviceNodeOf(label);
         if (chatKey.length == 0) {
             assertEq(dotnsPopResolver.chatKey(node).length, 0);
         } else {
@@ -62,24 +64,24 @@ contract DotnsPopControllerFuzz is BaseDotns {
         }
     }
 
-    /// @dev The reservation covers the stem, and the stem is what a public registrant contends
-    ///      for: a digit-suffixed spelling is measured as written and so is an unrelated name
-    ///      the reservation never sees.
+    /// @dev The reservation covers the base name, and the base name is what a public registrant
+    ///      contends for: a digit-suffixed spelling is measured as written and so is an unrelated
+    ///      name the reservation never sees.
     function testFuzz_public_register_respects_popRules_reservation(bool reserveFirst) public {
-        string memory stem = "longnamebob";
+        string memory baseName = "longnamebob";
 
         if (reserveFirst) {
             // The reserved base label `longnamebob` classifies as NoStatus (11 characters); the
-            // lite label has to be PopLite-eligible. Tiago needs PopFull status so both
+            // device name has to be Devicehood-eligible. Tiago needs Personhood status so both
             // `priceWithCheck` calls inside `reserveBaseName` succeed.
-            _grantPopFull(tiago);
-            _reservePop(tiago, LITE_LABEL_A, "", stem);
+            _grantPersonhood(tiago);
+            _reservePop(tiago, DEVICE_LABEL_A, "", baseName);
         }
 
-        bytes32 secret = keccak256(abi.encodePacked(stem, ed, block.timestamp));
+        bytes32 secret = keccak256(abi.encodePacked(baseName, ed, block.timestamp));
         IDotnsRegistrarController.Registration memory registration =
             IDotnsRegistrarController.Registration({
-                label: stem,
+                label: baseName,
                 owner: ed,
                 secret: secret,
                 reserved: true,
@@ -95,16 +97,17 @@ contract DotnsPopControllerFuzz is BaseDotns {
         if (reserveFirst) {
             vm.expectRevert(
                 abi.encodeWithSelector(
-                    IPopRules.PopError.selector, "Base name reserved for original Lite registrant"
+                    IPopRules.PopError.selector,
+                    "Reserved for a device-name holder's personhood claim"
                 )
             );
             vm.prank(ed);
             dotnsRegistrarController.register{value: 1 ether}(registration);
         } else {
-            uint256 cost = popRules.priceWithCheck(stem, ed).price;
+            uint256 cost = popRules.priceWithCheck(baseName, ed).price;
             vm.prank(ed);
             dotnsRegistrarController.register{value: cost}(registration);
-            assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(stem))), ed);
+            assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(baseName))), ed);
         }
     }
 
@@ -124,15 +127,15 @@ contract DotnsPopControllerFuzz is BaseDotns {
         vm.prank(owner);
         dotnsPopController.setReservationDuration(duration);
 
-        // Reserving `BASE_LABEL_A` (PopFull classification) alongside the
-        // lite leg requires ed to hold PopFull status so both `priceWithCheck`
+        // Reserving `PERSONHOOD_LABEL_A` (Personhood classification) alongside the
+        // the issuance requires ed to hold Personhood status so both `priceWithCheck`
         // calls succeed.
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, "", BASE_LABEL_A);
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, "", PERSONHOOD_LABEL_A);
 
         vm.warp(block.timestamp + uint256(elapsed));
 
-        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         if (uint256(elapsed) <= uint256(duration)) {
             assertTrue(reserved);
             assertEq(holder, ed);
@@ -152,9 +155,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
         string memory label = string.concat("joseph", ".", _twoDigitDecimal(uint256(suffix)));
         bytes memory chatKey = _validChatKey(keySeed);
 
-        _grantPopLite(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({liteLabel: label, user: ed, chatKey: chatKey})
+        _grantDevicehood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({label: label, user: ed, chatKey: chatKey})
         );
 
         IDotnsPopController.PendingClaim[] memory pending =
@@ -164,7 +167,7 @@ contract DotnsPopControllerFuzz is BaseDotns {
         assertEq(storeFactory.getLabelStore(ed), address(0));
         // Chat key is persisted eagerly on the resolver at reserve time, even though
         // the LabelStore write is deferred to settlement on the cold path.
-        bytes32 node = _liteNodeOf(label);
+        bytes32 node = _deviceNodeOf(label);
         assertEq(dotnsPopResolver.chatKey(node), chatKey);
     }
 
@@ -178,15 +181,15 @@ contract DotnsPopControllerFuzz is BaseDotns {
         string memory label = string.concat("joseph", ".", _twoDigitDecimal(uint256(suffix)));
         bytes memory chatKey = _validChatKey(keySeed);
 
-        _grantPopLite(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({liteLabel: label, user: ed, chatKey: chatKey})
+        _grantDevicehood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({label: label, user: ed, chatKey: chatKey})
         );
 
         vm.prank(ed);
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
 
-        bytes32 node = _liteNodeOf(label);
+        bytes32 node = _deviceNodeOf(label);
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(ILabelStore(store).getLabel(node), string.concat(label, protocolRegistry.tld()));
@@ -210,10 +213,10 @@ contract DotnsPopControllerFuzz is BaseDotns {
         vm.prank(owner);
         dotnsPopController.setReservationDuration(duration);
 
-        _grantPopLite(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x77)
+        _grantDevicehood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x77)
             })
         );
 
@@ -221,18 +224,18 @@ contract DotnsPopControllerFuzz is BaseDotns {
         vm.warp(uint256(mintedAt) + uint256(elapsed));
 
         // Stores always settle: settlement writes the label into the store whether or not the
-        // reservation deadline has passed, so age never strands a claim.
+        // claim is older than `reservationDuration`, so age never strands a claim.
         vm.prank(ed);
         (uint256 settledCount, bool moreRemaining) =
             dotnsPopController.settlePendingClaims(ed, type(uint256).max);
         assertEq(settledCount, 1);
         assertFalse(moreRemaining);
 
-        bytes32 node = _liteNodeOf(LITE_LABEL_A);
+        bytes32 node = _deviceNodeOf(DEVICE_LABEL_A);
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(node), string.concat(LITE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(node), string.concat(DEVICE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }

@@ -13,6 +13,13 @@ on:
 permissions:
   contents: read
 
+# Keyed by PR number so a new push cancels this PR's still-running extractor check
+# instead of queuing behind it; every content-triggered workflow in this repo does
+# the same.
+concurrency:
+  group: genesis-extractor-test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   genesis-extractor-test:
     runs-on: ubuntu-latest

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {IDotnsPricing} from "./IDotnsPricing.sol";
 
-/// @title DotNS Scarcity Pricing
+/// @title dotNS Scarcity Pricing
 /// @notice Prices a registration on a geometric scarcity curve driven by base length.
 /// @dev The curve doubles the base fee for each character below nine and halves it for each
 ///      character from nine upward, never below the floor. The base fee is the curve's value at
@@ -28,8 +29,9 @@ contract DotnsScarcityPricing is IDotnsPricing {
     /// @dev Carries the curve invariants: the base fee and floor are both strictly positive, the
     ///      floor does not exceed the base fee, and the base fee stays within
     ///      `type(uint256).max / 512` so the multiplication below nine characters cannot overflow.
-    ///      An all-digit label such as "42" strips to base length 0 and reaches the 2**9
-    /// multiplier, which sets the /512 ceiling. Any breach triggers @custom:reverts PricingError.
+    ///      A base length of 0 reaches the 2**9 multiplier, which sets the /512 ceiling: no label
+    ///      measures zero, but the pricing function accepts any length. Any breach triggers
+    ///      @custom:reverts PricingError.
     /// @param baseFeeValue Base fee D in wei.
     /// @param minPriceValue Price floor F in wei.
     constructor(uint256 baseFeeValue, uint256 minPriceValue) {

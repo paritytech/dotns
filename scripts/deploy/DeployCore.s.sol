@@ -13,7 +13,7 @@ import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolReg
 import {Multicall3} from "../../contracts/utils/Multicall3.sol";
 
 /// @title DeployCore
-/// @notice First stage of the DotNS fresh-deploy pipeline. Bootstraps the
+/// @notice First stage of the dotNS fresh-deploy pipeline. Bootstraps the
 ///         CREATE3 factory, deploys the protocol registry through it, records
 ///         the factory on the registry, then deploys the foundational
 ///         name-ownership layer: four UUPS proxies (store factory, registrar,

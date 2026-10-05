@@ -5,12 +5,15 @@
 //   changelog  --current <file> [--previous <file>]      release-note lines about address changes
 //              [--previous-tag <name>]
 //   changedset --previous <codehashes.json>              contracts whose built code differs, one per line
+//   bases      --out <file>                              published ABIs each contract inherits from
 //   abidiff    --current <dir> [--previous <dir>]        selector-level ABI diff for the release body
 //              [--previous-tag <name>] [--json <file>]
+//              [--bases <file>]
 //   verify     --network <folder> --rpc <url> [--tag <TAG>]  check a committed manifest against a chain
 //
-// `build` and `changelog` run in both publish workflows; `validate` runs on pull requests, so a
-// broken manifest fails there rather than at release time. `verify` stays out of the release
+// `build`, `bases` and `abidiff` run in both publish workflows, and `changelog` in the release
+// one. `validate` runs on pull requests, so a broken manifest fails there rather than at release
+// time. `verify` stays out of the release
 // path, which must work without reaching a chain; with `--tag` it also checks the chain's
 // declared protocol version and code identity. `changedset` names exactly what a release
 // changed, for upgrade tooling (which lives outside this repository) and for humans. No
@@ -166,15 +169,67 @@ function stripCborMetadata(name, hex) {
   return `0x${code.slice(0, stripped * 2)}`;
 }
 
+// The metadata at the end is not the only metadata in the code. A contract that deploys other
+// contracts (with `new`, for example) carries a copy of their creation code, and each copy ends
+// with that contract's own metadata. StoreFactory is an example: it contains LabelStore's
+// creation code, so a comment-only edit to LabelStore changes a few bytes inside StoreFactory.
+//
+// To ignore that, the hash (digest) inside each embedded metadata block is set to zeros. The
+// code keeps its length, so nothing else moves, and the compiler version bytes are kept. A real
+// change to an embedded contract's code, or to the compiler, still changes the hash.
+//
+// A block is found by its exact shape, not by where it sits: {"ipfs": <34-byte hash>, "solc":
+// <3-byte version>} followed by its length, 0x0033. That is what solc writes with foundry's
+// default `bytecode_hash = "ipfs"`. The older `bzzr1` shape is handled too. With
+// `bytecode_hash = "none"` there is no hash to clear. Normal code does not contain these exact
+// bytes by chance, and a match only counts if it starts on a whole byte.
+const EMBEDDED_METADATA_SHAPES = [
+  { prefix: "a264697066735822", digestHexLength: 68, suffix: "0033" },
+  { prefix: "a265627a7a72315820", digestHexLength: 64, suffix: "0032" },
+];
+
+function zeroEmbeddedMetadataDigests(hex) {
+  let code = hex.toLowerCase();
+  for (const { prefix, digestHexLength, suffix } of EMBEDDED_METADATA_SHAPES) {
+    const shape = new RegExp(
+      `${prefix}[0-9a-f]{${digestHexLength}}64736f6c6343[0-9a-f]{6}${suffix}`,
+      "g",
+    );
+    const zeros = "0".repeat(digestHexLength);
+    let match;
+    while ((match = shape.exec(code)) !== null) {
+      // `code` starts with "0x", so every byte starts at an even index. A match at an odd index
+      // starts in the middle of a byte, so it is not a real block. Keep searching from the next
+      // character.
+      if (match.index % 2 !== 0) {
+        shape.lastIndex = match.index + 1;
+        continue;
+      }
+      const digestStart = match.index + prefix.length;
+      code = code.slice(0, digestStart) + zeros + code.slice(digestStart + digestHexLength);
+    }
+  }
+  return code;
+}
+
 // keccak256 via `cast keccak`, keeping the script dependency-free like the chain reads.
 function keccakHex(hex) {
   return cast(["keccak", hex]);
 }
 
+// Saved in codehashes.json as `hashScheme`, so that `changedset` can hash the current build the
+// same way the previous file was hashed. Comparing hashes made in two different ways would show
+// changes that are not there.
+//   1: the metadata at the end is removed. Files written before `hashScheme` existed use this.
+//   2: the same, and the hashes inside embedded metadata are set to zeros as well.
+// Both give the same result for a contract that does not deploy other contracts.
+const HASH_SCHEME = 2;
+const HASH_SCHEMES = [1, 2];
+
 // Stripped-metadata hash of each deployable contract's built runtime bytecode. These are
 // artifact-side hashes for comparing builds with builds (the changed-set); they are never
 // compared against on-chain hashes, which live in a different domain (see `verify`).
-function builtCodehashes() {
+function builtCodehashes(scheme = HASH_SCHEME) {
   const { contracts } = classifyContracts(readContractNames());
   const hashes = {};
   for (const name of contracts) {
@@ -183,7 +238,8 @@ function builtCodehashes() {
     );
     const runtime = artefact?.deployedBytecode?.object;
     if (!runtime || runtime === "0x") fail(`${name}: no deployed bytecode in the artefact`);
-    hashes[name] = keccakHex(stripCborMetadata(name, runtime));
+    const stripped = stripCborMetadata(name, runtime);
+    hashes[name] = keccakHex(scheme >= 2 ? zeroEmbeddedMetadataDigests(stripped) : stripped);
   }
   return hashes;
 }
@@ -216,7 +272,23 @@ function changedset(args) {
   const previous = JSON.parse(readFileSync(resolve(process.cwd(), args.previous), "utf8"));
   const previousHashes = previous?.hashes;
   if (!previousHashes) fail(`${args.previous} has no 'hashes' map`);
-  const current = builtCodehashes();
+  // Hash the build the same way the previous file was hashed. Otherwise a change in how the
+  // hash is computed would look like a change in the code.
+  const scheme = previous.hashScheme ?? 1;
+  if (!HASH_SCHEMES.includes(scheme)) {
+    fail(
+      `${args.previous} uses hashScheme ${scheme}; this script knows ${HASH_SCHEMES.join(", ")}`,
+    );
+  }
+  if (scheme < HASH_SCHEME) {
+    // Printed to stderr, because stdout is the list that upgrade tooling reads.
+    console.error(
+      `[release-metadata] ${args.previous} uses hashScheme ${scheme}, so this build is hashed ` +
+        `the same way. A contract that deploys other contracts with \`new\` is listed if any ` +
+        `contract it deploys changed at all, even if only a comment changed.`,
+    );
+  }
+  const current = builtCodehashes(scheme);
   // Union, not just the current set: a contract only in the previous release was removed and a
   // contract only in this one is new. Neither is coverable by an in-place upgrade, so both must
   // surface and force the coverage gate to refuse rather than dropping out of the diff.
@@ -315,66 +387,241 @@ function diffAbi(previous, current) {
   return result;
 }
 
-// Markdown fragment for the release body plus a machine-readable JSON asset. Prints "no
-// changes" rather than nothing, so absence is a statement and not a gap; a missing previous
-// release degrades the same way rather than failing the release.
+// For each published ABI, the other published ABIs it inherits from, nearest first. This comes
+// from the build itself, not from names, so a contract is matched with its interface whatever
+// they are called. For example, DotnsFlatPricing implements IDotnsPricing. Bases that are not
+// published ABIs are skipped, because the release body can only point at ABIs that ship in the
+// release.
+//
+// A contract's artifact lists its bases as AST ids. Ids only mean something inside the compiler
+// run that made them, and an incremental `forge build` can leave artifacts from several runs in
+// out/. So each artifact is matched to the build info of its own run (foundry.toml keeps
+// `build_info = true`), and its base ids are turned into names there.
+function publishedBases() {
+  const buildInfoDir = join(ROOT, "out", "build-info");
+  if (!existsSync(buildInfoDir)) {
+    fail(`${buildInfoDir} not found; foundry.toml needs \`build_info = true\`, then forge build`);
+  }
+  // For each compiler run: contract id -> { name, path }.
+  const runs = readdirSync(buildInfoDir)
+    .filter((file) => file.endsWith(".json"))
+    .map((file) => {
+      const info = JSON.parse(readFileSync(join(buildInfoDir, file), "utf8"));
+      const byId = new Map();
+      for (const [path, source] of Object.entries(info?.output?.sources ?? {})) {
+        for (const node of source?.ast?.nodes ?? []) {
+          if (node.nodeType === "ContractDefinition") byId.set(node.id, { name: node.name, path });
+        }
+      }
+      return byId;
+    });
+
+  const published = readContractNames();
+  const publishedSet = new Set(published);
+  const bases = {};
+  for (const name of published) {
+    const path = join(ROOT, "out", `${name}.sol`, `${name}.json`);
+    if (!existsSync(path)) {
+      fail(`${path} not found; run forge build, or check .github/abi-contracts.txt`);
+    }
+    const artefact = JSON.parse(readFileSync(path, "utf8"));
+    const def = artefact?.ast?.nodes?.find(
+      (node) => node.nodeType === "ContractDefinition" && node.name === name,
+    );
+    if (!def) fail(`${path} has no AST for ${name}; foundry.toml needs \`ast = true\``);
+    // The run that built this artifact is the one that has this contract, in this file, under
+    // the same id.
+    const run = runs.find((byId) => {
+      const known = byId.get(def.id);
+      return known?.name === name && known.path === artefact.ast.absolutePath;
+    });
+    if (!run) {
+      fail(`no build info in out/build-info matches ${name}; run forge clean && forge build`);
+    }
+    // The first id is the contract itself.
+    const found = (def.linearizedBaseContracts ?? [])
+      .slice(1)
+      .map((id) => run.get(id)?.name)
+      .filter((base) => base && publishedSet.has(base));
+    if (found.length > 0) bases[name] = found;
+  }
+  return bases;
+}
+
+function writeBases(args) {
+  if (!args.out) fail("bases needs --out <file>");
+  const bases = publishedBases();
+  writeJson(resolve(process.cwd(), args.out), bases);
+  log(`${Object.keys(bases).length} published ABI(s) inherit from another published ABI`);
+}
+
+function readBases(path) {
+  const bases = JSON.parse(readFileSync(resolve(process.cwd(), path), "utf8"));
+  const valid =
+    bases &&
+    typeof bases === "object" &&
+    !Array.isArray(bases) &&
+    Object.values(bases).every((list) => Array.isArray(list));
+  if (!valid) {
+    fail(`${path} does not map contract names to lists of bases; write it with \`bases\``);
+  }
+  return bases;
+}
+
+// Order of the lines in the release body. Breaking changes are the ones that stop an existing
+// caller or indexer from working. The rest are grouped after them.
+const BREAKING_GROUPS = [
+  "functionChanged",
+  "functionRemoved",
+  "contractRemoved",
+  "eventChanged",
+  "eventRemoved",
+];
+const OTHER_GROUPS = [
+  "contractAdded",
+  "functionAdded",
+  "eventAdded",
+  "errorChanged",
+  "errorAdded",
+  "errorRemoved",
+];
+
+// Writes the ABI part of the release body, plus the full diff as JSON.
+//
+// The body is kept short so that people read it. It lists only the breaking changes, one line
+// each: changed function signatures, removed functions, contracts no longer published, then
+// changed or removed events. Everything else (additions, new contracts, custom errors) goes in a
+// collapsed block with a count. The JSON always has the full diff for every contract.
+//
+// A contract and the interfaces it implements usually publish the same functions and events, so
+// one change would be listed several times. `--bases` (written by `bases`) says which published
+// ABIs each contract inherits from. A contract's line is left out when one of those bases has
+// exactly the same line, so the change is listed once, under the interface that declares it,
+// which is what callers bind to. A change that only the contract has is still listed. Without
+// `--bases`, every contract is listed on its own.
+//
+// When there is nothing to report, it says so, so an empty section is never mistaken for a
+// missing one. A previous release without ABIs is reported the same way instead of failing.
 function abidiff(args) {
   if (!args.current) fail("abidiff needs --current <dir>");
   const previousTag = args["previous-tag"] ?? "the previous release";
-  const lines = [];
   const report = { previousTag: args["previous-tag"] ?? null, contracts: {} };
+  const lines = [""];
 
   if (!args.previous) {
-    lines.push("", "No earlier release carries ABIs to diff against.");
+    lines.push("No earlier release carries ABIs to diff against.");
     report.previousUnavailable = true;
   } else {
     const currentAbis = readAbiDir(resolve(process.cwd(), args.current));
     const previousAbis = readAbiDir(resolve(process.cwd(), args.previous));
-    const changedLines = [];
-    const otherLines = [];
-    for (const [name, abi] of currentAbis) {
+    const code = (text) => `\`${text}\``;
+    const signatures = (list) => list.map(code).join(", ");
+    const member = (signature) => signature.slice(0, signature.indexOf("("));
+
+    // One entry per change. `change` describes the change without naming the contract, so a
+    // contract's entry can be matched against its interface's.
+    const entries = [];
+    const add = (contract, group, change, text) => entries.push({ contract, group, change, text });
+
+    for (const name of [...currentAbis.keys()].sort()) {
       const previousAbi = previousAbis.get(name);
       if (!previousAbi) {
-        otherLines.push(`- \`${name}\`: new contract`);
+        add(name, "contractAdded", "added", "new contract");
         report.contracts[name] = { newContract: true };
         continue;
       }
-      const diff = diffAbi(previousAbi, abi);
+      const diff = diffAbi(previousAbi, currentAbis.get(name));
       if (Object.keys(diff).length === 0) continue;
       report.contracts[name] = diff;
       for (const [kind, { changed, added, removed }] of Object.entries(diff)) {
+        // Functions need no label. Events and errors say what they are.
+        const label = kind === "function" ? "" : ` ${kind}`;
         for (const entry of changed) {
-          changedLines.push(
-            `- \`${name}\`: ${kind} \`${entry.name}\` changed signature: ` +
-              `${entry.was.map((s) => `\`${s}\``).join(", ") || "(none)"} is now ` +
-              `${entry.now.map((s) => `\`${s}\``).join(", ") || "(none)"}`,
+          add(
+            name,
+            `${kind}Changed`,
+            `${kind} ${entry.was.join(" ")} > ${entry.now.join(" ")}`,
+            `${code(`${name}.${entry.name}`)}${label}: ` +
+              `${signatures(entry.was)} → ${signatures(entry.now)}`,
           );
         }
-        for (const signature of added) otherLines.push(`- \`${name}\`: ${kind} \`${signature}\` added`);
         for (const signature of removed) {
-          otherLines.push(`- \`${name}\`: ${kind} \`${signature}\` removed`);
+          add(
+            name,
+            `${kind}Removed`,
+            `${kind} removed ${signature}`,
+            `${code(`${name}.${member(signature)}`)}${label}: ${code(signature)} removed`,
+          );
+        }
+        for (const signature of added) {
+          add(
+            name,
+            `${kind}Added`,
+            `${kind} added ${signature}`,
+            `${code(`${name}.${member(signature)}`)}${label}: ${code(signature)} added`,
+          );
         }
       }
     }
-    for (const name of previousAbis.keys()) {
+    for (const name of [...previousAbis.keys()].sort()) {
       if (!currentAbis.has(name)) {
-        otherLines.push(`- \`${name}\`: no longer published`);
+        add(name, "contractRemoved", "removed", "no longer published");
         report.contracts[name] = { removedContract: true };
       }
     }
 
-    lines.push("", `## ABI changes since ${previousTag}`, "");
-    if (changedLines.length + otherLines.length === 0) {
-      lines.push(`No ABI changes since ${previousTag}.`);
+    // Leave out a contract's line when one of its bases has the same one. A contract that is new
+    // together with its bases is named on its base's line instead. That is the furthest base
+    // that is also new, which has no new base of its own, so the whole family ends up on one
+    // line. A removed contract is not in the current build, so its bases are not known and it
+    // keeps its own line.
+    const bases = args.bases ? readBases(args.bases) : {};
+    const byChange = new Map(entries.map((entry) => [`${entry.contract} ${entry.change}`, entry]));
+    const isContractLine = (entry) =>
+      entry.group === "contractAdded" || entry.group === "contractRemoved";
+    const shown = entries.filter((entry) => {
+      const covering = (bases[entry.contract] ?? []).filter((base) =>
+        byChange.has(`${base} ${entry.change}`),
+      );
+      if (covering.length === 0) return true;
+      if (isContractLine(entry)) {
+        const home = byChange.get(`${covering.at(-1)} ${entry.change}`);
+        home.names = [...(home.names ?? [home.contract]), entry.contract];
+      }
+      return false;
+    });
+    const nameList = (names) => {
+      const quoted = names.map(code);
+      return quoted.length > 1
+        ? `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)}`
+        : quoted[0];
+    };
+    const line = (entry) =>
+      isContractLine(entry)
+        ? `- ${nameList(entry.names ?? [entry.contract])}: ` +
+          (entry.names && entry.group === "contractAdded" ? "new contracts" : entry.text)
+        : `- ${entry.text}`;
+    const inOrder = (groups) =>
+      groups.flatMap((group) => shown.filter((entry) => entry.group === group)).map(line);
+    const breaking = inOrder(BREAKING_GROUPS);
+    const others = inOrder(OTHER_GROUPS);
+
+    if (breaking.length + others.length === 0) {
+      lines.push(`## ABI changes since ${previousTag}`, "", `No ABI changes since ${previousTag}.`);
     } else {
-      if (changedLines.length > 0) {
+      lines.push(`## Breaking ABI changes since ${previousTag}`, "");
+      lines.push(...(breaking.length > 0 ? breaking : ["None."]));
+      if (others.length > 0) {
         lines.push(
-          "**Changed signatures.** Existing callers of these get a bare revert until updated:",
-          ...changedLines,
           "",
+          "<details>",
+          `<summary>Other ABI changes (${others.length})</summary>`,
+          "",
+          ...others,
+          "",
+          "</details>",
         );
       }
-      lines.push(...otherLines);
     }
   }
 
@@ -413,6 +660,7 @@ function build(args) {
   // pre-release tags, and an upgrade diffs its build against the previous release's file.
   writeJson(join(outDir, "codehashes.json"), {
     version: tag,
+    hashScheme: HASH_SCHEME,
     build: buildInputs(),
     hashes: builtCodehashes(),
   });
@@ -589,6 +837,8 @@ function verify(args) {
     ]).replace(/^"|"$/g, "");
     if (declaredVersion === tag) {
       console.log(`  ok   protocolVersion ${declaredVersion}`);
+    } else if (declaredVersion === "") {
+      problems.push(`chain declares no protocol version, expected '${tag}'`);
     } else {
       problems.push(`chain declares protocol version '${declaredVersion}', expected '${tag}'`);
     }
@@ -637,9 +887,10 @@ function verify(args) {
         rpc,
       ]);
       if (declared === ZERO_HASH) {
-        // A key that is tolerated unset is also tolerated undeclared when a network set it
-        // anyway: Paseo's genesis wired multicall3 before the no-registration policy, and the
-        // declaration pass deliberately skips it, so the key is set with no code identity.
+        // A key that is tolerated unset is also tolerated undeclared. Such keys are outside
+        // the declared release surface, so the declaration pass never writes a codehash for
+        // them; a network whose genesis predates the current policy can still have one set,
+        // and that combination (set, no code identity) is expected there.
         if (UNSET_TOLERATED[key]) {
           resolved.add(address.toLowerCase());
           console.log(`  skip ${key} ${address} (${label}: no declaration, ${UNSET_TOLERATED[key]})`);
@@ -677,10 +928,11 @@ function verify(args) {
   const notExpected = new Set(unpointed);
   for (const [address, label] of byAddress) {
     if (!resolved.has(address) && !notExpected.has(address)) {
-      // A `*Legacy` entry is a superseded deployment kept on purpose: the store migration
-      // records the outgoing factory and its beacons, because the migrated stores stay on
-      // those beacons forever and the old factory is the only contract able to upgrade them.
-      // No key points at them by design (see MigrateStoreFactory and the runbook's step 13).
+      // A `*Legacy` entry records an address that became stale or unused after an in-place
+      // upgrade: when a contract moves to a new address, the outgoing one keeps its manifest
+      // entry under the `Legacy` suffix instead of being erased, because live state can keep
+      // depending on it after nothing points at it. Unkeyed by design, so the reverse check
+      // skips it instead of reading it as an orphan.
       if (label.endsWith("Legacy")) {
         console.log(`  skip ${label} ${contracts[label]} (superseded deployment, kept for the beacon upgrade path)`);
         continue;
@@ -710,6 +962,7 @@ if (mode === "build") build(args);
 else if (mode === "validate") validate();
 else if (mode === "changelog") changelog(args);
 else if (mode === "changedset") changedset(args);
+else if (mode === "bases") writeBases(args);
 else if (mode === "abidiff") abidiff(args);
 else if (mode === "verify") verify(args);
 else {
@@ -717,7 +970,9 @@ else {
     "usage: release-metadata.mjs build --tag <TAG> [--out <dir>] | validate | " +
       "changelog --current <file> [--previous <file>] [--previous-tag <name>] | " +
       "changedset --previous <codehashes.json> | " +
-      "abidiff --current <dir> [--previous <dir>] [--previous-tag <name>] [--json <file>] | " +
+      "bases --out <file> | " +
+      "abidiff --current <dir> [--previous <dir>] [--previous-tag <name>] [--json <file>] " +
+      "[--bases <file>] | " +
       "verify --network <folder> --rpc <url> [--tag <TAG>]",
   );
 }

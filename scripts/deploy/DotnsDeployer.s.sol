@@ -28,7 +28,7 @@ import {
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 
 /// @title DotnsDeployer
-/// @notice Fresh-deploy script for the full DotNS contract set behind UUPS proxies.
+/// @notice Fresh-deploy script for the full dotNS contract set behind UUPS proxies.
 /// @dev Deploys every proxy in its own broadcast scope to cap forge's per-tx
 ///      memory accounting; every proxy still runs OZ upgrade-safety validation.
 ///      The protocol registry is deployed first so every downstream proxy can
@@ -92,7 +92,7 @@ contract DotnsDeployer is BaseDeployer {
         address nameWhitelist;
     }
 
-    /// @notice Deploys the full DotNS contract set, wires the protocol registry,
+    /// @notice Deploys the full dotNS contract set, wires the protocol registry,
     ///         and writes the resulting manifest under `deployments/`.
     /// @dev Network-specific output folder comes from `networkFolder`, honouring
     ///      the `DEPLOYMENT_NETWORK` override and otherwise the `block.chainid`

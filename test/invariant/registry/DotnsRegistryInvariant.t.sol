@@ -6,7 +6,7 @@ import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {RegistryHandler} from "./RegistryHandler.t.sol";
 
-/// @title Dotns Registry Invariant Suite
+/// @title dotNS Registry Invariant Suite
 /// @notice Asserts authorisation, persistence, and parent-reassignment properties of the
 ///         hierarchical registry across randomised registration, subnode creation, and
 ///         transfer flows.
@@ -29,12 +29,12 @@ contract DotnsRegistryInvariantTest is BaseDotns {
 
         vm.deal(address(handler), 1000 ether);
 
-        handler.addActor(ed, IPopRules.PopStatus.PopFull);
-        handler.addActor(leonardo, IPopRules.PopStatus.PopLite);
+        handler.addActor(ed, IPopRules.PopStatus.Personhood);
+        handler.addActor(leonardo, IPopRules.PopStatus.Devicehood);
         handler.addActor(tiago, IPopRules.PopStatus.NoStatus);
 
         address alice = _createUser("alice");
-        handler.addActor(alice, IPopRules.PopStatus.PopFull);
+        handler.addActor(alice, IPopRules.PopStatus.Personhood);
 
         targetContract(address(handler));
 

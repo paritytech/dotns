@@ -20,8 +20,8 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
     /// @notice 14-char label classifying as NoStatus, so registration seeds a funded position.
     string internal constant FUNDED_LABEL = "redeemlabela01";
 
-    /// @notice 6-char digit-free label classifying as PopFull, registered on the cross-payer path
-    ///         so its deposit position carries a zero amount.
+    /// @notice 6-char digit-free label classifying as Personhood, registered on the cross-payer
+    ///         path so its deposit position carries a zero amount.
     string internal constant FREE_LABEL = "redeem";
 
     /// @notice Register `label` for `nameOwner` at `status` and return its tokenId.
@@ -322,7 +322,8 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
     ///      right to recover their own name for no consideration whatsoever. `withdraw` is also a
     ///      step a holder has every reason to make before a name can be recycled.
     function test_zero_amount_withdrawal_does_not_forfeit_the_redeem_right() public {
-        uint256 tokenId = _registerCrossPayer(FREE_LABEL, ed, leonardo, IPopRules.PopStatus.PopFull);
+        uint256 tokenId =
+            _registerCrossPayer(FREE_LABEL, ed, leonardo, IPopRules.PopStatus.Personhood);
         assertEq(_positionOf(tokenId).amount, 0, "this case needs a zero-amount position");
 
         _approveAndRelease(tokenId, ed);
@@ -439,7 +440,8 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
     ///      Under a `released && claimed` reclaim gate that would make the name permanently
     ///      unregisterable.
     function test_zero_amount_release_becomes_reclaimable_without_any_withdrawal() public {
-        uint256 tokenId = _registerCrossPayer(FREE_LABEL, ed, leonardo, IPopRules.PopStatus.PopFull);
+        uint256 tokenId =
+            _registerCrossPayer(FREE_LABEL, ed, leonardo, IPopRules.PopStatus.Personhood);
 
         assertEq(
             _positionOf(tokenId).amount,

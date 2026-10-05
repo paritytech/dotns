@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -34,17 +35,19 @@ contract DotnsPopResolver is
     /// @notice Stored chat-key bytes keyed by node.
     mapping(bytes32 node => bytes chatKey) private _chatKeys;
 
-    /// @notice Stored lite-person labelhash keyed by full-person node.
-    /// @dev Forward direction (full => lite): maps a full-person node to the
-    ///      labelhash of the lite username it was claimed from.
-    mapping(bytes32 fullNode => bytes32 liteLabelhash) private _liteLinks;
+    /// @notice Stored device-name labelhash keyed by personhood-name node.
+    /// @dev Forward direction: maps a personhood-name node to the labelhash of the device name it
+    ///      is linked to.
+    /// @custom:oz-renamed-from _liteLinks
+    mapping(bytes32 personhoodNode => bytes32 deviceLabelhash) private _deviceLinks;
 
-    /// @notice Reverse index mapping a lite labelhash to the full-person node
-    ///         it was promoted to.
-    /// @dev Written alongside `_liteLinks` on every claim so consumers that look
-    ///      up by lite username resolve the full name without scanning events.
-    ///      Zero when the lite label has never been linked to a full claim.
-    mapping(bytes32 liteLabelhash => bytes32 fullNode) private _fullClaims;
+    /// @notice Reverse index mapping a device-name labelhash to the personhood-name node it is
+    ///         linked to.
+    /// @dev Written alongside `_deviceLinks` on every link so consumers that look up by device
+    ///      name resolve the personhood name without scanning events. Zero when the device name
+    ///      has never been linked.
+    /// @custom:oz-renamed-from _fullClaims
+    mapping(bytes32 deviceLabelhash => bytes32 personhoodNode) private _personhoodNodes;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
@@ -96,25 +99,25 @@ contract DotnsPopResolver is
     }
 
     /// @inheritdoc IDotnsPopResolver
-    function setLiteLink(
-        bytes32 fullNode,
-        bytes32 liteLabelhash
+    function setDeviceLink(
+        bytes32 personhoodNode,
+        bytes32 deviceLabelhash
     )
         external
         override
         onlyPopController
     {
-        bytes32 oldLite = _liteLinks[fullNode];
-        bytes32 oldFull = _fullClaims[liteLabelhash];
-        if (oldLite != bytes32(0) && oldLite != liteLabelhash) {
-            delete _fullClaims[oldLite];
+        bytes32 oldDevice = _deviceLinks[personhoodNode];
+        bytes32 oldPersonhood = _personhoodNodes[deviceLabelhash];
+        if (oldDevice != bytes32(0) && oldDevice != deviceLabelhash) {
+            delete _personhoodNodes[oldDevice];
         }
-        if (oldFull != bytes32(0) && oldFull != fullNode) {
-            delete _liteLinks[oldFull];
+        if (oldPersonhood != bytes32(0) && oldPersonhood != personhoodNode) {
+            delete _deviceLinks[oldPersonhood];
         }
-        _liteLinks[fullNode] = liteLabelhash;
-        _fullClaims[liteLabelhash] = fullNode;
-        emit LiteLinkUpdated(fullNode, liteLabelhash);
+        _deviceLinks[personhoodNode] = deviceLabelhash;
+        _personhoodNodes[deviceLabelhash] = personhoodNode;
+        emit DeviceLinkUpdated(personhoodNode, deviceLabelhash);
     }
 
     /// @inheritdoc IDotnsPopResolver
@@ -123,17 +126,17 @@ contract DotnsPopResolver is
     }
 
     /// @inheritdoc IDotnsPopResolver
-    function liteLink(bytes32 fullNode) external view override returns (bytes32) {
-        return _liteLinks[fullNode];
+    function deviceLabelhashOf(bytes32 personhoodNode) external view override returns (bytes32) {
+        return _deviceLinks[personhoodNode];
     }
 
     /// @inheritdoc IDotnsPopResolver
-    function fullClaim(bytes32 liteLabelhash) external view override returns (bytes32) {
-        return _fullClaims[liteLabelhash];
+    function personhoodNodeOf(bytes32 deviceLabelhash) external view override returns (bytes32) {
+        return _personhoodNodes[deviceLabelhash];
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
+    ///         registry so every dotNS contract reports one synchronised value.
     /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
     ///      `version()` selector for ABI compatibility. It reports the network's declaration,
     ///      not this contract's build; per-contract identity is the codehash declared on the

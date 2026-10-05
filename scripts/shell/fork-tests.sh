@@ -39,8 +39,9 @@ if adapter_is_up; then
 else
   echo "fork-tests: starting the eth-rpc adapter (docker compose up --build -d eth-rpc)"
   docker compose up --build -d eth-rpc
-  scripts/shell/wait-for-eth-rpc.sh "$RPC_URL"
 fi
+# Answering `eth_chainId` comes before the block index is usable, so a reused adapter waits too.
+scripts/shell/wait-for-eth-rpc.sh "$RPC_URL"
 
 # The OpenZeppelin upgrade validator reads Foundry build-info, and a stale incremental
 # build trips it with "Found multiple contracts with name ...". Start from a clean

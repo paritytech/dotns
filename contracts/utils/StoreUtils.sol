@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {ILabelStore} from "../store/ILabelStore.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
 
-/// @title DotNS Store Utilities Library
+/// @title dotNS Store Utilities Library
 /// @notice Canonical helpers for protocol writes into per-user `LabelStore` instances.
-/// @dev One auth rule, one write path. Every DotNS consumer (controller, registrar,
+/// @dev One auth rule, one write path. Every dotNS consumer (controller, registrar,
 ///      registry, PoP controller) funnels label writes through `writeNewLabel` so
 ///      authorisation, deploy-on-first-use and conflict handling are identical across flows.
 /// @custom:security-contact admin@parity.io

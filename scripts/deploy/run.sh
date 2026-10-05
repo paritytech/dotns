@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Runs the multi-stage DotNS deploy pipeline against a Foundry keystore
+# Runs the multi-stage dotNS deploy pipeline against a Foundry keystore
 # wallet. `.env` is a one-off bootstrap file: it carries PRIVATE_KEY and
 # ACCOUNT_PASSWORD only long enough to import the wallet into the
 # Foundry keystore on the first run, after which the file is deleted so
@@ -122,7 +122,7 @@ else
   esac
 fi
 
-# Reuse a pre-deployed CREATE3 factory when its address is supplied. Every DotNS
+# Reuse a pre-deployed CREATE3 factory when its address is supplied. Every dotNS
 # address derives from the factory address, and the factory's own address is
 # nonce-derived, so a key that also runs upgrades cannot keep it stable across
 # chain resets. Deploy the factory once from a single-purpose key at nonce 0

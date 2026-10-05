@@ -6,31 +6,31 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {IDotnsRegistryOld} from "./IDotnsRegistryOld.sol";
+import {IDotnsRegistry} from "./IDotnsRegistry.sol";
 import {IDotnsController} from "../registrars/IDotnsController.sol";
-import {IDotnsRegistrarOld} from "../registrars/IDotnsRegistrarOld.sol";
-import {IStoreFactoryOld} from "../store/IStoreFactoryOld.sol";
-import {StoreUtilsOld} from "../utils/StoreUtilsOld.sol";
+import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
+import {IStoreFactory} from "../store/IStoreFactory.sol";
+import {StoreUtils} from "../utils/StoreUtils.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
-import {IDotnsProtocolRegistryOld} from "./IDotnsProtocolRegistryOld.sol";
-import {StringUtils} from "../utils/StringUtils.sol";
-import {DotnsConstantsOld} from "../utils/DotnsConstantsOld.sol";
+import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
+import {StringUtilsOld} from "../utils/StringUtilsOld.sol";
+import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title Dotns Registry
 /// @author Parity
 /// @notice Upgradeable on-chain registry for hierarchical name ownership and resolution.
 /// @dev Tokenised second-level nodes store `owner == address(0)` as a sentinel and defer to
-///      `IDotnsRegistrarOld.ownerOf`; subnodes carry an explicit owner address in `records`.
+///      `IDotnsRegistrar.ownerOf`; subnodes carry an explicit owner address in `records`.
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistryOld {
-    using StoreUtilsOld for IStoreFactoryOld;
-    using StringUtils for *;
+contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistry {
+    using StoreUtils for IStoreFactory;
+    using StringUtilsOld for *;
 
     /// @notice Mapping of node identifiers to records.
     mapping(bytes32 node => Record record) private records;
 
     /// @notice Protocol-level address registry for all DotNS contracts.
-    IDotnsProtocolRegistryOld public protocolRegistry;
+    IDotnsProtocolRegistry public protocolRegistry;
 
     uint256[50] private __gap;
 
@@ -55,15 +55,22 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     /// @dev Callable exactly once via `Initializable`, otherwise
     ///      @custom:reverts InvalidInitialization. `registry` must be non-zero, otherwise
     ///      @custom:reverts NotAllowed.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(IDotnsProtocolRegistryOld registry) external initializer {
-        __Ownable_init(msg.sender);
+    function initialize(
+        address initialOwner,
+        IDotnsProtocolRegistry registry
+    )
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
 
         require(address(registry) != address(0), NotAllowed());
         protocolRegistry = registry;
     }
 
-    /// @inheritdoc IDotnsRegistryOld
+    /// @inheritdoc IDotnsRegistry
     function setSubnodeOwner(SubnodeRecord calldata record)
         external
         override
@@ -72,6 +79,13 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     {
         address newOwner = record.owner;
         require(newOwner != address(0), NotAllowed());
+
+        // Deferring the store write (persist == false) is a controller workflow: the deferred label
+        // is backfilled later by an authorised writer, and only a registered controller drives that
+        // path. Every other caller must persist eagerly rather than strand an unindexed label.
+        if (!record.persist) {
+            _onlyRegistrarController();
+        }
 
         bytes32 parentNode = record.parentNode;
         string calldata subLabel = record.subLabel;
@@ -84,7 +98,7 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         subnode = LabelUtils.namehashUnder(parentNode, labelhash);
 
         Record storage existing = records[subnode];
-        address reverseResolver = protocolRegistry.get(DotnsConstantsOld.REVERSE_RESOLVER);
+        address reverseResolver = protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER);
         if (existing.exists) {
             address previousOwner = existing.owner;
             // Reset the resolver pointer on reassignment so the prior subnode owner's resolver
@@ -116,11 +130,10 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         emit NewOwner(parentNode, labelhash, newOwner);
     }
 
-    /// @inheritdoc IDotnsRegistryOld
+    /// @inheritdoc IDotnsRegistry
     function setOwner(bytes32 node, address newOwner) external override onlyRegistrarController {
         require(newOwner != address(0), NotAllowed());
-        IDotnsRegistrarOld registrar =
-            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         require(registrar.ownerOf(uint256(node)) == newOwner, NotAuthorised());
 
         // The resolver pointer is reset to the default reverse resolver on every call to this
@@ -131,20 +144,20 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         // Owner remains the zero sentinel so reads delegate to the registrar's ERC-721 holder.
         records[node] = Record({
             owner: address(0),
-            resolver: protocolRegistry.get(DotnsConstantsOld.REVERSE_RESOLVER),
+            resolver: protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER),
             exists: true
         });
 
         emit NodeTransferred(node, newOwner);
     }
 
-    /// @inheritdoc IDotnsRegistryOld
+    /// @inheritdoc IDotnsRegistry
     function setResolver(bytes32 node, address newResolver) external override authorised(node) {
         records[node].resolver = newResolver;
         emit NewResolver(node, newResolver);
     }
 
-    /// @inheritdoc IDotnsRegistryOld
+    /// @inheritdoc IDotnsRegistry
     function setSubnodeResolver(SubnodeResolverRecord calldata record)
         external
         override
@@ -165,7 +178,7 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         emit NewResolver(subnode, record.resolver);
     }
 
-    /// @inheritdoc IDotnsRegistryOld
+    /// @inheritdoc IDotnsRegistry
     function owner(bytes32 node) external view override returns (address) {
         Record storage record = records[node];
         // Read `owner` first: a non-zero stored owner proves the record exists and is a subnode,
@@ -174,22 +187,21 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         address storedOwner = record.owner;
         if (storedOwner != address(0)) return storedOwner;
         if (!record.exists) return address(0);
-        IDotnsRegistrarOld registrar =
-            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         return registrar.ownerOf(uint256(node));
     }
 
-    /// @inheritdoc IDotnsRegistryOld
+    /// @inheritdoc IDotnsRegistry
     function resolver(bytes32 node) external view override returns (address) {
         return records[node].resolver;
     }
 
-    /// @inheritdoc IDotnsRegistryOld
+    /// @inheritdoc IDotnsRegistry
     function recordExists(bytes32 node) external view override returns (bool) {
         return records[node].exists;
     }
 
-    /// @inheritdoc IDotnsRegistryOld
+    /// @inheritdoc IDotnsRegistry
     function isAuthorised(
         bytes32 node,
         address account
@@ -212,9 +224,8 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     )
         internal
     {
-        IStoreFactoryOld factory =
-            IStoreFactoryOld(protocolRegistry.get(DotnsConstantsOld.STORE_FACTORY));
-        factory.writeLabel(storeOwner, node, fullName);
+        IStoreFactory factory = IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
+        factory.writeNewLabel(storeOwner, node, fullName);
     }
 
     /// @notice Computes the namehash of `parentLabel` rooted at the network's TLD node.
@@ -277,8 +288,7 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
         if (!record.exists) return false;
 
-        IDotnsRegistrarOld registrar =
-            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         uint256 tokenId = uint256(node);
         address tokenOwner = registrar.ownerOf(tokenId);
         if (account == tokenOwner) return true;
@@ -294,17 +304,20 @@ contract DotnsRegistryOld is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     ///      in one place and lets commit-reveal and PoP controllers coexist without registry
     ///      reconfiguration on each addition.
     function _onlyRegistrarController() internal view {
-        IDotnsRegistrarOld registrar =
-            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         require(registrar.controllers(IDotnsController(msg.sender)), NotAuthorised());
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every DotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
-
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

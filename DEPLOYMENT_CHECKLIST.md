@@ -1,6 +1,6 @@
-# DotNS Deployment Checklist
+# dotNS Deployment Checklist
 
-A step-by-step, copy/paste checklist for deploying DotNS to **any** Polkadot
+A step-by-step, copy/paste checklist for deploying dotNS to **any** Polkadot
 chain (any PolkaVM / `revive`-backed Asset Hub-style chain that exposes an
 ETH-RPC adapter).
 

@@ -1,10 +1,10 @@
-# DotNS Deployments
+# dotNS Deployments
 
 Current deployment addresses and developer deployment notes for dotNS contracts.
 
 ## What this file is for
 
-This file is the operational companion to the README. It explains how to run the local ETH-RPC adapter, how to deploy DotNS, where deployment manifests are written, and which addresses are currently live on the supported Paseo environments.
+This file is the operational companion to the README. It explains how to run the local ETH-RPC adapter, how to deploy dotNS, where deployment manifests are written, and which addresses are currently live on the supported Paseo environments.
 
 > For a short, do-this-in-order checklist (including how to target **any** Polkadot chain, not just the Paseo environments), see [`DEPLOYMENT_CHECKLIST.md`](./DEPLOYMENT_CHECKLIST.md).
 
@@ -283,9 +283,9 @@ If the deployment was intended to update a public environment, update the addres
 
 ### Network manifests and the expected set
 
-`deployments/<network>/<chainId>.json` is a **network record**: what is deployed on that live network right now. It is updated only by a real deploy or migration on that network, never by a code change. Everything that answers for reality reads these files: releases copy their addresses verbatim, and pointing tooling or the wire stage at an address with nothing behind it breaks whatever reads it.
+`deployments/<network>/<chainId>.json` is a **network record**: what is deployed on that live network right now. It is updated only by a real deploy or migration on that network, never by a code change. Everything that answers for reality reads these files: releases copy their addresses verbatim, and pointing tooling or the wire stage at an address with nothing behind it breaks whatever reads it. The CREATE3 parity gates compare `expected.json` rather than these files, so the rule that a code change leaves them alone is enforced in CI instead: `release-metadata.yml` fails a pull request that edits one unless it carries the `deployment-record` label.
 
-`deployments/expected.json` is the **expected set**: the addresses a fresh deploy of the current revision lands through the pinned CREATE3 factory. It is a property of the code, not of any network; the CI deploy job and `scripts/genesis/build-genesis.sh` verify against it, and releases never publish it.
+`deployments/expected.json` is the **expected set**: the addresses a fresh deploy of the current revision lands through the pinned CREATE3 factory. It is a property of the code, not of any network; the CI deploy job and `scripts/genesis/build-genesis.sh` verify against it, and releases publish it only as `dotns-genesis-addresses.json`, the address set of their genesis files.
 
 The expected set can legitimately disagree with a network manifest: after a code change moves an address, the expected set carries the new address while every network manifest keeps the old one until that network actually redeploys. The difference between them is the migration backlog, readable as a diff, and it is resolved per network by the event that relocates the contract: a wipe-and-redeploy on a test network, a deliberate migration on one that never wipes.
 
@@ -505,12 +505,12 @@ question about this network. Use an archive node, or Blockscout at
 
 ### Broadcast order
 
-The in-place upgrade to v0.8.0 has a fixed order, and nothing in the scripts enforces it: the
-protocol registry has to go first because every other contract's `version()` reads through it,
-the store migration after that because it rewires a key the declaration records, and the
-declaration last because it is a claim about the whole deployment.
-[`docs/PASEO-V080-RUNBOOK.md`](./docs/PASEO-V080-RUNBOOK.md) is the step list, with what to check
-after each one.
+The in-place upgrade to v1.0.0 has a fixed order: the PoP resolver and controller change together
+because the new controller writes links through a resolver function the old resolver lacks, and
+the old controller through one the new resolver drops; the lens goes after them
+because it reads the resolver's new getters, and the declaration goes last because it is a claim
+about the whole deployment. [`docs/PASEO-V100-RUNBOOK.md`](./docs/PASEO-V100-RUNBOOK.md) is the
+step list, with what to check after each one.
 
 ### The deployed code is not always the code in a release
 

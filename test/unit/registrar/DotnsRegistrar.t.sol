@@ -363,9 +363,9 @@ contract DotnsRegistrarTests is BaseDotns {
 
     function test_transfer_reverts_when_fee_required_but_no_value_attached() public {
         string memory label = "feerequired01";
-        // Grant Full to ed so the mint succeeds, but leave leonardo at NoStatus so the
+        // Grant personhood to ed so the mint succeeds, but leave leonardo at NoStatus so the
         // transfer floor charges a non-zero downgrade fee.
-        _register(label, ed, IPopRules.PopStatus.PopFull);
+        _register(label, ed, IPopRules.PopStatus.Personhood);
         uint256 tokenId = _tokenIdForLabel(label);
 
         uint256 fee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
@@ -444,8 +444,8 @@ contract DotnsRegistrarTests is BaseDotns {
         assertTrue(dotnsRegistrar.supportsInterface(type(IERC721).interfaceId));
     }
 
-    /// @notice Mints a name as if through the PoP gateway: the caller is the address registered
-    /// under `POP_CONTROLLER`, and the gateway path passes an empty label.
+    /// @notice Mints a name as if through the dotNS gateway pallet: the caller is the address
+    /// registered under `POP_CONTROLLER`, and the gateway path passes an empty label.
     function _mintSoulbound(
         string memory label,
         address nameOwner

@@ -10,9 +10,9 @@ import {ILabelStore} from "../../contracts/store/ILabelStore.sol";
 /// @notice End-to-end happy-path integration coverage for registration,
 ///         records, subnames, and ERC721 transfers across all PoP tiers.
 contract BasicDotnsIntegration is BaseDotns {
-    /// @notice PopFull-classified label fixture used by the integration flow.
+    /// @notice Personhood-classified label fixture used by the integration flow.
     string internal constant NAME_POPFULL = "waytalls";
-    /// @notice PopLite-classified label fixture used by the integration flow.
+    /// @notice Devicehood-classified label fixture used by the integration flow.
     string internal constant NAME_POPLITE = "way2tall01";
     /// @notice NoStatus-classified label fixture used by the integration flow.
     string internal constant NAME_NOSTATUS = "kitesurfing01";
@@ -37,8 +37,8 @@ contract BasicDotnsIntegration is BaseDotns {
         string transferRecipientSub;
     }
 
-    function test_popfull_end_to_end() public {
-        _grantPopFull(ed);
+    function test_personhood_end_to_end() public {
+        _grantPersonhood(ed);
 
         _flowEndToEnd(
             FlowParams({
@@ -55,8 +55,8 @@ contract BasicDotnsIntegration is BaseDotns {
         );
     }
 
-    function test_poplite_end_to_end() public {
-        _grantPopLite(leonardo);
+    function test_devicehood_end_to_end() public {
+        _grantDevicehood(leonardo);
 
         _flowEndToEnd(
             FlowParams({
@@ -222,7 +222,7 @@ contract BasicDotnsIntegration is BaseDotns {
         _commitAndRegister(NAME_NOSTATUS, victim, false);
         assertEq(dotnsReverseResolver.nameOf(victim), "");
 
-        _grantPopFull(victim);
+        _grantPersonhood(victim);
 
         string memory victimPrimary = "victimname01";
         _commitAndRegister(victimPrimary, victim, true);

@@ -11,18 +11,18 @@ import {IDotnsRegistrarController} from "../../contracts/registrars/IDotnsRegist
 /// @notice Integration coverage for revert paths protecting registration, subnames,
 ///         and resolver writes.
 contract BasicDotnsIntegrationReverts is BaseDotns {
-    /// @notice PopFull-classified label fixture exercised by the revert cases.
+    /// @notice Personhood-classified label fixture exercised by the revert cases.
     string internal constant NAME_POPFULL = "waytalls";
 
     /// @notice Sample CIDv1 content hash used as a record value.
     bytes internal constant CID_A =
         hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-    function test_revert_poplite_cannot_register_popfull_required() public {
+    function test_revert_devicehood_cannot_register_personhood_required() public {
         string memory nameLabel = NAME_POPFULL;
         address registrant = ed;
 
-        _grantPopLite(registrant);
+        _grantDevicehood(registrant);
         vm.startPrank(registrant);
 
         bytes32 secret = keccak256(abi.encodePacked(nameLabel, registrant, block.timestamp));
@@ -41,11 +41,7 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
 
         vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPopRules.PopError.selector, "Requires Full personhood verification"
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IPopRules.PopError.selector, "Requires personhood"));
         dotnsRegistrarController.register(registration);
         vm.stopPrank();
     }
@@ -54,7 +50,7 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
         address parentOwner = ed;
         address attacker = tiago;
 
-        _grantPopFull(parentOwner);
+        _grantPersonhood(parentOwner);
         _commitAndRegister(NAME_POPFULL, parentOwner, true);
 
         bytes32 parentNode = _namehash(dotNode, keccak256(bytes(NAME_POPFULL)));
@@ -76,7 +72,7 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
     function test_parent_can_reassign_existing_subdomain() public {
         address parentOwner = ed;
 
-        _grantPopFull(parentOwner);
+        _grantPersonhood(parentOwner);
         _commitAndRegister(NAME_POPFULL, parentOwner, true);
         bytes32 parentNode = _namehash(dotNode, keccak256(bytes(NAME_POPFULL)));
 
@@ -104,7 +100,7 @@ contract BasicDotnsIntegrationReverts is BaseDotns {
         address parentOwner = ed;
         address attacker = tiago;
 
-        _grantPopFull(parentOwner);
+        _grantPersonhood(parentOwner);
         _commitAndRegister(NAME_POPFULL, parentOwner, true);
 
         bytes32 node = _namehash(dotNode, keccak256(bytes(NAME_POPFULL)));

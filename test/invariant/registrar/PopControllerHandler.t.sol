@@ -24,7 +24,7 @@ import {IPersonhood} from "../../../contracts/external/personhood/IPersonhood.so
 /// @notice Bounded random-action handler for @custom:contract DotnsPopController invariant tests.
 /// @dev Cycles through an actor set and a fixed base-label set so the fuzzer
 ///      explores combinations deterministically. Tracks every labelhash that has
-///      hosted a reservation, every minted lite token, and every successful
+///      hosted a reservation, every minted device name, and every successful
 ///      claim so invariants can iterate over just what exists.
 contract PopControllerHandler is Test {
     /// @notice The PoP controller under test.
@@ -35,7 +35,7 @@ contract PopControllerHandler is Test {
     DotnsRegistrar public immutable REGISTRAR;
     /// @notice Pricing and classification, read to quote a public registration.
     IPopRules public immutable POP_RULES;
-    /// @notice The hierarchical registry, where a lite name lives as a subname of its container.
+    /// @notice The hierarchical registry, where a device name lives as a subname of its container.
     IDotnsRegistry public immutable REGISTRY;
     /// @notice Node hash of the suite's TLD, injected from the deployed protocol registry.
     /// @dev Keeps the handler rooted at the same TLD the protocol under test uses, without a
@@ -53,32 +53,32 @@ contract PopControllerHandler is Test {
     bytes32[] public reservedLabelsSeen;
     /// @notice Dedup set for `reservedLabelsSeen` to keep iteration cheap.
     mapping(bytes32 labelhash => bool) internal _tracked;
-    /// @notice Monotonic per-actor counter feeding the lite-label suffix so
+    /// @notice Monotonic per-actor counter feeding the device-name suffix so
     ///         each generated label is unique inside an actor's namespace.
-    mapping(address actor => uint64 suffix) internal _liteSuffix;
+    mapping(address actor => uint64 suffix) internal _deviceSuffix;
 
-    /// @notice Lite tokens minted through the handler (one push per successful
-    ///         reserve, plus the lite and full nodes pushed on claim and the
-    ///         full node pushed on reLink). Used by the labelOf-non-empty
+    /// @notice Device names minted through the handler (one push per successful
+    ///         reserve, plus the device and personhood nodes pushed on claim and the
+    ///         personhood node pushed on reLink). Used by the labelOf-non-empty
     ///         invariant to enumerate the token space without scanning the
     ///         full uint256 id range.
-    uint256[] public mintedLiteTokenIds;
+    uint256[] public mintedDeviceTokenIds;
 
-    /// @notice Full nodes minted through successful claims, captured alongside
-    ///         the lite labelhash they were linked against. Used by the
-    ///         fullClaim/liteLink inverse invariant: for each entry,
-    ///         fullClaim(liteHash) == node.
-    bytes32[] public claimedFullNodes;
-    /// @notice Lite labelhashes paired index-for-index with `claimedFullNodes`.
-    bytes32[] public claimedLiteLabelhashes;
+    /// @notice Personhood nodes minted through successful claims, captured alongside
+    ///         the device-name labelhash they were linked against. Used by the
+    ///         personhoodNodeOf/deviceLabelhashOf inverse invariant: for each entry,
+    ///         personhoodNodeOf(deviceLabelhash) == node.
+    bytes32[] public claimedPersonhoodNodes;
+    /// @notice Device-name labelhashes paired index-for-index with `claimedPersonhoodNodes`.
+    bytes32[] public claimedDeviceLabelhashes;
 
-    /// @notice Prior lite labels reserved by the handler. Used by reLink
-    ///         actions so the fuzzer can re-use an existing lite label
+    /// @notice Prior device names reserved by the handler. Used by reLink
+    ///         actions so the fuzzer can re-use an existing device name
     ///         against a fresh base claim, driving the resolver overwrite
     ///         paths under repeated `(baseLabel, actor)` reuse. Kept as
     ///         the raw string because the controller re-hashes internally
     ///         on every call.
-    string[] public priorLiteLabels;
+    string[] public priorDeviceLabels;
 
     /// @notice Every label the gateway has issued, deduplicated.
     /// @dev Provenance is written once at mint, so this set only grows. The monotonicity
@@ -125,7 +125,7 @@ contract PopControllerHandler is Test {
     mapping(address actor => bool) internal _pendingActorTracked;
 
     /// @notice Seeds the actor pool, base-label set, and personhood mocks so
-    ///         every action call admits both lite and base classifications.
+    ///         every action call admits both device-name and base classifications.
     /// @param controller_ The PoP controller under test.
     /// @param publicController_ The public commit-reveal controller.
     /// @param registrar_ The ERC-721 registrar both controllers mint through.
@@ -149,19 +149,19 @@ contract PopControllerHandler is Test {
         REGISTRY = registry_;
         TLD_NODE = tldNode_;
         actors = actors_;
-        // baselength 8, no trailing digits: PopFull classification.
+        // baselength 8, no trailing digits: Personhood classification.
         baseLabels.push("alicebob");
         // length 12, no trailing digits: NoStatus classification. A reservable base label
-        // keys the reservation queue, which only ever holds a digit-free stem.
+        // keys the reservation queue, which only ever holds a digit-free base name.
         baseLabels.push("wonderlandxy");
         // baselength 10, no trailing digits: NoStatus classification.
         baseLabels.push("carolcarol");
 
-        // Every actor needs PopFull status on the personhood precompile so the
+        // Every actor needs Personhood status on the personhood precompile so the
         // classification/tier guard in PopRules.priceWithCheck admits every
-        // label the handler can generate: PopLite lite labels (PopFull is a
-        // superset of PopLite), PopFull base labels, and NoStatus base labels
-        // (which merely require userStatus != PopLite).
+        // label the handler can generate: Devicehood device names (Personhood is a
+        // superset of Devicehood), Personhood base labels, and NoStatus base labels
+        // (which merely require userStatus != Devicehood).
         for (uint256 i = 0; i < actors_.length; i++) {
             _mockPersonhoodTier(actors_[i], 2);
         }
@@ -178,7 +178,7 @@ contract PopControllerHandler is Test {
     /// @notice Mocks the personhood precompile so `account` reports the given
     ///         status byte for the protocol's personhood context.
     /// @dev Status byte mirrors the precompile's wire format: 0 = NoStatus,
-    ///      1 = PopLite, 2 = PopFull. A zero status clears the context alias.
+    ///      1 = Devicehood, 2 = Personhood. A zero status clears the context alias.
     function _mockPersonhoodTier(address account, uint8 statusByte) internal {
         bytes32 contextAlias =
             statusByte == 0 ? bytes32(0) : keccak256(abi.encode(account, statusByte));
@@ -212,19 +212,19 @@ contract PopControllerHandler is Test {
     }
 
     /// @notice Number of token ids the handler has ever recorded as minted.
-    function mintedLiteTokenCount() external view returns (uint256) {
-        return mintedLiteTokenIds.length;
+    function mintedDeviceTokenCount() external view returns (uint256) {
+        return mintedDeviceTokenIds.length;
     }
 
-    /// @notice Number of successful (lite, full) claim pairs the handler has
+    /// @notice Number of successful (device, personhood) claim pairs the handler has
     ///         recorded.
     function claimedCount() external view returns (uint256) {
-        return claimedFullNodes.length;
+        return claimedPersonhoodNodes.length;
     }
 
-    /// @notice Number of prior lite labels available for reLink replay.
-    function priorLiteLabelCount() external view returns (uint256) {
-        return priorLiteLabels.length;
+    /// @notice Number of prior device names available for reLink replay.
+    function priorDeviceLabelCount() external view returns (uint256) {
+        return priorDeviceLabels.length;
     }
 
     /// @notice Number of actors the handler has ever seen with a pending claim.
@@ -232,30 +232,31 @@ contract PopControllerHandler is Test {
         return pendingClaimActorsSeen.length;
     }
 
-    /// @notice Reserves a lite label for an actor, optionally enqueueing on a
+    /// @notice Reserves a device name for an actor, optionally enqueueing on a
     ///         base label.
     /// @dev Swallows known-good reverts (QueueFull, AlreadyReserved, ERC721
     ///      collision) so the runner keeps exploring.
     function reserve(uint256 actorIndex, uint256 baseIndex, bool attachReservation) external {
         address actor = _actor(actorIndex);
-        _liteSuffix[actor]++;
-        string memory liteLabel = _buildLiteLabel("rsv", actor, _liteSuffix[actor]);
+        _deviceSuffix[actor]++;
+        string memory deviceLabel = _buildDeviceLabel("rsv", actor, _deviceSuffix[actor]);
         string memory reservedBase = attachReservation ? _baseLabel(baseIndex) : "";
 
-        IDotnsPopController.BaseReservation memory params = IDotnsPopController.BaseReservation({
-            lite: IDotnsPopController.LiteRegistration({
-                liteLabel: liteLabel, user: actor, chatKey: ""
-            }),
-            reservedBaseLabel: reservedBase
-        });
+        IDotnsPopController.DeviceNameIssuanceWithReservation memory params =
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: deviceLabel, user: actor, chatKey: ""
+                }),
+                reservedLabel: reservedBase
+            });
 
-        if (_callReserveBaseName(params)) {
+        if (_callIssueDeviceNameWithReservation(params)) {
             if (attachReservation) _track(keccak256(bytes(reservedBase)));
-            // A lite name is a subname beneath its numeric container, not a token, so record its
+            // A device name is a subname beneath its numeric container, not a token, so record its
             // subnode rather than the whole-label hash.
-            mintedLiteTokenIds.push(uint256(SubnodeUtils.liteSubnodeOf(TLD_NODE, liteLabel)));
-            priorLiteLabels.push(liteLabel);
-            _trackGatewayLabel(liteLabel);
+            mintedDeviceTokenIds.push(uint256(SubnodeUtils.deviceSubnodeOf(TLD_NODE, deviceLabel)));
+            priorDeviceLabels.push(deviceLabel);
+            _trackGatewayLabel(deviceLabel);
             _trackPendingActor(actor);
         }
     }
@@ -264,7 +265,7 @@ contract PopControllerHandler is Test {
     ///         head of the queue for the picked base label.
     /// @dev Missing preconditions (wrong actor, expired head, empty queue)
     ///      surface as a revert and are swallowed so the runner keeps
-    ///      leg and the full register leg.
+    ///      leg and the personhood issuance leg.
     function claim(uint256 actorIndex, uint256 baseIndex) external {
         address actor = _actor(actorIndex);
         string memory baseLabel = _baseLabel(baseIndex);
@@ -273,73 +274,77 @@ contract PopControllerHandler is Test {
         if (reservation.labelhash == bytes32(0)) return;
         if (reservation.labelhash != keccak256(bytes(baseLabel))) return;
 
-        _liteSuffix[actor]++;
-        string memory liteLabel = _buildLiteLabel("clm", actor, _liteSuffix[actor]);
+        _deviceSuffix[actor]++;
+        string memory deviceLabel = _buildDeviceLabel("clm", actor, _deviceSuffix[actor]);
 
-        IDotnsPopController.BaseReservation memory liteParams = IDotnsPopController.BaseReservation({
-            lite: IDotnsPopController.LiteRegistration({
-                liteLabel: liteLabel, user: actor, chatKey: ""
-            }),
-            reservedBaseLabel: ""
-        });
-        if (!_callReserveBaseName(liteParams)) return;
-        // Recorded here rather than after the full leg below: the subname exists from this point,
-        // and a full leg that reverts would otherwise leave it outside every invariant's reach. A
-        // lite name is a subname beneath its numeric container, not a token, so record its subnode.
-        mintedLiteTokenIds.push(uint256(SubnodeUtils.liteSubnodeOf(TLD_NODE, liteLabel)));
-        priorLiteLabels.push(liteLabel);
-        _trackGatewayLabel(liteLabel);
+        IDotnsPopController.DeviceNameIssuanceWithReservation memory deviceParams =
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: deviceLabel, user: actor, chatKey: ""
+                }),
+                reservedLabel: ""
+            });
+        if (!_callIssueDeviceNameWithReservation(deviceParams)) return;
+        // Recorded here rather than after the personhood leg below: the subname exists from this
+        // point, and a personhood leg that reverts would otherwise leave it outside every
+        // invariant's reach. A device name is a subname beneath its numeric container, not a token,
+        // so record its subnode.
+        mintedDeviceTokenIds.push(uint256(SubnodeUtils.deviceSubnodeOf(TLD_NODE, deviceLabel)));
+        priorDeviceLabels.push(deviceLabel);
+        _trackGatewayLabel(deviceLabel);
         _trackPendingActor(actor);
 
-        // The lite leg stashed a pending claim. Settle it now so the base
+        // The the issuance stashed a pending claim. Settle it now so the base
         // registration below takes the warm path; the pending-claim mechanism
         // forbids a second stash for the same user.
         vm.prank(actor);
         try CONTROLLER.settlePendingClaims(actor, type(uint256).max) {} catch {}
 
         IDotnsPopController.Link memory link = IDotnsPopController.Link({
-            kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
+            kind: IDotnsPopController.LinkKind.DeviceName, deviceLabel: deviceLabel, chatKey: ""
         });
-        IDotnsPopController.FullRegistration memory fullParams =
-            IDotnsPopController.FullRegistration({label: baseLabel, user: actor, link: link});
-        if (!_callRegisterBaseName(fullParams)) return;
+        IDotnsPopController.PersonhoodNameIssuance memory personhoodParams =
+            IDotnsPopController.PersonhoodNameIssuance({label: baseLabel, user: actor, link: link});
+        if (!_callIssuePersonhoodName(personhoodParams)) return;
 
-        bytes32 fullNode = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(baseLabel));
-        claimedLiteLabelhashes.push(LabelUtils.labelhashMemory(liteLabel));
-        claimedFullNodes.push(fullNode);
-        mintedLiteTokenIds.push(uint256(fullNode));
+        bytes32 personhoodNode =
+            LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(baseLabel));
+        claimedDeviceLabelhashes.push(LabelUtils.labelhashMemory(deviceLabel));
+        claimedPersonhoodNodes.push(personhoodNode);
+        mintedDeviceTokenIds.push(uint256(personhoodNode));
         _trackGatewayLabel(baseLabel);
     }
 
-    /// @notice Re-registers an already-used lite label against a fresh
-    ///         base-label claim so the same liteHash maps to a new fullNode.
+    /// @notice Re-registers an already-used device name against a fresh
+    ///         base-label claim so the same deviceLabelhash maps to a new personhoodNode.
     /// @dev Drives the resolver overwrite paths. When the handler
     ///      re-uses the same (baseLabel, actor) pair later it also exercises
-    ///      the symmetric case: same fullNode mapped to a new liteHash.
-    function reLink(uint256 actorIndex, uint256 baseIndex, uint256 liteIndex) external {
-        uint256 liteCount = priorLiteLabels.length;
-        if (liteCount == 0) return;
+    ///      the symmetric case: same personhoodNode mapped to a new deviceLabelhash.
+    function reLink(uint256 actorIndex, uint256 baseIndex, uint256 deviceIndex) external {
+        uint256 deviceCount = priorDeviceLabels.length;
+        if (deviceCount == 0) return;
 
         address actor = _actor(actorIndex);
         string memory baseLabel = _baseLabel(baseIndex);
-        string memory liteLabel = priorLiteLabels[liteIndex % liteCount];
+        string memory deviceLabel = priorDeviceLabels[deviceIndex % deviceCount];
 
         IDotnsPopController.UserReservation memory reservation = CONTROLLER.userReservation(actor);
         if (reservation.labelhash == bytes32(0)) return;
         if (reservation.labelhash != keccak256(bytes(baseLabel))) return;
 
         IDotnsPopController.Link memory link = IDotnsPopController.Link({
-            kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
+            kind: IDotnsPopController.LinkKind.DeviceName, deviceLabel: deviceLabel, chatKey: ""
         });
-        IDotnsPopController.FullRegistration memory params =
-            IDotnsPopController.FullRegistration({label: baseLabel, user: actor, link: link});
-        if (!_callRegisterBaseName(params)) return;
+        IDotnsPopController.PersonhoodNameIssuance memory params =
+            IDotnsPopController.PersonhoodNameIssuance({label: baseLabel, user: actor, link: link});
+        if (!_callIssuePersonhoodName(params)) return;
 
-        bytes32 liteLabelhash = LabelUtils.labelhashMemory(liteLabel);
-        bytes32 fullNode = LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(baseLabel));
-        claimedLiteLabelhashes.push(liteLabelhash);
-        claimedFullNodes.push(fullNode);
-        mintedLiteTokenIds.push(uint256(fullNode));
+        bytes32 deviceLabelhash = LabelUtils.labelhashMemory(deviceLabel);
+        bytes32 personhoodNode =
+            LabelUtils.namehashUnder(TLD_NODE, LabelUtils.labelhashMemory(baseLabel));
+        claimedDeviceLabelhashes.push(deviceLabelhash);
+        claimedPersonhoodNodes.push(personhoodNode);
+        mintedDeviceTokenIds.push(uint256(personhoodNode));
         _trackGatewayLabel(baseLabel);
     }
 
@@ -394,7 +399,7 @@ contract PopControllerHandler is Test {
         address registrant = publicActors[actorIndex % publicActors.length];
         // Alternate between a contested base label and one of the public path's own. The
         // contested half exercises the race; the fresh half keeps the public side populated
-        // even in a run where the gateway holds every shared stem, so the provenance
+        // even in a run where the gateway holds every shared base name, so the provenance
         // invariant always has a public label to check. Ten characters classifies NoStatus.
         string memory label = baseIndex % 2 == 0
             ? _baseLabel(baseIndex)
@@ -406,7 +411,7 @@ contract PopControllerHandler is Test {
         ) {
             price = quote.price;
         } catch {
-            // A stem the gateway queue holds for someone else, or a tier the registrant does
+            // A base name the gateway queue holds for someone else, or a tier the registrant does
             // not meet, is priced nowhere. Both are ordinary contention.
             return;
         }
@@ -449,13 +454,13 @@ contract PopControllerHandler is Test {
     ///      registered one moves once the fee is paid. The recipient is a public actor either
     ///      way, so a moved name never deposits a `LabelStore` on a gateway actor.
     function attemptTransfer(uint256 tokenIndex, uint256 toIndex) external {
-        uint256 gatewayCount = mintedLiteTokenIds.length;
+        uint256 gatewayCount = mintedDeviceTokenIds.length;
         uint256 total = gatewayCount + publicTokenIds.length;
         if (total == 0) return;
 
         uint256 pick = tokenIndex % total;
         uint256 tokenId =
-            pick < gatewayCount ? mintedLiteTokenIds[pick] : publicTokenIds[pick - gatewayCount];
+            pick < gatewayCount ? mintedDeviceTokenIds[pick] : publicTokenIds[pick - gatewayCount];
         if (!REGISTRAR.exists(tokenId)) return;
 
         address from = REGISTRAR.ownerOf(tokenId);
@@ -480,10 +485,10 @@ contract PopControllerHandler is Test {
 
     /// @notice Creates an arbitrary subname under a gateway-issued name.
     /// @dev Interleaves subname creation with gateway mints so no subnode can quietly land on an
-    ///      issued name. A lite parent is skipped: this derives the parent node by hashing the
-    ///      whole label under the TLD, which is not a node the gateway minted for a lite name, so
-    ///      the existence check returns early. The subnode owner comes from `publicActors` so a
-    ///      subname never deposits a `LabelStore` on a gateway actor.
+    ///      issued name. A device-name parent is skipped: this derives the parent node by hashing
+    ///      the whole label under the TLD, which is not a node the gateway minted for a device
+    ///      name, so the existence check returns early. The subnode owner comes from `publicActors`
+    ///      so a subname never deposits a `LabelStore` on a gateway actor.
     function createSubname(uint256 parentIndex, uint256 subLabelSeed, uint256 toIndex) external {
         uint256 n = gatewayLabelsSeen.length;
         if (n == 0) return;
@@ -551,12 +556,14 @@ contract PopControllerHandler is Test {
     /// @dev Returns true on success and false on revert so the caller's
     ///      bookkeeping (ghost arrays) stays consistent with on-chain state.
     /// @return ok Whether the underlying call succeeded.
-    function _callReserveBaseName(IDotnsPopController.BaseReservation memory params)
+    function _callIssueDeviceNameWithReservation(
+        IDotnsPopController.DeviceNameIssuanceWithReservation memory params
+    )
         internal
         returns (bool ok)
     {
         _mockOriginIsRoot(true);
-        try CONTROLLER.reserveBaseName(params) {
+        try CONTROLLER.issueDeviceNameWithReservation(params) {
             ok = true;
         } catch {
             ok = false;
@@ -567,14 +574,14 @@ contract PopControllerHandler is Test {
         _mockOriginIsRoot(false);
     }
 
-    /// @notice Mirror of `_callReserveBaseName` for `registerBaseName`.
+    /// @notice Mirror of `_callIssueDeviceNameWithReservation` for `issuePersonhoodName`.
     /// @return ok Whether the underlying call succeeded.
-    function _callRegisterBaseName(IDotnsPopController.FullRegistration memory params)
+    function _callIssuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance memory params)
         internal
         returns (bool ok)
     {
         _mockOriginIsRoot(true);
-        try CONTROLLER.registerBaseName(params) {
+        try CONTROLLER.issuePersonhoodName(params) {
             ok = true;
         } catch {
             ok = false;
@@ -591,15 +598,15 @@ contract PopControllerHandler is Test {
         );
     }
 
-    /// @notice Builds a classification-valid PoP lite label.
+    /// @notice Builds a classification-valid PoP device name.
     /// @dev Shape: `<tag><4 letters from actor>.<2 digits>`, the separated form the gateway
-    ///      accepts. The stem is 7 characters, which classifies as PopLite under PopRules, and
+    ///      accepts. The stem is 7 characters, which classifies as Devicehood under PopRules, and
     ///      the separator and digits are the suffix. Tag disambiguates the reserve vs claim call
     ///      sites so neither collides with the other in the ERC721 namespace. The letter block
-    ///      is derived from the actor address via keccak so each actor lives in its own lite
+    ///      is derived from the actor address via keccak so each actor lives in its own device-name
     ///      namespace. Suffix wraps modulo 100 so the label keeps exactly two digits;
     ///      collisions past 100 reuses are swallowed by the caller's try/catch.
-    function _buildLiteLabel(
+    function _buildDeviceLabel(
         string memory tag,
         address actor,
         uint64 suffix

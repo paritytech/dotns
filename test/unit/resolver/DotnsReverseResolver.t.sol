@@ -11,10 +11,10 @@ import {IDotnsReverseResolver} from "../../../contracts/resolvers/IDotnsReverseR
 ///         @custom:function nameOf read.
 contract DotnsReverseResolverTests is BaseDotns {
     /// @notice Label fixture used by tests that need a labelled, transferable name.
-    /// @dev Stem of nine characters with a two-digit suffix; classifies as NoStatus.
+    /// @dev Eleven characters measured as written, digits included; classifies as NoStatus.
     string internal constant CLAIM_LABEL = "claimuser01";
     /// @notice Secondary label fixture used by overwrite and transfer tests.
-    /// @dev Stem of nine characters with a two-digit suffix; classifies as NoStatus.
+    /// @dev Twelve characters measured as written, digits included; classifies as NoStatus.
     string internal constant ALT_LABEL = "secondname01";
 
     function test_nameof_returns_empty_when_unset() public view {
@@ -116,18 +116,18 @@ contract DotnsReverseResolverTests is BaseDotns {
         assertEq(dotnsReverseResolver.nameOf(leonardo), string.concat(CLAIM_LABEL, ".dot"));
     }
 
-    /// @notice A lite username owner can claim and reverse-resolve it.
-    /// @dev A lite name is a registry subname, not a token, so the claim reads ownership through
+    /// @notice A device name owner can claim and reverse-resolve it.
+    /// @dev A device name is a registry subname, not a token, so the claim reads ownership through
     /// the registry at the stem-under-container node rather than from the registrar's ERC-721
     ///      ledger, and the reverse read resolves the same node.
-    function test_claim_and_nameof_for_a_lite_username() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
+    function test_claim_and_nameof_for_a_device_name() public {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "");
 
         vm.prank(ed);
-        dotnsReverseResolver.claimReverseRecord(LITE_LABEL_A);
+        dotnsReverseResolver.claimReverseRecord(DEVICE_LABEL_A);
 
-        assertEq(dotnsReverseResolver.nameOf(ed), string.concat(LITE_LABEL_A, ".dot"));
+        assertEq(dotnsReverseResolver.nameOf(ed), string.concat(DEVICE_LABEL_A, ".dot"));
     }
 
     function test_nameof_fails_closed_when_caller_no_longer_owns_stored_name() public {

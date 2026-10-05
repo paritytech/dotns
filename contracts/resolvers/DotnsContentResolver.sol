@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -15,7 +16,7 @@ import {IDotnsContentResolver} from "./IDotnsContentResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
-/// @title Dotns Content Resolver
+/// @title dotNS Content Resolver
 /// @notice Implements `IDotnsContentResolver` interface with content hash, text records, and
 /// operator approvals.
 /// @dev Writes are gated on the registry's authorisation for the node (owner or registrar-level
@@ -40,7 +41,7 @@ contract DotnsContentResolver is
     /// @notice Store all approval mapping
     mapping(address owner => mapping(address operator => bool approved)) private operators;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
@@ -142,7 +143,7 @@ contract DotnsContentResolver is
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
+    ///         registry so every dotNS contract reports one synchronised value.
     /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
     ///      `version()` selector for ABI compatibility. It reports the network's declaration,
     ///      not this contract's build; per-contract identity is the codehash declared on the

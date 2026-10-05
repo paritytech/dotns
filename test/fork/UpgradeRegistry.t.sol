@@ -21,8 +21,8 @@ contract UpgradeRegistryHarness is UpgradeRegistry {
 
 /// @title UpgradeRegistryForkTest
 /// @notice Pairs one-to-one with `scripts/deploy/UpgradeRegistry.s.sol`. Upgrades the deployed
-/// registry and proves records survive, then that the gate the release adds actually closes on the
-/// live controller set.
+/// registry and proves records survive, then that the deferral gate still closes on the live
+/// controller set.
 /// @dev Requires the local ETH-RPC adapter on `paseo_local`; see `DEPLOYMENTS.md`. Run the suite
 ///      with `bun run test:fork`, which also checks every snapshot against the deployed bytecode
 ///      before the first test runs.
@@ -48,11 +48,11 @@ contract UpgradeRegistryForkTest is BaseUpgradeFork {
         tldNode = IDotnsProtocolRegistry(_live("DotnsProtocolRegistry")).tldNode();
     }
 
-    /// @notice The TLD record survives the swap and the new deferral gate rejects a plain caller.
-    /// @dev The gate is the reason this upgrade exists. It reads `registrar.controllers` from live
-    ///      state on every call, so a unit test cannot show it closing against the real controller
-    ///      set; this can. The caller here owns nothing, so it fails the ownership modifier too,
-    ///      which is why the assertion is only that a plain caller cannot defer.
+    /// @notice The TLD record survives the swap and the deferral gate rejects a plain caller.
+    /// @dev The gate reads `registrar.controllers` from live state on every call, so a unit test
+    ///      cannot show it closing against the real controller set; this can. The caller here owns
+    ///      nothing, so it fails the ownership modifier too, which is why the assertion is only
+    ///      that a plain caller cannot defer.
     function test_upgrade_preserves_records_and_closes_the_deferral_gate() public {
         IDotnsRegistry registry = IDotnsRegistry(proxy);
 

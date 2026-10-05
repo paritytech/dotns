@@ -1,4 +1,4 @@
-name: Add Issues to DotNS Project
+name: Add Issues to dotNS Project
 
 on:
   issues:

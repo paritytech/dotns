@@ -38,27 +38,15 @@ contract LayoutCompatibilityTests is Test {
         );
     }
 
-    function test_protocolRegistry_layout_is_compatible() public {
-        // The one proxy that genuinely adds storage: #304 appends `_protocolVersion` and
-        // `_expectedCodehash` and shrinks the gap to match, which is an append, not a move.
-        _assertCompatible(
-            "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            "DotnsProtocolRegistryOld.sol:DotnsProtocolRegistryOld"
-        );
+    function test_popRules_layout_is_compatible() public {
+        _assertCompatible("PopRules.sol:PopRules", "PopRulesOld.sol:PopRulesOld");
     }
 
-    function test_registrar_layout_is_compatible() public {
+    function test_popResolver_layout_is_compatible() public {
+        // `_liteLinks` becomes `_deviceLinks` in slot 2 and `_fullClaims` becomes
+        // `_personhoodNodes` in slot 3, types unchanged, declared by renamed-from annotations.
         _assertCompatible(
-            "DotnsRegistrar.sol:DotnsRegistrar", "DotnsRegistrarOld.sol:DotnsRegistrarOld"
-        );
-    }
-
-    function test_registrarController_layout_is_compatible() public {
-        // The retained `__whiteListSlot` placeholder is what keeps `protocolRegistry` on the slot
-        // the live proxy uses. Without it this assertion is what fails.
-        _assertCompatible(
-            "DotnsRegistrarController.sol:DotnsRegistrarController",
-            "DotnsRegistrarControllerOld.sol:DotnsRegistrarControllerOld"
+            "DotnsPopResolver.sol:DotnsPopResolver", "DotnsPopResolverOld.sol:DotnsPopResolverOld"
         );
     }
 
@@ -66,64 +54,6 @@ contract LayoutCompatibilityTests is Test {
         _assertCompatible(
             "DotnsPopController.sol:DotnsPopController",
             "DotnsPopControllerOld.sol:DotnsPopControllerOld"
-        );
-    }
-
-    function test_popRules_layout_is_compatible() public {
-        _assertCompatible("PopRules.sol:PopRules", "PopRulesOld.sol:PopRulesOld");
-    }
-
-    function test_nameEscrow_layout_is_compatible() public {
-        _assertCompatible(
-            "DotnsNameEscrow.sol:DotnsNameEscrow", "DotnsNameEscrowOld.sol:DotnsNameEscrowOld"
-        );
-    }
-
-    function test_nameWhitelist_layout_is_compatible() public {
-        _assertCompatible(
-            "DotnsNameWhitelist.sol:DotnsNameWhitelist",
-            "DotnsNameWhitelistOld.sol:DotnsNameWhitelistOld"
-        );
-    }
-
-    function test_resolver_layout_is_compatible() public {
-        _assertCompatible(
-            "DotnsResolver.sol:DotnsResolver", "DotnsResolverOld.sol:DotnsResolverOld"
-        );
-    }
-
-    function test_reverseResolver_layout_is_compatible() public {
-        _assertCompatible(
-            "DotnsReverseResolver.sol:DotnsReverseResolver",
-            "DotnsReverseResolverOld.sol:DotnsReverseResolverOld"
-        );
-    }
-
-    function test_contentResolver_layout_is_compatible() public {
-        _assertCompatible(
-            "DotnsContentResolver.sol:DotnsContentResolver",
-            "DotnsContentResolverOld.sol:DotnsContentResolverOld"
-        );
-    }
-
-    function test_popResolver_layout_is_compatible() public {
-        _assertCompatible(
-            "DotnsPopResolver.sol:DotnsPopResolver", "DotnsPopResolverOld.sol:DotnsPopResolverOld"
-        );
-    }
-
-    /// @notice The store-factory migration swaps the implementation twice, so both directions have
-    ///         to be layout-compatible, not just the way in.
-    /// @dev The migrator is the shipped factory with four fields widened and one entrypoint added,
-    ///      so these hold by construction. Asserting them anyway is what catches someone editing
-    ///      the migrator into something that can no longer be swapped back out, which would strand
-    ///      the proxy on migration tooling.
-    function test_storeFactory_migration_is_compatible_in_both_directions() public {
-        _assertCompatible(
-            "StoreFactoryMigrator.sol:StoreFactoryMigrator", "StoreFactory.sol:StoreFactory"
-        );
-        _assertCompatible(
-            "StoreFactory.sol:StoreFactory", "StoreFactoryMigrator.sol:StoreFactoryMigrator"
         );
     }
 }

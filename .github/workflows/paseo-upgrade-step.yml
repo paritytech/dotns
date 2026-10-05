@@ -13,16 +13,13 @@ name: Paseo Upgrade Step
 # The gate is the `testnet-upgrades` environment: every run pauses until a required reviewer
 # approves it, whoever added the label. The label is the request; the approval is the decision.
 # Labels are also how retries work: the job removes its label when it finishes, so re-adding it
-# re-runs the step. The rotation script skips what already moved and the twelve swaps are
-# idempotent; step 13 is the exception, and its runbook section says to inspect, not re-add.
+# re-runs the step. Re-running one that already landed is harmless: a single-proxy upgrade swaps
+# in the same code again, and the other steps skip what is already on chain.
 #
-# Key handling. Step 0 signs with the repository-level `DOTNS_ADMIN_KEY`, because its value
-# cannot be read by anyone, so it cannot be re-entered as an environment secret. That exposure
-# is time-boxed: step 0's whole purpose is to make that key powerless. The fresh key the
-# operator generates IS entered as an environment secret under the same name, which shadows the
-# repository one for every later step, and the repository copy is then deleted. Runner logs on
-# this public repository are world-readable, so nothing here may ever echo key material; the
-# password below only encrypts a keystore that lives for one run.
+# Key handling. Every step signs with `DOTNS_ADMIN_KEY` from the `testnet-upgrades`
+# environment, the owner of every proxy and of the protocol registry. Runner logs on this public
+# repository are world-readable, so nothing here may ever echo key material; the password below
+# only encrypts a keystore that lives for one run.
 
 on:
   pull_request:
@@ -57,17 +54,20 @@ jobs:
         run: |
           set -euo pipefail
           SCRIPT="${LABEL#run:}"
+          # Each step names the contracts it upgrades, whose snapshots are checked against the
+          # chain right before it broadcasts. Steps that upgrade no proxy name none.
           case "$SCRIPT" in
-            RotateOwnership|UpgradeProtocolRegistry|UpgradeRegistry|UpgradeRegistrar|\
-            UpgradeRegistrarController|UpgradePopController|UpgradePopRules|\
-            UpgradeNameEscrow|UpgradeNameWhitelist|UpgradeResolver|UpgradeReverseResolver|\
-            UpgradeContentResolver|UpgradePopResolver|MigrateStoreFactory|DeclareRelease) ;;
+            UpgradeRegistry) SUBJECTS="DotnsRegistry" ;;
+            UpgradePopRules) SUBJECTS="PopRules" ;;
+            UpgradePopResolverAndController) SUBJECTS="DotnsPopResolver DotnsPopController" ;;
+            RedeployPopLens|DeclareRelease) SUBJECTS="" ;;
             *)
-              echo "::error::'$SCRIPT' is not a runbook step; see docs/PASEO-V080-RUNBOOK.md"
+              echo "::error::'$SCRIPT' is not a runbook step; see docs/PASEO-V100-RUNBOOK.md"
               exit 1
               ;;
           esac
           echo "script=$SCRIPT" >> "$GITHUB_OUTPUT"
+          echo "subjects=$SUBJECTS" >> "$GITHUB_OUTPUT"
 
       # The head commit, not the merge ref. A pull_request checkout defaults to the PR merged
       # into its base, and master merged into this branch is not the code that was reviewed or
@@ -93,32 +93,28 @@ jobs:
           docker compose up --build -d eth-rpc
           scripts/shell/wait-for-eth-rpc.sh http://127.0.0.1:8545
 
-      # Only before anything has been broadcast: the moment step 1 lands, the snapshots stop
-      # matching the chain by design, so this gate is pinned to step 0 instead of pretending to
-      # be a mid-flight health check.
+      # Scoped to the contracts this step upgrades. Every proxy an earlier step upgraded has
+      # moved past its snapshot by design; the ones this step is about to swap must still match,
+      # and a mismatch here means the code changed underneath the campaign.
       - name: Verify snapshots against the deployed bytecode
-        if: steps.step.outputs.script == 'RotateOwnership'
+        if: steps.step.outputs.subjects != ''
         env:
           RPC_URL: http://127.0.0.1:8545
+          SNAPSHOT_SUBJECTS: ${{ steps.step.outputs.subjects }}
         run: scripts/shell/verify-snapshots.sh
 
       - name: Broadcast ${{ steps.step.outputs.script }}
         env:
           SCRIPT: ${{ steps.step.outputs.script }}
           RPC_URL: http://127.0.0.1:8545
-          # `_account.sh` imports this into a run-local keystore when none exists. Environment
-          # secrets shadow repository ones for jobs that declare the environment, which is what
-          # switches every post-rotation step onto the fresh key without touching this file.
+          # `_account.sh` imports this into a run-local keystore when none exists.
           PRIVATE_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
           # Encrypts a keystore that exists for the lifetime of this runner. Masked because no
           # log line should print even throwaway credentials in cleartext.
           ACCOUNT_PASSWORD: testnet-upgrades-run-${{ github.run_id }}
-          # Step parameters, configured as environment variables on `testnet-upgrades`:
-          # DOTNS_NEW_OWNER for step 0, DOTNS_RELEASE_TAG for step 14, and optionally
-          # DOTNS_OLD_STORE_FACTORY as the step 13 cross-check.
-          DOTNS_NEW_OWNER: ${{ vars.DOTNS_NEW_OWNER }}
+          # Step parameter, configured as an environment variable on `testnet-upgrades`: the
+          # release tag `RedeployPopLens` scopes its salt to and `DeclareRelease` declares.
           DOTNS_RELEASE_TAG: ${{ vars.DOTNS_RELEASE_TAG }}
-          DOTNS_OLD_STORE_FACTORY: ${{ vars.DOTNS_OLD_STORE_FACTORY }}
         run: |
           set -euo pipefail
           echo "::add-mask::$ACCOUNT_PASSWORD"
@@ -126,8 +122,8 @@ jobs:
 
       # The broadcast record and the manifest are the two things a step changes on disk. The
       # manifest cannot be pushed back from here: the branch requires signed commits, which a
-      # runner cannot produce, so step 13's manifest change is committed by the operator from
-      # the artifact. Everything else leaves the workspace unchanged.
+      # runner cannot produce, so the manifest `RedeployPopLens` writes is committed by the
+      # operator from the artifact. Everything else leaves the workspace unchanged.
       - name: Keep the broadcast record
         if: always()
         uses: actions/upload-artifact@v4
@@ -151,5 +147,5 @@ jobs:
         run: |
           set -euo pipefail
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" \
-            --body "**${SCRIPT}**: ${RESULT}. [Run](${RUN_URL}). Broadcast record and manifest attached as artifacts. Re-add \`${LABEL}\` to retry; for MigrateStoreFactory, read the runbook before retrying anything."
+            --body "**${SCRIPT}**: ${RESULT}. [Run](${RUN_URL}). Broadcast record and manifest attached as artifacts. Re-add \`${LABEL}\` to retry."
           gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --remove-label "$LABEL"

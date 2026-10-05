@@ -59,7 +59,7 @@ contract WireDeployments is BaseDeployer {
         string label;
     }
 
-    function run() external {
+    function run() external virtual {
         address owner = msg.sender;
         vm.label(owner, "OWNER");
 

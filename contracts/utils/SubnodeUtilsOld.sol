@@ -1,25 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
-import {IDotnsRegistryOld} from "../registry/IDotnsRegistryOld.sol";
-import {IDotnsRegistrarOld} from "../registrars/IDotnsRegistrarOld.sol";
-import {IDotnsProtocolRegistryOld} from "../registry/IDotnsProtocolRegistryOld.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
+import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
+import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {LabelUtils} from "./LabelUtils.sol";
-import {StringUtils} from "./StringUtils.sol";
-import {DotnsConstantsOld} from "./DotnsConstantsOld.sol";
+import {StringUtilsOld} from "./StringUtilsOld.sol";
+import {DotnsConstants} from "./DotnsConstants.sol";
 
 /// @title DotNS Subnode Utilities Library
 /// @notice General-purpose helpers for registering names that live as subnodes of another name,
 ///         rather than as tokenised second-level registrations.
 /// @dev A subname has no token: its ownership lives in the registry record, not in the registrar's
-///      ERC-721 ledger. So it is registered through @custom:function
-/// IDotnsRegistryOld.setSubnodeOwner here, rather than through the tokenised mint triad of
-/// @custom:contract RegistrationUtilsOld.
+///      ERC-721 ledger. So it is registered through @custom:function IDotnsRegistry.setSubnodeOwner
+///      here, rather than through the tokenised mint triad of @custom:contract RegistrationUtils.
 /// @custom:security-contact admin@parity.io
 library SubnodeUtilsOld {
     /// @notice Inputs describing a single subname registration.
     /// @dev Passed as a struct so call sites name each field rather than thread a positional
-    ///      argument list, mirroring @custom:struct RegistrationUtilsOld.RegistrationContext.
+    ///      argument list, mirroring @custom:struct RegistrationUtils.RegistrationContext.
     /// @param protocolRegistry Protocol-level address registry used to resolve the registry and
     /// TLD.
     /// @param parentLabel Second-level parent label, e.g. `01`.
@@ -27,7 +26,7 @@ library SubnodeUtilsOld {
     /// @param owner Address to record as the subname owner.
     /// @param persist Whether the registry should index the subnode into the owner's `LabelStore`.
     struct SubnameContext {
-        IDotnsProtocolRegistryOld protocolRegistry;
+        IDotnsProtocolRegistry protocolRegistry;
         string parentLabel;
         string subLabel;
         address owner;
@@ -60,8 +59,8 @@ library SubnodeUtilsOld {
     /// separator first.
     /// @dev The single place a lite label is turned into a node, shared by the write path and every
     ///      reader of a lite name so the issuer and its readers agree on where a lite name lives.
-    ///      Callers gate on @custom:function StringUtils.isLitePersonLabelMemory beforehand, so the
-    ///      label is known to carry the separator this splits on.
+    ///      Callers gate on @custom:function StringUtilsOld.isLitePersonLabelMemory beforehand, so
+    ///      the label is known to carry the separator this splits on.
     /// @param tldNode The TLD node.
     /// @param liteLabel Lite label, e.g. `alice.01`.
     /// @return subnode Namehash of the stem beneath its numeric container beneath the TLD.
@@ -73,7 +72,7 @@ library SubnodeUtilsOld {
         pure
         returns (bytes32 subnode)
     {
-        (string memory stem, string memory suffix) = StringUtils.splitLiteLabel(liteLabel);
+        (string memory stem, string memory suffix) = StringUtilsOld.splitLiteLabel(liteLabel);
         subnode = subnodeOf(tldNode, suffix, stem);
     }
 
@@ -81,13 +80,13 @@ library SubnodeUtilsOld {
     ///         if it does not exist yet.
     /// @dev Derives the parent node `parentLabel.tld`; when no name is registered there yet it is
     ///      minted through the registrar with the calling contract as owner, so the caller holds
-    ///      the parent authority @custom:function IDotnsRegistryOld.setSubnodeOwner requires. The
+    ///      the parent authority @custom:function IDotnsRegistry.setSubnodeOwner requires. The
     ///      calling contract must therefore be a registrar controller, otherwise the registrar
     ///      @custom:reverts NotController. When a name already exists at the parent it must be
     /// owned by the caller, otherwise @custom:reverts NotAuthorised, so a name someone else holds
     /// is
     ///      never treated as the caller's parent. Ownership of the subname is then recorded through
-    ///      @custom:function IDotnsRegistryOld.setSubnodeOwner. `persist` is forwarded to the
+    ///      @custom:function IDotnsRegistry.setSubnodeOwner. `persist` is forwarded to the
     /// registry: when false the ownership and resolver record is written but the owner's
     /// `LabelStore` is
     ///      not, and the caller writes the label into the store separately.
@@ -101,16 +100,14 @@ library SubnodeUtilsOld {
     /// @param context Subname registration inputs. See @custom:struct SubnameContext.
     /// @return subnode Namehash of the registered subname.
     function registerSubname(SubnameContext memory context) internal returns (bytes32 subnode) {
-        IDotnsProtocolRegistryOld protocolRegistry = context.protocolRegistry;
+        IDotnsProtocolRegistry protocolRegistry = context.protocolRegistry;
 
         bytes32 parentNode = LabelUtils.namehashUnder(
             protocolRegistry.tldNode(), LabelUtils.labelhashMemory(context.parentLabel)
         );
 
-        IDotnsRegistrarOld registrar =
-            IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
-        IDotnsRegistryOld registry =
-            IDotnsRegistryOld(protocolRegistry.get(DotnsConstantsOld.REGISTRY));
+        IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
+        IDotnsRegistry registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
 
         // Mint the parent on first use, owned by the caller, and pass an empty label so no
         // `LabelStore` is written for it. When it already exists it must belong to the caller,
@@ -121,11 +118,11 @@ library SubnodeUtilsOld {
             registrar.register(uint256(parentNode), address(this), "");
             registry.setOwner(parentNode, address(this));
         } else {
-            require(registry.owner(parentNode) == address(this), IDotnsRegistryOld.NotAuthorised());
+            require(registry.owner(parentNode) == address(this), IDotnsRegistry.NotAuthorised());
         }
 
         subnode = registry.setSubnodeOwner(
-            IDotnsRegistryOld.SubnodeRecord({
+            IDotnsRegistry.SubnodeRecord({
                 parentNode: parentNode,
                 subLabel: context.subLabel,
                 parentLabel: context.parentLabel,

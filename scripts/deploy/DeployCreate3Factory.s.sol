@@ -7,7 +7,7 @@ import {Create3Factory} from "../../contracts/deploy/Create3Factory.sol";
 
 /// @title DeployCreate3Factory
 /// @notice Deploys the CREATE3 factory on its own, from a single-purpose key.
-/// @dev Every DotNS address is a pure function of the CREATE3 factory address
+/// @dev Every dotNS address is a pure function of the CREATE3 factory address
 ///      and a stable salt, and the factory address is `keccak(deployer, nonce)`.
 ///      A key that also runs the pipeline or upgrades cannot guarantee its
 ///      nonce, so a factory it mints drifts to a new address on every chain

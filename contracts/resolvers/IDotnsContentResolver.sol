@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title Dotns Content Resolver
+/// @title dotNS Content Resolver
 /// @notice Defines storage and retrieval for content hash, text records, and operator approvals for
-/// DotNS nodes. @dev Content hash and text records point to off-chain content such as IPFS CIDs or
+/// dotNS nodes. @dev Content hash and text records point to off-chain content such as IPFS CIDs or
 ///      future schemes; interpretation is handled off-chain. Operator approvals allow
 ///      third parties to manage records on behalf of the owner.
 /// @custom:security-contact admin@parity.io
@@ -31,7 +32,7 @@ interface IDotnsContentResolver {
     error NotAuthorised(bytes32 node, address caller);
 
     /// @notice Sets the content hash for a node.
-    /// @dev The caller must own the node in the DotNS registry or be an approved operator,
+    /// @dev The caller must own the node in the dotNS registry or be an approved operator,
     ///      otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an
     ///      IPFS CID); the resolver stores them as-is and never interprets the payload. Emits
     ///      @custom:emits ContentHashUpdated on every successful write.
@@ -45,7 +46,7 @@ interface IDotnsContentResolver {
     function contenthash(bytes32 node) external view returns (bytes memory hash);
 
     /// @notice Sets a text record for a node.
-    /// @dev The caller must own the node in the DotNS registry or be an approved operator,
+    /// @dev The caller must own the node in the dotNS registry or be an approved operator,
     ///      otherwise @custom:reverts NotAuthorised. Text records are arbitrary key/value strings
     ///      (e.g. `avatar`, `url`, `description`). Emits @custom:emits TextUpdated on every
     ///      successful write.

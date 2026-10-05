@@ -282,7 +282,7 @@ jobs:
           fi
 
       # This CI deploy reproduces the expected address set. The canonical factory
-      # was deployed above, and every DotNS address is a pure function of that
+      # was deployed above, and every dotNS address is a pure function of that
       # factory plus a fixed salt, so the freshly deployed manifest must equal the
       # committed expected set. Assert that, print the expected-vs-actual table, then
       # rerun the pipeline to prove the deploy is resumable: a rerun adopts every

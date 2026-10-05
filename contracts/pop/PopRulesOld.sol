@@ -9,14 +9,14 @@ import {
 import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
-import {StringUtils} from "../utils/StringUtils.sol";
-import {SystemUtilsOld} from "../utils/SystemUtilsOld.sol";
-import {IPopRules} from "./IPopRules.sol";
-import {IDotnsCostModelRegistryOld} from "./IDotnsCostModelRegistryOld.sol";
-import {IDotnsProtocolRegistryOld} from "../registry/IDotnsProtocolRegistryOld.sol";
+import {StringUtilsOld} from "../utils/StringUtilsOld.sol";
+import {SystemUtils} from "../utils/SystemUtils.sol";
+import {IPopRulesOld} from "./IPopRulesOld.sol";
+import {IDotnsCostModelRegistry} from "./IDotnsCostModelRegistry.sol";
+import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {IDotnsController} from "../registrars/IDotnsController.sol";
 import {DotnsRegistrarOld} from "../registrars/DotnsRegistrarOld.sol";
-import {DotnsConstantsOld} from "../utils/DotnsConstantsOld.sol";
+import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {IPersonhood} from "../external/personhood/IPersonhood.sol";
 
 /// @title PopRulesOld
@@ -28,7 +28,7 @@ import {IPersonhood} from "../external/personhood/IPersonhood.sol";
 ///      lengths >= 9 are open to any caller as NoStatus. PopLite is the separated form alone: a
 ///      digit suffix on an ordinary label says nothing about personhood.
 ///      Every caller pays the same amount for a given base length. The amount comes from the cost
-///      model registered under `DotnsConstantsOld.COST_MODEL`, which owns the curve; this contract
+///      model registered under `DotnsConstants.COST_MODEL`, which owns the curve; this contract
 ///      passes it only the base length and keeps the classification, reservation, and tier rules.
 ///      Personhood only unlocks the premium band. Base lengths below nine are closed to the public
 ///      paid path until Root sets `shortNamesEnabled`; the gateway and registerReserved do
@@ -39,9 +39,9 @@ contract PopRulesOld is
     UUPSUpgradeable,
     OwnableUpgradeable,
     ERC165Upgradeable,
-    IPopRules
+    IPopRulesOld
 {
-    using StringUtils for *;
+    using StringUtilsOld for *;
 
     /// @notice Active reservations keyed by stem.
     mapping(string baseName => Reservation reservation) public reservations;
@@ -50,7 +50,7 @@ contract PopRulesOld is
     uint256 public constant MAX_RESERVATION_TIME = 12 weeks;
 
     /// @notice Protocol-level address registry for all DotNS contracts.
-    IDotnsProtocolRegistryOld public protocolRegistry;
+    IDotnsProtocolRegistry public protocolRegistry;
 
     /// @notice Whether the public paid path may register names shorter than nine characters.
     ///         Closed by default; only governance opens it.
@@ -73,25 +73,26 @@ contract PopRulesOld is
     /// @notice Initialises the oracle (public entry point).
     /// @dev Runs once behind the proxy; subsequent calls trigger @custom:reverts
     ///      InvalidInitialization via the `initializer` modifier. Amounts come from the cost model
-    ///      registered under `DotnsConstantsOld.COST_MODEL`, so no price is seeded here.
+    ///      registered under `DotnsConstants.COST_MODEL`, so no price is seeded here.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(IDotnsProtocolRegistryOld registry) public initializer {
-        __Ownable_init(msg.sender);
+    function initialize(address initialOwner, IDotnsProtocolRegistry registry) public initializer {
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function setShortNamesEnabled(bool enabled) external override {
         // Opening the short-name band to the public path is a governance decision, so it is gated
         // on a substrate Root origin rather than the owner. `msg.sender` is deliberately not read:
         // a Root origin has no account behind it, so reading it would trap.
-        require(SystemUtilsOld.originIsRoot(), NotRoot());
+        require(SystemUtils.originIsRoot(), NotRoot());
         shortNamesEnabled = enabled;
         emit ShortNamesEnabledUpdated(enabled);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function classifyName(string calldata name)
         external
         pure
@@ -102,7 +103,7 @@ contract PopRulesOld is
         (requirement, message,) = _classifyValidatedName(name);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function reserveBaseName(
         string calldata stem,
         address userAddress
@@ -120,14 +121,14 @@ contract PopRulesOld is
         _writeReservation(stem, userAddress);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function isBaseName(string calldata baseName) external pure override returns (bool isBase) {
         _requireLabel(baseName);
         uint256 digits = _countTrailingDigits(baseName);
         return digits == 0;
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function getBaseNameReservation(string calldata baseName)
         external
         view
@@ -139,7 +140,7 @@ contract PopRulesOld is
         return (reserved.owner, reserved.expires);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function isBaseNameReserved(string calldata baseName)
         external
         view
@@ -151,7 +152,7 @@ contract PopRulesOld is
         return (_isLive(reservation), reservation.owner, reservation.expires);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function priceWithCheck(
         string calldata name,
         address userAddress
@@ -164,7 +165,7 @@ contract PopRulesOld is
         return _priceWithCheck(name, userAddress, false, 0);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function priceWithCheckAtVersion(
         string calldata name,
         address userAddress,
@@ -178,7 +179,7 @@ contract PopRulesOld is
         return _priceWithCheck(name, userAddress, true, pricingVersionValue);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function priceWithoutCheck(
         string calldata name,
         address userAddress
@@ -191,7 +192,7 @@ contract PopRulesOld is
         return _priceWithoutCheck(name, userAddress, false, 0);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function priceWithoutCheckAtVersion(
         string calldata name,
         address userAddress,
@@ -273,24 +274,24 @@ contract PopRulesOld is
 
         if (_isLive(reservation) && reservation.owner != userAddress) {
             metadata.message = "Base name reserved for original Lite registrant";
-            metadata.status = IPopRules.PopStatus.Reserved;
+            metadata.status = IPopRulesOld.PopStatus.Reserved;
         }
 
         return metadata;
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function price(string calldata name) external view override returns (uint256) {
         _requireLabel(name);
         return _priceValidatedName(_validatedBaseLength(name));
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function pricingVersion() external view override returns (uint256 modelVersion) {
         return _costModelRegistry().currentVersion();
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function transferFloor(
         string calldata name,
         address from,
@@ -317,7 +318,7 @@ contract PopRulesOld is
         return reachComponent > downgradeComponent ? reachComponent : downgradeComponent;
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function personhoodOf(address account) external view override returns (PopStatus tier) {
         return _personhoodTier(account);
     }
@@ -330,8 +331,8 @@ contract PopRulesOld is
     ///      collapses to `NoStatus` so a future tier addition fails closed instead of
     ///      silently being treated as a higher level than it actually is.
     function _personhoodTier(address account) private view returns (PopStatus) {
-        IPersonhood.PersonhoodInfo memory info = IPersonhood(DotnsConstantsOld.PERSONHOOD)
-            .personhoodStatus(account, DotnsConstantsOld.PERSONHOOD_CONTEXT);
+        IPersonhood.PersonhoodInfo memory info = IPersonhood(DotnsConstants.PERSONHOOD)
+            .personhoodStatus(account, DotnsConstants.PERSONHOOD_CONTEXT);
         if (info.status == 2) return PopStatus.PopFull;
         if (info.status == 1) return PopStatus.PopLite;
         return PopStatus.NoStatus;
@@ -372,13 +373,13 @@ contract PopRulesOld is
         return _costModelRegistry().priceForBaseLengthAtVersion(pricingVersionValue, baseLength);
     }
 
-    /// @notice Resolves the cost-model registry registered under `DotnsConstantsOld.COST_MODEL`.
+    /// @notice Resolves the cost-model registry registered under `DotnsConstants.COST_MODEL`.
     /// @dev @custom:reverts PopError when no registry is configured, so a pricing read fails closed
     ///      rather than resolving through the zero address.
-    function _costModelRegistry() private view returns (IDotnsCostModelRegistryOld registry) {
-        address configured = protocolRegistry.get(DotnsConstantsOld.COST_MODEL);
+    function _costModelRegistry() private view returns (IDotnsCostModelRegistry registry) {
+        address configured = protocolRegistry.get(DotnsConstants.COST_MODEL);
         require(configured != address(0), PopError("Cost model not configured"));
-        return IDotnsCostModelRegistryOld(configured);
+        return IDotnsCostModelRegistry(configured);
     }
 
     /// @notice Reverts a public paid registration of a base length below nine while the short-name
@@ -401,7 +402,7 @@ contract PopRulesOld is
     function _stemEnd(string calldata name) private pure returns (uint256 stemEnd) {
         stemEnd = bytes(name).length;
         if (!name.isLitePersonLabel()) return stemEnd;
-        return stemEnd - StringUtils.LITE_SUFFIX_DIGITS - 1;
+        return stemEnd - StringUtilsOld.LITE_SUFFIX_DIGITS - 1;
     }
 
     /// @notice The base length that pricing and classification both use to place a name in its
@@ -525,25 +526,31 @@ contract PopRulesOld is
         override
         returns (bool supported)
     {
-        return interfaceId == type(IPopRules).interfaceId || super.supportsInterface(interfaceId);
+        return interfaceId == type(IPopRulesOld).interfaceId || super.supportsInterface(interfaceId);
     }
 
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    /// @notice Returns implementation version.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every DotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
 
     /// @notice Ensures the caller is any controller authorised on the registrar.
     function _onlyRegistry() internal view {
         DotnsRegistrarOld registrar =
-            DotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+            DotnsRegistrarOld(protocolRegistry.get(DotnsConstants.REGISTRAR));
         require(registrar.controllers(IDotnsController(msg.sender)), NotRegistry());
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function reserveBaseNameForPop(
         string calldata stem,
         address userAddress
@@ -560,13 +567,13 @@ contract PopRulesOld is
         _writeReservation(stem, userAddress);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function stripDigits(string calldata name) external pure override returns (string memory stem) {
         _requireLabel(name);
         return _stripDigits(name);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function releaseBaseName(string calldata stem) external override onlyRegistry {
         _requireStem(stem);
         require(
@@ -588,7 +595,7 @@ contract PopRulesOld is
         emit BaseNameReleased(stem);
     }
 
-    /// @inheritdoc IPopRules
+    /// @inheritdoc IPopRulesOld
     function releaseReservationForReclaim(
         string calldata stem,
         address expectedOwner

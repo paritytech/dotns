@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title DotNS Label Utilities Library
-/// @notice Canonical keccak labelhash and namehash helpers shared by every DotNS contract that
+/// @title dotNS Label Utilities Library
+/// @notice Canonical keccak labelhash and namehash helpers shared by every dotNS contract that
 ///         derives node identifiers from user-supplied labels.
 /// @dev Exists so that the identical inline-assembly keccak sequences don't need to
 ///      live in every controller, registrar, or resolver. Every caller that maps a

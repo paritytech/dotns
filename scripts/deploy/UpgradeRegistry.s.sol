@@ -15,9 +15,9 @@ import {
 ///         proxy from the on-disk manifest, diffs the new storage layout against the pinned
 ///         @custom:contract DotnsRegistryOld snapshot, and swaps the implementation only when the
 ///         diff and every unsafe-pattern check pass.
-/// @dev The swap adds the controller gate on a deferred store write (`persist` false), and moves
-/// the store write to `StoreUtils.writeNewLabel`, which refuses to overwrite a locked label with a
-///      different one instead of silently skipping it.
+/// @dev The swap changes the registry only through `StringUtils`: `isNamePath`, which every subnode
+///      write checks on its parent label, now rejects a path longer than 255 octets, and the
+///      device-name helpers carry their new names.
 ///
 ///      The snapshot is the implementation deployed on chain, not the previous release: these
 ///      proxies were upgraded in place after their last release, so a snapshot taken from a tag

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title DotNS Constants
-/// @notice Protocol-level invariants shared across DotNS contracts.
+/// @title dotNS Constants
+/// @notice Protocol-level invariants shared across dotNS contracts.
 /// @dev Centralises the well-known protocol-registry keys that every contract uses to discover
 ///      its siblings (registrar, controller, registry, resolvers, etc.). Each key is a
 ///      role address resolved at call time, so rotating an implementation is a
@@ -20,8 +21,9 @@ library DotnsConstants {
 
     /// @notice Address of the Proof-of-Personhood precompile backed by the
     ///         alias-accounts pallet on Asset Hub.
-    /// @dev Consumed by `PopRules` to read each account's personhood tier
-    ///      (`None` / `Lite` / `Full`) and the dotns-scoped `contextAlias`.
+    /// @dev Consumed by `PopRules` to read each account's proof status, which the precompile
+    ///      names `None` / `Lite` / `Full` (PopRules maps them to `NoStatus` / `Devicehood` /
+    ///      `Personhood`), and the dotns-scoped `contextAlias`.
     address internal constant PERSONHOOD = address(0x000000000000000000000000000000000a010000);
 
     /// @notice Application identifier passed to @custom:function IPersonhood.personhoodStatus.
@@ -145,16 +147,16 @@ library DotnsConstants {
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant CONTENT_RESOLVER = bytes32("contentResolver");
 
-    /// @notice Well-known key for the dedicated PoP controller orchestrating lite/full-person
-    ///         username issuance on behalf of the PoP gateway.
+    /// @notice Well-known key for the dedicated PoP controller that issues device names and
+    ///         personhood names on behalf of the dotNS gateway pallet.
     /// @dev Kept distinct from `CONTROLLER` (commit-reveal public controller) so the
     ///      two can coexist per `DotnsRegistrar`'s multi-controller affordance.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant POP_CONTROLLER = bytes32("popController");
 
     /// @notice Well-known key for the PoP resolver holding per-name records produced
-    ///         by the PoP username flow (chat keys, lite => full links).
-    /// @dev Role: `node => chatKey` and bidirectional `lite <=> full` link index.
+    ///         by the gateway pallet (chat keys, device links).
+    /// @dev Role: `node => chatKey` and bidirectional device-link index.
     ///      Writer is the `POP_CONTROLLER`, not the node owner.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant POP_RESOLVER = bytes32("popResolver");

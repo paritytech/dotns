@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -66,7 +67,7 @@ contract DotnsNameWhitelist is
         mapping(bytes32 role => RoleData) _roles;
     }
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @notice Live-claim cap per name, tunable by governance within
@@ -137,7 +138,7 @@ contract DotnsNameWhitelist is
     ///      @custom:reverts InvalidInitialization. Sets `initialOwner` as owner and wires the
     ///      protocol registry the node derivation reads the TLD from.
     /// @param initialOwner Address that owns the contract once initialised.
-    /// @param registry Protocol registry all DotNS contracts resolve through.
+    /// @param registry Protocol registry all dotNS contracts resolve through.
     function initialize(
         address initialOwner,
         IDotnsProtocolRegistry registry

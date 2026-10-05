@@ -21,6 +21,13 @@ set -euo pipefail
 #   scripts/shell/verify-snapshots.sh                        # against RPC_URL
 #   RPC_URL=https://eth-rpc-paseo-next.polkadot.io ...
 #   DOTNS_NETWORK=paseo-assethub scripts/shell/verify-snapshots.sh
+#   SNAPSHOT_SUBJECTS="DotnsPopResolver DotnsPopController" ...   # only these contracts
+#
+# SNAPSHOT_SUBJECTS limits the bytecode comparison to the named contracts. Mid-campaign, every
+# proxy already upgraded has moved past its snapshot by design, so the gate before a step checks
+# only the contracts that step upgrades. A named contract also passes when it already runs this
+# build's implementation, which is what a step that died part way leaves behind; anything else is
+# still a failure. Every snapshot is still built.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
@@ -50,11 +57,12 @@ echo "verify-snapshots: $manifest against $RPC_URL (chain $chain_id)"
 
 forge build >/dev/null
 
-RPC_URL="$RPC_URL" MANIFEST="$manifest" python3 - "${snapshots[@]}" <<'PY'
+RPC_URL="$RPC_URL" MANIFEST="$manifest" SNAPSHOT_SUBJECTS="${SNAPSHOT_SUBJECTS:-}" python3 - "${snapshots[@]}" <<'PY'
 import json, os, sys, time, urllib.request
 
 RPC = os.environ["RPC_URL"]
 manifest = json.load(open(os.environ["MANIFEST"]))
+only = set(os.environ["SNAPSHOT_SUBJECTS"].split())
 # EIP-1967 implementation slot.
 SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
 
@@ -99,13 +107,30 @@ def deployed(name):
     return addr, bytes.fromhex((rpc("eth_getCode", [addr, "latest"]) or "0x")[2:])
 
 
-failures, checked, skipped = [], 0, []
+def matches(art, live):
+    """Whether `live` is the artefact's runtime code, immutables and metadata masked."""
+    built = bytearray(bytes.fromhex(art["deployedBytecode"]["object"][2:]))
+    live = bytearray(live)
+    if len(built) != len(live):
+        return False
+    for refs in art["deployedBytecode"].get("immutableReferences", {}).values():
+        for r in refs:
+            start, length = r["start"], r["length"]
+            built[start:start + length] = b"\0" * length
+            live[start:start + length] = b"\0" * length
+    return strip_metadata(built) == strip_metadata(live)
+
+
+failures, checked, skipped, upgraded = [], 0, [], 0
 for path in sys.argv[1:]:
     snapshot = os.path.basename(path)[:-4]          # DotnsRegistryOld
     subject = snapshot[:-3]                          # DotnsRegistry
     if subject not in manifest:
         # Interfaces, libraries and helper snapshots have no deployed counterpart of
         # their own; they are pulled in so the contract snapshots compile.
+        skipped.append(snapshot)
+        continue
+    if only and subject not in only:
         skipped.append(snapshot)
         continue
 
@@ -117,28 +142,32 @@ for path in sys.argv[1:]:
     art = json.load(open(artefact))
     built = bytearray(bytes.fromhex(art["deployedBytecode"]["object"][2:]))
     impl, live = deployed(subject)
-    live = bytearray(live)
     checked += 1
+
+    if matches(art, live):
+        print(f"  ok  {snapshot} == {subject} at {impl}")
+        continue
+
+    # Scoped to a step: a subject that already runs this build was upgraded by an earlier run of
+    # the same step, which is the state a retry has to start from.
+    current = f"out/{subject}.sol/{subject}.json"
+    if only and os.path.exists(current) and matches(json.load(open(current)), live):
+        print(f"  ok  {subject} at {impl} already runs this build")
+        upgraded += 1
+        continue
 
     if len(built) != len(live):
         failures.append(
             f"{snapshot}: {len(built)} bytes built against {len(live)} deployed at {impl}"
         )
-        continue
-
-    for refs in art["deployedBytecode"].get("immutableReferences", {}).values():
-        for r in refs:
-            start, length = r["start"], r["length"]
-            built[start:start + length] = b"\0" * length
-            live[start:start + length] = b"\0" * length
-
-    if strip_metadata(built) != strip_metadata(live):
-        failures.append(f"{snapshot}: same length but different code from {impl}")
     else:
-        print(f"  ok  {snapshot} == {subject} at {impl}")
+        failures.append(f"{snapshot}: same length but different code from {impl}")
+
+if only - {os.path.basename(p)[:-7] for p in sys.argv[1:]}:
+    failures.append(f"SNAPSHOT_SUBJECTS names contracts with no snapshot: {sorted(only - {os.path.basename(p)[:-7] for p in sys.argv[1:]})}")
 
 if skipped:
-    print(f"  --  {len(skipped)} snapshot(s) with no deployed counterpart: {', '.join(skipped)}")
+    print(f"  --  {len(skipped)} snapshot(s) not compared: {', '.join(skipped)}")
 
 if failures:
     print("\nverify-snapshots: FAILED", file=sys.stderr)
@@ -152,5 +181,8 @@ if failures:
     )
     sys.exit(1)
 
-print(f"\nverify-snapshots: {checked} snapshot(s) reproduce the deployed bytecode")
+summary = f"{checked - upgraded} snapshot(s) reproduce the deployed bytecode"
+if upgraded:
+    summary += f", {upgraded} contract(s) already run this build"
+print(f"\nverify-snapshots: {summary}")
 PY
