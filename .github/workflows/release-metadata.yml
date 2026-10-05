@@ -65,6 +65,17 @@ jobs:
           IS_DEPLOY_RECORD: ${{ contains(github.event.pull_request.labels.*.name, 'deployment-record') }}
         run: |
           changed=$(git diff --name-only "$BASE_SHA"...HEAD -- 'deployments/*/*.json')
+          # A manifest identical to master's was carried in by merging master into a long-lived
+          # branch, which records nothing new. On a pull request into master it cannot match.
+          edited=""
+          for f in $changed; do
+            if git diff --quiet origin/master HEAD -- "$f" 2>/dev/null; then
+              echo "Carried from master unchanged: $f"
+            else
+              edited="$edited $f"
+            fi
+          done
+          changed="${edited# }"
           if [ -z "$changed" ]; then
             echo "No live network manifest was edited."
             exit 0
