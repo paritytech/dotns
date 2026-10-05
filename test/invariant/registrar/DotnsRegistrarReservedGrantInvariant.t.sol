@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {ReservedGrantHandler} from "./ReservedGrantHandler.t.sol";
 
-/// @title Dotns Reserved Grant Invariant Suite
+/// @title dotNS Reserved Grant Invariant Suite
 /// @notice Asserts the properties the grant-gated reserved path exists to provide, across any
 ///         reachable interleaving of grants, relayed mints, ungranted attempts and double spends:
 ///         only granted labels mint, they mint to the beneficiary rather than the submitter, a

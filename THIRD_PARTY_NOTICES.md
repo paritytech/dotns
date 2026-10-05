@@ -6,7 +6,7 @@ summary; the licence text shipped with each dependency is authoritative.
 
 ## Code derived from ENS
 
-Parts of the DotNS contract suite are adapted from the Ethereum Name Service (ENS) contracts
+Parts of the dotNS contract suite are adapted from the Ethereum Name Service (ENS) contracts
 (registry / registrar / resolver / reverse-resolver structure, namehash and labelhash, and the
 commit-reveal registration flow). The ENS contracts are MIT-licensed and copyright True Names
 Limited. The MIT licence requires the original copyright and permission notice to be retained; it is

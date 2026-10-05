@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
@@ -8,10 +9,10 @@ import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {StoreUtils} from "./StoreUtils.sol";
 import {DotnsConstants} from "./DotnsConstants.sol";
 
-/// @title DotNS Registration Utilities Library
+/// @title dotNS Registration Utilities Library
 /// @notice Single canonical implementation of the "mint + forward-registry + store-write"
-///         triad used by every DotNS registration flow.
-/// @dev Exists so that every controller (public commit-reveal, PoP gateway, future
+///         triad used by every dotNS registration flow.
+/// @dev Exists so that every controller (public commit-reveal, gateway path, future
 ///      privileged flows) calls the same sequence. Without this library each controller
 ///      re-implements the sequence, and the implementations drift.
 /// @dev Scope: this library is deliberately minimal. It only performs the steps

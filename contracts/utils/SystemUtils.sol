@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {ISystem} from "../external/revive/ISystem.sol";
 import {DotnsConstants} from "./DotnsConstants.sol";
 
 /// @title SystemUtils
-/// @notice Shared access to revive's System precompile for DotNS contracts.
+/// @notice Shared access to revive's System precompile for dotNS contracts.
 /// @dev Canonical wrapper around `ISystem` at `DotnsConstants.REVIVE_SYSTEM`, so the precompile
 ///      address and interface are wired in one place rather than duplicated per consumer.
 /// @custom:security-contact admin@parity.io

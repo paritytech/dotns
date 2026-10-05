@@ -40,8 +40,8 @@ import {IPersonhood} from "../../contracts/external/personhood/IPersonhood.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 /// @title BaseDotns
-/// @notice Common Foundry test base for deploying a DotNS stack behind UUPS proxies.
-/// @dev Deploys and wires the core DotNS contracts used by test suites:
+/// @notice Common Foundry test base for deploying a dotNS stack behind UUPS proxies.
+/// @dev Deploys and wires the core dotNS contracts used by test suites:
 ///      - StoreFactory: per-user Store instances used for immutable registration writes
 ///      - DotnsRegistrar: ERC721-backed registrar used to allocate label ownership
 ///      - DotnsRegistry: forward registry used to set subnode ownership under .dot
@@ -78,7 +78,7 @@ abstract contract BaseDotns is Test {
     /// @notice Deployed cost-model registry resolved by PopRules under `COST_MODEL`.
     DotnsCostModelRegistry public costModelRegistry;
 
-    /// @notice Deployed DotNS registrar instance.
+    /// @notice Deployed dotNS registrar instance.
     DotnsRegistrar public dotnsRegistrar;
 
     /// @notice Deployed registrar controller instance.
@@ -96,30 +96,42 @@ abstract contract BaseDotns is Test {
     /// @notice Deployed reverse resolver instance.
     DotnsReverseResolver public dotnsReverseResolver;
 
-    /// @notice Deployed PoP resolver instance (chat keys + lite links).
+    /// @notice Deployed PoP resolver instance (chat keys + device-name links).
     DotnsPopResolver public dotnsPopResolver;
 
-    /// @notice Deployed PoP controller instance (gateway-driven lite/full issuance).
+    /// @notice Deployed PoP controller instance (gateway-driven device-name and personhood-name
+    ///         issuance).
     DotnsPopController public dotnsPopController;
 
     /// @notice Deployed PoP lens instance (read-only view over PoP identity data).
     DotnsPopLens public dotnsPopLens;
 
-    /// @notice Selector for the typed reserveLiteName entrypoint.
-    bytes4 internal constant SELECTOR_RESERVE_LITE_TYPED =
-        bytes4(keccak256("reserveLiteName((string,address,bytes))"));
+    /// @notice Selector for the typed issueDeviceName entrypoint.
+    bytes4 internal constant SELECTOR_ISSUE_DEVICE_NAME =
+        bytes4(keccak256("issueDeviceName((string,address,bytes))"));
 
-    /// @notice Selector for the typed reserveBaseName entrypoint.
-    bytes4 internal constant SELECTOR_RESERVE_BASE_TYPED =
-        bytes4(keccak256("reserveBaseName(((string,address,bytes),string))"));
+    /// @notice Selector for the typed issueDeviceNameWithReservation entrypoint.
+    bytes4 internal constant SELECTOR_ISSUE_DEVICE_NAME_WITH_RESERVATION =
+        bytes4(keccak256("issueDeviceNameWithReservation(((string,address,bytes),string))"));
 
-    /// @notice Selector for the typed reserveBaseNameOnly entrypoint.
-    bytes4 internal constant SELECTOR_RESERVE_BASE_ONLY_TYPED =
-        bytes4(keccak256("reserveBaseNameOnly((address,string))"));
+    /// @notice Selector for the typed reservePersonhoodName entrypoint.
+    bytes4 internal constant SELECTOR_RESERVE_PERSONHOOD_NAME =
+        bytes4(keccak256("reservePersonhoodName((address,string))"));
 
-    /// @notice Selector for the typed registerBaseName entrypoint.
-    bytes4 internal constant SELECTOR_REGISTER_BASE_TYPED =
-        bytes4(keccak256("registerBaseName((string,address,(uint8,string,bytes)))"));
+    /// @notice Selector for the typed issuePersonhoodName entrypoint.
+    bytes4 internal constant SELECTOR_ISSUE_PERSONHOOD_NAME =
+        bytes4(keccak256("issuePersonhoodName((string,address,(uint8,string,bytes)))"));
+
+    /// @notice Selector of `reserveLiteName((string,address,bytes))`.
+    /// @dev A literal: the legacy selectors never change while the legacy interface exists, so a
+    ///      signature edit fails the pin in the legacy suite.
+    bytes4 internal constant SELECTOR_LEGACY_RESERVE_LITE_NAME = 0x220015c0;
+
+    /// @notice Selector of `reserveBaseName(((string,address,bytes),string))`.
+    bytes4 internal constant SELECTOR_LEGACY_RESERVE_BASE_NAME = 0xd89f1bce;
+
+    /// @notice Selector of `registerBaseName((string,address,(uint8,string,bytes)))`.
+    bytes4 internal constant SELECTOR_LEGACY_REGISTER_BASE_NAME = 0x7c4b376b;
 
     /// @notice Default reservation duration used by the PoP controller.
     uint64 public constant DEFAULT_RESERVATION_DURATION = 7 days;
@@ -157,24 +169,32 @@ abstract contract BaseDotns is Test {
     bytes32 public constant ZERO_HASH = bytes32(0);
 
     // Classification-valid labels for the PoP path (post PopRules enforcement).
-    // A stem of 7 behind a two-digit suffix classifies as PopLite. These carry the gateway's
+    // A stem of 7 behind a two-digit suffix classifies as Devicehood. These carry the gateway's
     // separator, which reaches the chain only through the PoP path: the public path rejects a
     // separator, so a dotted label is always gateway-issued.
-    /// @notice PoP lite classification label fixture A.
-    string internal constant LITE_LABEL_A = "michael.01";
-    /// @notice PoP lite classification label fixture B.
-    string internal constant LITE_LABEL_B = "matthew.02";
-    /// @notice PoP lite classification label fixture C.
-    string internal constant LITE_LABEL_C = "william.03";
-    /// @notice PoP lite classification label fixture D.
-    string internal constant LITE_LABEL_D = "richard.04";
+    /// @notice PoP device-name classification label fixture A.
+    string internal constant DEVICE_LABEL_A = "michael.01";
+    /// @notice PoP device-name classification label fixture B.
+    string internal constant DEVICE_LABEL_B = "matthew.02";
+    /// @notice PoP device-name classification label fixture C.
+    string internal constant DEVICE_LABEL_C = "william.03";
+    /// @notice PoP device-name classification label fixture D.
+    string internal constant DEVICE_LABEL_D = "richard.04";
 
-    // baselength 8 with no trailing digits classifies as PopFull.
-    /// @notice PoP full classification label fixture A.
+    // Base length 8 with no trailing digits classifies as Personhood.
+    /// @notice Personhood-name fixture A: a single name, as a person would choose it.
+    string internal constant PERSONHOOD_LABEL_A = "victoria";
+    /// @notice Personhood-name fixture B.
+    string internal constant PERSONHOOD_LABEL_B = "isabella";
+    /// @notice Personhood-name fixture C.
+    string internal constant PERSONHOOD_LABEL_C = "caroline";
+
+    // Ordinary labels for suites outside PoP: 8 letters, no digits and no device suffix.
+    /// @notice Plain label fixture A, for suites that register or grant a label outside PoP.
     string internal constant BASE_LABEL_A = "alicebob";
-    /// @notice PoP full classification label fixture B.
+    /// @notice Plain label fixture B.
     string internal constant BASE_LABEL_B = "wonderla";
-    /// @notice PoP full classification label fixture C.
+    /// @notice Plain label fixture C.
     string internal constant BASE_LABEL_C = "carolboy";
 
     // Measured whole at 11, which is 9 or more, so these classify as NoStatus.
@@ -355,7 +375,7 @@ abstract contract BaseDotns is Test {
         vm.stopPrank();
         vm.warp(block.timestamp + 365 days);
         // Default every account to `None` (NoStatus) on the personhood
-        // precompile. Per-account `_grantPopFull`/`_grantPopLite` calls install
+        // precompile. Per-account `_grantPersonhood`/`_grantDevicehood` calls install
         // more specific mocks that override this selector-only stub.
         vm.mockCall(
             DotnsConstants.PERSONHOOD,
@@ -425,14 +445,14 @@ abstract contract BaseDotns is Test {
         node = LabelUtils.namehashUnder(_tldNode(), LabelUtils.labelhashMemory(label));
     }
 
-    /// @notice Computes the hierarchical subnode for a lite label `<stem>.<suffix>`.
-    /// @dev A lite username is `stem` beneath the numeric container `suffix.tld`, so its node is
+    /// @notice Computes the hierarchical subnode for a device name `<stem>.<suffix>`.
+    /// @dev A device name is `stem` beneath the numeric container `suffix.tld`, so its node is
     ///      `namehash(namehash(tldNode, keccak(suffix)), keccak(stem))`, not a hash of the whole
-    ///      label. Mirrors @custom:function DotnsPopController._liteSubnode.
-    /// @param liteLabel Lite label, e.g. `michael.01`.
+    ///      label. Mirrors @custom:function DotnsPopController._deviceSubnode.
+    /// @param deviceLabel Device name, e.g. `michael.01`.
     /// @return node The subnode identifier.
-    function _liteNodeOf(string memory liteLabel) internal pure returns (bytes32 node) {
-        (string memory stem, string memory suffix) = StringUtils.splitLiteLabel(liteLabel);
+    function _deviceNodeOf(string memory deviceLabel) internal pure returns (bytes32 node) {
+        (string memory stem, string memory suffix) = StringUtils.splitDeviceLabel(deviceLabel);
         bytes32 parentNode =
             LabelUtils.namehashUnder(_tldNode(), LabelUtils.labelhashMemory(suffix));
         node = LabelUtils.namehashUnder(parentNode, LabelUtils.labelhashMemory(stem));
@@ -452,13 +472,14 @@ abstract contract BaseDotns is Test {
     /// @notice Mocks the personhood precompile so it returns `tier` for `who`
     ///         under the dotns context.
     /// @dev Single source of truth for tier mocking. Tier numbering matches
-    ///      @custom:contract IPersonhood: 0=None, 1=Lite, 2=Full. `contextAlias` is non-zero
+    ///      @custom:contract IPersonhood, which names them 0=None, 1=Lite, 2=Full;
+    ///      1 is `Devicehood` and 2 is `Personhood` here. `contextAlias` is non-zero
     ///      whenever `tier != 0` so callers that read it (cross-context
     ///      identity tests) still see a deterministic value.
     function _setUserPopStatus(address who, IPopRules.PopStatus tier) internal {
         uint8 status;
-        if (tier == IPopRules.PopStatus.PopFull) status = 2;
-        else if (tier == IPopRules.PopStatus.PopLite) status = 1;
+        if (tier == IPopRules.PopStatus.Personhood) status = 2;
+        else if (tier == IPopRules.PopStatus.Devicehood) status = 1;
         // PopStatus.Reserved is a label classification, never a user tier; map
         // anything else to None.
         bytes32 contextAlias = status == 0 ? bytes32(0) : keccak256(abi.encode(who, status));
@@ -471,14 +492,14 @@ abstract contract BaseDotns is Test {
         );
     }
 
-    /// @notice Grants PopFull status to `who` via the personhood precompile mock.
-    function _grantPopFull(address who) internal {
-        _setUserPopStatus(who, IPopRules.PopStatus.PopFull);
+    /// @notice Grants Personhood status to `who` via the personhood precompile mock.
+    function _grantPersonhood(address who) internal {
+        _setUserPopStatus(who, IPopRules.PopStatus.Personhood);
     }
 
-    /// @notice Grants PopLite status to `who` via the personhood precompile mock.
-    function _grantPopLite(address who) internal {
-        _setUserPopStatus(who, IPopRules.PopStatus.PopLite);
+    /// @notice Grants Devicehood status to `who` via the personhood precompile mock.
+    function _grantDevicehood(address who) internal {
+        _setUserPopStatus(who, IPopRules.PopStatus.Devicehood);
     }
 
     /// @notice Resets `who` back to `None` on the personhood precompile mock.
@@ -522,22 +543,22 @@ abstract contract BaseDotns is Test {
     /// against the resolver and store hold. Chat keys are persisted eagerly on the PoP
     /// resolver at reserve time regardless of settlement. Tests that want to observe
     /// cold-path semantics (label stashed, no store deployed) must call
-    /// @custom:function _rootReserveBaseName or @custom:function _rootReserveLiteName
-    /// directly.
+    /// @custom:function _rootIssueDeviceNameWithReservation or
+    /// @custom:function _rootIssueDeviceName directly.
     function _reservePop(
         address user,
-        string memory liteLabel,
+        string memory deviceLabel,
         bytes memory chatKey,
-        string memory reservedBaseLabel
+        string memory reservedLabel
     )
         internal
     {
-        _rootReserveBaseName(
-            IDotnsPopController.BaseReservation({
-                lite: IDotnsPopController.LiteRegistration({
-                    liteLabel: liteLabel, user: user, chatKey: chatKey
+        _rootIssueDeviceNameWithReservation(
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: deviceLabel, user: user, chatKey: chatKey
                 }),
-                reservedBaseLabel: reservedBaseLabel
+                reservedLabel: reservedLabel
             })
         );
         if (dotnsPopController.pendingClaimCountOf(user) != 0) {
@@ -546,28 +567,59 @@ abstract contract BaseDotns is Test {
         }
     }
 
-    /// @notice Dispatches the typed `reserveLiteName` call under a mocked Root origin.
-    function _rootReserveLiteName(IDotnsPopController.LiteRegistration memory params) internal {
-        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_LITE_TYPED, params));
+    /// @notice Dispatches the typed `issueDeviceName` call under a mocked Root origin.
+    function _rootIssueDeviceName(IDotnsPopController.DeviceNameIssuance memory params) internal {
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_ISSUE_DEVICE_NAME, params));
     }
 
     /// @notice Dispatches the typed `reserveBaseName` call under a mocked Root origin.
-    function _rootReserveBaseName(IDotnsPopController.BaseReservation memory params) internal {
-        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_TYPED, params));
-    }
-
-    /// @notice Dispatches the typed `reserveBaseNameOnly` call under a mocked Root origin.
-    function _rootReserveBaseNameOnly(IDotnsPopController.BaseNameReservation memory params)
+    function _rootIssueDeviceNameWithReservation(
+        IDotnsPopController.DeviceNameIssuanceWithReservation memory params
+    )
         internal
     {
-        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_BASE_ONLY_TYPED, params));
+        _dispatchFromRoot(
+            abi.encodeWithSelector(SELECTOR_ISSUE_DEVICE_NAME_WITH_RESERVATION, params)
+        );
     }
 
-    /// @notice Dispatches the typed `registerBaseName` call under a mocked Root origin.
+    /// @notice Dispatches the typed `reservePersonhoodName` call under a mocked Root origin.
+    function _rootReservePersonhoodName(IDotnsPopController.PersonhoodNameReservation memory params)
+        internal
+    {
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_RESERVE_PERSONHOOD_NAME, params));
+    }
+
+    /// @notice Dispatches the typed `issuePersonhoodName` call under a mocked Root origin.
     /// @dev Dispatches the label as written. The gateway sends what People Chain holds, so a
-    ///      helper that reshaped it would hide whether a fixture is a valid lite label.
-    function _rootRegisterBaseName(IDotnsPopController.FullRegistration memory params) internal {
-        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_REGISTER_BASE_TYPED, params));
+    ///      helper that reshaped it would hide whether a fixture is a valid device name.
+    function _rootIssuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance memory params)
+        internal
+    {
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_ISSUE_PERSONHOOD_NAME, params));
+    }
+
+    /// @notice Dispatches the legacy `reserveLiteName` call under a mocked Root origin.
+    function _rootLegacyReserveLiteName(IDotnsPopController.DeviceNameIssuance memory params)
+        internal
+    {
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_LEGACY_RESERVE_LITE_NAME, params));
+    }
+
+    /// @notice Dispatches the legacy `reserveBaseName` call under a mocked Root origin.
+    function _rootLegacyReserveBaseName(
+        IDotnsPopController.DeviceNameIssuanceWithReservation memory params
+    )
+        internal
+    {
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_LEGACY_RESERVE_BASE_NAME, params));
+    }
+
+    /// @notice Dispatches the legacy `registerBaseName` call under a mocked Root origin.
+    function _rootLegacyRegisterBaseName(IDotnsPopController.PersonhoodNameIssuance memory params)
+        internal
+    {
+        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_LEGACY_REGISTER_BASE_NAME, params));
     }
 
     /// @notice Calls `payload` on the PoP controller under a mocked Root origin.
@@ -591,25 +643,25 @@ abstract contract BaseDotns is Test {
         return data;
     }
 
-    /// @notice Constructs a `Link` that inherits the chat key from a prior lite label.
-    function _linkWithLite(string memory liteLabel)
+    /// @notice Constructs a `Link` that inherits the chat key from a prior device name.
+    function _linkWithDeviceName(string memory deviceLabel)
         internal
         pure
         returns (IDotnsPopController.Link memory)
     {
         return IDotnsPopController.Link({
-            kind: IDotnsPopController.LinkKind.LiteUsername, liteLabel: liteLabel, chatKey: ""
+            kind: IDotnsPopController.LinkKind.DeviceName, deviceLabel: deviceLabel, chatKey: ""
         });
     }
 
-    /// @notice Constructs a `Link` carrying a fresh chat key (no lite inheritance).
+    /// @notice Constructs a `Link` carrying a fresh chat key (no device-name inheritance).
     function _linkFresh(bytes memory chatKey)
         internal
         pure
         returns (IDotnsPopController.Link memory)
     {
         return IDotnsPopController.Link({
-            kind: IDotnsPopController.LinkKind.None, liteLabel: "", chatKey: chatKey
+            kind: IDotnsPopController.LinkKind.None, deviceLabel: "", chatKey: chatKey
         });
     }
 
@@ -717,7 +769,7 @@ abstract contract BaseDotns is Test {
 
     /// @notice Registers `label` for `labelOwner` under the requested PoP status and
     ///         returns its node.
-    /// @dev For NoStatus, no status is set on the oracle. For PopLite/PopFull, status is set
+    /// @dev For NoStatus, no status is set on the oracle. For Devicehood/Personhood, status is set
     ///      for `(labelOwner, label)` before commit-reveal.
     /// @param label The label to register (without the `.dot` suffix).
     /// @param labelOwner The address that will own the registered label.

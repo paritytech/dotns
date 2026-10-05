@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title Dotns Resolver
-/// @notice Defines forward-resolution address records for DotNS nodes.
+/// @title dotNS Resolver
+/// @notice Defines forward-resolution address records for dotNS nodes.
 /// @dev Forward-address records describe where a name points. Authority therefore
 ///      follows node ownership in the forward registry, not a privileged writer.
 /// @custom:security-contact admin@parity.io

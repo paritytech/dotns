@@ -162,7 +162,7 @@ contract EscrowHandler is Test {
     ///      randomly aligns or splits their PoP statuses, and dispatches the controller
     ///      `register()` call from the payer. Routes to the deposit, depositProtocolFee,
     ///      or skip branch depending on the resulting tier prices. Revert-safe: if the
-    ///      computed price is zero on both sides (PoPLite/PoPFull no-cost path) the call
+    ///      computed price is zero on both sides (Devicehood/Personhood no-cost path) the call
     ///      still completes but ghost state is only updated where state actually changed.
     /// @param ownerSeed Seed selecting the registrant.
     /// @param payerSeed Seed selecting the payer.
@@ -174,21 +174,21 @@ contract EscrowHandler is Test {
         address ownerAddr = _pickDifferentActor(payer, payerSeed);
         if (ownerAddr == address(0)) return;
 
-        // Tier-status assignment: 0 = both NoStatus, 1 = elevate payer to PopFull,
-        // 2 = elevate owner to PopLite, 3 = elevate both (no fee differential).
+        // Tier-status assignment: 0 = both NoStatus, 1 = elevate payer to Personhood,
+        // 2 = elevate owner to Devicehood, 3 = elevate both (no fee differential).
         uint256 mode = bound(statusSeed, 0, 3);
         if (mode == 0) {
             _mockPersonhoodTier(payer, IPopRules.PopStatus.NoStatus);
             _mockPersonhoodTier(ownerAddr, IPopRules.PopStatus.NoStatus);
         } else if (mode == 1) {
-            _mockPersonhoodTier(payer, IPopRules.PopStatus.PopFull);
+            _mockPersonhoodTier(payer, IPopRules.PopStatus.Personhood);
             _mockPersonhoodTier(ownerAddr, IPopRules.PopStatus.NoStatus);
         } else if (mode == 2) {
             _mockPersonhoodTier(payer, IPopRules.PopStatus.NoStatus);
-            _mockPersonhoodTier(ownerAddr, IPopRules.PopStatus.PopLite);
+            _mockPersonhoodTier(ownerAddr, IPopRules.PopStatus.Devicehood);
         } else if (mode == 3) {
-            _mockPersonhoodTier(payer, IPopRules.PopStatus.PopFull);
-            _mockPersonhoodTier(ownerAddr, IPopRules.PopStatus.PopFull);
+            _mockPersonhoodTier(payer, IPopRules.PopStatus.Personhood);
+            _mockPersonhoodTier(ownerAddr, IPopRules.PopStatus.Personhood);
         }
 
         string memory label = _generateUniqueLabel();
@@ -450,7 +450,7 @@ contract EscrowHandler is Test {
     }
 
     /// @notice Sets a random PoP status for an actor mid-run.
-    /// @dev Bound: 0 = NoStatus, 1 = PopLite, 2 = PopFull. Allows the fuzzer to flip
+    /// @dev Bound: 0 = NoStatus, 1 = Devicehood, 2 = Personhood. Allows the fuzzer to flip
     ///      tiers between handler calls so subsequent registrations and transfers exercise
     ///      every routing branch.
     /// @param actorSeed Seed selecting the actor whose status flips.
@@ -469,8 +469,8 @@ contract EscrowHandler is Test {
     /// @param tier Verification tier to report for `account`.
     function _mockPersonhoodTier(address account, IPopRules.PopStatus tier) internal {
         uint8 statusByte;
-        if (tier == IPopRules.PopStatus.PopFull) statusByte = 2;
-        else if (tier == IPopRules.PopStatus.PopLite) statusByte = 1;
+        if (tier == IPopRules.PopStatus.Personhood) statusByte = 2;
+        else if (tier == IPopRules.PopStatus.Devicehood) statusByte = 1;
 
         bytes32 contextAlias =
             statusByte == 0 ? bytes32(0) : keccak256(abi.encode(account, statusByte));

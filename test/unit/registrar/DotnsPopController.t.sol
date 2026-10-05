@@ -22,16 +22,16 @@ import {Vm} from "forge-std/Vm.sol";
 ///         tests assert specific behaviours that do not benefit from input
 ///         variation.
 contract DotnsPopControllerTests is BaseDotns {
-    function test_reserveBaseName_mints_and_wires_registry_and_resolver() public {
-        // Lite path requires PopLite tier and a classification-valid lite label.
-        _grantPopFull(ed);
+    function test_issueDeviceNameWithReservation_mints_and_wires_registry_and_resolver() public {
+        // Device-name path requires Devicehood tier and a classification-valid device name.
+        _grantPersonhood(ed);
         bytes memory chatKey = _validChatKey(0x01);
 
-        _reservePop(ed, LITE_LABEL_A, chatKey, "");
+        _reservePop(ed, DEVICE_LABEL_A, chatKey, "");
 
-        // A lite username is a subnode under its numeric container, not a tokenised name, so its
+        // A device name is a subnode under its numeric container, not a tokenised name, so its
         // ownership lives in the registry record rather than the registrar's ERC-721 ledger.
-        bytes32 node = _liteNodeOf(LITE_LABEL_A);
+        bytes32 node = _deviceNodeOf(DEVICE_LABEL_A);
         assertEq(dotnsRegistry.owner(node), ed);
         assertEq(dotnsPopResolver.chatKey(node), chatKey);
 
@@ -51,9 +51,9 @@ contract DotnsPopControllerTests is BaseDotns {
     ///         does not re-mint it.
     /// @dev A re-mint would revert on the already-registered container, so the second reservation
     ///      succeeding, with the container owner unchanged, is proof it took the reuse path.
-    function test_second_lite_stem_reuses_the_container() public {
-        _grantPopFull(ed);
-        _grantPopFull(leonardo);
+    function test_second_device_stem_reuses_the_container() public {
+        _grantPersonhood(ed);
+        _grantPersonhood(leonardo);
 
         _reservePop(ed, "michael.01", _validChatKey(0x01), "");
         bytes32 containerNode = _nodeOf("01");
@@ -62,177 +62,199 @@ contract DotnsPopControllerTests is BaseDotns {
         _reservePop(leonardo, "matthew.01", _validChatKey(0x02), "");
 
         assertEq(dotnsRegistry.owner(containerNode), containerOwner, "container not re-owned");
-        assertEq(dotnsRegistry.owner(_liteNodeOf("michael.01")), ed, "first stem owned by ed");
+        assertEq(dotnsRegistry.owner(_deviceNodeOf("michael.01")), ed, "first stem owned by ed");
         assertEq(
-            dotnsRegistry.owner(_liteNodeOf("matthew.01")),
+            dotnsRegistry.owner(_deviceNodeOf("matthew.01")),
             leonardo,
             "second stem owned by leonardo"
         );
     }
 
-    function test_reserveBaseName_reverts_when_origin_is_not_root() public {
+    function test_issueDeviceNameWithReservation_reverts_when_origin_is_not_root() public {
         _mockOriginIsRoot(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
-        dotnsPopController.reserveBaseName(
-            IDotnsPopController.BaseReservation({
-                lite: IDotnsPopController.LiteRegistration({
-                    liteLabel: LITE_LABEL_A, user: ed, chatKey: ""
+        dotnsPopController.issueDeviceNameWithReservation(
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: DEVICE_LABEL_A, user: ed, chatKey: ""
                 }),
-                reservedBaseLabel: ""
+                reservedLabel: ""
             })
         );
     }
 
-    function test_reserveBaseName_enqueues_when_reserved_label_provided() public {
+    function test_issueDeviceNameWithReservation_enqueues_when_reserved_label_provided() public {
         // `PopRules.priceWithCheck` admits only the live reservation holder on
         // a given base stem, so the queue is single-occupant. Multi-occupant
         // queue coverage lives in the invariant suite.
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), BASE_LABEL_A);
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), PERSONHOOD_LABEL_A);
 
-        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertTrue(reserved);
         assertEq(holder, ed);
     }
 
-    function test_registerBaseName_claim_emits_claim_event_and_not_standalone() public {
-        // ed gets a different PopFull-classified base label via standalone mint.
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+    function test_issuePersonhoodName_claim_emits_reservation_claimed() public {
+        // ed gets a different Personhood-classified base label via standalone mint.
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
 
         vm.recordLogs();
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        _assertEventEmittedOnce(logs, keccak256("BaseNameClaimed(bytes32,address,string)"));
-        _assertEventNotEmitted(logs, keccak256("StandaloneNameRegistered(bytes32,address,string)"));
+        _assertEventEmittedOnce(logs, keccak256("ReservationClaimed(bytes32,address)"));
+        _assertEventEmittedOnce(logs, keccak256("PersonhoodNameIssued(bytes32,address,string)"));
 
-        (bool reserved,) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(reserved);
     }
 
-    function test_registerBaseName_standalone_emits_standalone_event_and_not_claim() public {
-        _grantPopFull(tiago);
-        _reservePop(tiago, LITE_LABEL_B, _validChatKey(0x01), BASE_LABEL_A);
+    function test_issuePersonhoodName_standalone_emits_no_reservation_claimed() public {
+        _grantPersonhood(tiago);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0x01), PERSONHOOD_LABEL_A);
         // `priceWithCheck` admits only the live reservation holder on a given
         // base stem, so the standalone mint runs against a separate, free stem
         // owned by a different user; this asserts neither user sees state leak
         // from the other.
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xcf));
 
         vm.recordLogs();
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_C, user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_C, user: ed, link: link
+            })
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        _assertEventEmittedOnce(logs, keccak256("StandaloneNameRegistered(bytes32,address,string)"));
-        _assertEventNotEmitted(logs, keccak256("BaseNameClaimed(bytes32,address,string)"));
+        _assertEventEmittedOnce(logs, keccak256("PersonhoodNameIssued(bytes32,address,string)"));
+        _assertEventNotEmitted(logs, keccak256("ReservationClaimed(bytes32,address)"));
     }
 
-    function test_registerBaseName_claim_inherits_chat_key_from_lite_node() public {
-        // Promote ed to PopFull so the standalone PopFull-classified mint passes.
-        _grantPopFull(ed);
-        bytes memory liteChatKey = _validChatKey(0xaa);
-        _reservePop(ed, LITE_LABEL_A, liteChatKey, BASE_LABEL_A);
+    function test_issuePersonhoodName_claim_inherits_chat_key_from_device_node() public {
+        // Promote ed to Personhood so the standalone Personhood-classified mint passes.
+        _grantPersonhood(ed);
+        bytes memory deviceChatKey = _validChatKey(0xaa);
+        _reservePop(ed, DEVICE_LABEL_A, deviceChatKey, PERSONHOOD_LABEL_A);
 
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
 
-        bytes32 fullNode = _nodeOf(BASE_LABEL_A);
-        assertEq(dotnsPopResolver.chatKey(fullNode), liteChatKey);
-        assertEq(dotnsPopResolver.liteLink(fullNode), keccak256(bytes(LITE_LABEL_A)));
+        bytes32 personhoodNode = _nodeOf(PERSONHOOD_LABEL_A);
+        assertEq(dotnsPopResolver.chatKey(personhoodNode), deviceChatKey);
+        assertEq(
+            dotnsPopResolver.deviceLabelhashOf(personhoodNode), keccak256(bytes(DEVICE_LABEL_A))
+        );
     }
 
-    function test_registerBaseName_claim_wipes_entire_queue() public {
+    function test_issuePersonhoodName_claim_wipes_entire_queue() public {
         // `priceWithCheck` admits only the live reservation holder on a given
         // base stem, so the queue stays single-occupant; after the holder
         // claims, the stem is free for a fresh reservation from any user.
-        _grantPopFull(ed);
-        _grantPopFull(tiago);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+        _grantPersonhood(ed);
+        _grantPersonhood(tiago);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
 
-        _reservePop(tiago, LITE_LABEL_D, _validChatKey(0x04), BASE_LABEL_B);
-        (, address wonderHolder) = dotnsPopController.isReservedForClaim(BASE_LABEL_B);
+        _reservePop(tiago, DEVICE_LABEL_D, _validChatKey(0x04), PERSONHOOD_LABEL_B);
+        (, address wonderHolder) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_B);
         assertEq(wonderHolder, tiago);
     }
 
-    function test_registerBaseName_standalone_auto_relinquishes_users_other_reservation() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+    function test_issuePersonhoodName_standalone_auto_relinquishes_users_other_reservation()
+        public
+    {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0x02));
 
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_B, user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_B, user: ed, link: link
+            })
         );
 
-        (bool reserved,) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(reserved);
     }
 
-    function test_registerBaseName_standalone_with_lite_link_silently_relinquishes() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+    function test_issuePersonhoodName_standalone_with_device_link_relinquishes_the_other_reservation()
+        public
+    {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
-        _grantPopFull(ed);
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
+        _grantPersonhood(ed);
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
 
         vm.recordLogs();
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_B, user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_B, user: ed, link: link
+            })
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        _assertEventEmittedOnce(logs, keccak256("StandaloneNameRegistered(bytes32,address,string)"));
-        _assertEventEmittedOnce(logs, keccak256("LiteToFullLinked(bytes32,bytes32)"));
-        _assertEventNotEmitted(logs, keccak256("BaseNameClaimed(bytes32,address,string)"));
-        _assertEventNotEmitted(logs, keccak256("ReservationRelinquished(bytes32,address)"));
+        _assertEventEmittedOnce(logs, keccak256("PersonhoodNameIssued(bytes32,address,string)"));
+        _assertEventEmittedOnce(logs, keccak256("DeviceNameLinked(bytes32,bytes32)"));
+        _assertEventNotEmitted(logs, keccak256("ReservationClaimed(bytes32,address)"));
+        _assertEventEmittedOnce(logs, keccak256("ReservationRelinquished(bytes32,address)"));
 
-        bytes32 fullNode = _nodeOf(BASE_LABEL_B);
-        assertEq(dotnsPopResolver.liteLink(fullNode), keccak256(bytes(LITE_LABEL_A)));
+        bytes32 personhoodNode = _nodeOf(PERSONHOOD_LABEL_B);
+        assertEq(
+            dotnsPopResolver.deviceLabelhashOf(personhoodNode), keccak256(bytes(DEVICE_LABEL_A))
+        );
 
-        (bool reserved,) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(reserved);
     }
 
-    function test_registerBaseName_reverts_when_origin_is_not_root() public {
+    function test_issuePersonhoodName_reverts_when_origin_is_not_root() public {
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xaa));
 
         _mockOriginIsRoot(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
-        dotnsPopController.registerBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        dotnsPopController.issuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
     }
 
     function test_relinquishReservation_promotes_next_waiter_when_head_leaves() public {
-        _grantPopFull(ed);
-        _grantPopFull(tiago);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+        _grantPersonhood(ed);
+        _grantPersonhood(tiago);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
         vm.prank(ed);
         dotnsPopController.relinquishReservation();
 
-        (bool empty,) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool empty,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(empty);
 
-        _reservePop(tiago, LITE_LABEL_B, _validChatKey(0x02), BASE_LABEL_A);
-        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0x02), PERSONHOOD_LABEL_A);
+        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertTrue(reserved);
         assertEq(holder, tiago);
     }
@@ -246,12 +268,12 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_setReservationDuration_shortening_retroactively_expires_live_entries() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         // Enqueue alice under the default duration (7 days).
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
         (bool liveBefore, address holderBefore) =
-            dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+            dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertTrue(liveBefore);
         assertEq(holderBefore, ed);
         // Warp 2 days forward (still well within the original 7-day window).
@@ -261,7 +283,7 @@ contract DotnsPopControllerTests is BaseDotns {
         vm.prank(owner);
         dotnsPopController.setReservationDuration(1 days);
 
-        (bool liveAfter,) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool liveAfter,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(liveAfter);
     }
 
@@ -275,34 +297,34 @@ contract DotnsPopControllerTests is BaseDotns {
         // Two independent reads must agree: the per-user reservation pointer
         // (`userReservation`) and the per-base claim view (`isReservedForClaim`).
         // Both change atomically when the same user re-reserves on a new stem.
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
         IDotnsPopController.UserReservation memory firstReservation =
             dotnsPopController.userReservation(ed);
-        assertEq(firstReservation.labelhash, keccak256(bytes(BASE_LABEL_A)));
+        assertEq(firstReservation.labelhash, keccak256(bytes(PERSONHOOD_LABEL_A)));
         // Second reservation by the same user on a different stem drops the
         // first slot and installs the new one.
-        _reservePop(ed, LITE_LABEL_B, _validChatKey(0x02), BASE_LABEL_B);
+        _reservePop(ed, DEVICE_LABEL_B, _validChatKey(0x02), PERSONHOOD_LABEL_B);
 
         IDotnsPopController.UserReservation memory secondReservation =
             dotnsPopController.userReservation(ed);
-        assertEq(secondReservation.labelhash, keccak256(bytes(BASE_LABEL_B)));
+        assertEq(secondReservation.labelhash, keccak256(bytes(PERSONHOOD_LABEL_B)));
 
-        (bool firstReserved,) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool firstReserved,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(firstReserved);
 
         (bool secondReserved, address secondHolder) =
-            dotnsPopController.isReservedForClaim(BASE_LABEL_B);
+            dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_B);
         assertTrue(secondReserved);
         assertEq(secondHolder, ed);
     }
 
     function test_reEnqueue_after_own_expiry_promotes_same_user_to_head() public {
-        string memory baseStem = BASE_LABEL_A;
-        _grantPopFull(ed);
+        string memory baseStem = PERSONHOOD_LABEL_A;
+        _grantPersonhood(ed);
 
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), baseStem);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), baseStem);
         // Warp past the reservation window and fire the GC so ed's pointer gets
         // cleared by `_advanceExpiredHead`. If the expiry path forgets the
         // per-user pointer, the second reserve call below hits `AlreadyReserved`
@@ -312,8 +334,8 @@ contract DotnsPopControllerTests is BaseDotns {
 
         (bool expiredReserved,) = dotnsPopController.isReservedForClaim(baseStem);
         assertFalse(expiredReserved);
-        // Same user reserves the same stem again with a fresh lite label.
-        _reservePop(ed, LITE_LABEL_B, _validChatKey(0x02), baseStem);
+        // Same user reserves the same stem again with a fresh device name.
+        _reservePop(ed, DEVICE_LABEL_B, _validChatKey(0x02), baseStem);
 
         (bool nowReserved, address holder) = dotnsPopController.isReservedForClaim(baseStem);
         assertTrue(nowReserved);
@@ -321,17 +343,17 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_claim_then_reEnqueue_on_same_stem_resets_cleanly() public {
-        string memory baseStem = BASE_LABEL_A;
-        _grantPopFull(ed);
-        _grantPopFull(tiago);
+        string memory baseStem = PERSONHOOD_LABEL_A;
+        _grantPersonhood(ed);
+        _grantPersonhood(tiago);
 
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), baseStem);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), baseStem);
         // Claim wipes the queue via `_clearQueue` which must also drop
         // `_reservedBaseLabel[labelhash]` and release the PopRules slot. Missing
         // any one of those lets the next reservation inherit stale state.
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: baseStem, user: ed, link: link})
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: baseStem, user: ed, link: link})
         );
 
         (bool oldSlot, address oldHolder) = dotnsPopController.isReservedForClaim(baseStem);
@@ -339,41 +361,42 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(oldHolder, address(0));
         // Fresh stem, different user. If the previous queue leaked, this enqueue
         // would either revert or land the wrong head address on PopRules.
-        _reservePop(tiago, LITE_LABEL_B, _validChatKey(0x02), BASE_LABEL_B);
-        (bool newSlot, address newHolder) = dotnsPopController.isReservedForClaim(BASE_LABEL_B);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0x02), PERSONHOOD_LABEL_B);
+        (bool newSlot, address newHolder) =
+            dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_B);
         assertTrue(newSlot);
         assertEq(newHolder, tiago);
 
-        (address popHolder,) = popRules.getBaseNameReservation(BASE_LABEL_B);
+        (address popHolder,) = popRules.getBaseNameReservation(PERSONHOOD_LABEL_B);
         assertEq(popHolder, tiago);
     }
 
     function test_expireReservation_is_permissionless() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
         vm.warp(block.timestamp + dotnsPopController.reservationDuration() + 1);
         // Anyone can call. Pinning this prevents a future patch from silently
         // adding `onlyRoot` and breaking permissionless garbage collection.
         address stranger = makeAddr("stranger");
         vm.prank(stranger);
-        dotnsPopController.expireReservation(BASE_LABEL_A);
+        dotnsPopController.expireReservation(PERSONHOOD_LABEL_A);
 
-        (bool reserved,) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(reserved);
     }
 
     function test_head_expires_clears_slot_for_next_reserver() public {
-        string memory baseStem = BASE_LABEL_A;
-        _grantPopFull(ed);
-        _grantPopFull(leonardo);
+        string memory baseStem = PERSONHOOD_LABEL_A;
+        _grantPersonhood(ed);
+        _grantPersonhood(leonardo);
 
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), baseStem);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), baseStem);
 
         vm.warp(block.timestamp + dotnsPopController.reservationDuration() + 1);
         dotnsPopController.expireReservation(baseStem);
 
-        _reservePop(leonardo, LITE_LABEL_C, _validChatKey(0x03), baseStem);
+        _reservePop(leonardo, DEVICE_LABEL_C, _validChatKey(0x03), baseStem);
 
         (bool reserved, address holder) = dotnsPopController.isReservedForClaim(baseStem);
         assertTrue(reserved);
@@ -384,51 +407,51 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_entry_point_format_rejections() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
         // The shape check runs before any pricing, so "michael" is rejected for carrying no
         // separator rather than for anything about its tier.
-        vm.expectRevert(IDotnsPopController.InvalidLiteLabel.selector);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({liteLabel: "michael", user: ed, chatKey: ""})
+        vm.expectRevert(IDotnsPopController.InvalidDeviceLabel.selector);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({label: "michael", user: ed, chatKey: ""})
         );
 
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xaa));
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "not.valid", user: ed, link: link})
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: "not.valid", user: ed, link: link})
         );
     }
 
-    function test_same_stem_lite_and_base_occupy_distinct_registrar_tokens() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "");
-        // "michael" (baselength 7, no trailing digits) classifies as PopFull
-        // and shares the lite's stem, so both tokens coexist on the registrar.
-        _grantPopFull(tiago);
+    function test_same_stem_device_and_personhood_names_occupy_distinct_nodes() public {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "");
+        // "michael" (baselength 7, no trailing digits) classifies as Personhood
+        // and shares the device name's stem, so both tokens coexist on the registrar.
+        _grantPersonhood(tiago);
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xbb));
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "michael", user: tiago, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: "michael", user: tiago, link: link})
         );
 
-        assertEq(dotnsRegistry.owner(_liteNodeOf(LITE_LABEL_A)), ed);
+        assertEq(dotnsRegistry.owner(_deviceNodeOf(DEVICE_LABEL_A)), ed);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("michael"))), tiago);
     }
 
     function test_both_controllers_can_mint_on_shared_registrar() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "");
         _commitAndRegister("longnamebob01", tiago, true);
 
-        assertEq(dotnsRegistry.owner(_liteNodeOf(LITE_LABEL_A)), ed);
+        assertEq(dotnsRegistry.owner(_deviceNodeOf(DEVICE_LABEL_A)), ed);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("longnamebob01"))), tiago);
     }
 
     function test_gateway_reserved_name_rejects_public_register_by_other_user() public {
-        _grantPopFull(tiago);
+        _grantPersonhood(tiago);
         // The gateway reserves the stem, and the stem is what the reservation blocks: a public
         // registrant contends for `longnamebob` itself.
-        _reservePop(tiago, LITE_LABEL_A, _validChatKey(0x11), "longnamebob");
+        _reservePop(tiago, DEVICE_LABEL_A, _validChatKey(0x11), "longnamebob");
 
         (address holder,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, tiago);
@@ -455,7 +478,7 @@ contract DotnsPopControllerTests is BaseDotns {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPopRules.PopError.selector, "Base name reserved for original Lite registrant"
+                IPopRules.PopError.selector, "Reserved for a device-name holder's personhood claim"
             )
         );
         vm.prank(ed);
@@ -463,8 +486,8 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_gateway_reserved_name_allows_holder_to_register_via_public() public {
-        _grantPopFull(tiago);
-        _reservePop(tiago, LITE_LABEL_A, _validChatKey(0x11), "longnamebob");
+        _grantPersonhood(tiago);
+        _reservePop(tiago, DEVICE_LABEL_A, _validChatKey(0x11), "longnamebob");
 
         _commitAndRegister("longnamebob", tiago, true);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("longnamebob"))), tiago);
@@ -475,50 +498,50 @@ contract DotnsPopControllerTests is BaseDotns {
     ///      shares no stem with it and a stranger may take it. This is the guarantee that
     ///      replaces the old cross-flow, where the two spellings collided.
     function test_gateway_reservation_does_not_cover_a_digit_suffixed_name() public {
-        _grantPopFull(tiago);
-        _reservePop(tiago, LITE_LABEL_A, _validChatKey(0x11), "longnamebob");
+        _grantPersonhood(tiago);
+        _reservePop(tiago, DEVICE_LABEL_A, _validChatKey(0x11), "longnamebob");
 
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         _commitAndRegister("longnamebob01", ed, true);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("longnamebob01"))), ed);
     }
 
-    function test_second_pop_lite_mint_of_same_label_reverts() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "");
+    function test_second_device_name_issuance_of_same_label_reverts() public {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "");
 
-        // Re-issuing a lite name is rejected at the controller before any registry write, so a
+        // Re-issuing a device name is rejected at the controller before any registry write, so a
         // duplicate dispatch cannot rehome the identity or overwrite its records.
-        _grantPopFull(tiago);
-        vm.expectRevert(IDotnsPopController.LiteNameAlreadyIssued.selector);
-        _rootReserveBaseName(
-            IDotnsPopController.BaseReservation({
-                lite: IDotnsPopController.LiteRegistration({
-                    liteLabel: LITE_LABEL_A, user: tiago, chatKey: _validChatKey(0xbb)
+        _grantPersonhood(tiago);
+        vm.expectRevert(IDotnsPopController.DeviceNameAlreadyIssued.selector);
+        _rootIssueDeviceNameWithReservation(
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: DEVICE_LABEL_A, user: tiago, chatKey: _validChatKey(0xbb)
                 }),
-                reservedBaseLabel: ""
+                reservedLabel: ""
             })
         );
     }
 
-    /// @notice A lite name's owner can host a subname beneath it.
-    /// @dev A lite name is itself a subname the owner controls in the registry, so the owner holds
-    ///      the parent authority @custom:function IDotnsRegistry.setSubnodeOwner requires and can
-    ///      graft their own subnames beneath it, such as a device name `phone.michael.01`.
-    function test_lite_name_owner_can_host_a_subname() public {
-        _grantPopLite(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0xb4)
+    /// @notice A device name's owner can host a subname beneath it.
+    /// @dev A device name is itself a subname the owner controls in the registry, so the owner
+    ///      holds the parent authority @custom:function IDotnsRegistry.setSubnodeOwner requires and
+    ///      can graft their own subnames beneath it, such as a device name `phone.michael.01`.
+    function test_device_name_owner_can_host_a_subname() public {
+        _grantDevicehood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0xb4)
             })
         );
 
-        // A lite name is a subname the owner controls, so they can host their own subnames beneath
-        // it, such as a device name `phone.michael.01`.
+        // A device name is a subname the owner controls, so they can host their own subnames
+        // beneath it, such as a device name `phone.michael.01`.
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: _liteNodeOf(LITE_LABEL_A),
+            parentNode: _deviceNodeOf(DEVICE_LABEL_A),
             subLabel: "phone",
-            parentLabel: LITE_LABEL_A,
+            parentLabel: DEVICE_LABEL_A,
             owner: ed,
             persist: true
         });
@@ -534,10 +557,10 @@ contract DotnsPopControllerTests is BaseDotns {
     ///      inside the same call, so the assertion that it still reads false is what proves the
     ///      failed mint took the provenance write with it. A public name that answered
     ///      `isPopIssued` would pass for a person.
-    function test_pop_full_mint_after_public_register_reverts_and_writes_no_provenance() public {
+    function test_personhood_mint_after_public_register_reverts_and_writes_no_provenance() public {
         string memory label = "longnamebobx";
 
-        _grantPopFull(tiago);
+        _grantPersonhood(tiago);
         _commitAndRegister(label, tiago, true);
 
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xd1));
@@ -546,20 +569,22 @@ contract DotnsPopControllerTests is BaseDotns {
                 IDotnsRegistrar.NameNotAvailable.selector, uint256(_nodeOf(label))
             )
         );
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: label, user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: label, user: ed, link: link})
         );
 
         assertFalse(dotnsPopController.isPopIssued(label), "provenance survived a failed mint");
         assertFalse(dotnsRegistrar.isSoulbound(uint256(_nodeOf(label))), "public name locked");
     }
 
-    function test_public_register_after_pop_full_mint_reverts_at_registrar() public {
-        // "longnamebobx" is classification-NoStatus, so ed keeps default status. A full-person
+    function test_public_register_after_personhood_mint_reverts_at_registrar() public {
+        // "longnamebobx" is classification-NoStatus, so ed keeps default status. A personhood
         // label carries no digit suffix.
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xcf));
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "longnamebobx", user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: "longnamebobx", user: ed, link: link
+            })
         );
 
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("longnamebobx"))), ed);
@@ -591,17 +616,19 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_owner_of_pop_minted_name_can_create_subname() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xcf));
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
 
-        bytes32 parentNode = _nodeOf(BASE_LABEL_A);
+        bytes32 parentNode = _nodeOf(PERSONHOOD_LABEL_A);
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
             parentNode: parentNode,
             subLabel: "app",
-            parentLabel: BASE_LABEL_A,
+            parentLabel: PERSONHOOD_LABEL_A,
             owner: leonardo,
             persist: true
         });
@@ -613,17 +640,19 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_non_owner_cannot_create_subname_under_pop_minted_name() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xcf));
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
 
-        bytes32 parentNode = _nodeOf(BASE_LABEL_A);
+        bytes32 parentNode = _nodeOf(PERSONHOOD_LABEL_A);
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
             parentNode: parentNode,
             subLabel: "app",
-            parentLabel: BASE_LABEL_A,
+            parentLabel: PERSONHOOD_LABEL_A,
             owner: tiago,
             persist: true
         });
@@ -637,16 +666,16 @@ contract DotnsPopControllerTests is BaseDotns {
         // A name minted through the public commit-reveal flow already has an owner, so a PoP
         // reservation over it could never be redeemed. The guard rejects it at reserve time
         // rather than admitting it and only failing at claim, which would have locked every
-        // lite name built on that stem for the full reservation window.
+        // device name built on that stem for the full reservation window.
         _commitAndRegister("longnamebob", ed, true);
 
-        _grantPopFull(tiago);
-        vm.expectRevert(IDotnsPopController.BaseNameAlreadyRegistered.selector);
-        _reservePop(tiago, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob");
+        _grantPersonhood(tiago);
+        vm.expectRevert(IDotnsPopController.PersonhoodNameUnavailable.selector);
+        _reservePop(tiago, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob");
 
-        // The guard runs before the lite mint, so the whole call aborts and no lite name is
-        // minted for the candidate.
-        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(LITE_LABEL_A))));
+        // The guard runs before the device-name mint, so the whole call aborts and no device name
+        // is minted for the candidate.
+        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(DEVICE_LABEL_A))));
 
         // No reservation was recorded, so the stem family stays open to other candidates.
         (bool reserved,) = dotnsPopController.isReservedForClaim("longnamebob");
@@ -654,8 +683,8 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_enqueue_becomesHead_writes_popRules_reservation() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob");
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob");
 
         (address holder, uint64 expires) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, ed);
@@ -663,12 +692,12 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_claim_releases_popRules_slot() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob");
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob");
 
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "longnamebob", user: ed, link: link})
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: "longnamebob", user: ed, link: link})
         );
 
         (address holder,) = popRules.getBaseNameReservation("longnamebob");
@@ -676,8 +705,8 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_relinquish_last_releases_popRules_slot() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob");
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob");
 
         vm.prank(ed);
         dotnsPopController.relinquishReservation();
@@ -687,8 +716,8 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_advanceExpiredHead_last_expire_releases_popRules_slot() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob");
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob");
 
         vm.warp(block.timestamp + dotnsPopController.reservationDuration() + 1);
         dotnsPopController.expireReservation("longnamebob");
@@ -697,44 +726,47 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(holder, address(0));
     }
 
-    function test_reserveBaseName_reverts_for_digit_suffixed_reserved_base_label() public {
-        _grantPopFull(ed);
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob01");
+    function test_issueDeviceNameWithReservation_reverts_for_digit_suffixed_reserved_label()
+        public
+    {
+        _grantPersonhood(ed);
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob01");
     }
 
-    function test_reserveBaseName_reverts_when_reserved_label_already_registered() public {
-        // George worked example: ed reserves and then claims the base name, which frees the
-        // stem slot on PopRules. A later lite candidate must not be able to queue a reservation
-        // over the now-registered name: the queue keys by stem, so an unclaimable reservation
-        // would hold that stem for the full reservation window and block every lite name built
-        // on it.
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob");
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({
-                label: "longnamebob", user: ed, link: _linkWithLite(LITE_LABEL_A)
+    function test_issueDeviceNameWithReservation_reverts_when_reserved_label_already_registered()
+        public
+    {
+        // George worked example: ed reserves and then claims the base name, which frees the stem
+        // slot on PopRules. A later device-name candidate must not be able to queue a reservation
+        // over the now-registered name: the queue keys by stem, so an unclaimable reservation would
+        // hold that stem for the full reservation window and block every device name built on it.
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob");
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: "longnamebob", user: ed, link: _linkWithDeviceName(DEVICE_LABEL_A)
             })
         );
 
-        _grantPopFull(tiago);
-        vm.expectRevert(IDotnsPopController.BaseNameAlreadyRegistered.selector);
-        _reservePop(tiago, LITE_LABEL_B, _validChatKey(0xbb), "longnamebob");
+        _grantPersonhood(tiago);
+        vm.expectRevert(IDotnsPopController.PersonhoodNameUnavailable.selector);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0xbb), "longnamebob");
     }
 
     /// @dev Claiming the stem takes the name, so nothing is left for a stranger to register.
     ///      What the claim releases is the reservation slot on PopRules, which is what this
     ///      asserts; a digit-suffixed spelling would prove nothing, being an unrelated name.
     function test_claim_clears_the_reservation_slot() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob");
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob");
 
         (address beforeClaim,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(beforeClaim, ed, "reserved for the claimant");
 
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "longnamebob", user: ed, link: link})
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: "longnamebob", user: ed, link: link})
         );
 
         (address afterClaim,) = popRules.getBaseNameReservation("longnamebob");
@@ -743,13 +775,13 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_public_stranger_can_mint_after_reservation_expires() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob");
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob");
 
         vm.warp(block.timestamp + dotnsPopController.reservationDuration() + 1);
         dotnsPopController.expireReservation("longnamebob");
 
-        _grantPopFull(tiago);
+        _grantPersonhood(tiago);
         _commitAndRegister("longnamebob", tiago, true);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("longnamebob"))), tiago);
     }
@@ -760,12 +792,12 @@ contract DotnsPopControllerTests is BaseDotns {
         _mockOriginIsRoot(false);
         vm.prank(address(dotnsRegistrarController));
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
-        dotnsPopController.reserveBaseName(
-            IDotnsPopController.BaseReservation({
-                lite: IDotnsPopController.LiteRegistration({
-                    liteLabel: LITE_LABEL_A, user: ed, chatKey: ""
+        dotnsPopController.issueDeviceNameWithReservation(
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: DEVICE_LABEL_A, user: ed, chatKey: ""
                 }),
-                reservedBaseLabel: "longnamebob"
+                reservedLabel: "longnamebob"
             })
         );
     }
@@ -806,259 +838,270 @@ contract DotnsPopControllerTests is BaseDotns {
         assertFalse(reservedAfter);
     }
 
-    function test_registerBaseName_standalone_succeeds_when_head_is_expired() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+    function test_issuePersonhoodName_standalone_succeeds_when_head_is_expired() public {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
         // Walk past both the controller and PopRules expiry windows so
         // nothing blocks tiago's priceWithCheck.
         vm.warp(block.timestamp + popRules.MAX_RESERVATION_TIME() + 1);
 
-        _grantPopFull(tiago);
+        _grantPersonhood(tiago);
 
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xcf));
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: tiago, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: tiago, link: link
+            })
         );
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(BASE_LABEL_A))), tiago);
+        assertEq(
+            IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(PERSONHOOD_LABEL_A))), tiago
+        );
     }
 
-    function test_registerBaseName_standalone_succeeds_when_queue_empty() public {
-        _grantPopFull(ed);
+    function test_issuePersonhoodName_standalone_succeeds_when_queue_empty() public {
+        _grantPersonhood(ed);
 
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xcf));
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(BASE_LABEL_A))), ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(PERSONHOOD_LABEL_A))), ed);
     }
 
-    function test_registerBaseName_claim_path_bypasses_standalone_holder_guard() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+    function test_issuePersonhoodName_claim_path_bypasses_standalone_holder_guard() public {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(BASE_LABEL_A))), ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(PERSONHOOD_LABEL_A))), ed);
     }
 
-    function test_registerBaseName_guard_blocks_stranger_and_preserves_claim() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+    function test_issuePersonhoodName_guard_blocks_stranger_and_preserves_claim() public {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
-        _grantPopFull(tiago);
+        _grantPersonhood(tiago);
         IDotnsPopController.Link memory strangerLink = _linkFresh(_validChatKey(0xbb));
         vm.expectPartialRevert(IDotnsPopController.NotHolder.selector);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({
-                label: BASE_LABEL_A, user: tiago, link: strangerLink
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: tiago, link: strangerLink
             })
         );
         // A's reservation is intact; A claims successfully.
-        IDotnsPopController.Link memory claimLink = _linkWithLite(LITE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: claimLink})
+        IDotnsPopController.Link memory claimLink = _linkWithDeviceName(DEVICE_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: claimLink
+            })
         );
 
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(BASE_LABEL_A))), ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(PERSONHOOD_LABEL_A))), ed);
     }
 
-    function test_registerBaseName_reverts_for_governance_length_name() public {
-        _grantPopFull(ed);
+    function test_issuePersonhoodName_reverts_for_governance_length_name() public {
+        _grantPersonhood(ed);
 
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xaa));
         // Stem "alice" has baselength 5; classifies as `Reserved for Governance`,
         // which the PoP controller's governance guard rejects.
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
 
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "alice", user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: "alice", user: ed, link: link})
         );
     }
 
-    function test_reserveBaseName_reserved_label_classification_reverts() public {
-        _grantPopFull(ed);
+    function test_issueDeviceNameWithReservation_reserved_label_classification_reverts() public {
+        _grantPersonhood(ed);
 
-        // Lite leg uses a valid lite label; reserved leg uses a <=5-char stem,
+        // The issuance uses a valid device name; reserved leg uses a <=5-char stem,
         // which classifies as `Reserved for Governance` and is rejected by the
         // PoP controller's governance guard.
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _rootReserveBaseName(
-            IDotnsPopController.BaseReservation({
-                lite: IDotnsPopController.LiteRegistration({
-                    liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _rootIssueDeviceNameWithReservation(
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
                 }),
-                reservedBaseLabel: "alice"
+                reservedLabel: "alice"
             })
         );
     }
 
-    function test_registerBaseName_popFull_user_on_popFull_label_succeeds() public {
-        _grantPopFull(ed);
+    function test_issuePersonhoodName_personhood_user_on_personhood_label_succeeds() public {
+        _grantPersonhood(ed);
 
         uint256 controllerBalanceBefore = address(dotnsPopController).balance;
 
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xaa));
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
         // No native token moves on the PoP path.
         assertEq(address(dotnsPopController).balance, controllerBalanceBefore);
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(BASE_LABEL_A))), ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf(PERSONHOOD_LABEL_A))), ed);
     }
 
-    function test_reserveLiteName_succeeds_regardless_of_base_reservation() public {
-        string memory baseStem = BASE_LABEL_A;
+    function test_issueDeviceName_succeeds_regardless_of_stem_reservation() public {
+        string memory baseStem = PERSONHOOD_LABEL_A;
         // Occupy the base stem with a live reservation.
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), baseStem);
-        // A different user calls reserveLiteName on a different lite label.
-        address fresh = makeAddr("freshLite");
-        _grantPopLite(fresh);
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), baseStem);
+        // A different user calls issueDeviceName on a different device name.
+        address fresh = makeAddr("freshDevice");
+        _grantDevicehood(fresh);
 
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: "stephen.01", user: fresh, chatKey: _validChatKey(0xcc)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: "stephen.01", user: fresh, chatKey: _validChatKey(0xcc)
             })
         );
 
-        assertEq(dotnsRegistry.owner(_liteNodeOf("stephen.01")), fresh);
+        assertEq(dotnsRegistry.owner(_deviceNodeOf("stephen.01")), fresh);
     }
 
-    function test_reserveLiteName_reverts_for_non_lite_format() public {
-        _grantPopFull(ed);
+    function test_issueDeviceName_reverts_for_non_device_format() public {
+        _grantPersonhood(ed);
 
-        vm.expectRevert(IDotnsPopController.InvalidLiteLabel.selector);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: "alice", user: ed, chatKey: _validChatKey(0xaa)
-            })
-        );
-    }
-
-    function test_reserveLiteName_reverts_when_suffix_is_not_exactly_two_digits() public {
-        _grantPopFull(ed);
-
-        vm.expectRevert(IDotnsPopController.InvalidLiteLabel.selector);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: "michael.001", user: ed, chatKey: _validChatKey(0xaa)
+        vm.expectRevert(IDotnsPopController.InvalidDeviceLabel.selector);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: "alice", user: ed, chatKey: _validChatKey(0xaa)
             })
         );
     }
 
-    function test_reserveLiteName_reverts_when_the_stem_is_governance_reserved() public {
-        _grantPopFull(ed);
+    function test_issueDeviceName_reverts_when_suffix_is_not_exactly_two_digits() public {
+        _grantPersonhood(ed);
 
-        // `abcd.12` is a well-formed lite label whose four-letter stem classifies as Reserved,
+        vm.expectRevert(IDotnsPopController.InvalidDeviceLabel.selector);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: "michael.001", user: ed, chatKey: _validChatKey(0xaa)
+            })
+        );
+    }
+
+    function test_issueDeviceName_reverts_when_the_stem_is_governance_reserved() public {
+        _grantPersonhood(ed);
+
+        // `abcd.12` is a well-formed device name whose four-letter stem classifies as Reserved,
         // so classification is what rejects it rather than the shape.
-        vm.expectRevert(IDotnsPopController.InvalidLiteLabel.selector);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: "abcd.12", user: ed, chatKey: _validChatKey(0xaa)
+        vm.expectRevert(IDotnsPopController.InvalidDeviceLabel.selector);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: "abcd.12", user: ed, chatKey: _validChatKey(0xaa)
             })
         );
     }
 
-    function test_reserveLiteName_succeeds_for_long_stem() public {
-        _grantPopLite(ed);
+    function test_issueDeviceName_succeeds_for_long_stem() public {
+        _grantDevicehood(ed);
 
         // `andrewsays.01` has a stem of 10, which classifies as NoStatus. The gateway may issue
-        // it as a lite username regardless of stem length.
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: "andrewsays.01", user: ed, chatKey: _validChatKey(0xaa)
+        // it as a device name regardless of stem length.
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: "andrewsays.01", user: ed, chatKey: _validChatKey(0xaa)
             })
         );
 
-        assertEq(dotnsRegistry.owner(_liteNodeOf("andrewsays.01")), ed);
+        assertEq(dotnsRegistry.owner(_deviceNodeOf("andrewsays.01")), ed);
     }
 
-    /// @notice A public registration is not an identity and appears in neither listing.
-    /// @dev Both listings require provenance, so a name the gateway never minted is absent from
-    ///      both however it is spelled. Without that, `joseph42` would read as a full-person
-    ///      identity purely because it is a single label.
-    function test_lens_omits_a_public_registration_from_both_listings() public {
-        _grantPopFull(ed);
+    /// @notice A public registration is not an identity and is not listed.
+    /// @dev The listing requires provenance, so a name the gateway never minted is absent however
+    ///      it is spelled. Without that, `joseph42` would read as a personhood name purely because
+    ///      it is a single label.
+    function test_lens_omits_a_public_registration() public {
+        _grantPersonhood(ed);
         _commitAndRegister("joseph42", ed, true);
 
         assertFalse(dotnsPopController.isPopIssued("joseph42"), "the gateway did not mint it");
 
-        assertEq(dotnsPopLens.fullNamesOf(ed, 0, 10).length, 0, "not a full-person identity");
-        assertEq(dotnsPopLens.liteNamesOf(ed, 0, 10).length, 0, "nor a lite one");
-        assertEq(dotnsPopLens.fullNameCountOf(ed), 0);
-        assertEq(dotnsPopLens.liteNameCountOf(ed), 0);
+        assertEq(dotnsPopLens.namesOf(ed, 0, 10).length, 0, "not an identity");
+        assertEq(dotnsPopLens.nameCountOf(ed), 0);
     }
 
-    /// @notice A full-person gateway name lists as full, not lite.
-    /// @dev `isPopIssued` covers every name the controller mints, lite and full alike, so it
-    ///      cannot say which kind a name is. The separator does that. Keying the lite listing on
-    ///      provenance alone would move every full-person identity into it.
-    function test_lens_lists_a_full_person_name_as_full() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
+    /// @notice Device names and personhood names come back in one listing.
+    /// @dev `isPopIssued` covers every name the controller mints, of both kinds, and the label
+    ///      shape tells them apart: a device name carries its separator.
+    function test_lens_lists_device_and_personhood_names_together() public {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "");
 
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
 
-        assertTrue(dotnsPopController.isPopIssued(BASE_LABEL_A), "both kinds carry provenance");
-        assertTrue(dotnsPopController.isPopIssued(LITE_LABEL_A), "both kinds carry provenance");
+        assertTrue(
+            dotnsPopController.isPopIssued(PERSONHOOD_LABEL_A), "both kinds carry provenance"
+        );
+        assertTrue(dotnsPopController.isPopIssued(DEVICE_LABEL_A), "both kinds carry provenance");
 
-        IDotnsPopLens.Name[] memory full = dotnsPopLens.fullNamesOf(ed, 0, 10);
-        assertEq(full.length, 1, "the full-person name is in the full listing");
-        assertEq(full[0].label, BASE_LABEL_A);
-
-        IDotnsPopLens.Name[] memory lite = dotnsPopLens.liteNamesOf(ed, 0, 10);
-        assertEq(lite.length, 1, "and the lite name is in the lite listing");
-        assertEq(lite[0].label, LITE_LABEL_A);
+        IDotnsPopLens.Name[] memory names = dotnsPopLens.namesOf(ed, 0, 10);
+        assertEq(names.length, 2, "both names are listed");
+        assertTrue(_namesContainNode(names, _nodeOf(PERSONHOOD_LABEL_A)), "the personhood name");
+        assertTrue(_namesContainNode(names, _deviceNodeOf(DEVICE_LABEL_A)), "and the device name");
+        assertEq(dotnsPopLens.nameCountOf(ed), 2);
     }
 
-    /// @notice A full-person name is letters only, the same rule a lite stem follows.
+    /// @notice A personhood name is letters only, the same rule a device-name stem follows.
     /// @dev The hyphen and interior-digit cases are the ones a trailing-digit check misses:
     ///      `alice-bob` and `micha3l` are valid DNS labels and would otherwise be issued as
-    ///      identities, while being impossible as lite stems. All three revert with this
+    ///      identities, while being impossible as device-name stems. All three revert with this
     ///      interface's own error.
-    function test_registerBaseName_rejects_a_label_that_is_not_letters_only() public {
+    function test_issuePersonhoodName_rejects_a_label_that_is_not_letters_only() public {
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xa1));
 
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "alice-bob", user: ed, link: link})
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: "alice-bob", user: ed, link: link})
         );
 
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "micha3l", user: ed, link: link})
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: "micha3l", user: ed, link: link})
         );
 
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "Joseph", user: ed, link: link})
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: "Joseph", user: ed, link: link})
         );
     }
 
-    /// @dev The reservation entrypoints share `_validateBaseLabel`, so a hyphen is rejected
+    /// @dev The reservation entrypoints share `_validatePersonhoodLabel`, so a hyphen is rejected
     ///      there too rather than resolving to an empty queue.
     function test_reservation_entrypoints_reject_a_label_that_is_not_letters_only() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xa2), "alice-bob");
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xa2), "alice-bob");
 
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
         dotnsPopController.expireReservation("alice-bob");
 
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
         dotnsPopController.isReservedForClaim("micha3l");
 
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xa3), "Joseph");
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xa3), "Joseph");
     }
 
     /// @notice The controller answers its own ERC-165 id and nothing else.
@@ -1074,16 +1117,16 @@ contract DotnsPopControllerTests is BaseDotns {
     /// @dev The node is the hash of the whole string, so it is not the node a subname path
     ///      would produce for the same text. Pinning both is what makes "keep the dot"
     ///      concrete rather than cosmetic.
-    function test_reserveLiteName_stores_the_label_with_its_separator() public {
-        _grantPopLite(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: "michael.01", user: ed, chatKey: _validChatKey(0xaa)
+    function test_issueDeviceName_stores_the_label_with_its_separator() public {
+        _grantDevicehood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: "michael.01", user: ed, chatKey: _validChatKey(0xaa)
             })
         );
 
         // The name is a subname under its numeric container, owned in the registry record.
-        bytes32 subnamePathNode = _liteNodeOf("michael.01");
+        bytes32 subnamePathNode = _deviceNodeOf("michael.01");
         assertEq(dotnsRegistry.owner(subnamePathNode), ed);
 
         // The whole-label reading is a different node and is never minted as a token.
@@ -1093,12 +1136,12 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_isPopIssued_is_set_at_mint() public {
-        _grantPopLite(ed);
+        _grantDevicehood(ed);
         assertFalse(dotnsPopController.isPopIssued("michael.01"), "not issued before the mint");
 
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: "michael.01", user: ed, chatKey: _validChatKey(0xaa)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: "michael.01", user: ed, chatKey: _validChatKey(0xaa)
             })
         );
 
@@ -1117,11 +1160,11 @@ contract DotnsPopControllerTests is BaseDotns {
     ///      name stashed as a pending claim must already answer true.
     function test_isPopIssued_holds_across_cold_path_settlement() public {
         address cold = makeAddr("coldClaimant");
-        _grantPopLite(cold);
+        _grantDevicehood(cold);
 
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: "william.03", user: cold, chatKey: _validChatKey(0xbb)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: "william.03", user: cold, chatKey: _validChatKey(0xbb)
             })
         );
 
@@ -1134,134 +1177,139 @@ contract DotnsPopControllerTests is BaseDotns {
         assertTrue(dotnsPopController.isPopIssued("william.03"), "still true once settled");
     }
 
-    /// @dev Provenance covers every name this controller mints, not only the lite ones, because
-    ///      it records who issued the name rather than which tier it sits in.
-    function test_isPopIssued_covers_full_person_names() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
+    /// @dev Provenance covers every name this controller mints, not only the device-name ones,
+    ///      because it records who issued the name rather than which tier it sits in.
+    function test_isPopIssued_covers_personhood_names() public {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "");
 
-        IDotnsPopController.Link memory link = _linkWithLite(LITE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: ed, link: link})
+        IDotnsPopController.Link memory link = _linkWithDeviceName(DEVICE_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: link
+            })
         );
 
-        assertTrue(dotnsPopController.isPopIssued(BASE_LABEL_A));
+        assertTrue(dotnsPopController.isPopIssued(PERSONHOOD_LABEL_A));
     }
 
-    function test_reserveLiteName_reverts_when_origin_is_not_root() public {
+    function test_issueDeviceName_reverts_when_origin_is_not_root() public {
         _mockOriginIsRoot(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
-        dotnsPopController.reserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
+        dotnsPopController.issueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
             })
         );
     }
 
-    function test_reserveBaseName_lite_and_base_legs_both_succeed_in_one_call() public {
-        _grantPopFull(ed);
+    function test_issueDeviceNameWithReservation_issuance_and_reservation_both_succeed_in_one_call()
+        public
+    {
+        _grantPersonhood(ed);
 
-        _rootReserveBaseName(
-            IDotnsPopController.BaseReservation({
-                lite: IDotnsPopController.LiteRegistration({
-                    liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
+        _rootIssueDeviceNameWithReservation(
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
                 }),
-                reservedBaseLabel: BASE_LABEL_A
+                reservedLabel: PERSONHOOD_LABEL_A
             })
         );
 
-        assertEq(dotnsRegistry.owner(_liteNodeOf(LITE_LABEL_A)), ed);
+        assertEq(dotnsRegistry.owner(_deviceNodeOf(DEVICE_LABEL_A)), ed);
 
-        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertTrue(reserved);
         assertEq(holder, ed);
     }
 
-    function test_split_gateway_flow_mints_lite_then_reserves_base() public {
-        _grantPopFull(ed);
+    function test_split_gateway_flow_issues_device_name_then_reserves_personhood_name() public {
+        _grantPersonhood(ed);
 
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
             })
         );
 
-        assertEq(dotnsRegistry.owner(_liteNodeOf(LITE_LABEL_A)), ed);
-        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(BASE_LABEL_A))));
+        assertEq(dotnsRegistry.owner(_deviceNodeOf(DEVICE_LABEL_A)), ed);
+        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(PERSONHOOD_LABEL_A))));
 
-        _rootReserveBaseNameOnly(
-            IDotnsPopController.BaseNameReservation({user: ed, reservedBaseLabel: BASE_LABEL_A})
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: ed, label: PERSONHOOD_LABEL_A})
         );
 
-        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertTrue(reserved);
         assertEq(holder, ed);
-        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(BASE_LABEL_A))));
+        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(PERSONHOOD_LABEL_A))));
     }
 
-    function test_reserveBaseNameOnly_reverts_when_origin_is_not_root() public {
+    function test_reservePersonhoodName_reverts_when_origin_is_not_root() public {
         _mockOriginIsRoot(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
-        dotnsPopController.reserveBaseNameOnly(
-            IDotnsPopController.BaseNameReservation({user: ed, reservedBaseLabel: BASE_LABEL_A})
+        dotnsPopController.reservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: ed, label: PERSONHOOD_LABEL_A})
         );
     }
 
-    function test_reserveBaseNameOnly_reverts_for_reserved_or_suffixed_labels() public {
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _rootReserveBaseNameOnly(
-            IDotnsPopController.BaseNameReservation({user: ed, reservedBaseLabel: "alice"})
+    function test_reservePersonhoodName_reverts_for_reserved_or_suffixed_labels() public {
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: ed, label: "alice"})
         );
 
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _rootReserveBaseNameOnly(
-            IDotnsPopController.BaseNameReservation({user: ed, reservedBaseLabel: "longnamebob01"})
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: ed, label: "longnamebob01"})
         );
     }
 
-    function test_reserveBaseNameOnly_reverts_when_label_already_registered() public {
+    function test_reservePersonhoodName_reverts_when_label_already_registered() public {
         // The standalone reservation entrypoint shares the same guard: a base name that already
         // has an owner on the registrar can never be redeemed, so the reservation is rejected up
         // front rather than discovered to be unusable at claim time.
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0xaa), "longnamebob");
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({
-                label: "longnamebob", user: ed, link: _linkWithLite(LITE_LABEL_A)
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0xaa), "longnamebob");
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: "longnamebob", user: ed, link: _linkWithDeviceName(DEVICE_LABEL_A)
             })
         );
 
-        vm.expectRevert(IDotnsPopController.BaseNameAlreadyRegistered.selector);
-        _rootReserveBaseNameOnly(
-            IDotnsPopController.BaseNameReservation({user: tiago, reservedBaseLabel: "longnamebob"})
+        vm.expectRevert(IDotnsPopController.PersonhoodNameUnavailable.selector);
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: tiago, label: "longnamebob"})
         );
     }
 
-    function test_reserveBaseNameOnly_does_not_mint_lite_or_base_name() public {
-        _rootReserveBaseNameOnly(
-            IDotnsPopController.BaseNameReservation({user: ed, reservedBaseLabel: BASE_LABEL_A})
+    function test_reservePersonhoodName_does_not_issue_a_name() public {
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: ed, label: PERSONHOOD_LABEL_A})
         );
 
-        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(LITE_LABEL_A))));
-        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(BASE_LABEL_A))));
+        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(DEVICE_LABEL_A))));
+        assertFalse(dotnsRegistrar.exists(uint256(_nodeOf(PERSONHOOD_LABEL_A))));
 
-        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertTrue(reserved);
         assertEq(holder, ed);
     }
 
-    function test_reserveBaseNameOnly_same_user_can_replace_prior_reservation() public {
-        _rootReserveBaseNameOnly(
-            IDotnsPopController.BaseNameReservation({user: ed, reservedBaseLabel: BASE_LABEL_A})
+    function test_reservePersonhoodName_same_user_can_replace_prior_reservation() public {
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: ed, label: PERSONHOOD_LABEL_A})
         );
-        _rootReserveBaseNameOnly(
-            IDotnsPopController.BaseNameReservation({user: ed, reservedBaseLabel: BASE_LABEL_B})
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: ed, label: PERSONHOOD_LABEL_B})
         );
 
-        (bool firstReserved,) = dotnsPopController.isReservedForClaim(BASE_LABEL_A);
+        (bool firstReserved,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(firstReserved);
 
-        (bool secondReserved, address holder) = dotnsPopController.isReservedForClaim(BASE_LABEL_B);
+        (bool secondReserved, address holder) =
+            dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_B);
         assertTrue(secondReserved);
         assertEq(holder, ed);
     }
@@ -1271,14 +1319,14 @@ contract DotnsPopControllerTests is BaseDotns {
         // gateway can settle a user's pending claim, deploying the user's store and writing the
         // stashed label. The settled name lands in the beneficiary's store, and the settlement
         // event records the third party as the settler.
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
             })
         );
 
-        bytes32 labelhash = keccak256(bytes(LITE_LABEL_A));
+        bytes32 labelhash = keccak256(bytes(DEVICE_LABEL_A));
         address expectedStore =
             vm.computeCreateAddress(address(storeFactory), vm.getNonce(address(storeFactory)));
 
@@ -1290,17 +1338,17 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertEq(store, expectedStore);
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
-            string.concat(LITE_LABEL_A, ".dot")
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_A)),
+            string.concat(DEVICE_LABEL_A, ".dot")
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
 
     function test_user_settles_own_pending_claim_after_gateway_mint() public {
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
             })
         );
 
@@ -1310,17 +1358,17 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
-            string.concat(LITE_LABEL_A, ".dot")
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_A)),
+            string.concat(DEVICE_LABEL_A, ".dot")
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
 
     function test_claimLabelStore_settles_callers_own_pending_claim() public {
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
             })
         );
 
@@ -1331,22 +1379,22 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
-            string.concat(LITE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_A)),
+            string.concat(DEVICE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
 
     function test_settle_deploys_store_when_user_has_none() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0xaa)
             })
         );
 
-        assertEq(dotnsPopController.pendingClaims(ed, 0, 1)[0].label, LITE_LABEL_A);
+        assertEq(dotnsPopController.pendingClaims(ed, 0, 1)[0].label, DEVICE_LABEL_A);
         assertEq(storeFactory.getLabelStore(ed), address(0));
 
         (uint256 settledCount, bool moreRemaining) =
@@ -1357,40 +1405,40 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
-            string.concat(LITE_LABEL_A, ".dot")
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_A)),
+            string.concat(DEVICE_LABEL_A, ".dot")
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
 
-    function test_registerBaseName_zero_length_label_reverts() public {
-        _grantPopFull(ed);
+    function test_issuePersonhoodName_zero_length_label_reverts() public {
+        _grantPersonhood(ed);
 
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xaa));
-        vm.expectRevert(IDotnsPopController.InvalidBaseLabel.selector);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: "", user: ed, link: link})
+        vm.expectRevert(IDotnsPopController.InvalidPersonhoodLabel.selector);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({label: "", user: ed, link: link})
         );
     }
 
-    function test_reserveBaseName_accepts_65_byte_chat_key() public {
-        _grantPopFull(ed);
+    function test_issueDeviceNameWithReservation_accepts_65_byte_chat_key() public {
+        _grantPersonhood(ed);
 
         bytes memory chatKey = _validChatKey(0x42);
 
-        _rootReserveBaseName(
-            IDotnsPopController.BaseReservation({
-                lite: IDotnsPopController.LiteRegistration({
-                    liteLabel: LITE_LABEL_A, user: ed, chatKey: chatKey
+        _rootIssueDeviceNameWithReservation(
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: DEVICE_LABEL_A, user: ed, chatKey: chatKey
                 }),
-                reservedBaseLabel: ""
+                reservedLabel: ""
             })
         );
 
         vm.prank(ed);
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
 
-        bytes32 node = _liteNodeOf(LITE_LABEL_A);
+        bytes32 node = _deviceNodeOf(DEVICE_LABEL_A);
         assertEq(dotnsPopResolver.chatKey(node), chatKey);
     }
 
@@ -1414,16 +1462,16 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_gatewayReserve_stashes_pending_claim_when_user_has_no_label_store() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         bytes memory chatKey = _validChatKey(0x01);
 
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: chatKey
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: chatKey
             })
         );
 
-        bytes32 node = _liteNodeOf(LITE_LABEL_A);
+        bytes32 node = _deviceNodeOf(DEVICE_LABEL_A);
         assertEq(dotnsRegistry.owner(node), ed);
         assertEq(storeFactory.getLabelStore(ed), address(0));
         // Chat key is now persisted eagerly on the resolver at reserve time, even when
@@ -1432,17 +1480,17 @@ contract DotnsPopControllerTests is BaseDotns {
 
         IDotnsPopController.PendingClaim[] memory pending =
             dotnsPopController.pendingClaims(ed, 0, type(uint256).max);
-        assertEq(pending[0].label, LITE_LABEL_A);
+        assertEq(pending[0].label, DEVICE_LABEL_A);
         assertGt(pending[0].mintedAt, 0);
     }
 
     function test_settle_deploys_store_and_writes_label_and_chat_key() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         bytes memory chatKey = _validChatKey(0x07);
 
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: chatKey
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: chatKey
             })
         );
 
@@ -1452,9 +1500,9 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
 
-        bytes32 node = _liteNodeOf(LITE_LABEL_A);
+        bytes32 node = _deviceNodeOf(DEVICE_LABEL_A);
         assertEq(
-            ILabelStore(store).getLabel(node), string.concat(LITE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(node), string.concat(DEVICE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopResolver.chatKey(node), chatKey);
 
@@ -1462,16 +1510,16 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_settle_emits_settled_and_name_registered() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         bytes memory chatKey = _validChatKey(0x03);
 
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: chatKey
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: chatKey
             })
         );
 
-        bytes32 labelhash = keccak256(bytes(LITE_LABEL_A));
+        bytes32 labelhash = keccak256(bytes(DEVICE_LABEL_A));
         address expectedStore =
             vm.computeCreateAddress(address(storeFactory), vm.getNonce(address(storeFactory)));
 
@@ -1479,7 +1527,7 @@ contract DotnsPopControllerTests is BaseDotns {
         vm.expectEmit(true, true, false, true, address(dotnsPopController));
         emit IDotnsPopController.PendingClaimSettled(ed, labelhash, expectedStore, ed);
         vm.expectEmit(true, true, true, true, address(dotnsPopController));
-        emit IDotnsPopController.NameRegistered(LITE_LABEL_A, labelhash, ed, expectedStore);
+        emit IDotnsPopController.NameRegistered(DEVICE_LABEL_A, labelhash, ed, expectedStore);
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
     }
 
@@ -1498,20 +1546,20 @@ contract DotnsPopControllerTests is BaseDotns {
         // A large queue is drained in bounded batches so a single settlement can never exceed the
         // block gas limit. Settling with a limit below the queue length reports the residue and a
         // follow-up call clears it.
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x05)
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x05)
             })
         );
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_B, user: ed, chatKey: _validChatKey(0x06)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_B, user: ed, chatKey: _validChatKey(0x06)
             })
         );
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_C, user: ed, chatKey: _validChatKey(0x07)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_C, user: ed, chatKey: _validChatKey(0x07)
             })
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 3);
@@ -1530,21 +1578,21 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
 
-    function test_settle_on_expiry_by_third_party_writes_label() public {
-        // Age never gates settlement: a claim warped past its reservation deadline still settles
+    function test_settle_after_reservation_duration_by_third_party_writes_label() public {
+        // Age never gates settlement: a claim warped past `reservationDuration` still settles
         // in full. A third party drives the settlement, the store is deployed for the beneficiary,
         // the label is written, the queue empties, the beneficiary leaves the enumeration set, and
         // the settler is recorded on the event.
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x02)
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x02)
             })
         );
 
         vm.warp(block.timestamp + DEFAULT_RESERVATION_DURATION + 1);
 
-        bytes32 labelhash = keccak256(bytes(LITE_LABEL_A));
+        bytes32 labelhash = keccak256(bytes(DEVICE_LABEL_A));
         address expectedStore =
             vm.computeCreateAddress(address(storeFactory), vm.getNonce(address(storeFactory)));
 
@@ -1559,8 +1607,8 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertEq(store, expectedStore);
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
-            string.concat(LITE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_A)),
+            string.concat(DEVICE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
         assertEq(dotnsPopController.pendingClaimUserCount(), 0);
@@ -1570,10 +1618,10 @@ contract DotnsPopControllerTests is BaseDotns {
         // The old model dropped lapsed entries; stores now always settle. Warping past the
         // reservation duration and settling writes the label into the store rather than
         // discarding it.
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x04)
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x04)
             })
         );
 
@@ -1585,34 +1633,34 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
-            string.concat(LITE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_A)),
+            string.concat(DEVICE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
         assertEq(dotnsPopController.pendingClaimUserCount(), 0);
     }
 
-    function test_reserveLiteName_piles_second_pending_claim_when_caller_has_no_store() public {
+    function test_issueDeviceName_piles_second_pending_claim_when_caller_has_no_store() public {
         // The Root gateway origin cannot deploy a LabelStore, so a store-less user keeps
         // accumulating deferred names instead of reverting; a single signed-origin
         // settlement writes them all at once.
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x05)
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x05)
             })
         );
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_B, user: ed, chatKey: _validChatKey(0x06)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_B, user: ed, chatKey: _validChatKey(0x06)
             })
         );
 
         IDotnsPopController.PendingClaim[] memory pending =
             dotnsPopController.pendingClaims(ed, 0, type(uint256).max);
         assertEq(pending.length, 2);
-        assertEq(pending[0].label, LITE_LABEL_A);
-        assertEq(pending[1].label, LITE_LABEL_B);
+        assertEq(pending[0].label, DEVICE_LABEL_A);
+        assertEq(pending[1].label, DEVICE_LABEL_B);
         assertEq(dotnsPopController.pendingClaimUserCount(), 1);
 
         vm.prank(ed);
@@ -1621,12 +1669,12 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
-            string.concat(LITE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_A)),
+            string.concat(DEVICE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_B)),
-            string.concat(LITE_LABEL_B, protocolRegistry.tld())
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_B)),
+            string.concat(DEVICE_LABEL_B, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
         assertEq(dotnsPopController.pendingClaimUserCount(), 0);
@@ -1637,34 +1685,34 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
 
-    function test_registerBaseName_claim_by_store_less_full_person_piles_then_settles() public {
-        // Regression: a store-less full person reserves a lite name plus a base reservation
-        // (the lite leg stashes a deferred claim because Root cannot deploy the store), then
-        // claims the base name. The base mint stashes a second deferred claim instead of
+    function test_issuePersonhoodName_claim_by_store_less_personhood_piles_then_settles() public {
+        // Regression: a store-less personhood holder reserves a device name plus a base reservation
+        // (the device-name issuance stashes a deferred claim because Root cannot deploy the store),
+        // then claims the base name. The base mint stashes a second deferred claim instead of
         // reverting; one signed-origin settlement deploys the store and settles both.
-        _grantPopFull(ed);
-        _rootReserveBaseName(
-            IDotnsPopController.BaseReservation({
-                lite: IDotnsPopController.LiteRegistration({
-                    liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x31)
+        _grantPersonhood(ed);
+        _rootIssueDeviceNameWithReservation(
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x31)
                 }),
-                reservedBaseLabel: BASE_LABEL_A
+                reservedLabel: PERSONHOOD_LABEL_A
             })
         );
         assertEq(storeFactory.getLabelStore(ed), address(0));
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 1);
 
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({
-                label: BASE_LABEL_A, user: ed, link: _linkWithLite(LITE_LABEL_A)
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: _linkWithDeviceName(DEVICE_LABEL_A)
             })
         );
 
         IDotnsPopController.PendingClaim[] memory pending =
             dotnsPopController.pendingClaims(ed, 0, type(uint256).max);
         assertEq(pending.length, 2);
-        assertEq(pending[0].label, LITE_LABEL_A);
-        assertEq(pending[1].label, BASE_LABEL_A);
+        assertEq(pending[0].label, DEVICE_LABEL_A);
+        assertEq(pending[1].label, PERSONHOOD_LABEL_A);
 
         vm.prank(ed);
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
@@ -1672,34 +1720,34 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
-            string.concat(LITE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_A)),
+            string.concat(DEVICE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(
-            ILabelStore(store).getLabel(_nodeOf(BASE_LABEL_A)),
-            string.concat(BASE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(_nodeOf(PERSONHOOD_LABEL_A)),
+            string.concat(PERSONHOOD_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
 
     function test_pendingClaimUsers_enumeration_mirrors_stash_and_settle() public {
-        _grantPopFull(ed);
-        _grantPopFull(tiago);
-        _grantPopFull(leonardo);
+        _grantPersonhood(ed);
+        _grantPersonhood(tiago);
+        _grantPersonhood(leonardo);
 
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
             })
         );
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_B, user: tiago, chatKey: _validChatKey(0x02)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_B, user: tiago, chatKey: _validChatKey(0x02)
             })
         );
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_C, user: leonardo, chatKey: _validChatKey(0x03)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_C, user: leonardo, chatKey: _validChatKey(0x03)
             })
         );
 
@@ -1723,10 +1771,10 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_pendingClaimUsers_returns_empty_when_offset_past_count() public {
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
             })
         );
 
@@ -1734,13 +1782,13 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(empty.length, 0);
     }
 
-    function test_settle_at_exact_expiry_boundary_writes_label() public {
-        // Age is irrelevant to settlement: at the exact reservation deadline the claim still
-        // settles and writes its label rather than being treated as forfeit.
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x11)
+    function test_settle_at_exactly_reservation_duration_writes_label() public {
+        // Age is irrelevant to settlement: exactly `reservationDuration` after the mint the claim
+        // still settles and writes its label rather than being treated as forfeit.
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x11)
             })
         );
 
@@ -1753,8 +1801,8 @@ contract DotnsPopControllerTests is BaseDotns {
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(_liteNodeOf(LITE_LABEL_A)),
-            string.concat(LITE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(_deviceNodeOf(DEVICE_LABEL_A)),
+            string.concat(DEVICE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
     }
@@ -1762,11 +1810,11 @@ contract DotnsPopControllerTests is BaseDotns {
     function test_settle_is_keyed_by_user_arg_other_stash_untouched() public {
         // Settlement targets the `user` argument, not the caller: settling for a user with no
         // stash is a no-op and does not disturb another user's pending claim.
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
         bytes memory chatKey = _validChatKey(0x12);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: chatKey
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: chatKey
             })
         );
 
@@ -1778,7 +1826,7 @@ contract DotnsPopControllerTests is BaseDotns {
 
         IDotnsPopController.PendingClaim[] memory pending =
             dotnsPopController.pendingClaims(ed, 0, type(uint256).max);
-        assertEq(pending[0].label, LITE_LABEL_A);
+        assertEq(pending[0].label, DEVICE_LABEL_A);
         assertGt(pending[0].mintedAt, 0);
         assertEq(storeFactory.getLabelStore(ed), address(0));
         assertEq(storeFactory.getLabelStore(tiago), address(0));
@@ -1786,22 +1834,22 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_pendingClaimUsers_pagination_boundary_cases() public {
-        _grantPopFull(ed);
-        _grantPopFull(tiago);
-        _grantPopFull(leonardo);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
+        _grantPersonhood(ed);
+        _grantPersonhood(tiago);
+        _grantPersonhood(leonardo);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x01)
             })
         );
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_B, user: tiago, chatKey: _validChatKey(0x02)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_B, user: tiago, chatKey: _validChatKey(0x02)
             })
         );
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_C, user: leonardo, chatKey: _validChatKey(0x03)
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_C, user: leonardo, chatKey: _validChatKey(0x03)
             })
         );
 
@@ -1815,28 +1863,28 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_settle_with_empty_chat_key_skips_resolver_write() public {
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({liteLabel: LITE_LABEL_A, user: ed, chatKey: ""})
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({label: DEVICE_LABEL_A, user: ed, chatKey: ""})
         );
 
         vm.prank(ed);
         dotnsPopController.settlePendingClaims(ed, type(uint256).max);
 
-        bytes32 node = _liteNodeOf(LITE_LABEL_A);
+        bytes32 node = _deviceNodeOf(DEVICE_LABEL_A);
         address store = storeFactory.getLabelStore(ed);
         assertTrue(store != address(0));
         assertEq(
-            ILabelStore(store).getLabel(node), string.concat(LITE_LABEL_A, protocolRegistry.tld())
+            ILabelStore(store).getLabel(node), string.concat(DEVICE_LABEL_A, protocolRegistry.tld())
         );
         assertEq(dotnsPopResolver.chatKey(node).length, 0);
     }
 
     function test_gatewayReserve_warm_user_after_settle_writes_directly_without_stashing() public {
-        _grantPopFull(ed);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: ed, chatKey: _validChatKey(0x21)
+        _grantPersonhood(ed);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: ed, chatKey: _validChatKey(0x21)
             })
         );
 
@@ -1846,15 +1894,15 @@ contract DotnsPopControllerTests is BaseDotns {
         assertTrue(store != address(0));
 
         bytes memory secondChatKey = _validChatKey(0x22);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_B, user: ed, chatKey: secondChatKey
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_B, user: ed, chatKey: secondChatKey
             })
         );
 
-        bytes32 node = _liteNodeOf(LITE_LABEL_B);
+        bytes32 node = _deviceNodeOf(DEVICE_LABEL_B);
         assertEq(
-            ILabelStore(store).getLabel(node), string.concat(LITE_LABEL_B, protocolRegistry.tld())
+            ILabelStore(store).getLabel(node), string.concat(DEVICE_LABEL_B, protocolRegistry.tld())
         );
         assertEq(dotnsPopResolver.chatKey(node), secondChatKey);
         assertEq(dotnsPopController.pendingClaimCountOf(ed), 0);
@@ -1864,12 +1912,12 @@ contract DotnsPopControllerTests is BaseDotns {
     function test_advanceExpiredHead_promotes_waiter_and_resyncs_popRules() public {
         string memory stem = "longnamebob";
         uint64 duration = dotnsPopController.reservationDuration();
-        _grantPopFull(ed);
-        _grantPopFull(tiago);
+        _grantPersonhood(ed);
+        _grantPersonhood(tiago);
 
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), stem);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), stem);
         vm.warp(block.timestamp + uint256(duration) / 2);
-        _reservePop(tiago, LITE_LABEL_B, _validChatKey(0x02), stem);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0x02), stem);
 
         bytes32 labelhash = keccak256(bytes(stem));
         (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(labelhash);
@@ -1900,191 +1948,237 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_multiWaiter_standaloneGuard_rejects_non_head_user() public {
-        _grantPopFull(ed);
-        _grantPopFull(tiago);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
-        _reservePop(tiago, LITE_LABEL_B, _validChatKey(0x02), BASE_LABEL_A);
+        _grantPersonhood(ed);
+        _grantPersonhood(tiago);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0x02), PERSONHOOD_LABEL_A);
 
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xbb));
         vm.expectPartialRevert(IDotnsPopController.NotHolder.selector);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: BASE_LABEL_A, user: tiago, link: link})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: tiago, link: link
+            })
         );
     }
 
-    function test_liteNamesOf_and_fullNamesOf_split_issued_names_by_shape() public {
-        // Settled names read back from the store; a pending gateway name reads from the queue with
-        // a live deadline; the two shapes never cross into each other's list; an untouched account
-        // returns empty lists and zero counts.
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({
-                label: BASE_LABEL_A, user: ed, link: _linkFresh(_validChatKey(0x02))
+    function test_namesOf_lists_issued_names_with_settlement_state() public {
+        // Settled names read back from the store; a pending gateway name reads from the queue; an
+        // untouched account returns an empty list and a zero count.
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "");
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: _linkFresh(_validChatKey(0x02))
             })
         );
 
-        _grantPopFull(leonardo);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_C, user: leonardo, chatKey: _validChatKey(0x03)
+        _grantPersonhood(leonardo);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_C, user: leonardo, chatKey: _validChatKey(0x03)
             })
         );
 
-        IDotnsPopLens.Name[] memory edLite = dotnsPopLens.liteNamesOf(ed, 0, type(uint256).max);
-        assertEq(edLite.length, 1);
-        assertEq(edLite[0].node, _liteNodeOf(LITE_LABEL_A));
-        assertEq(edLite[0].label, LITE_LABEL_A);
-        assertTrue(edLite[0].settled);
-        assertEq(edLite[0].deadline, 0);
+        IDotnsPopLens.Name[] memory edNames = dotnsPopLens.namesOf(ed, 0, type(uint256).max);
+        assertEq(edNames.length, 2);
+        IDotnsPopLens.Name memory edDevice = _nameWithNode(edNames, _deviceNodeOf(DEVICE_LABEL_A));
+        assertEq(edDevice.label, DEVICE_LABEL_A);
+        assertTrue(edDevice.settled);
+        IDotnsPopLens.Name memory edPersonhood = _nameWithNode(edNames, _nodeOf(PERSONHOOD_LABEL_A));
+        assertEq(edPersonhood.label, PERSONHOOD_LABEL_A);
+        assertTrue(edPersonhood.settled);
+        assertEq(dotnsPopLens.nameCountOf(ed), 2);
 
-        IDotnsPopLens.Name[] memory edFull = dotnsPopLens.fullNamesOf(ed, 0, type(uint256).max);
-        assertEq(edFull.length, 1);
-        assertEq(edFull[0].node, _nodeOf(BASE_LABEL_A));
-        assertEq(edFull[0].label, BASE_LABEL_A);
-        assertTrue(edFull[0].settled);
+        IDotnsPopLens.Name[] memory leoNames = dotnsPopLens.namesOf(leonardo, 0, type(uint256).max);
+        assertEq(leoNames.length, 1);
+        assertEq(leoNames[0].node, _deviceNodeOf(DEVICE_LABEL_C));
+        assertEq(leoNames[0].label, DEVICE_LABEL_C);
+        assertFalse(leoNames[0].settled);
+        assertEq(dotnsPopLens.nameCountOf(leonardo), 1);
 
-        assertEq(dotnsPopLens.liteNameCountOf(ed), 1);
-        assertEq(dotnsPopLens.fullNameCountOf(ed), 1);
-
-        IDotnsPopLens.Name[] memory leoLite =
-            dotnsPopLens.liteNamesOf(leonardo, 0, type(uint256).max);
-        assertEq(leoLite.length, 1);
-        assertEq(leoLite[0].node, _liteNodeOf(LITE_LABEL_C));
-        assertEq(leoLite[0].label, LITE_LABEL_C);
-        assertFalse(leoLite[0].settled);
-        assertGt(leoLite[0].deadline, 0);
-        assertEq(dotnsPopLens.liteNameCountOf(leonardo), 1);
-        assertEq(dotnsPopLens.fullNameCountOf(leonardo), 0);
-
-        assertEq(dotnsPopLens.liteNamesOf(tiago, 0, type(uint256).max).length, 0);
-        assertEq(dotnsPopLens.fullNamesOf(tiago, 0, type(uint256).max).length, 0);
-        assertEq(dotnsPopLens.liteNameCountOf(tiago), 0);
-        assertEq(dotnsPopLens.fullNameCountOf(tiago), 0);
+        assertEq(dotnsPopLens.namesOf(tiago, 0, type(uint256).max).length, 0);
+        assertEq(dotnsPopLens.nameCountOf(tiago), 0);
     }
 
-    function test_liteNamesOf_pagination_slices_and_clamps() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_B, user: ed, chatKey: _validChatKey(0x02)
+    function test_namesOf_pagination_slices_and_clamps() public {
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "");
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_B, user: ed, chatKey: _validChatKey(0x02)
             })
         );
 
-        assertEq(dotnsPopLens.liteNameCountOf(ed), 2);
+        assertEq(dotnsPopLens.nameCountOf(ed), 2);
 
-        IDotnsPopLens.Name[] memory first = dotnsPopLens.liteNamesOf(ed, 0, 1);
+        IDotnsPopLens.Name[] memory first = dotnsPopLens.namesOf(ed, 0, 1);
         assertEq(first.length, 1);
-        IDotnsPopLens.Name[] memory second = dotnsPopLens.liteNamesOf(ed, 1, 1);
+        IDotnsPopLens.Name[] memory second = dotnsPopLens.namesOf(ed, 1, 1);
         assertEq(second.length, 1);
         assertTrue(first[0].node != second[0].node);
 
-        assertEq(dotnsPopLens.liteNamesOf(ed, 2, 1).length, 0);
+        assertEq(dotnsPopLens.namesOf(ed, 2, 1).length, 0);
 
         // A limit above the internal page ceiling is clamped rather than reverting; the account
         // holds fewer names than the ceiling, so the full set still comes back.
         IDotnsPopLens.Name[] memory clamped =
-            dotnsPopLens.liteNamesOf(ed, 0, DotnsConstants.MAX_PAGE_SIZE + 1);
+            dotnsPopLens.namesOf(ed, 0, DotnsConstants.MAX_PAGE_SIZE + 1);
         assertEq(clamped.length, 2);
     }
 
     function test_name_listings_exclude_names_owned_by_others() public {
         // The listing re-checks registrar ownership per entry, so a name owned by another account
         // never surfaces in this account's list.
-        _grantPopFull(ed);
-        _grantPopFull(tiago);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
-        _reservePop(tiago, LITE_LABEL_C, _validChatKey(0x02), "");
+        _grantPersonhood(ed);
+        _grantPersonhood(tiago);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "");
+        _reservePop(tiago, DEVICE_LABEL_C, _validChatKey(0x02), "");
 
-        IDotnsPopLens.Name[] memory edLite = dotnsPopLens.liteNamesOf(ed, 0, type(uint256).max);
-        assertEq(edLite.length, 1);
-        assertFalse(_namesContainNode(edLite, _liteNodeOf(LITE_LABEL_C)));
+        IDotnsPopLens.Name[] memory edDevice = dotnsPopLens.namesOf(ed, 0, type(uint256).max);
+        assertEq(edDevice.length, 1);
+        assertFalse(_namesContainNode(edDevice, _deviceNodeOf(DEVICE_LABEL_C)));
 
-        IDotnsPopLens.Name[] memory tiagoLite =
-            dotnsPopLens.liteNamesOf(tiago, 0, type(uint256).max);
-        assertEq(tiagoLite.length, 1);
-        assertFalse(_namesContainNode(tiagoLite, _liteNodeOf(LITE_LABEL_A)));
+        IDotnsPopLens.Name[] memory tiagoDevice = dotnsPopLens.namesOf(tiago, 0, type(uint256).max);
+        assertEq(tiagoDevice.length, 1);
+        assertFalse(_namesContainNode(tiagoDevice, _deviceNodeOf(DEVICE_LABEL_A)));
     }
 
     function test_nameDetail_and_nameDetailByNode_report_record() public {
-        _grantPopFull(ed);
-        bytes memory liteChatKey = _validChatKey(0xaa);
-        _reservePop(ed, LITE_LABEL_A, liteChatKey, BASE_LABEL_A);
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({
-                label: BASE_LABEL_A, user: ed, link: _linkWithLite(LITE_LABEL_A)
+        _grantPersonhood(ed);
+        bytes memory deviceChatKey = _validChatKey(0xaa);
+        _reservePop(ed, DEVICE_LABEL_A, deviceChatKey, PERSONHOOD_LABEL_A);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: _linkWithDeviceName(DEVICE_LABEL_A)
             })
         );
 
-        bytes32 fullNode = _nodeOf(BASE_LABEL_A);
-        IDotnsPopLens.NameDetail memory full = dotnsPopLens.nameDetail(BASE_LABEL_A);
-        assertEq(full.node, fullNode);
-        assertEq(full.label, BASE_LABEL_A);
-        assertEq(full.owner, ed);
-        assertTrue(full.exists);
-        assertTrue(full.settled);
-        assertTrue(full.tier == IPopRules.PopStatus.PopFull);
-        assertEq(full.chatKey, liteChatKey);
-        assertEq(full.liteLink, keccak256(bytes(LITE_LABEL_A)));
-        // A base label is never a lite labelhash, so no promoted node is keyed under it.
-        assertEq(full.fullClaim, bytes32(0));
+        bytes32 personhoodNode = _nodeOf(PERSONHOOD_LABEL_A);
+        IDotnsPopLens.NameDetail memory personhood = dotnsPopLens.nameDetail(PERSONHOOD_LABEL_A);
+        assertEq(personhood.node, personhoodNode);
+        assertEq(personhood.label, PERSONHOOD_LABEL_A);
+        assertEq(personhood.owner, ed);
+        assertTrue(personhood.exists);
+        assertTrue(personhood.settled);
+        assertTrue(personhood.requiredTier == IPopRules.PopStatus.Personhood);
+        assertEq(personhood.chatKey, deviceChatKey);
+        assertEq(personhood.deviceLabelhash, keccak256(bytes(DEVICE_LABEL_A)));
+        // A base label is never a device-name labelhash, so no promoted node is keyed under it.
+        assertEq(personhood.personhoodNode, bytes32(0));
 
-        // Holding the lite label lets nameDetail recover the promoted full node.
-        IDotnsPopLens.NameDetail memory lite = dotnsPopLens.nameDetail(LITE_LABEL_A);
-        assertEq(lite.fullClaim, fullNode);
+        // Holding the device name lets nameDetail recover the promoted personhood node.
+        IDotnsPopLens.NameDetail memory device = dotnsPopLens.nameDetail(DEVICE_LABEL_A);
+        assertEq(device.personhoodNode, personhoodNode);
 
-        // A settled lite name that was never promoted carries no full claim, and the by-node
-        // overload leaves it zero.
-        _grantPopFull(leonardo);
-        _reservePop(leonardo, LITE_LABEL_C, _validChatKey(0xbb), "");
+        // A settled device name that was never promoted carries no personhood claim, and the
+        // by-node overload leaves it zero.
+        _grantPersonhood(leonardo);
+        _reservePop(leonardo, DEVICE_LABEL_C, _validChatKey(0xbb), "");
         IDotnsPopLens.NameDetail memory coldByNode =
-            dotnsPopLens.nameDetailByNode(_liteNodeOf(LITE_LABEL_C));
+            dotnsPopLens.nameDetailByNode(_deviceNodeOf(DEVICE_LABEL_C));
         assertTrue(coldByNode.exists);
-        assertEq(coldByNode.fullClaim, bytes32(0));
+        assertEq(coldByNode.personhoodNode, bytes32(0));
 
         // Unknown name and node never revert and return a zeroed record.
         IDotnsPopLens.NameDetail memory unknownName = dotnsPopLens.nameDetail("nothingxx");
         assertFalse(unknownName.exists);
         assertEq(unknownName.owner, address(0));
         assertEq(bytes(unknownName.label).length, 0);
-        assertEq(unknownName.fullClaim, bytes32(0));
+        assertEq(unknownName.personhoodNode, bytes32(0));
 
         IDotnsPopLens.NameDetail memory unknownNode =
             dotnsPopLens.nameDetailByNode(bytes32(uint256(0xdead)));
         assertFalse(unknownNode.exists);
         assertEq(unknownNode.owner, address(0));
-        assertEq(unknownNode.fullClaim, bytes32(0));
+        assertEq(unknownNode.personhoodNode, bytes32(0));
     }
 
-    /// @notice `nameDetail` classifies a cold-path lite name before it settles, not only after.
+    /// @notice `nameDetail` classifies a cold-path device name before it settles, not only after.
     /// @dev A pending subname has no label recoverable from its node, so `nameDetail` classifies
     /// the caller-supplied label. Before this was wired the tier read `NoStatus` until settlement
     ///      wrote the label into the store.
-    function test_nameDetail_classifies_a_cold_lite_name_before_and_after_settlement() public {
-        address fresh = makeAddr("coldlite");
-        _grantPopLite(fresh);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_A, user: fresh, chatKey: _validChatKey(0x01)
+    function test_nameDetail_classifies_a_cold_device_name_before_and_after_settlement() public {
+        address fresh = makeAddr("colddevice");
+        _grantDevicehood(fresh);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_A, user: fresh, chatKey: _validChatKey(0x01)
             })
         );
 
         // Cold path: the claim is staged and no store is deployed yet.
         assertEq(storeFactory.getLabelStore(fresh), address(0), "cold user has no store yet");
-        IDotnsPopLens.NameDetail memory pending = dotnsPopLens.nameDetail(LITE_LABEL_A);
+        IDotnsPopLens.NameDetail memory pending = dotnsPopLens.nameDetail(DEVICE_LABEL_A);
         assertTrue(pending.exists, "subname owned before settlement");
         assertFalse(pending.settled, "not settled yet");
-        assertEq(pending.label, LITE_LABEL_A, "caller label supplied before settlement");
-        assertTrue(pending.tier == IPopRules.PopStatus.PopLite, "classified as lite before settle");
+        assertEq(pending.label, DEVICE_LABEL_A, "caller label supplied before settlement");
+        assertTrue(
+            pending.requiredTier == IPopRules.PopStatus.Devicehood,
+            "classified as devicehood before settle"
+        );
 
         vm.prank(fresh);
         dotnsPopController.settlePendingClaims(fresh, type(uint256).max);
 
-        IDotnsPopLens.NameDetail memory settled = dotnsPopLens.nameDetail(LITE_LABEL_A);
+        IDotnsPopLens.NameDetail memory settled = dotnsPopLens.nameDetail(DEVICE_LABEL_A);
         assertTrue(settled.settled, "settled after draining the queue");
-        assertEq(settled.label, LITE_LABEL_A, "label recovered from the store after settlement");
-        assertTrue(settled.tier == IPopRules.PopStatus.PopLite, "still lite after settlement");
+        assertEq(settled.label, DEVICE_LABEL_A, "label recovered from the store after settlement");
+        assertTrue(
+            settled.requiredTier == IPopRules.PopStatus.Devicehood,
+            "still devicehood after settlement"
+        );
+    }
+
+    /// @notice `nameDetail` reports an unsettled personhood name's label and tier.
+    /// @dev The registrar reads a tokenised name's label from the holder's `LabelStore`, which a
+    ///      store-less holder does not have yet, so the lens falls back to the caller's label.
+    function test_nameDetail_reports_an_unsettled_personhood_name() public {
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: _linkFresh("")
+            })
+        );
+        assertEq(dotnsPopController.pendingClaimCountOf(ed), 1, "the claim is pending");
+
+        IDotnsPopLens.NameDetail memory detail = dotnsPopLens.nameDetail(PERSONHOOD_LABEL_A);
+        assertTrue(detail.exists, "minted before settlement");
+        assertFalse(detail.settled, "not settled yet");
+        assertEq(detail.label, PERSONHOOD_LABEL_A, "caller label supplied before settlement");
+        assertTrue(
+            detail.requiredTier == IPopRules.PopStatus.Personhood,
+            "classified as personhood before settlement"
+        );
+    }
+
+    /// @notice `nameDetailByNode` leaves an unsettled personhood name's label empty until
+    ///         settlement makes it recoverable from the node.
+    function test_nameDetailByNode_recovers_a_personhood_label_only_after_settlement() public {
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: PERSONHOOD_LABEL_A, user: ed, link: _linkFresh("")
+            })
+        );
+        bytes32 node = _nodeOf(PERSONHOOD_LABEL_A);
+
+        IDotnsPopLens.NameDetail memory pending = dotnsPopLens.nameDetailByNode(node);
+        assertTrue(pending.exists, "minted before settlement");
+        assertFalse(pending.settled, "not settled yet");
+        assertEq(pending.label, "", "no label recoverable from the node before settlement");
+        assertTrue(
+            pending.requiredTier == IPopRules.PopStatus.NoStatus, "unclassified without a label"
+        );
+
+        vm.prank(ed);
+        dotnsPopController.settlePendingClaims(ed, type(uint256).max);
+
+        IDotnsPopLens.NameDetail memory settled = dotnsPopLens.nameDetailByNode(node);
+        assertTrue(settled.settled, "settled after draining the queue");
+        assertEq(settled.label, PERSONHOOD_LABEL_A, "label recovered after settlement");
+        assertTrue(
+            settled.requiredTier == IPopRules.PopStatus.Personhood,
+            "classified as personhood after settlement"
+        );
     }
 
     /// @notice A store row whose node key is not its own text's node is neither counted nor listed.
@@ -2093,14 +2187,14 @@ contract DotnsPopControllerTests is BaseDotns {
     /// are
     ///      derived together), so this injects one directly to pin the guard.
     function test_lens_ignores_a_store_row_whose_node_does_not_match_its_text() public {
-        _grantPopFull(ed);
-        _grantPopFull(leonardo);
+        _grantPersonhood(ed);
+        _grantPersonhood(leonardo);
 
-        // ed holds a legitimate lite name, which deploys ed's store and counts once.
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), "");
-        assertEq(dotnsPopLens.liteNameCountOf(ed), 1, "one legitimate lite name");
+        // ed holds a legitimate device name, which deploys ed's store and counts once.
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "");
+        assertEq(dotnsPopLens.nameCountOf(ed), 1, "one legitimate device name");
 
-        // A second lite name, issued to leonardo, so its text reads as PoP-issued.
+        // A second device name, issued to leonardo, so its text reads as PoP-issued.
         _reservePop(leonardo, "another.01", _validChatKey(0x02), "");
 
         // ed owns a storeless subname beneath the numeric container. Only a registered controller
@@ -2127,19 +2221,23 @@ contract DotnsPopControllerTests is BaseDotns {
 
         // The forged row is owned by ed and its text is PoP-issued, but its node does not match the
         // text, so the listing excludes it and the count stays one.
-        assertEq(dotnsPopLens.liteNameCountOf(ed), 1, "forged row excluded from the count");
-        IDotnsPopLens.Name[] memory lite = dotnsPopLens.liteNamesOf(ed, 0, type(uint256).max);
-        assertEq(lite.length, 1, "forged row excluded from the listing");
-        assertEq(lite[0].node, _liteNodeOf(LITE_LABEL_A), "only the legitimate lite name is listed");
+        assertEq(dotnsPopLens.nameCountOf(ed), 1, "forged row excluded from the count");
+        IDotnsPopLens.Name[] memory names = dotnsPopLens.namesOf(ed, 0, type(uint256).max);
+        assertEq(names.length, 1, "forged row excluded from the listing");
+        assertEq(
+            names[0].node,
+            _deviceNodeOf(DEVICE_LABEL_A),
+            "only the legitimate device name is listed"
+        );
     }
 
     function test_profileOf_reports_store_pending_and_reservation() public {
         // A store-less user with a staged claim, a settled user holding a reservation, and an
         // untouched account each report distinct profile facts.
-        _grantPopFull(leonardo);
-        _rootReserveLiteName(
-            IDotnsPopController.LiteRegistration({
-                liteLabel: LITE_LABEL_C, user: leonardo, chatKey: _validChatKey(0x01)
+        _grantPersonhood(leonardo);
+        _rootIssueDeviceName(
+            IDotnsPopController.DeviceNameIssuance({
+                label: DEVICE_LABEL_C, user: leonardo, chatKey: _validChatKey(0x01)
             })
         );
         IDotnsPopLens.PopProfile memory cold = dotnsPopLens.profileOf(leonardo);
@@ -2147,12 +2245,12 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(cold.pendingClaimCount, 1);
         assertEq(cold.reservationLabelhash, bytes32(0));
 
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x02), BASE_LABEL_A);
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x02), PERSONHOOD_LABEL_A);
         IDotnsPopLens.PopProfile memory warm = dotnsPopLens.profileOf(ed);
         assertTrue(warm.hasLabelStore);
         assertEq(warm.pendingClaimCount, 0);
-        assertEq(warm.reservationLabelhash, keccak256(bytes(BASE_LABEL_A)));
+        assertEq(warm.reservationLabelhash, keccak256(bytes(PERSONHOOD_LABEL_A)));
 
         IDotnsPopLens.PopProfile memory empty = dotnsPopLens.profileOf(tiago);
         assertFalse(empty.hasLabelStore);
@@ -2161,15 +2259,30 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_reservedBaseLabelOf_returns_label_or_empty() public {
-        _grantPopFull(ed);
-        _reservePop(ed, LITE_LABEL_A, _validChatKey(0x01), BASE_LABEL_A);
+        _grantPersonhood(ed);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
         assertEq(
-            dotnsPopController.reservedBaseLabelOf(keccak256(bytes(BASE_LABEL_A))), BASE_LABEL_A
+            dotnsPopController.reservedLabelOf(keccak256(bytes(PERSONHOOD_LABEL_A))),
+            PERSONHOOD_LABEL_A
         );
         assertEq(
-            bytes(dotnsPopController.reservedBaseLabelOf(keccak256(bytes("unknownbase")))).length, 0
+            bytes(dotnsPopController.reservedLabelOf(keccak256(bytes("unknownbase")))).length, 0
         );
+    }
+
+    function _nameWithNode(
+        IDotnsPopLens.Name[] memory names,
+        bytes32 node
+    )
+        internal
+        pure
+        returns (IDotnsPopLens.Name memory)
+    {
+        for (uint256 i; i < names.length; ++i) {
+            if (names[i].node == node) return names[i];
+        }
+        revert("no name with that node");
     }
 
     function _namesContainNode(

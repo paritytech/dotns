@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title Dotns Reverse Resolver
+/// @title dotNS Reverse Resolver
 /// @notice Interface for writing and reading reverse name records for addresses.
 /// @dev Reverse records bind to an EOA rather than a registry node. Two write paths exist:
 ///      a registrar-only setter used by the controller during reserved registration, and a
@@ -17,7 +18,7 @@ interface IDotnsReverseResolver {
     /// @notice Thrown when a caller attempts to claim a reverse record for a name they do not own.
     /// @param caller The address attempting the claim.
     /// @param node The claimed name's node: a token id for a tokenised name, and the
-    ///        stem-under-container subnode for a lite name.
+    ///        stem-under-container subnode for a device name.
     error NotNameOwner(address caller, uint256 node);
 
     /// @notice Emitted when a name is associated with an address.
@@ -35,7 +36,7 @@ interface IDotnsReverseResolver {
 
     /// @notice Self-service claim: associates `msg.sender` with `<label>` under the network TLD.
     /// @dev The caller must currently own `label`, read through the registry, which delegates a
-    ///      tokenised name to the registrar and holds a lite subname directly, otherwise
+    ///      tokenised name to the registrar and holds a device-name subname directly, otherwise
     ///      @custom:reverts NotNameOwner. Overwrites any existing record for the caller
     ///      and emits @custom:emits ReverseNameSet on every successful write. Transferring the
     ///      name away does not eagerly clear the record; @custom:function nameOf fails closed at

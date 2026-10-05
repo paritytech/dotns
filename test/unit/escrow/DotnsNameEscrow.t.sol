@@ -34,8 +34,8 @@ contract GhostNft is ERC721 {
 ///         @custom:contract DotnsNameEscrow, plus the pull-payment and solvency guarantees.
 contract DotnsNameEscrowTest is BaseDotns {
     /// @notice Default label used across most tests.
-    /// @dev Nine-character stem that classifies as NoStatus; the flat deposit equals
-    ///      BASE_DEPOSIT.
+    /// @dev Eleven characters measured as written, which classifies as NoStatus; the flat deposit
+    ///      equals BASE_DEPOSIT.
     string internal constant LABEL = "labelnine01";
 
     /// @notice Register `label` for `nameOwner` under the NoStatus PoP tier and return its tokenId.
@@ -219,7 +219,7 @@ contract DotnsNameEscrowTest is BaseDotns {
 
     function test_self_registration_seeds_funded_position() public {
         string memory popLabel = "selfregis";
-        bytes32 node = _register(popLabel, ed, IPopRules.PopStatus.PopFull);
+        bytes32 node = _register(popLabel, ed, IPopRules.PopStatus.Personhood);
         uint256 tokenId = uint256(node);
 
         vm.prank(ed);
@@ -410,9 +410,9 @@ contract DotnsNameEscrowTest is BaseDotns {
     function test_funded_position_rebinds_to_new_holder_on_transfer() public {
         string memory label = BASE_LABEL_A;
 
-        _grantPopFull(ed);
-        _grantPopFull(leonardo);
-        _register(label, ed, IPopRules.PopStatus.PopFull);
+        _grantPersonhood(ed);
+        _grantPersonhood(leonardo);
+        _register(label, ed, IPopRules.PopStatus.Personhood);
         uint256 tokenId = _tokenIdForLabel(label);
 
         IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
@@ -456,8 +456,8 @@ contract DotnsNameEscrowTest is BaseDotns {
     function test_downgrade_transfer_pays_name_price() public {
         string memory label = "lights01";
 
-        _grantPopFull(ed);
-        _grantPopLite(leonardo);
+        _grantPersonhood(ed);
+        _grantDevicehood(leonardo);
 
         _commitAndRegister(label, ed, false);
 
@@ -484,17 +484,17 @@ contract DotnsNameEscrowTest is BaseDotns {
         // Downward cross-tier transfer of a funded NoStatus name: the friction fee settles to
         // protocol fees and the deposit travels with the NFT. There is no transfer-time refund:
         // `position.recipient` rebinds to the new holder, the locked deposit follows, and only
-        // the new holder can later release into escrow. Promoting `ed` to PopFull before the
+        // the new holder can later release into escrow. Promoting `ed` to Personhood before the
         // transfer forces `PopRules.transferFloor` to return the base fee D while the position
         // still carries the original `BASE_DEPOSIT` deposit, so both legs of `chargeTransferFee`
         // run in one call.
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
         uint256 startingPrice = popRules.price(LABEL);
         uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-        assertEq(quotedFee, startingPrice, "PopFull holder downgrading to NoStatus pays D");
+        assertEq(quotedFee, startingPrice, "Personhood holder downgrading to NoStatus pays D");
 
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
         uint256 protocolFeesBefore = dotnsNameEscrow.protocolFees();
@@ -761,14 +761,14 @@ contract DotnsNameEscrowTest is BaseDotns {
     /// @notice Verified payer sponsoring a NoStatus owner on a NoStatus-tier label pays
     ///         exactly D under the max-not-sum rule.
     /// @dev `priced.price` equals D because the owner is NoStatus, and `transferFloor` returns
-    ///      D because the payer's PopFull tier downgrades into the owner's NoStatus tier. The
+    ///      D because the payer's Personhood tier downgrades into the owner's NoStatus tier. The
     ///      controller charges `max(priced.price, friction) = D` and routes the entire charge
     ///      into protocol fees; the owner-side refundable position is seeded with zero
     ///      amount, so reserves must not move.
     function test_cross_payer_verified_sponsors_nostatus_pays_only_D() public {
         string memory label = "crosspayr01";
 
-        _grantPopFull(leonardo);
+        _grantPersonhood(leonardo);
         // ed left at default NoStatus tier.
 
         uint256 priorProtocolFees = dotnsNameEscrow.protocolFees();
@@ -810,8 +810,8 @@ contract DotnsNameEscrowTest is BaseDotns {
     function test_cross_payer_pays_the_curve_into_fees() public {
         string memory label = BASE_LABEL_A;
 
-        _grantPopFull(leonardo);
-        _grantPopFull(ed);
+        _grantPersonhood(leonardo);
+        _grantPersonhood(ed);
 
         uint256 ownPrice = popRules.price(label);
         uint256 priorProtocolFees = dotnsNameEscrow.protocolFees();
@@ -845,12 +845,12 @@ contract DotnsNameEscrowTest is BaseDotns {
     ///      it, so `max(ownerPrice, friction)` collapses to the owner price. The whole charge
     ///      routes to protocol fees with no refundable deposit.
     function test_cross_payer_downgrade_charges_only_owner_price() public {
-        // LITE_LABEL_A carries the gateway's separator, which the public path this test drives
+        // DEVICE_LABEL_A carries the gateway's separator, which the public path this test drives
         // rejects, so the label here is a flat one in the same tier.
         string memory label = "michael01";
 
-        _grantPopFull(leonardo);
-        _grantPopLite(ed);
+        _grantPersonhood(leonardo);
+        _grantDevicehood(ed);
 
         uint256 ownPrice = popRules.price(label);
         uint256 priorProtocolFees = dotnsNameEscrow.protocolFees();

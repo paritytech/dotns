@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -6,7 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IDotnsCostModelRegistry} from "./IDotnsCostModelRegistry.sol";
 import {IDotnsPricing} from "./IDotnsPricing.sol";
 
-/// @title DotNS Cost Model Registry
+/// @title dotNS Cost Model Registry
 /// @notice Keeps every registered cost model addressable by version and tracks the current one.
 /// @dev Holds only pointers, so it stays a plain owner-gated contract. `PopRules` resolves it once
 ///      through `DotnsConstants.COST_MODEL` and prices the current version for fresh reads and a

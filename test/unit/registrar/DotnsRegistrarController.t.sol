@@ -146,7 +146,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     function test_register_reverts_at_exact_expiry_boundary() public {
         string memory nameLabel = "alicebobx";
         address nameOwner = ed;
-        _grantPopFull(nameOwner);
+        _grantPersonhood(nameOwner);
 
         IDotnsRegistrarController.Registration memory registration =
             IDotnsRegistrarController.Registration({
@@ -178,11 +178,11 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         vm.stopPrank();
     }
 
-    function test_register_popfull_wires_all_records() public {
+    function test_register_personhood_wires_all_records() public {
         string memory nameLabel = "web2summit";
         address nameOwner = ed;
 
-        _grantPopFull(nameOwner);
+        _grantPersonhood(nameOwner);
 
         vm.prank(owner);
         storeFactory.deployLabelStoreFor(nameOwner);
@@ -222,13 +222,13 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     }
 
     /// @notice A two-digit second-level name is unreachable, which is what keeps a subname
-    ///         from spelling a lite name.
+    ///         from spelling a device name.
     /// @dev `joseph.42` reads either as one label or as `joseph` beneath `42`, and the second
     ///      reading needs `42` to exist. No production controller entry point can create it:
     ///      this path requires three characters, and both gateway paths are letters only. An
     ///      owner-authorised controller calling the registrar directly is not bound by either,
     ///      so the invariant holds over entry points rather than over the registrar. Pinned
-    ///      here because it rests on a length floor that reads as unrelated to lite names.
+    ///      here because it rests on a length floor that reads as unrelated to device names.
     ///      `register` is called directly rather than through `_commitAndRegister`, which
     ///      quotes `priceWithCheck` first and would revert on the reserved tier instead. No
     ///      commitment is needed: the label is validated before one is consumed.
@@ -250,21 +250,21 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         dotnsRegistrarController.register(registration);
     }
 
-    /// @notice A public registration reserves no stem.
+    /// @notice A public registration reserves no base name.
     /// @dev PopRules' reservation slot belongs to the gateway queue, and `register` writes none
-    ///      of its own. Pinned here because a stem the public path reserved silently would
+    ///      of its own. Pinned here because a base name the public path reserved silently would
     ///      block the gateway's own registrant for the whole reservation window.
     function test_public_register_reserves_no_base_name() public {
         string memory nameLabel = "lights01";
         address nameOwner = ed;
 
-        _grantPopFull(nameOwner);
+        _grantPersonhood(nameOwner);
         _commitAndRegister(nameLabel, nameOwner, true);
 
         assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(nameLabel)), nameOwner);
 
         (bool isReserved,,) = popRules.isBaseNameReserved(popRules.stripDigits(nameLabel));
-        assertFalse(isReserved, "no stem reserved by a public registration");
+        assertFalse(isReserved, "no base name reserved by a public registration");
     }
 
     function test_register_does_not_overwrite_third_party_reverse_record() public {
@@ -516,7 +516,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     function test_transfer_writes_label_and_creates_store() public {
         string memory nameLabel = "alicetransfer01";
 
-        _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
+        _register(nameLabel, ed, IPopRules.PopStatus.Personhood);
 
         assertEq(storeFactory.getLabelStore(leonardo), address(0));
 
@@ -540,7 +540,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     function test_transfer_back_skips_locked_entry() public {
         string memory nameLabel = "carolreturn01";
 
-        _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
+        _register(nameLabel, ed, IPopRules.PopStatus.Personhood);
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
@@ -562,7 +562,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     function test_transfer_clears_primary_reverse_name_when_current_name_is_moved() public {
         string memory nameLabel = "primarymove01";
 
-        _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
+        _register(nameLabel, ed, IPopRules.PopStatus.Personhood);
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
         assertEq(dotnsReverseResolver.nameOf(ed), "primarymove01.dot");
@@ -580,7 +580,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         assertEq(storeFactory.getLabelStore(address(0)), address(0));
 
-        _register(nameLabel, tiago, IPopRules.PopStatus.PopFull);
+        _register(nameLabel, tiago, IPopRules.PopStatus.Personhood);
 
         ILabelStore tiagoStore = ILabelStore(storeFactory.getLabelStore(tiago));
         uint256 tokenId = _tokenIdForLabel(nameLabel);
@@ -592,7 +592,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     function test_safe_transfer_writes_to_store() public {
         string memory nameLabel = "safexfer01";
 
-        _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
+        _register(nameLabel, ed, IPopRules.PopStatus.Personhood);
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
@@ -614,7 +614,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         address payer = ed;
         address ownerAddr = leonardo;
 
-        _grantPopFull(payer);
+        _grantPersonhood(payer);
 
         bytes32 secret = keccak256(abi.encodePacked(popfullLabel, ownerAddr, block.timestamp));
         IDotnsRegistrarController.Registration memory registration =
@@ -644,7 +644,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
                 IPopRules.OwnerStatusInsufficient.selector,
                 popfullLabel,
                 IPopRules.PopStatus.NoStatus,
-                IPopRules.PopStatus.PopFull
+                IPopRules.PopStatus.Personhood
             )
         );
         dotnsRegistrarController.register{value: charge}(registration);
@@ -653,7 +653,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     function test_transfer_via_approved_operator_writes_to_store() public {
         string memory nameLabel = "opxfer01";
 
-        _register(nameLabel, ed, IPopRules.PopStatus.PopFull);
+        _register(nameLabel, ed, IPopRules.PopStatus.Personhood);
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
@@ -1096,9 +1096,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
     // Regression: the paid path's governance-reserved rejection is unchanged by the grant gate.
 
     /// @dev A reserved-tier label (base length five or fewer) is refused on the paid path whoever
-    /// pays. The cross-payer branch distinguishes a governance-reserved label from a stem held by
-    /// another user, so it reverts `GovernanceReserved` rather than `NameReserved`. Reserved-tier
-    /// labels reach circulation only through `registerReserved`, and a grant does not change that.
+    /// pays. The cross-payer branch distinguishes a governance-reserved label from a base name
+    /// held by another user: this one reverts `GovernanceReserved`, and `NameReserved` is kept for
+    /// the held base name. Reserved-tier labels reach circulation only through `registerReserved`,
+    /// and a grant does not change that.
     function test_register_rejects_a_governance_reserved_label_for_a_cross_payer() public {
         string memory nameLabel = "alice";
 

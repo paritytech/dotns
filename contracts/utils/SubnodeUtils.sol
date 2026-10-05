@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
@@ -8,7 +9,7 @@ import {LabelUtils} from "./LabelUtils.sol";
 import {StringUtils} from "./StringUtils.sol";
 import {DotnsConstants} from "./DotnsConstants.sol";
 
-/// @title DotNS Subnode Utilities Library
+/// @title dotNS Subnode Utilities Library
 /// @notice General-purpose helpers for registering names that live as subnodes of another name,
 ///         rather than as tokenised second-level registrations.
 /// @dev A subname has no token: its ownership lives in the registry record, not in the registrar's
@@ -55,24 +56,24 @@ library SubnodeUtils {
         subnode = LabelUtils.namehashUnder(parentNode, LabelUtils.labelhashMemory(subLabel));
     }
 
-    /// @notice Derives the subnode for a lite label `<stem>.<suffix>`, splitting it on the
+    /// @notice Derives the subnode for a device name `<stem>.<suffix>`, splitting it on the
     /// separator first.
-    /// @dev The single place a lite label is turned into a node, shared by the write path and every
-    ///      reader of a lite name so the issuer and its readers agree on where a lite name lives.
-    ///      Callers gate on @custom:function StringUtils.isLitePersonLabelMemory beforehand, so the
-    ///      label is known to carry the separator this splits on.
+    /// @dev The single place a device name is turned into a node, shared by the write path and
+    ///      every reader of a device name so the issuer and its readers agree on where a device
+    ///      name lives. Callers gate on @custom:function StringUtils.isDeviceLabelMemory
+    ///      beforehand, so the label is known to carry the separator this splits on.
     /// @param tldNode The TLD node.
-    /// @param liteLabel Lite label, e.g. `alice.01`.
+    /// @param deviceLabel Device name, e.g. `alice.01`.
     /// @return subnode Namehash of the stem beneath its numeric container beneath the TLD.
-    function liteSubnodeOf(
+    function deviceSubnodeOf(
         bytes32 tldNode,
-        string memory liteLabel
+        string memory deviceLabel
     )
         internal
         pure
         returns (bytes32 subnode)
     {
-        (string memory stem, string memory suffix) = StringUtils.splitLiteLabel(liteLabel);
+        (string memory stem, string memory suffix) = StringUtils.splitDeviceLabel(deviceLabel);
         subnode = subnodeOf(tldNode, suffix, stem);
     }
 

@@ -13,7 +13,7 @@ import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {DeploymentNetwork} from "./DeploymentNetwork.sol";
 
 /// @title BaseDeployer
-/// @notice Shared base for the DotNS deploy pipeline. Each concrete stage
+/// @notice Shared base for the dotNS deploy pipeline. Each concrete stage
 ///         script reads the manifest from disk (populated by prior stages),
 ///         deploys its own proxies in its own forge-script process, and writes
 ///         the updated manifest back.
@@ -30,7 +30,7 @@ abstract contract BaseDeployer is Script {
     ///         successive calls within the same run.
     string internal constant MANIFEST_OBJECT_KEY = "dotns.manifest";
 
-    /// @notice Namespace for all DotNS CREATE3 salts.
+    /// @notice Namespace for all dotNS CREATE3 salts.
     /// @dev Do not include the chain ID: the deployment goal is identical
     ///      addresses for identical bytecode and constructor data on every
     ///      chain. Bump this value only when intentionally moving the whole
@@ -250,7 +250,7 @@ abstract contract BaseDeployer is Script {
     /// @dev Full OZ upgrade-safety validation runs on every call. The helper
     ///      exists so every stage script shares one canonical deploy shape
     ///      rather than repeating the validation, broadcast, label, and log
-    ///      sequence. Salts are derived from a stable DotNS namespace plus the
+    ///      sequence. Salts are derived from a stable dotNS namespace plus the
     ///      manifest label, so addresses stay the same across chains as long as
     ///      the deployer, bytecode, constructor args, and label remain stable.
     /// @param owner Broadcasting account; becomes the proxy owner.
@@ -347,7 +347,7 @@ abstract contract BaseDeployer is Script {
     /// @notice Ensures the CREATE3 factory exists and primes it as the in-memory
     ///         override for the remainder of this process, reusing a pre-deployed
     ///         factory when one is configured.
-    /// @dev Every DotNS address is a pure function of the factory address and a
+    /// @dev Every dotNS address is a pure function of the factory address and a
     ///      stable salt, and the factory address is `keccak(deployer, nonce)`. A
     ///      fresh `new Create3Factory()` from a key whose nonce is not fixed
     ///      therefore lands at a new address and shifts every downstream CREATE3
@@ -399,7 +399,7 @@ abstract contract BaseDeployer is Script {
             "  Its address depends on the deployer nonce and is NOT reproducible across chain"
         );
         console.log(
-            "  resets. To pin every DotNS address, set CREATE3_FACTORY (or run deploy:all)."
+            "  resets. To pin every dotNS address, set CREATE3_FACTORY (or run deploy:all)."
         );
         _adoptCreate3Factory(factory);
     }

@@ -41,7 +41,7 @@ contract DotnsRegistryTests is BaseDotns {
     }
 
     /// @notice A separator is never valid in a subname label.
-    /// @dev This is what reserves the dotted-label space to the PoP gateway. Loosen it and a
+    /// @dev This is what reserves the dotted-label space to the gateway path. Loosen it and a
     ///      subname could be minted whose label equals a person's, putting two claimants on one
     ///      node. Both subnode entry points are checked, since either would open the space.
     function test_subname_label_carrying_a_separator_is_rejected() public {
@@ -75,7 +75,7 @@ contract DotnsRegistryTests is BaseDotns {
     }
 
     /// @notice A subname created outside the gateway carries no person provenance.
-    /// @dev The gateway issues a lite name as the subname `michael` under `01` and records it in
+    /// @dev The gateway issues a device name as the subname `michael` under `01` and records it in
     ///      `_popIssued`. This test creates the same subname directly, without the gateway, and
     ///      shows it reads back as not `isPopIssued`: provenance, not the name text, is what marks
     /// a gateway-issued person. No production controller entry point can create the parent here:
@@ -378,7 +378,7 @@ contract DotnsRegistryTests is BaseDotns {
 
     function test_revert_subnode_owner_with_parent_label_mismatch() public {
         string memory parentLabel = "actualparent01";
-        bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.PopFull);
+        bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.Personhood);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
             parentNode: parentNode,
@@ -616,8 +616,8 @@ contract DotnsRegistryTests is BaseDotns {
     function test_same_sublabel_under_different_parents_owned_by_same_address() public {
         string memory parentLabelA = "alphaomega";
         string memory parentLabelB = "bravobro";
-        bytes32 parentNodeA = _register(parentLabelA, owner, IPopRules.PopStatus.PopFull);
-        bytes32 parentNodeB = _register(parentLabelB, owner, IPopRules.PopStatus.PopFull);
+        bytes32 parentNodeA = _register(parentLabelA, owner, IPopRules.PopStatus.Personhood);
+        bytes32 parentNodeB = _register(parentLabelB, owner, IPopRules.PopStatus.Personhood);
 
         string memory subLabel = "app";
 

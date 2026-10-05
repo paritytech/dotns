@@ -1,46 +1,62 @@
 name: Publish Beta Package
 
+# Creating a `v*` tag is restricted to the dotns team by the `release tags` ruleset, the
+# `guard` job refuses a tag whose commit is not on master, and the gated job pauses on the
+# `releases` environment for a reviewer. A release therefore ships reviewed master code and
+# takes two distinct human actions: cutting the tag, and approving the run it starts.
 on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+-*"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Pre-release version, e.g. v0.5.5-rc1. The tag is created from the selected branch."
-        required: true
-        type: string
 
 permissions:
   contents: write
 
-# Two runs for the same version would race to attach assets to the same draft. On a
-# dispatch `github.ref_name` is the branch, so key on the requested version instead.
+# Two runs for the same version would race to attach assets to the same draft.
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.version || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  beta-release:
+  # Runs first, with no environment and read-only access: a tag that does not point at a
+  # commit on master stops here, before a reviewer is asked to approve and before any
+  # secret is read. master only takes pull requests, which need an approving review, so
+  # this keeps every release on reviewed code.
+  guard:
     runs-on: ubuntu-latest
-    # Baked into the genesis registry, so it decides which networks the artifact suits.
-    # Job-level: five steps name the file derived from it and must not disagree.
-    env:
-      DOTNS_TLD: testnet
+    permissions:
+      contents: read
     steps:
-      # On workflow_dispatch the tag does not exist yet; the release step creates it
-      # from the branch this run was started on. Read through an env var rather than
-      # interpolating the input into the script.
-      - name: Resolve release tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_VERSION: ${{ inputs.version }}
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require the tagged commit to be on master
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            TAG="$INPUT_VERSION"
-          else
-            TAG="$GITHUB_REF_NAME"
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::$GITHUB_REF_NAME points at $GITHUB_SHA, which is not on master. Tag a commit on master."
+            exit 1
           fi
+          echo "$GITHUB_REF_NAME points at $GITHUB_SHA, which is on master."
+
+  beta-release:
+    needs: guard
+    runs-on: ubuntu-latest
+    # Gated: this job reads the genesis owner key, which lives only on the `releases`
+    # environment, so every run waits for a reviewer's approval there.
+    environment: releases
+    # One genesis per TLD, since the TLD is baked into the registry: `.testnet` for previewnet,
+    # `.paseo` for Paseo Asset Hub Next V2. Job-level: several steps name the files it yields.
+    env:
+      DOTNS_TLDS: testnet paseo
+    steps:
+      # The run is started by pushing the tag, so the tag already exists and is the release's
+      # identity. Only the tag push triggers this workflow: the `release tags` ruleset keeps
+      # the workflow's token from creating a `v*` tag, so a run without one could not publish.
+      - name: Resolve release tag
+        run: |
+          TAG="$GITHUB_REF_NAME"
           # The suffix is restricted to characters GitHub keeps verbatim in an asset
           # name; a space, for instance, is rewritten to a dot and would fail the
           # asset check after a full build. Segmented like run.sh's semver check
@@ -50,16 +66,8 @@ jobs:
             echo "::error::Pre-release version must look like v1.2.3-rc1, got '$TAG'."
             exit 1
           fi
-          # A release created for an existing tag is cut at that tag's commit: GitHub
-          # ignores target_commitish when the tag is already there. The ABIs would come
-          # from this branch while the release pointed somewhere else.
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] \
-            && gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
-            echo "::error::Tag $TAG already exists; use a different version."
-            exit 1
-          fi
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
-          echo "Releasing $TAG from $GITHUB_REF_NAME."
+          echo "Releasing $TAG."
 
       - name: Reject a pre-published release
         env:
@@ -86,6 +94,30 @@ jobs:
           submodules: recursive
 
       - uses: ./.github/actions/setup-foundry
+
+      # The environment pairs the key (secret) with its address (variable). Deriving one from
+      # the other before the build turns a mistyped key into a failed run instead of a genesis
+      # owned by an address nobody holds. The address is public; the key is never printed.
+      - name: Check the owner key against its declared address
+        env:
+          DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
+          DOTNS_ADMIN_ADDRESS: ${{ vars.DOTNS_ADMIN_ADDRESS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DOTNS_ADMIN_KEY" ]; then
+            echo "::error::DOTNS_ADMIN_KEY is not configured on the releases environment"
+            exit 1
+          fi
+          if [ -z "$DOTNS_ADMIN_ADDRESS" ]; then
+            echo "::error::DOTNS_ADMIN_ADDRESS is not configured on the releases environment"
+            exit 1
+          fi
+          DERIVED="$(cast wallet address --private-key "$DOTNS_ADMIN_KEY")"
+          if [ "$(printf '%s' "$DERIVED" | tr 'A-Z' 'a-z')" != "$(printf '%s' "$DOTNS_ADMIN_ADDRESS" | tr 'A-Z' 'a-z')" ]; then
+            echo "::error::DOTNS_ADMIN_KEY derives to $DERIVED, the environment declares $DOTNS_ADMIN_ADDRESS"
+            exit 1
+          fi
+          echo "Owner key derives to the declared address $DERIVED"
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -125,8 +157,12 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
           FACTORY_DEPLOYER_KEY: ${{ secrets.FACTORY_DEPLOYER_KEY }}
           DOTNS_ADMIN_KEY: ${{ secrets.DOTNS_ADMIN_KEY }}
-          DOTNS_ADMIN_MNEMONIC: ${{ secrets.DOTNS_ADMIN_MNEMONIC }}
-        run: bash scripts/genesis/build-genesis.sh release
+        run: |
+          for tld in $DOTNS_TLDS; do
+            DOTNS_TLD="$tld" bash scripts/genesis/build-genesis.sh release
+          done
+          # The address set every genesis above carries, which the builder asserted.
+          cp deployments/expected.json release/dotns-genesis-addresses.json
 
       - name: Extract ABIs
         run: |
@@ -152,6 +188,11 @@ jobs:
           find release/abis -maxdepth 1 -type f -printf '%f\n' | sort > release/expected-assets.txt
           echo "Extracted $(wc -l < release/expected-assets.txt) ABIs"
 
+          # Record which published ABIs each contract inherits from, read from the same build.
+          # The ABI diff step uses it to list a change once, under the interface that declares
+          # it, even when the names do not match. Kept out of release/, since it is not an asset.
+          bun scripts/js/release-metadata.mjs bases --out "$RUNNER_TEMP/abi-bases.json"
+
       # No addresses: a pre-release is cut to be deployed, so the recorded addresses still
       # belong to the previous deployment of different code. Publishing them under this tag
       # would break the promise that a release's addresses and ABIs come from the same release.
@@ -165,7 +206,7 @@ jobs:
           TAG="$RELEASE_TAG"
           cd release
           zip -r "../dotns-abis-${TAG}.zip" abis/ release-manifest.json codehashes.json \
-            "dotns-genesis-${DOTNS_TLD}.json"
+            dotns-genesis-*.json
 
       - name: Generate release body
         env:
@@ -175,7 +216,7 @@ jobs:
           ASSET_BASE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG"
 
           cat > release-body.md << 'ENDOFBODY'
-          ## DotNS ABI Package (Pre-release)
+          ## dotNS ABI Package (Pre-release)
 
           > **This is a pre-release.** ABIs may change before the stable release.
 
@@ -199,7 +240,7 @@ jobs:
           ### Usage
 
           ```ts
-          import StoreAbi from "./abis/Store.json";
+          import LabelStoreAbi from "./abis/LabelStore.json";
           import RegistrarAbi from "./abis/DotnsRegistrar.json";
           ```
           ENDOFBODY
@@ -222,7 +263,12 @@ jobs:
             echo "not the previous live deployment's."
             echo ""
             echo "- **Release contents:** [release-manifest.json]($ASSET_BASE/release-manifest.json)"
-            echo "- [dotns-genesis-${DOTNS_TLD}.json]($ASSET_BASE/dotns-genesis-${DOTNS_TLD}.json) — pallet-revive genesis, \`.${DOTNS_TLD}\` TLD, for ${DOTNS_TLD} networks only."
+            for tld in $DOTNS_TLDS; do
+              echo "- [dotns-genesis-${tld}.json]($ASSET_BASE/dotns-genesis-${tld}.json) - pallet-revive genesis, \`.${tld}\` TLD, for .${tld} networks only."
+            done
+            echo "- [dotns-genesis-addresses.json]($ASSET_BASE/dotns-genesis-addresses.json) - the addresses those genesis files carry."
+            echo ""
+            echo "Previewnet uses \`.testnet\`, Paseo Asset Hub Next V2 uses \`.paseo\`."
           } >> release-body.md
 
       - name: ABI diff since previous release
@@ -241,22 +287,21 @@ jobs:
             prev_args=(--previous prev-abis/abis --previous-tag "$PREV")
           fi
           bun scripts/js/release-metadata.mjs abidiff --current release/abis \
-            "${prev_args[@]}" --json release/abi-diff.json >> release-body.md
+            "${prev_args[@]}" --bases "$RUNNER_TEMP/abi-bases.json" \
+            --json release/abi-diff.json >> release-body.md
 
       - name: Create draft pre-release with artifacts
         uses: softprops/action-gh-release@v2
         with:
-          # Explicit because on workflow_dispatch there is no tag to infer; the action
-          # creates it at this run's commit.
+          # The tag that started this run.
           tag_name: ${{ env.RELEASE_TAG }}
-          target_commitish: ${{ github.sha }}
           files: |
             dotns-abis-*.zip
             release/abis/*.json
             release/release-manifest.json
             release/codehashes.json
             release/abi-diff.json
-            release/dotns-genesis-${{ env.DOTNS_TLD }}.json
+            release/dotns-genesis-*.json
           body_path: release-body.md
           draft: true
           prerelease: true
@@ -275,7 +320,8 @@ jobs:
             echo "release-manifest.json"
             echo "codehashes.json"
             echo "abi-diff.json"
-            echo "dotns-genesis-${DOTNS_TLD}.json"
+            echo "dotns-genesis-addresses.json"
+            for tld in $DOTNS_TLDS; do echo "dotns-genesis-${tld}.json"; done
           } | sort > "$RUNNER_TEMP/wanted-assets.txt"
           if ! diff -u "$RUNNER_TEMP/wanted-assets.txt" "$RUNNER_TEMP/actual-assets.txt"; then
             echo "::error::Draft pre-release $TAG does not match the expected asset set; delete the draft and re-run."

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {IDotnsController} from "./IDotnsController.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
 
-/// @title Dotns Registrar Controller
+/// @title dotNS Registrar Controller
 /// @notice Interface for registering top-level labels using a commit reveal scheme.
 /// @dev Defines allocation only; forward resolution, reverse lookup, pricing mechanics, PoP
 /// validation, and store writing are handled by external contracts. Users commit a hash of
@@ -150,14 +151,14 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @custom:reverts CommitmentTooOld past `maxCommitmentAge`, and finally resolves the
     /// configured escrow address from the protocol registry (otherwise
     /// @custom:reverts EscrowNotConfigured). Splits on direct vs cross-payer at
-    /// `msg.sender == registration.owner`. The direct path runs `priceWithCheck` (personhood
+    /// `msg.sender == registration.owner`. The direct path runs `priceWithCheck` (PoP-status
     /// + reservation gate) and routes the charge to a refundable escrow deposit owned by
-    /// `registration.owner`. The cross-payer path skips the personhood revert in
+    /// `registration.owner`. The cross-payer path skips the PoP-status revert in
     /// `priceWithCheck` but applies it directly via @custom:reverts OwnerStatusInsufficient
     /// when the owner's recorded tier does not meet the label's required tier, and still
     /// rejects governance-reserved labels with @custom:reverts GovernanceReserved and live
-    /// cross-user stem reservations with @custom:reverts NameReserved. The cross-payer charge is
-    /// the owner-side registration price; the path applies no separate transfer friction. The
+    /// cross-user base-name reservations with @custom:reverts NameReserved. The cross-payer charge
+    /// is the owner-side registration price; the path applies no separate transfer friction. The
     /// charge routes to the escrow protocol fee pot while seeding a zero-amount deposit slot so
     /// the release lifecycle stays reachable. The reveal prices the name at the committed
     /// `pricingVersion`, so a model change between commit and reveal leaves the amount unchanged,

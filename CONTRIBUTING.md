@@ -1,6 +1,6 @@
-# Contributing to DotNS
+# Contributing to dotNS
 
-These guidelines apply to the DotNS repository ("dotns"). Contributions are welcome via issues, pull requests, reviews, and testing feedback. Protocol behaviour is documented in [README.md](./README.md) and network addresses in `deployments/<network>/<chain-id>.json`; this file is the contributor mechanics.
+These guidelines apply to the dotNS repository ("dotns"). Contributions are welcome via issues, pull requests, reviews, and testing feedback. Protocol behaviour is documented in [README.md](./README.md) and network addresses in `deployments/<network>/<chain-id>.json`; this file is the contributor mechanics.
 
 ## Types of contributing
 
@@ -74,7 +74,7 @@ Before opening a pull request:
 
 ## Feature design
 
-Treat the chain as the database. Assume no servers and no indexers. If a feature needs an offchain service to be usable, it is not a DotNS feature.
+Treat the chain as the database. Assume no servers and no indexers. If a feature needs an offchain service to be usable, it is not a dotNS feature.
 
 This has a practical implication: every feature must come with an explicit query path. A client should be able to start from a small set of known contracts and find everything it needs with a bounded number of calls. Every getter is `external view`; controllers and resolvers check authorisation on writes, never on reads; governance key rotation does not break existing read paths because consumers re-resolve their siblings through the protocol registry on every call.
 
@@ -118,12 +118,12 @@ Example query paths. Each row starts from a small set of known contracts; every 
 
 | Lookup | Path |
 | --- | --- |
-| Lite labelhash => full-person node | Protocol registry => PoP resolver => `fullClaim(liteLabelhash)` |
-| Full-person node => lite labelhash | Protocol registry => PoP resolver => `liteLink(fullNode)` |
+| Device-name labelhash => personhood-name node | Protocol registry => PoP resolver => `personhoodNodeOf(deviceLabelhash)` |
+| Personhood-name node => device-name labelhash | Protocol registry => PoP resolver => `deviceLabelhashOf(personhoodNode)` |
 | Node => chat key | Protocol registry => PoP resolver => `chatKey(node)` |
 | Node or tokenId => registered label | Protocol registry => registrar => `labelOf(uint256(node))` |
-| Base stem => gateway-reservation state | Protocol registry => PoP controller => `isReservedForClaim(baseLabel)` |
-| Base stem => cross-flow reservation state | Protocol registry => PopRules => `isBaseNameReserved(baseLabel)` |
+| Personhood name => gateway-reservation state | Protocol registry => PoP controller => `isReservedForClaim(label)` |
+| Base name => cross-flow reservation state | Protocol registry => PopRules => `isBaseNameReserved(baseName)` |
 | Node => ERC721 owner | Protocol registry => registrar => `ownerOf(uint256(node))` |
 | Subnode => forward-registry owner | Protocol registry => registry => `owner(subnode)` |
 | Node => forward address record | Protocol registry => forward resolver => address record |
@@ -135,7 +135,7 @@ Any new contract address that other contracts need to read must be looked up thr
 
 If you are adding a new contract category, add a `bytes32` key for it in `DotnsConstants.sol`, wire it up in `WireDeployments.s.sol` (including its entry in `_registryEntries`, so its code identity is declared and verified with the rest), and list the contract and its interface in `.github/abi-contracts.txt` so their ABIs ship in the release artifact. Read it the same way every existing contract does. Give the contract the standard `version()` mirror — a `view` that returns `protocolRegistry.protocolVersion()`, copied from any existing contract — and never a hardcoded version constant: what a network runs is declared once, on the protocol registry, every contract reports that one value, and per-contract identity is the declared codehash the deploy pipeline writes, not a self-report compiled into the bytecode.
 
-A change that moves or adds an address (a new salt, a new contract, a contract restructured behind a proxy) must update `deployments/expected.json` in the same PR — that diff is where review sees the move — and must NOT touch any `deployments/<network>/<chainId>.json`. Those are records of live networks, updated only by a real deploy on that network; editing one from a code PR publishes an address nothing is deployed at. The expected set diverging from a network's manifest is normal and means a redeploy or migration is owed on that network — see "Network manifests and the expected set" in `DEPLOYMENTS.md`.
+A change that moves or adds an address (a new salt, a new contract, a contract restructured behind a proxy) must update `deployments/expected.json` in the same PR — that diff is where review sees the move — and must NOT touch any `deployments/<network>/<chainId>.json`. Those are records of live networks, updated only by a real deploy on that network; editing one from a code PR publishes an address nothing is deployed at. The expected set diverging from a network's manifest is normal and means a redeploy or migration is owed on that network — see "Network manifests and the expected set" in `DEPLOYMENTS.md`. CI enforces this: `release-metadata.yml` fails a pull request that edits a live manifest unless the pull request carries the `deployment-record` label, which is how a real deploy records its addresses.
 
 Bad — the registrar address is frozen at construction, so rotating it needs an upgrade:
 
@@ -191,7 +191,7 @@ Do not cache the new address in storage on the existing contract during the upgr
 
 ## Static analysis and security tooling
 
-DotNS uses automated checks (including static analysis) on pull requests.
+dotNS uses automated checks (including static analysis) on pull requests.
 
 Important caveats:
 
@@ -315,11 +315,11 @@ Operational pitfalls of the local ETH-RPC adapter, each learned the hard way:
 2. Delete the paired fork test under `test/fork/`.
 3. Delete every `*Old.sol` and `I*Old.sol` referenced only by the upgrade script.
 4. Delete temporary forge artefacts: `broadcast/<Script>.s.sol/` and `cache/<Script>.s.sol/`.
-5. Update `deployments/<network>/<chainid>.json` with any new addresses. It is the only place they are recorded, so nothing else needs editing.
+5. Update `deployments/<network>/<chainid>.json` with any new addresses. It is the only place they are recorded, so nothing else needs editing. That edit is the one case where touching a live manifest is correct, so label the pull request `deployment-record`; without it the `live-manifests-unchanged` check refuses the diff.
 
 ## Code of conduct
 
 Be respectful and constructive.
 
 - Harassment, abuse, or aggressive behaviour is not acceptable.
-- Spam issues/PRs, or contributions unrelated to DotNS, may be closed.
+- Spam issues/PRs, or contributions unrelated to dotNS, may be closed.

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -23,13 +24,13 @@ import {IDotnsNameEscrow} from "../escrow/IDotnsNameEscrow.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
-/// @title Dotns Registrar
+/// @title dotNS Registrar
 /// @notice ERC721-backed registrar implementing permanent name ownership.
 /// @dev Deliberately policy-free on pricing, reservations, and PoP gating; those live in the
 /// controllers and @custom:contract IPopRules. The registrar owns transferability itself: publicly
-/// registered names transfer freely, while names minted through the PoP gateway are soulbound and
-/// revert on transfer. The `_update` hook enforces both the soulbound gate and the fee-on-transfer
-/// settlement that consults the escrow.
+/// registered names transfer freely, while names minted through the dotNS gateway pallet are
+/// soulbound and revert on transfer. The `_update` hook enforces both the soulbound gate and the
+/// fee-on-transfer settlement that consults the escrow.
 /// @custom:security-contact admin@parity.io
 contract DotnsRegistrar is
     Initializable,
@@ -49,12 +50,12 @@ contract DotnsRegistrar is
     /// @custom:oz-retyped-from mapping(IDotnsRegistrarController => bool)
     mapping(IDotnsController controller => bool exists) public controllers;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     /// @dev Used to resolve sibling contract addresses (store factory, controller, registry)
     /// without storing individual references.
     IDotnsProtocolRegistry public protocolRegistry;
 
-    /// @notice Marks a token as soulbound: minted through the PoP gateway and non-transferable.
+    /// @notice Marks a token as soulbound: minted through the gateway pallet and non-transferable.
     /// @dev Set at mint by @custom:function register when the caller is the address registered
     /// under `DotnsConstants.POP_CONTROLLER`. Write-once and never cleared: a name's soulbound
     /// state is fixed at registration. Read by the `_update` transfer gate and by
@@ -145,7 +146,7 @@ contract DotnsRegistrar is
         // `LabelStore` under `pallet-revive`, so the controller stashes a pending claim and the
         // user settles via @custom:function IDotnsPopController.claimLabelStore later). Non-empty
         // labels must still be canonical so the transfer-floor lookup in `_quoteTransferFee`
-        // cannot brick the token by reverting on a malformed stem.
+        // cannot brick the token by reverting on a malformed label.
         require(bytes(label).length == 0 || label.isSingleLabel(), InvalidLabel());
         _mint(owner, id);
         // Provenance is verified here rather than trusted from a caller-supplied flag: only the
@@ -226,7 +227,7 @@ contract DotnsRegistrar is
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
-    ///         registry so every DotNS contract reports one synchronised value.
+    ///         registry so every dotNS contract reports one synchronised value.
     /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
     ///      `version()` selector for ABI compatibility. It reports the network's declaration,
     ///      not this contract's build; per-contract identity is the codehash declared on the

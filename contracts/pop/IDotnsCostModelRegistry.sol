@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {IDotnsPricing} from "./IDotnsPricing.sol";
 
-/// @title DotNS Cost Model Registry
+/// @title dotNS Cost Model Registry
 /// @notice Holds every cost model the protocol has run and names the current one.
 /// @dev The address registered under `DotnsConstants.COST_MODEL` points here, set once and never
 ///      repointed. Changing the live curve registers a new model, which adds its version and moves
@@ -68,14 +69,16 @@ interface IDotnsCostModelRegistry {
     function current() external view returns (IDotnsPricing model);
 
     /// @notice Prices a base length at the current version.
-    /// @param baseLength Digit-stripped length of the label being priced.
+    /// @param baseLength Base length of the label being priced: its length as written, less a
+    ///        device name's suffix.
     /// @return weiPrice Registration cost in wei at the current version.
     function priceForBaseLength(uint256 baseLength) external view returns (uint256 weiPrice);
 
     /// @notice Prices a base length at a specific version.
     /// @dev @custom:reverts UnknownVersion when no model is registered for `version`.
     /// @param version The version to price against.
-    /// @param baseLength Digit-stripped length of the label being priced.
+    /// @param baseLength Base length of the label being priced: its length as written, less a
+    ///        device name's suffix.
     /// @return weiPrice Registration cost in wei at that version.
     function priceForBaseLengthAtVersion(
         uint256 version,

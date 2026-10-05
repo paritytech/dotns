@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 /// @title String Utilities Library
-/// @notice Provides string manipulation utilities for DotNS contracts.
+/// @notice Provides string manipulation utilities for dotNS contracts.
 /// @dev Extends OpenZeppelin's Strings library with additional UTF-8 and conversion helpers.
 /// @custom:security-contact admin@parity.io
 library StringUtils {
@@ -12,24 +13,41 @@ library StringUtils {
     using Strings for int256;
     using Strings for address;
 
-    /// @notice Number of digits in a lite-person PoP label's suffix.
+    /// @notice Number of digits in a device name's suffix.
     /// @dev The count the gateway emits, and an exact requirement here: the separator sits at a
     ///      fixed offset from the end, so a one or three digit suffix is rejected. The gateway
     /// reads its own minimum, so widening it there does not widen this.
-    uint256 internal constant LITE_SUFFIX_DIGITS = 2;
+    uint256 internal constant DEVICE_SUFFIX_DIGITS = 2;
 
     /// @notice Maximum number of octets in a single DNS label.
     /// @dev RFC 1035 caps each label at 63 octets. Enforced inside @custom:function _isDnsLabel so
     ///      every public validator (@custom:function isSingleLabel, @custom:function isNamePath,
-    ///      @custom:function isLitePersonLabel) inherits the bound and oversized labels never
-    ///      reach the registrar. A lite label bounds its stem rather than the whole string, so
-    ///      it reaches `MAX_DNS_LABEL_OCTETS + LITE_SUFFIX_DIGITS + 1` octets. Its stem is
-    ///      bounded here but checked in @custom:function _isLitePersonLabel, which is stricter
+    ///      @custom:function isDeviceLabel) inherits the bound and oversized labels never
+    ///      reach the registrar. A device name bounds its stem rather than the whole string, so
+    ///      it reaches `MAX_DNS_LABEL_OCTETS + DEVICE_SUFFIX_DIGITS + 1` octets. Its stem is
+    ///      bounded here but checked in @custom:function _isDeviceLabel, which is stricter
     ///      on charset than a DNS label: letters only.
+    ///      This is the per-segment bound only; @custom:function isNamePath additionally bounds
+    ///      the whole path with @custom:constant MAX_NAME_PATH_OCTETS.
     uint256 internal constant MAX_DNS_LABEL_OCTETS = 63;
 
-    /// @notice ASCII full stop separating a lite label's stem from its digit suffix.
-    /// @dev A lite label is the only label shape in DotNS that carries a separator;
+    /// @notice Cap on the dotted parent path a caller submits, in octets.
+    /// @dev Not an RFC 1035 figure, despite the value. That ceiling is 255 octets of *wire* name,
+    ///      where each label carries a length prefix and the name ends in a zero byte, and it
+    ///      covers the fully qualified name. This bounds the dotted presentation string the caller
+    ///      passes in, which also carries no TLD, so the two are not the same quantity and this
+    ///      one must not be retuned to "match RFC 1035". What reaches a `LabelStore` row is longer
+    ///      again, and depends on the network's TLD: `subLabel` + "." + path + the TLD, so about
+    ///      323 octets at the maximum where the TLD is four octets.
+    /// @dev @custom:constant MAX_DNS_LABEL_OCTETS bounds one segment; this bounds the path. Without
+    ///      it a caller composes an arbitrarily long `parentLabel` out of legal 63-octet segments,
+    ///      and `DotnsRegistry.setSubnodeOwner` stores the full name built from it verbatim in a
+    ///      `LabelStore` row that has no delete path, so the text is a permanent multiplier on
+    ///      every enumeration that reads the row back.
+    uint256 internal constant MAX_NAME_PATH_OCTETS = 255;
+
+    /// @notice ASCII full stop separating a device name's stem from its digit suffix.
+    /// @dev A device name is the only label shape in dotNS that carries a separator;
     ///      @custom:function _isDnsLabel rejects it everywhere else.
     bytes1 internal constant LABEL_SEPARATOR = 0x2e;
 
@@ -79,58 +97,58 @@ library StringUtils {
         return _isDnsLabel(label, 0, label.length);
     }
 
-    /// @notice Validates the lite-person PoP label format: `<stem>.<digits>`.
-    /// @dev A lite-person label is a stem of lowercase ASCII letters, one
+    /// @notice Validates the device-name format: `<stem>.<digits>`.
+    /// @dev A device name is a stem of lowercase ASCII letters, one
     ///      @custom:constant LABEL_SEPARATOR, then exactly
-    ///      @custom:constant LITE_SUFFIX_DIGITS digits (e.g. `joseph.42`). Letters only,
+    ///      @custom:constant DEVICE_SUFFIX_DIGITS digits (e.g. `joseph.42`). Letters only,
     ///      because the stem is the name a person chose, which is restricted to letters. How short
     /// a stem may be is policy rather than format, so it is left to the governance-reserved band in
     /// @custom:function IPopRules.classifyName.
-    ///      It is the only label shape in DotNS permitted to carry a separator, which is what
+    ///      It is the only label shape in dotNS permitted to carry a separator, which is what
     ///      reserves the dotted space to the gateway. A digit suffix is not exclusive: an
     ///      ordinary label may end in digits, but it is measured as written and so classifies by
     ///      its full length.
-    ///      Cross-flow priority is arbitrated on the stem, not on the whole label: a lite
-    ///      label's stem is reserved as a base name through
+    ///      Cross-flow priority is arbitrated on the base name: a device name's stem is its base
+    ///      name, reserved through
     ///      @custom:function IPopRules.reserveBaseNameForPop, so `joseph.42` contends with
-    ///      `joseph`. There is no flat spelling of a lite label for it to contend with.
+    ///      `joseph`. There is no flat spelling of a device name for it to contend with.
     /// @param value Candidate label.
     /// @return isValid True if `value` is a stem of lowercase ASCII letters followed by a
-    ///         separator and exactly @custom:constant LITE_SUFFIX_DIGITS digits.
-    function isLitePersonLabel(string calldata value) internal pure returns (bool isValid) {
-        return _isLitePersonLabel(bytes(value));
+    ///         separator and exactly @custom:constant DEVICE_SUFFIX_DIGITS digits.
+    function isDeviceLabel(string calldata value) internal pure returns (bool isValid) {
+        return _isDeviceLabel(bytes(value));
     }
 
-    /// @notice Memory-location helper for @custom:function isLitePersonLabel.
+    /// @notice Memory-location helper for @custom:function isDeviceLabel.
     /// @dev For callers holding the label in memory rather than calldata: the controller reads
     ///      it back from a struct before deriving the node, and the lens reads it out of a
     ///      store. Same predicate, different data location.
     /// @param value Candidate label held in memory.
     /// @return isValid True if `value` is a stem of lowercase ASCII letters followed by a
-    ///         separator and exactly @custom:constant LITE_SUFFIX_DIGITS digits.
-    function isLitePersonLabelMemory(string memory value) internal pure returns (bool isValid) {
-        return _isLitePersonLabel(bytes(value));
+    ///         separator and exactly @custom:constant DEVICE_SUFFIX_DIGITS digits.
+    function isDeviceLabelMemory(string memory value) internal pure returns (bool isValid) {
+        return _isDeviceLabel(bytes(value));
     }
 
-    function _isLitePersonLabel(bytes memory raw) private pure returns (bool isValid) {
+    function _isDeviceLabel(bytes memory raw) private pure returns (bool isValid) {
         uint256 length = raw.length;
         // One stem letter, the separator, then the digits is the shortest accepted shape. The
         // stem is not bounded below here: how short a name may be is policy, and PopRules
         // already holds it as the governance-reserved band. Enforcing a minimum here would
         // duplicate the governance-reserved band and drift from it.
-        if (length < LITE_SUFFIX_DIGITS + 2) return false;
+        if (length < DEVICE_SUFFIX_DIGITS + 2) return false;
 
         // Fixing the separator's position is what enforces the exact digit count: a third
         // digit, a missing separator and a trailing separator all land a non-separator byte
         // here. The letters-only stem then admits no second separator, so exactly one is
         // possible without scanning for it.
-        uint256 separator = length - LITE_SUFFIX_DIGITS - 1;
+        uint256 separator = length - DEVICE_SUFFIX_DIGITS - 1;
         if (raw[separator] != LABEL_SEPARATOR) return false;
 
         // The stem is a name a person chose, so it follows the same letters-only rule as a
-        // full-person label. Uppercase is excluded for the reason it is everywhere else here:
+        // personhood name. Uppercase is excluded for the reason it is everywhere else here:
         // a single name must have a single spelling, and so a single node.
-        if (!_isPersonLabel(raw, 0, separator)) return false;
+        if (!_isPersonhoodLabel(raw, 0, separator)) return false;
 
         for (uint256 i = separator + 1; i < length; ++i) {
             bytes1 char = raw[i];
@@ -141,19 +159,19 @@ library StringUtils {
     }
 
     /// @notice Validates that `value` is a name a person chose: lowercase ASCII letters only.
-    /// @dev Matches the gateway's full-person label rule, which admits no digits
+    /// @dev Matches the gateway's personhood-name rule, which admits no digits
     ///      and no hyphens, so a label outside this shape cannot have been issued. Stricter
     ///      than @custom:function isSingleLabel, and it is the same rule
-    ///      @custom:function isLitePersonLabel applies to a lite stem. How short a name may be
+    ///      @custom:function isDeviceLabel applies to a device-name stem. How short a name may be
     ///      is policy rather than format, so no floor is applied here.
     /// @param value Candidate label.
     /// @return isValid True if every octet of `value` is a lowercase ASCII letter.
-    function isPersonLabel(string calldata value) internal pure returns (bool isValid) {
+    function isPersonhoodLabel(string calldata value) internal pure returns (bool isValid) {
         bytes memory raw = bytes(value);
-        return _isPersonLabel(raw, 0, raw.length);
+        return _isPersonhoodLabel(raw, 0, raw.length);
     }
 
-    function _isPersonLabel(
+    function _isPersonhoodLabel(
         bytes memory raw,
         uint256 start,
         uint256 end
@@ -173,16 +191,16 @@ library StringUtils {
         return true;
     }
 
-    /// @notice Splits a lite-person label `<stem>.<digits>` into its stem and digit suffix.
-    /// @dev Splits at the first @custom:constant LABEL_SEPARATOR. A lite label carries exactly one
+    /// @notice Splits a device name `<stem>.<digits>` into its stem and digit suffix.
+    /// @dev Splits at the first @custom:constant LABEL_SEPARATOR. A device name carries exactly one
     ///      separator, so the caller is expected to have run @custom:function
-    /// isLitePersonLabelMemory first; a label with no separator returns the whole input as the stem
+    /// isDeviceLabelMemory first; a label with no separator returns the whole input as the stem
     /// and an empty
     ///      suffix, which the caller's later label checks reject.
-    /// @param value Lite label held in memory, for example `alice.01`.
+    /// @param value Device name held in memory, for example `alice.01`.
     /// @return stem The label before the separator, for example `alice`.
     /// @return suffix The digit suffix after the separator, for example `01`.
-    function splitLiteLabel(string memory value)
+    function splitDeviceLabel(string memory value)
         internal
         pure
         returns (string memory stem, string memory suffix)
@@ -213,18 +231,26 @@ library StringUtils {
         suffix = string(suffixBytes);
     }
 
-    /// @notice Validates that `s` is a dot-separated path of canonical DNS labels.
+    /// @notice Validates that `value` is a dot-separated path of canonical DNS labels, within
+    ///         the whole-path octet ceiling.
     /// @dev Each segment between dots must satisfy @custom:function isSingleLabel. Empty
     ///      segments (leading, trailing, or consecutive dots) fail. Used when
     ///      callers submit multi-label paths (e.g. `alice.dot`) rather than
     ///      bare labels.
+    ///      Two bounds apply and they are not the same one: @custom:constant MAX_DNS_LABEL_OCTETS
+    ///      caps each segment, and @custom:constant MAX_NAME_PATH_OCTETS caps the path. Without
+    ///      the second, a caller composes an unbounded path out of legal segments, so the
+    ///      segment bound alone does not bound what a caller can submit here.
     /// @param value Candidate name path.
-    /// @return isValid True if every dot-separated segment is a canonical DNS label.
+    /// @return isValid True if the path is at most @custom:constant MAX_NAME_PATH_OCTETS octets
+    ///         and every dot-separated segment is a canonical DNS label.
     function isNamePath(string calldata value) internal pure returns (bool isValid) {
-        bytes memory path = bytes(value);
-        uint256 length = path.length;
-        if (length == 0) return false;
+        // Measured on calldata and rejected before the copy: an oversized path is exactly the
+        // input this bound exists for, so it must not be paid for in memory first.
+        uint256 length = bytes(value).length;
+        if (length == 0 || length > MAX_NAME_PATH_OCTETS) return false;
 
+        bytes memory path = bytes(value);
         uint256 start;
         for (uint256 i = 0; i < length; ++i) {
             if (path[i] != bytes1(0x2e)) continue;

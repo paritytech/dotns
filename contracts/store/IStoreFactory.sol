@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 /// @title IStoreFactory
-/// @notice Interface for the DotNS per-user store factory.
+/// @notice Interface for the dotNS per-user store factory.
 /// @dev Owns two `UpgradeableBeacon` instances; one for `LabelStore` (protocol-managed),
 ///      one for `UserStore` (user-claimed). Each user may acquire at most one of each,
 ///      forever. There is no transfer, no redeploy, no additional store type.

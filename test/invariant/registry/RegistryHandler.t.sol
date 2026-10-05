@@ -122,8 +122,8 @@ contract RegistryHandler is Test {
     /// @param tier Verification tier to report for `account`.
     function _mockPersonhoodTier(address account, IPopRules.PopStatus tier) internal {
         uint8 statusByte;
-        if (tier == IPopRules.PopStatus.PopFull) statusByte = 2;
-        else if (tier == IPopRules.PopStatus.PopLite) statusByte = 1;
+        if (tier == IPopRules.PopStatus.Personhood) statusByte = 2;
+        else if (tier == IPopRules.PopStatus.Devicehood) statusByte = 1;
 
         bytes32 contextAlias =
             statusByte == 0 ? bytes32(0) : keccak256(abi.encode(account, statusByte));

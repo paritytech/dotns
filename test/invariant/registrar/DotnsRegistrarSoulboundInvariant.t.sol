@@ -4,7 +4,7 @@ pragma solidity ^0.8.34;
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {SoulboundHandler} from "./SoulboundHandler.t.sol";
 
-/// @title Dotns Registrar Soulbound Invariant Suite
+/// @title dotNS Registrar Soulbound Invariant Suite
 /// @notice Asserts that PoP-gateway (soulbound) names never change owner across any reachable
 ///         sequence of mints and transfer attempts, and that the campaign actually exercises
 ///         soulbound tokens rather than passing vacuously.
