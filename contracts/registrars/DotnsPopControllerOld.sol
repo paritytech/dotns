@@ -13,20 +13,20 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {IDotnsPopController} from "./IDotnsPopController.sol";
-import {IDotnsRegistrarOld} from "./IDotnsRegistrarOld.sol";
-import {IDotnsProtocolRegistryOld} from "../registry/IDotnsProtocolRegistryOld.sol";
-import {IDotnsPopResolver} from "../resolvers/IDotnsPopResolver.sol";
-import {IPopRules} from "../pop/IPopRules.sol";
-import {IStoreFactoryOld} from "../store/IStoreFactoryOld.sol";
+import {IDotnsPopControllerOld} from "./IDotnsPopControllerOld.sol";
+import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
+import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
+import {IDotnsPopResolverOld} from "../resolvers/IDotnsPopResolverOld.sol";
+import {IPopRulesOld} from "../pop/IPopRulesOld.sol";
+import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {ILabelStore} from "../store/ILabelStore.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
-import {RegistrationUtilsOld} from "../utils/RegistrationUtilsOld.sol";
+import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {SubnodeUtilsOld} from "../utils/SubnodeUtilsOld.sol";
-import {IDotnsRegistryOld} from "../registry/IDotnsRegistryOld.sol";
-import {StringUtils} from "../utils/StringUtils.sol";
-import {DotnsConstantsOld} from "../utils/DotnsConstantsOld.sol";
-import {SystemUtilsOld} from "../utils/SystemUtilsOld.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
+import {StringUtilsOld} from "../utils/StringUtilsOld.sol";
+import {DotnsConstants} from "../utils/DotnsConstants.sol";
+import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title DotnsPopControllerOld
 /// @notice Dedicated PoP controller orchestrating lite-person and full-person username
@@ -38,7 +38,7 @@ import {SystemUtilsOld} from "../utils/SystemUtilsOld.sol";
 /// Enforcement:
 /// Personhood is attested off-chain by the gateway before the call reaches this
 /// contract, so the on-chain personhood precompile is not re-queried on the gateway path.
-/// Every base-label mint path still calls @custom:function IPopRules.classifyName to reject
+/// Every base-label mint path still calls @custom:function IPopRulesOld.classifyName to reject
 /// governance-reserved labels (@custom:reverts InvalidBaseLabel on the base path,
 /// @custom:reverts InvalidLiteLabel on the lite path). The lite leg accepts any two-digit lite
 /// label whose stem is not governance-reserved, regardless of stem length. Native-token pricing
@@ -56,19 +56,19 @@ import {SystemUtilsOld} from "../utils/SystemUtilsOld.sol";
 /// contend for the same label. This holds of labels the contracts minted, not of an arbitrary
 /// string: a subname stored under a digit-only parent reads the same way, which is why
 /// provenance is published through @custom:function isPopIssued rather than inferred.
-/// (2) Base-name reservations are synchronised into `IPopRules`. The head of this
-/// controller's reservation queue is written through `IPopRules.reserveBaseNameForPop` on
-/// every head transition; the slot is cleared through `IPopRules.releaseBaseName` when the
+/// (2) Base-name reservations are synchronised into `IPopRulesOld`. The head of this
+/// controller's reservation queue is written through `IPopRulesOld.reserveBaseNameForPop` on
+/// every head transition; the slot is cleared through `IPopRulesOld.releaseBaseName` when the
 /// queue empties (claim, final relinquish, final expiry). The public commit-reveal
-/// controller routes through `IPopRules.priceWithCheck`, which rejects any registration
+/// controller routes through `IPopRulesOld.priceWithCheck`, which rejects any registration
 /// targeting a base-name stem reserved for another user, so the public flow respects
 /// gateway reservations without ever importing this contract. PopRulesOld is the single
 /// cross-flow authority; the queue here is the intra-PoP ordering layer on top of it.
 ///
 /// Shared primitives: labelhash / namehash via @custom:contract LabelUtils; the mint +
-/// forward-registry + store-write triad via @custom:contract RegistrationUtilsOld; chat-key and
+/// forward-registry + store-write triad via @custom:contract RegistrationUtils; chat-key and
 /// lite-to-full link persistence via
-/// @custom:contract IDotnsPopResolver. Keeping per-name records on the resolver preserves the
+/// @custom:contract IDotnsPopResolverOld. Keeping per-name records on the resolver preserves the
 /// "Store = labels only" invariant.
 /// @custom:security-contact admin@parity.io
 contract DotnsPopControllerOld is
@@ -76,9 +76,9 @@ contract DotnsPopControllerOld is
     UUPSUpgradeable,
     OwnableUpgradeable,
     ERC165Upgradeable,
-    IDotnsPopController
+    IDotnsPopControllerOld
 {
-    using StringUtils for *;
+    using StringUtilsOld for *;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Upper bound for the number of simultaneously queued reservations per label.
@@ -91,13 +91,13 @@ contract DotnsPopControllerOld is
     uint64 public constant MIN_RESERVATION_DURATION = 1 hours;
 
     /// @notice Required byte length for a non-empty chat key.
-    /// @dev Mirrors @custom:contract IDotnsPopResolver `InvalidChatKeyLength` so the controller
+    /// @dev Mirrors @custom:contract IDotnsPopResolverOld `InvalidChatKeyLength` so the controller
     /// can fail closed before the mint instead of bubbling the resolver's revert after partial
     /// state has been committed.
     uint256 private constant CHAT_KEY_LENGTH = 65;
 
     /// @notice Protocol-level address registry for all DotNS contracts.
-    IDotnsProtocolRegistryOld public protocolRegistry;
+    IDotnsProtocolRegistry public protocolRegistry;
 
     /// @notice Per-label queue metadata (head/tail pointers).
     mapping(bytes32 labelhash => ReservationQueueMeta meta) internal _reservationMeta;
@@ -165,8 +165,10 @@ contract DotnsPopControllerOld is
     /// call outside an active initialiser scope reverts with @custom:reverts NotInitializing.
     /// Emits @custom:emits ReservationDurationSet so indexers observe the initial value
     /// through the same event the setter uses later.
+    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
-        IDotnsProtocolRegistryOld registry,
+        address initialOwner,
+        IDotnsProtocolRegistry registry,
         uint64 reservationDuration_
     )
         external
@@ -176,26 +178,26 @@ contract DotnsPopControllerOld is
             reservationDuration_ >= MIN_RESERVATION_DURATION,
             ReservationDurationTooLow(reservationDuration_)
         );
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
         reservationDuration = reservationDuration_;
         emit ReservationDurationSet(reservationDuration_);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function isPopIssued(string calldata label) external view override returns (bool issued) {
         return _popIssued[label];
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function reserveLiteName(LiteRegistration calldata params) external override onlyRoot {
         _reserveLite(_popRules(), params);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function reserveBaseName(BaseReservation calldata params) external override onlyRoot {
-        IPopRules rules = _popRules();
+        IPopRulesOld rules = _popRules();
         bytes32 reservedHash;
         bool hasReservation = bytes(params.reservedBaseLabel).length != 0;
         if (hasReservation) {
@@ -211,9 +213,9 @@ contract DotnsPopControllerOld is
         }
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function reserveBaseNameOnly(BaseNameReservation calldata params) external override onlyRoot {
-        IPopRules rules = _popRules();
+        IPopRulesOld rules = _popRules();
         (bytes32 reservedHash,) = _validateReservableBaseLabel(rules, params.reservedBaseLabel);
         _advanceExpiredHead(reservedHash);
         _removeUserFromQueue(params.user);
@@ -231,15 +233,15 @@ contract DotnsPopControllerOld is
     /// Takes the @custom:struct LiteRegistration struct directly so both call sites pass the same
     /// payload shape: the typed entrypoint forwards its own `params`, the `reserveBaseName`
     /// entrypoint forwards `params.lite`.
-    function _reserveLite(IPopRules rules, LiteRegistration calldata params) internal {
+    function _reserveLite(IPopRulesOld rules, LiteRegistration calldata params) internal {
         require(params.liteLabel.isLitePersonLabel(), InvalidLiteLabel());
         _requireValidChatKey(params.chatKey);
 
-        (IPopRules.PopStatus required,) = rules.classifyName(params.liteLabel);
+        (IPopRulesOld.PopStatus required,) = rules.classifyName(params.liteLabel);
         // The shape check fixes the suffix, so classification lands on PopLite (stem 6-8),
         // NoStatus (stem 9 or more), or Reserved (stem 5 or fewer). Accept the first two; a
         // stem short enough to be governance-reserved is not issued from this path.
-        require(required != IPopRules.PopStatus.Reserved, InvalidLiteLabel());
+        require(required != IPopRulesOld.PopStatus.Reserved, InvalidLiteLabel());
         (bytes32 labelhash, bytes32 node) = _validateLiteLabel(params.liteLabel);
 
         _completeGatewayRegistration(
@@ -249,7 +251,7 @@ contract DotnsPopControllerOld is
         emit LiteNameReserved(labelhash, params.user, params.liteLabel);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function registerBaseName(FullRegistration calldata params) external override onlyRoot {
         Link calldata link = params.link;
         address user = params.user;
@@ -257,10 +259,10 @@ contract DotnsPopControllerOld is
 
         (bytes32 labelhash, bytes32 node) = _validateBaseLabel(label);
 
-        IPopRules rules = _popRules();
-        (IPopRules.PopStatus required,) = rules.classifyName(label);
+        IPopRulesOld rules = _popRules();
+        (IPopRulesOld.PopStatus required,) = rules.classifyName(label);
         require(
-            required != IPopRules.PopStatus.Reserved && required != IPopRules.PopStatus.PopLite,
+            required != IPopRulesOld.PopStatus.Reserved && required != IPopRulesOld.PopStatus.PopLite,
             InvalidBaseLabel()
         );
 
@@ -325,13 +327,13 @@ contract DotnsPopControllerOld is
         }
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function expireReservation(string calldata reservedBaseLabel) external override {
         (bytes32 labelhash,) = _validateBaseLabel(reservedBaseLabel);
         _advanceExpiredHead(labelhash);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function relinquishReservation() external override {
         UserReservation memory userRes = _userReservations[msg.sender];
         require(userRes.labelhash != bytes32(0), NoActiveReservation(msg.sender));
@@ -339,12 +341,12 @@ contract DotnsPopControllerOld is
         emit ReservationRelinquished(userRes.labelhash, msg.sender);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function claimLabelStore() external override returns (bool moreRemaining) {
-        (, moreRemaining) = _settlePending(msg.sender, DotnsConstantsOld.MAX_PAGE_SIZE);
+        (, moreRemaining) = _settlePending(msg.sender, DotnsConstants.MAX_PAGE_SIZE);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function settlePendingClaims(
         address user,
         uint256 limit
@@ -367,7 +369,7 @@ contract DotnsPopControllerOld is
         internal
         returns (uint256 settledCount, bool moreRemaining)
     {
-        IStoreFactoryOld factory = _storeFactory();
+        IStoreFactory factory = _storeFactory();
         address store = factory.getLabelStore(user);
 
         PendingClaim[] storage queue = _pendingClaimQueue[user];
@@ -396,7 +398,7 @@ contract DotnsPopControllerOld is
     /// empty queue never leaves a fresh store behind with nothing in it. Returns the (possibly
     /// newly deployed) store so the caller threads it through the remaining entries.
     function _settlePendingLabel(
-        IStoreFactoryOld factory,
+        IStoreFactory factory,
         address store,
         address user,
         string memory label
@@ -419,7 +421,7 @@ contract DotnsPopControllerOld is
         return store;
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function isReservedForClaim(string calldata reservedBaseLabel)
         external
         view
@@ -437,14 +439,14 @@ contract DotnsPopControllerOld is
         return (true, head.owner);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function setReservationDuration(uint64 duration) external override onlyOwner {
         require(duration >= MIN_RESERVATION_DURATION, ReservationDurationTooLow(duration));
         reservationDuration = duration;
         emit ReservationDurationSet(duration);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function reservationMeta(bytes32 labelhash)
         external
         view
@@ -455,7 +457,7 @@ contract DotnsPopControllerOld is
         return (meta.head, meta.tail);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function reservationEntry(
         bytes32 labelhash,
         uint64 index
@@ -469,7 +471,7 @@ contract DotnsPopControllerOld is
         return (entry.owner, entry.joinedAt);
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function userReservation(address user)
         external
         view
@@ -479,7 +481,7 @@ contract DotnsPopControllerOld is
         return _userReservations[user];
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function pendingClaims(
         address user,
         uint256 offset,
@@ -496,7 +498,7 @@ contract DotnsPopControllerOld is
 
         uint256 available = total - offset;
         uint256 count = limit < available ? limit : available;
-        if (count > DotnsConstantsOld.MAX_PAGE_SIZE) count = DotnsConstantsOld.MAX_PAGE_SIZE;
+        if (count > DotnsConstants.MAX_PAGE_SIZE) count = DotnsConstants.MAX_PAGE_SIZE;
 
         claims = new PendingClaim[](count);
         for (uint256 i; i < count; ++i) {
@@ -504,17 +506,17 @@ contract DotnsPopControllerOld is
         }
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function pendingClaimCountOf(address user) external view override returns (uint256 count) {
         return _pendingClaimQueue[user].length;
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function pendingClaimUserCount() external view override returns (uint256 count) {
         return _pendingClaimUsers.length();
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function pendingClaimUsers(
         uint256 offset,
         uint256 limit
@@ -529,7 +531,7 @@ contract DotnsPopControllerOld is
 
         uint256 available = total - offset;
         uint256 count = limit < available ? limit : available;
-        if (count > DotnsConstantsOld.MAX_PAGE_SIZE) count = DotnsConstantsOld.MAX_PAGE_SIZE;
+        if (count > DotnsConstants.MAX_PAGE_SIZE) count = DotnsConstants.MAX_PAGE_SIZE;
 
         users = new address[](count);
         for (uint256 i; i < count; ++i) {
@@ -537,7 +539,7 @@ contract DotnsPopControllerOld is
         }
     }
 
-    /// @inheritdoc IDotnsPopController
+    /// @inheritdoc IDotnsPopControllerOld
     function reservedBaseLabelOf(bytes32 labelhash)
         external
         view
@@ -554,25 +556,30 @@ contract DotnsPopControllerOld is
         override(ERC165Upgradeable, IERC165)
         returns (bool)
     {
-        return interfaceId == type(IDotnsPopController).interfaceId
+        return interfaceId == type(IDotnsPopControllerOld).interfaceId
             || super.supportsInterface(interfaceId);
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every DotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
 
     /// @notice Mints a name, wires forward registry, persists PoP-flow records (chat key,
     /// lite link) on the PoP resolver, and either writes the label into the owner's
     /// existing `LabelStore` or stashes a pending claim when the owner has none yet.
     /// @dev The mint + forward-registry pair is delegated to
-    /// @custom:function RegistrationUtilsOld.registerAndStore so this flow and the public
+    /// @custom:function RegistrationUtils.registerAndStore so this flow and the public
     /// commit-reveal flow share exactly one implementation of that sequence. The label is
     /// passed empty so the registrar does not deploy a `LabelStore`; the mint origin cannot
     /// run the `LabelStore` constructor. PoP-flow per-name records
-    /// (chat key, lite link) are persisted eagerly on @custom:contract IDotnsPopResolver
+    /// (chat key, lite link) are persisted eagerly on @custom:contract IDotnsPopResolverOld
     /// here, before the label is written, so the resolver carries the full identity record
     /// from mint time regardless of whether the owner already has a `LabelStore`. The Store
     /// stays labels-only. Warm path emits @custom:emits NameRegistered immediately; the
@@ -613,8 +620,8 @@ contract DotnsPopControllerOld is
                 })
             );
         } else {
-            RegistrationUtilsOld.registerAndStore(
-                RegistrationUtilsOld.RegistrationContext({
+            RegistrationUtils.registerAndStore(
+                RegistrationUtils.RegistrationContext({
                     protocolRegistry: protocolRegistry,
                     user: user,
                     label: "",
@@ -625,7 +632,7 @@ contract DotnsPopControllerOld is
         }
 
         if (chatKeyBytes.length != 0 || liteLabelhash != bytes32(0)) {
-            IDotnsPopResolver resolver = _popResolver();
+            IDotnsPopResolverOld resolver = _popResolver();
             if (chatKeyBytes.length != 0) {
                 resolver.setChatKey(node, chatKeyBytes);
             }
@@ -685,7 +692,7 @@ contract DotnsPopControllerOld is
     /// its existing `priceWithCheck` guard. Subsequent waiters only live in the local queue
     /// until they are promoted.
     function _enqueueReservation(
-        IPopRules rules,
+        IPopRulesOld rules,
         bytes32 labelhash,
         string memory baseLabel,
         address user
@@ -821,7 +828,7 @@ contract DotnsPopControllerOld is
 
     /// @notice Validates a base (full-person) label and derives `(labelhash, node)`.
     /// @dev Letters only, so this is stricter than a DNS label: a hyphen or an interior digit
-    /// is rejected here even though @custom:function StringUtils.isSingleLabel would admit it.
+    /// is rejected here even though @custom:function StringUtilsOld.isSingleLabel would admit it.
     function _validateBaseLabel(string calldata baseLabel)
         internal
         view
@@ -845,7 +852,7 @@ contract DotnsPopControllerOld is
     /// on it, for the full reservation window. `exists` (owner set) mirrors exactly what makes the
     /// eventual claim's mint revert, so a label that passes here is one a claim can still register.
     function _validateReservableBaseLabel(
-        IPopRules rules,
+        IPopRulesOld rules,
         string calldata baseLabel
     )
         internal
@@ -854,9 +861,9 @@ contract DotnsPopControllerOld is
     {
         (labelhash, node) = _validateBaseLabel(baseLabel);
 
-        (IPopRules.PopStatus required,) = rules.classifyName(baseLabel);
+        (IPopRulesOld.PopStatus required,) = rules.classifyName(baseLabel);
         require(
-            required != IPopRules.PopStatus.Reserved && rules.isBaseName(baseLabel),
+            required != IPopRulesOld.PopStatus.Reserved && rules.isBaseName(baseLabel),
             InvalidBaseLabel()
         );
         require(!_registrar().exists(uint256(node)), BaseNameAlreadyRegistered());
@@ -872,28 +879,28 @@ contract DotnsPopControllerOld is
     }
 
     /// @notice Resolves the PoP resolver via the protocol registry.
-    function _popResolver() internal view returns (IDotnsPopResolver) {
-        return IDotnsPopResolver(protocolRegistry.get(DotnsConstantsOld.POP_RESOLVER));
+    function _popResolver() internal view returns (IDotnsPopResolverOld) {
+        return IDotnsPopResolverOld(protocolRegistry.get(DotnsConstants.POP_RESOLVER));
     }
 
     /// @notice Resolves the PopRulesOld contract via the protocol registry.
-    function _popRules() internal view returns (IPopRules) {
-        return IPopRules(protocolRegistry.get(DotnsConstantsOld.POP_RULES));
+    function _popRules() internal view returns (IPopRulesOld) {
+        return IPopRulesOld(protocolRegistry.get(DotnsConstants.POP_RULES));
     }
 
     /// @notice Resolves the Store factory via the protocol registry.
-    function _storeFactory() internal view returns (IStoreFactoryOld) {
-        return IStoreFactoryOld(protocolRegistry.get(DotnsConstantsOld.STORE_FACTORY));
+    function _storeFactory() internal view returns (IStoreFactory) {
+        return IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
     }
 
     /// @notice Resolves the registrar via the protocol registry.
-    function _registrar() internal view returns (IDotnsRegistrarOld) {
-        return IDotnsRegistrarOld(protocolRegistry.get(DotnsConstantsOld.REGISTRAR));
+    function _registrar() internal view returns (IDotnsRegistrar) {
+        return IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
     }
 
     /// @notice Resolves the registry via the protocol registry.
-    function _registry() internal view returns (IDotnsRegistryOld) {
-        return IDotnsRegistryOld(protocolRegistry.get(DotnsConstantsOld.REGISTRY));
+    function _registry() internal view returns (IDotnsRegistry) {
+        return IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
     }
 
     /// @notice Writes the new head of the queue into PopRulesOld so the public commit-reveal flow
@@ -904,7 +911,7 @@ contract DotnsPopControllerOld is
     /// `reserveBaseNameForPop`.
     function _syncPopRulesToHead(bytes32 labelhash, address newHead) internal {
         string memory baseLabel = _reservedBaseLabel[labelhash];
-        IPopRules rules = _popRules();
+        IPopRulesOld rules = _popRules();
         rules.releaseBaseName(baseLabel);
         rules.reserveBaseNameForPop(baseLabel, newHead);
         emit ReservationHeadAdvanced(labelhash, newHead);
@@ -920,7 +927,7 @@ contract DotnsPopControllerOld is
     }
 
     /// @notice Internal check enforcing a Root origin.
-    /// @dev Authorises a call when @custom:function SystemUtilsOld.originIsRoot is true, and
+    /// @dev Authorises a call when @custom:function SystemUtils.originIsRoot is true, and
     ///      reverts with NotRoot otherwise. `msg.sender` is deliberately not consulted: a
     ///      Root origin has no account behind it, so reading `msg.sender` traps. That holds
     ///      for this frame and any delegatecall sharing it; a nested call sees the calling
@@ -932,7 +939,7 @@ contract DotnsPopControllerOld is
     ///      pass. Every call out of this contract goes to a protocol contract resolved
     ///      through the registry.
     function _onlyRoot() internal view {
-        require(SystemUtilsOld.originIsRoot(), NotRoot());
+        require(SystemUtils.originIsRoot(), NotRoot());
     }
 
     /// @inheritdoc UUPSUpgradeable
