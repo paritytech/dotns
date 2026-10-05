@@ -59,8 +59,8 @@ library SubnodeUtilsOld {
     /// separator first.
     /// @dev The single place a lite label is turned into a node, shared by the write path and every
     ///      reader of a lite name so the issuer and its readers agree on where a lite name lives.
-    ///      Callers gate on @custom:function StringUtilsOld.isLitePersonLabelMemory beforehand, so the
-    ///      label is known to carry the separator this splits on.
+    ///      Callers gate on @custom:function StringUtilsOld.isLitePersonLabelMemory beforehand, so
+    ///      the label is known to carry the separator this splits on.
     /// @param tldNode The TLD node.
     /// @param liteLabel Lite label, e.g. `alice.01`.
     /// @return subnode Namehash of the stem beneath its numeric container beneath the TLD.

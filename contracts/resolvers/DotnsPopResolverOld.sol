@@ -145,9 +145,8 @@ contract DotnsPopResolverOld is
 
     /// @inheritdoc ERC165Upgradeable
     function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        return
-            interfaceId == type(IDotnsPopResolverOld).interfaceId
-                || super.supportsInterface(interfaceId);
+        return interfaceId == type(IDotnsPopResolverOld).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     /// @notice Internal check enforcing PoP-controller-only access.

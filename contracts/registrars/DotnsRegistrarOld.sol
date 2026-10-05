@@ -26,8 +26,9 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 /// @title Dotns Registrar
 /// @notice ERC721-backed registrar implementing permanent name ownership.
 /// @dev Deliberately policy-free on pricing, reservations, and PoP gating; those live in the
-/// controllers and @custom:contract IPopRulesOld. The registrar owns transferability itself: publicly
-/// registered names transfer freely, while names minted through the PoP gateway are soulbound and
+/// controllers and @custom:contract IPopRulesOld. The registrar owns transferability itself:
+/// publicly registered names transfer freely, while names minted through the PoP gateway are
+/// soulbound and
 /// revert on transfer. The `_update` hook enforces both the soulbound gate and the fee-on-transfer
 /// settlement that consults the escrow.
 /// @custom:security-contact admin@parity.io
@@ -143,8 +144,9 @@ contract DotnsRegistrarOld is
         require(owner != protocolRegistry.get(DotnsConstants.NAME_ESCROW), InvalidOwner());
         // Empty labels are an intentional gateway-cold path (substrate Root cannot deploy a
         // `LabelStore` under `pallet-revive`, so the controller stashes a pending claim and the
-        // user settles via @custom:function IDotnsPopControllerOld.claimLabelStore later). Non-empty
-        // labels must still be canonical so the transfer-floor lookup in `_quoteTransferFee`
+        // user settles via @custom:function IDotnsPopControllerOld.claimLabelStore later).
+        // Non-empty labels must still be canonical so the transfer-floor lookup in
+        // `_quoteTransferFee`
         // cannot brick the token by reverting on a malformed stem.
         require(bytes(label).length == 0 || label.isSingleLabel(), InvalidLabel());
         _mint(owner, id);
@@ -422,8 +424,8 @@ contract DotnsRegistrarOld is
 
     /// @notice Quotes the friction fee required for a transfer.
     /// @dev Required fee is the name's own price returned by @custom:function
-    /// PopRulesOld.transferFloor. It is paid by the sender on every downward or cross-reach transfer
-    /// and settles to the
+    /// PopRulesOld.transferFloor. It is paid by the sender on every downward or cross-reach
+    /// transfer and settles to the
     /// protocol fee pot. Any prior deposit travels with the NFT: the escrow rebinds the position to
     /// the new holder rather than refunding the sender, so transferring a funded name forfeits the
     /// locked deposit to the recipient. Self-transfers and escrow-touching transfers return zero.

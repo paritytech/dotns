@@ -262,7 +262,8 @@ contract DotnsPopControllerOld is
         IPopRulesOld rules = _popRules();
         (IPopRulesOld.PopStatus required,) = rules.classifyName(label);
         require(
-            required != IPopRulesOld.PopStatus.Reserved && required != IPopRulesOld.PopStatus.PopLite,
+            required != IPopRulesOld.PopStatus.Reserved
+                && required != IPopRulesOld.PopStatus.PopLite,
             InvalidBaseLabel()
         );
 

@@ -156,8 +156,8 @@ interface IPopRulesOld {
     ///      enforces, but does require the input to be canonical and stem-shaped (no trailing
     ///      digits); a non-canonical or non-stem label triggers @custom:reverts PopError. If the
     ///      slot is already live and held by a different user, @custom:reverts PopError so the
-    ///      caller's local bookkeeping and PopRulesOld state stay in lockstep; if it is live for the
-    ///      same user, expiry is refreshed to `block.timestamp + MAX_RESERVATION_TIME`. Emits
+    ///      caller's local bookkeeping and PopRulesOld state stay in lockstep; if it is live for
+    ///      the same user, expiry is refreshed to `block.timestamp + MAX_RESERVATION_TIME`. Emits
     ///      @custom:emits BaseNameReserved on every successful write.
     /// @param stem The base label with no trailing digits.
     /// @param user The address receiving reservation rights.
