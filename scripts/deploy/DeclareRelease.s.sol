@@ -25,11 +25,24 @@ import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolReg
 ///      read as an older network rather than as a false new one.
 /// @custom:security-contact admin@parity.io
 contract DeclareRelease is WireDeployments {
+    /// @notice Runs @custom:function declare.
+    /// @dev `forge script` and `upgrade.sh` enter through `run`. Without this override that is
+    ///      the inherited wiring stage, which re-sets every key from the manifest and skips the
+    ///      checks `declare` makes before it writes.
+    function run() external override {
+        _declare();
+    }
+
     /// @notice Declares every key's codehash, verifies the deployment, then declares the release.
     /// @dev `DOTNS_RELEASE_TAG` is the bare semver the registry stores, for example `0.8.0`. It is
     ///      read before anything is broadcast, so a run that could not declare its release at the
     ///      end fails before it has written any of the codehashes.
     function declare() external {
+        _declare();
+    }
+
+    /// @notice Body of @custom:function run and @custom:function declare.
+    function _declare() internal {
         address owner = msg.sender;
         vm.label(owner, "OWNER");
 
