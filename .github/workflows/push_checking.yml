@@ -20,7 +20,6 @@ on:
   # it is created instead of the day someone remembers this file.
   pull_request:
     branches: [master, "dev/**"]
-    paths: ["contracts/**", "test/**", "**.sol"]
   push:
     branches: [master, "dev/**"]
     paths: ["contracts/**", "test/**", "**.sol"]
@@ -41,6 +40,7 @@ jobs:
     if: github.event.action != 'closed'
     name: ${{ matrix.kind.label }}
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.kind.timeout[github.event_name] }}
     strategy:
       # Each matrix kind runs on its own runner so neither has to hold the
       # other's peak memory. Don't fail-fast: surfacing both shards' results
@@ -51,9 +51,13 @@ jobs:
           - id: unit-fuzz
             label: Contract Tests (Unit + Fuzz)
             forge_args: --no-match-contract Invariant --no-match-path 'test/fork/**'
+            timeout: { pull_request: 30, push: 30 }
           - id: invariant
             label: Contract Tests (Invariant)
             forge_args: --match-contract Invariant --no-match-path 'test/fork/**'
+            # Pull requests run 100 invariant runs per campaign (about 30 minutes), master 300
+            # (about 100 minutes).
+            timeout: { pull_request: 60, push: 150 }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -140,6 +144,14 @@ jobs:
             echo "result=Failed - Build error" >> "$GITHUB_OUTPUT"
             echo "has_details=false" >> "$GITHUB_OUTPUT"
             exit 1
+          fi
+
+          # Pull requests run 100 invariant runs per campaign to keep the check short; pushes to
+          # master keep the ci profile's 300. No seed is fixed, so every run explores new
+          # sequences. The unit + fuzz leg runs no invariants, so this only affects the invariant
+          # leg.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            export FOUNDRY_INVARIANT_RUNS=100
           fi
 
           forge test -vv --summary ${{ matrix.kind.forge_args }} 2>&1 | tee test.log
@@ -302,8 +314,13 @@ jobs:
   report:
     name: Report Test Results
     needs: [test, fork]
-    if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
+    # A pull request from a fork gets a read-only token, so publishing the reports and the comment
+    # would fail.
+    if: >-
+      always() && github.event_name == 'pull_request' && github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -426,6 +443,7 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event.action == 'closed'
     steps:
       - uses: actions/checkout@v4

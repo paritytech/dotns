@@ -3,8 +3,6 @@ name: Deploy Contracts and Verify artifacts
 on:
   pull_request:
     branches: [master]
-    paths:
-      ["contracts/**", "scripts/**", "deployments/**", "**.sol", "package.json", "bun.lock"]
   push:
     branches: [master]
     paths:
@@ -21,7 +19,9 @@ concurrency:
 
 jobs:
   deploy:
+    name: Deploy Contracts
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     # Shared across steps. ACCOUNT_* is anvil test account 7 (public test keys,
     # never valid on a real network) used to run the pipeline. FACTORY_DEPLOYER is
@@ -431,8 +431,11 @@ jobs:
         if: always()
         run: pkill -f anvil || true
 
+      # A pull request from a fork gets a read-only token, so posting would fail this check.
       - name: Update PR comment
-        if: always() && github.event_name == 'pull_request'
+        if: >-
+          always() && github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         env:
           SECTION: Deploy Contracts

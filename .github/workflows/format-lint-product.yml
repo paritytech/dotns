@@ -2,7 +2,6 @@ name: Format & Lint
 
 on:
   pull_request:
-    paths: ['src/**', 'script/**', 'test/**', '**.sol']
 
 permissions:
   contents: read
@@ -17,7 +16,9 @@ concurrency:
 
 jobs:
   check:
+    name: Format & Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,8 +65,9 @@ jobs:
           path: '*.log'
           retention-days: 7
 
+      # A pull request from a fork gets a read-only token, so posting would fail this check.
       - name: Update PR comment
-        if: always()
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         env:
           SECTION: Format & Lint
