@@ -304,7 +304,8 @@ contract DotnsRegistrarController is
             );
         }
 
-        (, bytes32 labelhash, bytes32 node) = _requireAvailableLabel(registration.label);
+        (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
+            _requireAvailableLabel(registration.label);
         _consumeCommitment(registration);
 
         // Spend the grant before minting so a grant in the wrong state fails before any name is
@@ -318,12 +319,49 @@ contract DotnsRegistrarController is
             whitelist.consume(registration.label, registration.owner);
         }
 
+        IDotnsNameEscrow escrow = IDotnsNameEscrow(payable(_escrow()));
+        uint256 tokenId = uint256(node);
+        // `available` is true both for a never-minted label and for one the escrow still holds
+        // past its redeem window, so a grant can land on either and the fresh-mint branch alone
+        // is not enough: `DotnsRegistrar.register` rejects an id the escrow holds. Reserved-tier
+        // labels reach circulation only through this function, so without the reclaim branch a
+        // released grant would sit in custody, advertised as available, with no route back out.
+        //
+        // One deliberate divergence from @custom:function register: that path also clears a
+        // sibling controller's stale base-name reservation on reclaim. This one does not, because
+        // it reads no `IPopRules` state at all, and keeping it that way is what lets the whole
+        // function stay callable under a Root origin.
+        bool isReclaim = registrar.exists(tokenId);
+
         // No reverse record. `setReverseName` overwrites unconditionally, and the gate above lets
         // anyone submit for the beneficiary, so writing here would let a third party relabel
         // another address. The owner claims their own record through `claimReverseRecord`, which
         // checks ownership and writes only their own key.
         _completeRegistration(
-            registration, labelhash, node, 0, false, IDotnsReverseResolver(address(0)), false
+            registration, labelhash, node, 0, false, IDotnsReverseResolver(address(0)), isReclaim
+        );
+
+        if (isReclaim) {
+            escrow.reclaim(tokenId, registration.owner);
+            // Mirrors @custom:function register: reclaim hands the NFT to the new holder, so the
+            // registry record is rewritten only afterwards, once `ownerOf` reports that holder
+            // rather than the escrow. Otherwise the prior owner's resolver pointer follows the
+            // name.
+            IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY))
+                .setOwner(node, registration.owner);
+        }
+
+        // Seed the release position last, after `reclaim` has deleted whatever the previous holder
+        // left behind. A grant costs nothing, so there is no deposit to lock, but the position is
+        // also the lifecycle marker: `release` rejects a token whose position carries no recipient,
+        // so a name minted without one can never be released, never becomes reclaimable, and never
+        // returns to circulation. A zero amount keeps that lifecycle reachable while leaving
+        // nothing to withdraw and nothing for reclaim to settle, which is exactly what the
+        // cross-payer branch of @custom:function _settleEscrow seeds, for the same reason.
+        escrow.deposit(
+            IDotnsNameEscrow.DepositParams({
+                tokenId: tokenId, asset: address(0), amount: 0, recipient: registration.owner
+            })
         );
     }
 
