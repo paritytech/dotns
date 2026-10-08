@@ -151,9 +151,12 @@ Confirm these keys are present:
 - [ ] `DotnsPopLens`
 
 The wiring stage already asserts every protocol-registry binding, so a green deploy means they
-are set. One is worth confirming by hand, because it is the only key whose absence surfaces to
-users rather than to the pipeline: with `nameWhitelist` unset, `registerReserved` reverts
-`WhitelistNotConfigured` for every caller, Root included.
+are set. Two are worth confirming by hand, because their absence surfaces to users rather than
+to the pipeline. With `nameWhitelist` unset, `registerReserved` reverts `WhitelistNotConfigured`
+for every grant-backed caller; a Root dispatch skips the whitelist read and is unaffected. With
+`nameEscrow` unset it reverts `EscrowNotConfigured` for every caller, Root included, because the
+mint seeds the zero-amount release position that keeps a granted name inside the release
+lifecycle.
 
 ```bash
 cast call "$PROTOCOL_REGISTRY" "get(bytes32)(address)" \
