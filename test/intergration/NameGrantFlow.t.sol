@@ -107,9 +107,11 @@ contract NameGrantFlow is BaseDotns {
         assertEq(position.amount, 0, "a Root mint is free, so nothing is refundable");
     }
 
-    /// @dev The headline regression. Grants are the only route to a reserved-tier label, so before
-    ///      the position was seeded every one governance issued left the pool permanently: the
-    ///      holder could not release, so the name never became reclaimable and never came back.
+    /// @dev The defect this covers: a reserved registration that seeds no release position leaves
+    ///      its name permanently unreleasable, so the name never becomes reclaimable and never
+    ///      comes back. Grants are the only route to a reserved-tier label, which makes that a
+    ///      one-way exit for every short name governance issues. Walks the whole loop to prove the
+    ///      exit is real: mint, release, wait out the redeem window, grant the label again.
     function test_a_granted_reserved_tier_name_returns_to_circulation() public {
         // Three characters, so the label is governance-reserved and `register` cannot mint it.
         // `registerReserved` is the only way in, which is what makes the exit matter.
@@ -154,8 +156,8 @@ contract NameGrantFlow is BaseDotns {
         assertFalse(position.released, "the new position starts outside the released phase");
     }
 
-    /// @dev The position is the lifecycle marker, so it has to follow the name. Otherwise a granted
-    ///      name becomes unreleasable again the moment its first holder passes it on.
+    /// @dev The position is the lifecycle marker, so it has to follow the name. A granted name
+    ///      whose position stayed behind would be unreleasable in its second holder's hands.
     function test_a_granted_name_keeps_its_position_through_a_transfer() public {
         string memory nameLabel = "transferredgrant01";
         uint256 tokenId = _tokenIdForLabel(nameLabel);
@@ -183,8 +185,8 @@ contract NameGrantFlow is BaseDotns {
         );
     }
 
-    /// @dev The position seeding makes the escrow a hard dependency of this path, where it used to
-    ///      be absent entirely. Root is no exception: it skips the whitelist read, not this one.
+    /// @dev Seeding the release position makes the escrow a hard dependency of this path. Root is
+    ///      no exception: it skips the whitelist read, not this one.
     function test_reserved_registration_requires_a_configured_escrow() public {
         string memory nameLabel = "noescrowgrant01";
 

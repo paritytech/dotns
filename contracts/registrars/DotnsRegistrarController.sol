@@ -313,10 +313,10 @@ contract DotnsRegistrarController is
         address escrow = _escrow();
         uint256 tokenId = uint256(node);
         // `available` is true both for a never-minted label and for one the escrow still holds
-        // past its redeem window, so a grant can land on either and the fresh-mint branch alone is
-        // not enough: `DotnsRegistrar.register` rejects an id the escrow holds. Reserved-tier
-        // labels reach circulation only through this function, so without the reclaim branch a
-        // released grant would sit in custody, advertised as available, with no route back out.
+        // past its redeem window, so a grant can land on either and this path has to serve both:
+        // `DotnsRegistrar.register` rejects an id the escrow holds, so an existing token is
+        // reclaimed rather than minted. Reserved-tier labels reach circulation only through this
+        // function, so a released grant has no other route back out of custody.
         bool isReclaim = registrar.exists(tokenId);
 
         // No reverse record. `setReverseName` overwrites unconditionally, and the gate above lets
