@@ -172,7 +172,7 @@ interface IDotnsRegistrarController is IDotnsController {
     function register(Registration calldata registration) external payable;
 
     /// @notice Registers a granted name after the commitment delay, at zero base cost.
-    /// @dev Grant-backed issuance path: skips the PoP price check and the escrow deposit, but
+    /// @dev Grant-backed issuance path: skips the PoP price check and charges no deposit, but
     /// reuses the same commit-reveal pipeline so the same anti-front-running guarantees apply.
     ///
     /// Authority is either a substrate Root dispatch or a grant naming `registration.owner` on the
@@ -193,6 +193,14 @@ interface IDotnsRegistrarController is IDotnsController {
     /// (otherwise @custom:reverts NameNotAvailable), then consumes the prior commitment, which
     /// fails with @custom:reverts CommitmentNotFound, @custom:reverts CommitmentTooNew, or
     /// @custom:reverts CommitmentTooOld under the same conditions as @custom:function register.
-    /// Emits @custom:emits NameRegistered on success.
+    ///
+    /// Availability covers both a never-minted label and one the escrow still holds past its
+    /// redeem window, so this path reclaims from escrow when the token already exists, exactly as
+    /// @custom:function register does. It then seeds a zero-amount escrow release position keyed
+    /// to `registration.owner`. The grant is free, so there is nothing to refund, but the position
+    /// is what makes the name releasable: without it the holder cannot release, the name never
+    /// becomes reclaimable, and a reserved-tier label leaves circulation permanently. The escrow
+    /// must therefore be registered under `DotnsConstants.NAME_ESCROW`, otherwise
+    /// @custom:reverts EscrowNotConfigured. Emits @custom:emits NameRegistered on success.
     function registerReserved(Registration calldata registration) external;
 }
