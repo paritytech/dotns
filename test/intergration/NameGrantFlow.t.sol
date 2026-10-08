@@ -4,6 +4,7 @@ pragma solidity ^0.8.34;
 import {BaseDotns, IDotnsRegistrarController} from "../base/BaseDotns.t.sol";
 import {IDotnsNameWhitelist} from "../../contracts/whitelist/IDotnsNameWhitelist.sol";
 import {IDotnsNameEscrow} from "../../contracts/escrow/IDotnsNameEscrow.sol";
+import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /// @title NameGrantFlow
@@ -180,6 +181,34 @@ contract NameGrantFlow is BaseDotns {
             dotnsNameEscrow.getReleasePosition(tokenId).released,
             "the new holder can release what they were given"
         );
+    }
+
+    /// @dev The position seeding makes the escrow a hard dependency of this path, where it used to
+    ///      be absent entirely. Root is no exception: it skips the whitelist read, not this one.
+    function test_reserved_registration_requires_a_configured_escrow() public {
+        string memory nameLabel = "noescrowgrant01";
+
+        vm.prank(owner);
+        protocolRegistry.remove(DotnsConstants.NAME_ESCROW);
+
+        _grantName(nameLabel, ed);
+
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel,
+                owner: ed,
+                secret: keccak256(abi.encodePacked(nameLabel)),
+                reserved: true,
+                maxPrice: type(uint256).max,
+                pricingVersion: popRules.pricingVersion()
+            });
+
+        vm.startPrank(ed);
+        dotnsRegistrarController.commit(dotnsRegistrarController.makeCommitment(registration));
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+        vm.expectRevert(IDotnsRegistrarController.EscrowNotConfigured.selector);
+        dotnsRegistrarController.registerReserved(registration);
+        vm.stopPrank();
     }
 
     /// @notice Commit-reveal a reserved registration for `nameOwner`, submitted by `submitter`.
