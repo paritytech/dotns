@@ -235,12 +235,7 @@ contract DotnsRegistrarController is
         );
 
         if (isReclaim) {
-            IDotnsNameEscrow(payable(escrow)).reclaim(tokenId, registration.owner);
-            // Reclaim hands the NFT to the new holder; rewrite the registry record so the prior
-            // owner's resolver pointer cannot follow the name. Must run after `escrow.reclaim`
-            // so the registry's `ownerOf` check sees the new holder, not the escrow.
-            IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY))
-                .setOwner(node, registration.owner);
+            _reclaimFromEscrow(escrow, tokenId, node, registration.owner);
         }
 
         _settleEscrow(escrow, tokenId, registration.owner, isDirect, totalCharged);
@@ -273,11 +268,7 @@ contract DotnsRegistrarController is
         internal
     {
         uint256 depositAmount = isDirect ? chargeAmount : 0;
-        IDotnsNameEscrow(payable(escrow)).deposit{value: depositAmount}(
-            IDotnsNameEscrow.DepositParams({
-                tokenId: tokenId, asset: address(0), amount: depositAmount, recipient: nameOwner
-            })
-        );
+        _seedReleasePosition(escrow, tokenId, nameOwner, depositAmount);
 
         if (!isDirect && chargeAmount > 0) {
             IDotnsNameEscrow(payable(escrow)).depositProtocolFee{value: chargeAmount}(
@@ -319,18 +310,13 @@ contract DotnsRegistrarController is
             whitelist.consume(registration.label, registration.owner);
         }
 
-        IDotnsNameEscrow escrow = IDotnsNameEscrow(payable(_escrow()));
+        address escrow = _escrow();
         uint256 tokenId = uint256(node);
         // `available` is true both for a never-minted label and for one the escrow still holds
-        // past its redeem window, so a grant can land on either and the fresh-mint branch alone
-        // is not enough: `DotnsRegistrar.register` rejects an id the escrow holds. Reserved-tier
+        // past its redeem window, so a grant can land on either and the fresh-mint branch alone is
+        // not enough: `DotnsRegistrar.register` rejects an id the escrow holds. Reserved-tier
         // labels reach circulation only through this function, so without the reclaim branch a
         // released grant would sit in custody, advertised as available, with no route back out.
-        //
-        // One deliberate divergence from @custom:function register: that path also clears a
-        // sibling controller's stale base-name reservation on reclaim. This one does not, because
-        // it reads no `IPopRules` state at all, and keeping it that way is what lets the whole
-        // function stay callable under a Root origin.
         bool isReclaim = registrar.exists(tokenId);
 
         // No reverse record. `setReverseName` overwrites unconditionally, and the gate above lets
@@ -341,28 +327,20 @@ contract DotnsRegistrarController is
             registration, labelhash, node, 0, false, IDotnsReverseResolver(address(0)), isReclaim
         );
 
+        // One deliberate divergence from @custom:function register, which also clears a sibling
+        // controller's stale base-name reservation before reclaiming. This path does not, because
+        // it reads no `IPopRules` state at all, and keeping it that way is what lets the whole
+        // function stay callable under a Root origin.
         if (isReclaim) {
-            escrow.reclaim(tokenId, registration.owner);
-            // Mirrors @custom:function register: reclaim hands the NFT to the new holder, so the
-            // registry record is rewritten only afterwards, once `ownerOf` reports that holder
-            // rather than the escrow. Otherwise the prior owner's resolver pointer follows the
-            // name.
-            IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY))
-                .setOwner(node, registration.owner);
+            _reclaimFromEscrow(escrow, tokenId, node, registration.owner);
         }
 
-        // Seed the release position last, after `reclaim` has deleted whatever the previous holder
-        // left behind. A grant costs nothing, so there is no deposit to lock, but the position is
-        // also the lifecycle marker: `release` rejects a token whose position carries no recipient,
-        // so a name minted without one can never be released, never becomes reclaimable, and never
-        // returns to circulation. A zero amount keeps that lifecycle reachable while leaving
-        // nothing to withdraw and nothing for reclaim to settle, which is exactly what the
-        // cross-payer branch of @custom:function _settleEscrow seeds, for the same reason.
-        escrow.deposit(
-            IDotnsNameEscrow.DepositParams({
-                tokenId: tokenId, asset: address(0), amount: 0, recipient: registration.owner
-            })
-        );
+        // Seed the position last, after `reclaim` has deleted whatever the previous holder left
+        // behind. A grant costs nothing, so there is no deposit to lock, but the position is also
+        // the lifecycle marker: `release` rejects a token whose position carries no recipient, so
+        // a name minted without one can never be released, never becomes reclaimable, and never
+        // returns to circulation.
+        _seedReleasePosition(escrow, tokenId, registration.owner, 0);
     }
 
     /// @inheritdoc IERC165
@@ -479,6 +457,55 @@ contract DotnsRegistrarController is
     function _escrow() internal view returns (address escrow) {
         escrow = protocolRegistry.get(DotnsConstants.NAME_ESCROW);
         require(escrow != address(0), EscrowNotConfigured());
+    }
+
+    /// @notice Takes a name out of escrow custody and repoints the forward registry at its new
+    ///         holder.
+    /// @dev Shared by both registration paths so the ordering constraint lives in one place: the
+    ///      registry write must follow `escrow.reclaim`, because `setOwner` checks `ownerOf` and
+    ///      would otherwise see the escrow rather than `newOwner`. Without the rewrite the prior
+    ///      owner's resolver pointer follows the name to its new holder.
+    /// @param escrow Configured name escrow.
+    /// @param tokenId Token being reclaimed, equal to `uint256(node)`.
+    /// @param node Namehash of the label, as the forward registry keys it.
+    /// @param newOwner Address taking custody of the name.
+    function _reclaimFromEscrow(
+        address escrow,
+        uint256 tokenId,
+        bytes32 node,
+        address newOwner
+    )
+        internal
+    {
+        IDotnsNameEscrow(payable(escrow)).reclaim(tokenId, newOwner);
+        IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY)).setOwner(node, newOwner);
+    }
+
+    /// @notice Opens the escrow release position that every registration path must leave behind.
+    /// @dev The single construction site for a position, so "every minted name is releasable" is
+    ///      one rule rather than one per path. `amount` is the refundable deposit and may be zero:
+    ///      `DotnsNameEscrow` treats `recipient` as the presence sentinel, so a zero-amount
+    ///      position is still a position. Cross-payer registrations seed zero because the charge
+    ///      goes to the protocol fee pot instead, and grant-backed reserved registrations seed
+    ///      zero because they charge nothing at all. In both cases the position carries no value
+    ///      and exists only so `release`, `redeem` and `reclaim` stay reachable.
+    /// @param escrow Configured name escrow.
+    /// @param tokenId Token the position is keyed to.
+    /// @param recipient Address the deposit (when non-zero) and the lifecycle are keyed to.
+    /// @param amount Refundable deposit to lock, forwarded as `msg.value`.
+    function _seedReleasePosition(
+        address escrow,
+        uint256 tokenId,
+        address recipient,
+        uint256 amount
+    )
+        internal
+    {
+        IDotnsNameEscrow(payable(escrow)).deposit{value: amount}(
+            IDotnsNameEscrow.DepositParams({
+                tokenId: tokenId, asset: address(0), amount: amount, recipient: recipient
+            })
+        );
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
