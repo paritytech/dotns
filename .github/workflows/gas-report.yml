@@ -7,10 +7,6 @@ name: Gas Report
 # job is gated on `github.event.action == 'closed'` and does NOT check
 # out PR-head code, so no untrusted code executes under that context.
 #
-# The matrix `generate` shard that pulls the PR head's `patches/` runs
-# under the `pull_request` trigger (not `pull_request_target`), so its
-# checkout of PR-head code does not see repository secrets.
-#
 # Adding other `pull_request_target` event types or any step that
 # checks out PR-head code under that trigger would let a malicious PR
 # exfiltrate repo secrets. Re-review carefully if widened.
@@ -89,33 +85,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Sidecar checkout of the PR head's `patches/` and apply script. The
-      # master-branch matrix shard is checked out at `master`, which does not yet
-      # carry the OZ payable patches needed for the registrar transferFrom
-      # overrides. Sourcing them from the PR head keeps the two shards
-      # building against the same vendored OZ tree. Removed once the patches
-      # land on master.
-      - name: Sidecar checkout for OZ patches
-        if: matrix.target.id == 'master'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: pr-head-sidecar
-          sparse-checkout: |
-            patches
-            scripts/shell/apply-oz-patches.sh
-          sparse-checkout-cone-mode: false
-
-      - name: Apply OZ patches (master shard only)
-        if: matrix.target.id == 'master'
-        run: |
-          rm -rf patches
-          cp -R pr-head-sidecar/patches ./patches
-          mkdir -p scripts/shell
-          cp pr-head-sidecar/scripts/shell/apply-oz-patches.sh scripts/shell/apply-oz-patches.sh
-          chmod +x scripts/shell/apply-oz-patches.sh
-          bash scripts/shell/apply-oz-patches.sh
-
       - run: bun install
 
       # `cache/` and `out/` are forge's own incremental-compile state: it hashes each
@@ -123,11 +92,9 @@ jobs:
       # restored cache from an unrelated commit is always safe to build on top of.
       # Forge just recompiles whatever the content hashes say is dirty, so a partial
       # match via `restore-keys` still saves most of a cold `via_ir` build. This has
-      # to sit after `bun install`, not just after the master shard's patch step
-      # above: `bun install`'s postinstall (`setup.bash`) force-reclones `lib/`'s
-      # pinned dependencies for both shards and reapplies the OZ patches on top,
-      # so hashing `lib/` any earlier would key the cache off content that step
-      # is about to replace.
+      # to sit after `bun install`: its postinstall (`setup.bash`) force-reclones
+      # `lib/`'s pinned dependencies for both shards, so hashing `lib/` any earlier
+      # would key the cache off content that step is about to replace.
       #
       # Forge also drops persisted fuzz/invariant/test failure state under
       # `cache/fuzz`, `cache/invariant`, and `cache/test-failures`, and replays it

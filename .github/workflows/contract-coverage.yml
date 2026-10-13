@@ -66,9 +66,8 @@ jobs:
       # Forge just recompiles whatever the content hashes say is dirty, so a partial
       # match via `restore-keys` still saves most of a cold `via_ir` build. This has
       # to sit after `bun install`: its postinstall (`setup.bash`) force-reclones
-      # `lib/`'s pinned dependencies and reapplies the OZ patches on top, so hashing
-      # `lib/` any earlier would key the cache off content these steps are about to
-      # replace.
+      # `lib/`'s pinned dependencies, so hashing `lib/` any earlier would key the
+      # cache off content these steps are about to replace.
       #
       # Forge also drops persisted fuzz/invariant/test failure state under
       # `cache/fuzz`, `cache/invariant`, and `cache/test-failures`, and replays it

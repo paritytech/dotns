@@ -51,12 +51,6 @@ contract EscrowHandler is Test {
     /// @notice Label used to register each tokenId; required for re-registration after finalise.
     mapping(uint256 tokenId => string label) public labelByTokenId;
 
-    /// @notice Cumulative native amount credited into protocol fees by handler-driven flows.
-    /// @dev Increments via payable `transferFrom` (`chargeTransferFee`). Protocol fees only
-    ///      ever accrue, so a conservation invariant
-    ///      asserts this equals `escrow.protocolFees()`.
-    uint256 public ghost_protocolFeesPaidIn;
-
     /// @notice Cumulative native amount credited to recipients via `withdraw()`.
     uint256 public ghost_pendingCredits;
 
@@ -516,10 +510,9 @@ contract EscrowHandler is Test {
         }
     }
 
-    /// @notice Transfers a deposited token to a different actor without paying a cross-tier fee.
-    /// @dev Plain transferFrom path; no fee branch is hit because escrow custody is not
-    ///      involved and tier prices may match. Used to exercise the position-rebind path that
-    ///      moves `position.recipient` to the new holder on every NFT transfer.
+    /// @notice Transfers a deposited token to a different actor.
+    /// @dev Plain transferFrom path, free whatever the tiers. Used to exercise the position-rebind
+    ///      path that moves `position.recipient` to the new holder on every NFT transfer.
     /// @param tokenSeed Seed for selecting which deposited token to transfer.
     /// @param actorSeed Seed for selecting the recipient.
     function transferDeposited(uint256 tokenSeed, uint256 actorSeed) external {
@@ -528,80 +521,17 @@ contract EscrowHandler is Test {
         uint256 index = tokenSeed % _depositedTokenIds.length;
         uint256 tokenId = _depositedTokenIds[index];
 
-        // Zero-value transfer path: skip whenever the registrar's quote returns a
-        // non-zero fee. The quote folds in both the price-delta path and the
-        // transfer-fee path, so the handler stays in sync with whatever fee
-        // branches the contract grows over time.
-        string memory label = labelByTokenId[tokenId];
-        // Read once for documentation continuity; the actual gating check uses the quote.
-        label;
         address currentOwner = registrar.ownerOf(tokenId);
         address recipient = _pickDifferentActor(currentOwner, actorSeed);
         if (recipient == address(0)) return;
-
-        if (registrar.quoteTransferFee(tokenId, recipient) != 0) return;
 
         vm.prank(currentOwner);
         try registrar.transferFrom(currentOwner, recipient, tokenId) {
             // Sync the amount as a safety net against future downgrade paths that
             // might shrink it. Under the deposit-follows-name design the position
             // rebinds to the new holder on every transfer; the locked amount itself
-            // travels with the NFT, so on a zero-fee same-tier hop we expect both
-            // the amount and the per-asset reserves to stay put.
-            IDotnsNameEscrow.ReleasePosition memory pos = escrow.getReleasePosition(tokenId);
-            depositAmounts[tokenId] = pos.amount;
-        } catch {
-            return;
-        }
-    }
-
-    /// @notice Transfers a deposited token using payable `transferFrom`, exercising the
-    ///         cross-tier fee path through `chargeTransferFee`.
-    /// @dev Funds the call with whatever the registrar's `quoteTransferFee` returns, so the
-    ///      handler stays drift-resistant against future fee additions. Revert-safe: returns
-    ///      early when the recipient's price is zero (no fee path needed) or the inner call
-    ///      reverts.
-    /// @param tokenIdSeed Seed for selecting which deposited token to transfer.
-    /// @param fromSeed Unused (current owner is derived on-chain). Retained for fuzzer entropy.
-    /// @param toSeed Seed for selecting the recipient.
-    function transferPayable(uint256 tokenIdSeed, uint256 fromSeed, uint256 toSeed) external {
-        // `fromSeed` injects fuzzer entropy without overriding the registrar's required
-        // ownership check. Read it once so the parameter is not unused.
-        fromSeed;
-
-        if (_depositedTokenIds.length == 0 || actors.length < 2) return;
-
-        uint256 index = tokenIdSeed % _depositedTokenIds.length;
-        uint256 tokenId = _depositedTokenIds[index];
-        string memory label = labelByTokenId[tokenId];
-        if (bytes(label).length == 0) return;
-
-        address currentOwner = registrar.ownerOf(tokenId);
-        address to = _pickDifferentActor(currentOwner, toSeed);
-        if (to == address(0)) return;
-
-        // Use the registrar's own quote so the value attached matches whatever the
-        // contract actually requires. This includes the transfer-fee branch: when
-        // the recipient's verification level is below the label's required tier,
-        // the registrar charges the flat NoStatus deposit even though the
-        // price-delta path returns zero. Using `quoteTransferFee` makes the handler
-        // drift-resistant against future fee additions.
-        uint256 requiredFee = registrar.quoteTransferFee(tokenId, to);
-        if (requiredFee == 0) return;
-
-        vm.prank(currentOwner);
-        try registrar.transferFrom{value: requiredFee}(currentOwner, to, tokenId) {
-            // The transfer fee is credited in full to protocol fees: the position rebinds
-            // to the new holder rather than refunding, so reserves stay put. Accumulate the
-            // independently-quoted `requiredFee` so the conservation invariant verifies the
-            // escrow credited exactly the quoted fee.
-            ghost_protocolFeesPaidIn += requiredFee;
-
-            // Sync the amount as a safety net against future downgrade paths.
-            // Under the deposit-follows-name design the leaving-recipient branch
-            // rebinds the position to the new holder rather than refunding, so
-            // the locked amount and per-asset reserves stay put while the
-            // recipient pointer moves.
+            // travels with the NFT, so we expect both the amount and the per-asset
+            // reserves to stay put.
             IDotnsNameEscrow.ReleasePosition memory pos = escrow.getReleasePosition(tokenId);
             depositAmounts[tokenId] = pos.amount;
         } catch {
@@ -654,10 +584,8 @@ contract EscrowHandler is Test {
 
     /// @notice Returns the sum of outstanding time-locked refund entries across all actors.
     /// @dev Used by the full-solvency invariant to capture overpayment refunds that
-    ///      @custom:function chargeTransferFee credits via @custom:function _creditRefund when the
-    ///      attached value exceeds the transfer fee. Under the deposit-follows-name model the
-    ///      deposit itself never lands on this ledger; only payer overpayments do. Iterates each
-    ///      actor's entry list and sums each entry's amount.
+    ///      earlier implementations credited. Nothing credits new entries, so it stays zero here.
+    ///      Iterates each actor's entry list and sums each entry's amount.
     /// @return total Aggregate refund-ledger liability owed to the actor set.
     function totalPendingRefundEntries() external view returns (uint256 total) {
         uint256 length = actors.length;

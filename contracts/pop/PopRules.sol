@@ -294,35 +294,6 @@ contract PopRules is
     }
 
     /// @inheritdoc IPopRules
-    function transferFloor(
-        string calldata name,
-        address from,
-        address to
-    )
-        external
-        view
-        override
-        returns (uint256 floor)
-    {
-        _requireLabel(name);
-        if (from == to) return 0;
-        (PopStatus required,, uint256 baseLength) = _classifyValidatedName(name);
-        // A name open to all moves freely: any recipient could have registered it.
-        if (required == PopStatus.NoStatus) return 0;
-        uint256 ownPrice = _priceValidatedName(baseLength);
-
-        PopStatus toTier = _personhoodTier(to);
-        uint256 reachComponent = _meetsReach(required, toTier) ? 0 : ownPrice;
-
-        PopStatus fromTier = _personhoodTier(from);
-        // `_personhoodTier` never returns Reserved, so users are in {NoStatus, Devicehood,
-        // Personhood} and enum comparison reflects tier ordering directly.
-        uint256 downgradeComponent = toTier < fromTier ? ownPrice : 0;
-
-        return reachComponent > downgradeComponent ? reachComponent : downgradeComponent;
-    }
-
-    /// @inheritdoc IPopRules
     function popStatusOf(address account) external view override returns (PopStatus tier) {
         return _personhoodTier(account);
     }
@@ -343,21 +314,16 @@ contract PopRules is
     }
 
     /// @notice Single canonical "is `userStatus` at reach for `required`?" predicate.
-    /// @dev Both `priceWithCheck` and `transferFloor` build on this so the tier-eligibility rule
-    /// lives in exactly one place and the callers cannot disagree about who clears a given label.
-    /// `_personhoodTier` never returns `Reserved`, so `userStatus` is in `{NoStatus, Devicehood,
-    /// Personhood}` and the enum comparison reflects tier ordering directly. A `Reserved`
-    /// `required` (governance label) is unreachable by any verified user, so the comparison returns
-    /// false and the caller charges the friction fee, providing defence-in-depth if a Reserved
-    /// label ever enters circulation.
+    /// @dev `_personhoodTier` never returns `Reserved`, so `userStatus` is in `{NoStatus,
+    /// Devicehood, Personhood}` and the enum comparison reflects tier ordering directly. A
+    /// `Reserved` `required` (governance label) is unreachable by any verified user, so the
+    /// comparison returns false.
     function _meetsReach(PopStatus required, PopStatus userStatus) private pure returns (bool) {
         return userStatus >= required;
     }
 
     /// @notice Amount for a base length at the current cost-model version.
     /// @dev The cost-model registry owns the curve; this contract passes it only the base length.
-    ///      The call is a view because it runs on the ERC721 transfer floor read through
-    ///      @custom:function transferFloor.
     function _priceValidatedName(uint256 baseLength) internal view returns (uint256 priceValue) {
         return _costModelRegistry().priceForBaseLength(baseLength);
     }

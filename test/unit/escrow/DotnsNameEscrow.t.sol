@@ -7,6 +7,7 @@ import {BaseDotns, IDotnsRegistrarController} from "../../base/BaseDotns.t.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {IDotnsRegistrar} from "../../../contracts/registrars/IDotnsRegistrar.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
+import {stdStorage, StdStorage} from "forge-std/Test.sol";
 
 /// @title ForceSender
 /// @notice Self-destructing helper that force-credits its constructor balance to `target`,
@@ -29,10 +30,16 @@ contract GhostNft is ERC721 {
     }
 }
 
+/// @title ValueRejecter
+/// @notice Recipient with no `receive` or `fallback`, so any value sent to it reverts.
+contract ValueRejecter {}
+
 /// @title DotnsNameEscrowTest
 /// @notice Unit tests covering the deposit, release, withdrawal and reclaim lifecycle on
 ///         @custom:contract DotnsNameEscrow, plus the pull-payment and solvency guarantees.
 contract DotnsNameEscrowTest is BaseDotns {
+    using stdStorage for StdStorage;
+
     /// @notice Default label used across most tests.
     /// @dev Eleven characters measured as written, which classifies as NoStatus; the flat deposit
     ///      equals BASE_DEPOSIT.
@@ -367,9 +374,6 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(before.recipient, ed);
         assertEq(before.amount, BASE_DEPOSIT);
 
-        uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-        assertEq(quotedFee, 0, "same-tier NoStatus transfer should be free");
-
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
         uint256 edRefundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
         uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(leonardo);
@@ -419,9 +423,6 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(before.recipient, ed, "funded position starts with registrant");
         assertEq(before.amount, BASE_DEPOSIT, "self-registration locks a refundable deposit");
 
-        uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-        assertEq(quotedFee, 0, "same-tier transfer costs nothing");
-
         uint256 edRefundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
         uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(leonardo);
 
@@ -453,7 +454,9 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(afterRelease.recipient, leonardo, "release recipient is the current holder");
     }
 
-    function test_downgrade_transfer_pays_name_price() public {
+    function test_band_gated_downgrade_transfer_is_free() public {
+        // A personhood holder moving a name of the personhood band to a device holder, below the
+        // band, pays nothing and the deposit follows the name.
         string memory label = "lights01";
 
         _grantPersonhood(ed);
@@ -462,22 +465,14 @@ contract DotnsNameEscrowTest is BaseDotns {
         _commitAndRegister(label, ed, false);
 
         uint256 tokenId = _tokenIdForLabel(label);
-        uint256 ownPrice = popRules.price(label);
-        uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-
-        assertEq(quotedFee, ownPrice, "downgrade re-prices at the name's own length");
-
         uint256 priorProtocolFees = dotnsNameEscrow.protocolFees();
 
-        vm.deal(ed, quotedFee);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: quotedFee}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
-        assertEq(
-            dotnsNameEscrow.protocolFees() - priorProtocolFees,
-            ownPrice,
-            "downgrade fee settles to protocol fees"
-        );
+        assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
+        assertEq(dotnsNameEscrow.getReleasePosition(tokenId).recipient, leonardo);
+        assertEq(dotnsNameEscrow.protocolFees(), priorProtocolFees, "no fee reaches the pot");
     }
 
     function test_downgrade_transfer_is_free_and_rebinds_position() public {
@@ -487,8 +482,6 @@ contract DotnsNameEscrowTest is BaseDotns {
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
         _grantPersonhood(ed);
-
-        assertEq(dotnsRegistrar.quoteTransferFee(tokenId, leonardo), 0, "an open name moves free");
 
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
         uint256 escrowBalanceBefore = address(dotnsNameEscrow).balance;
@@ -525,12 +518,11 @@ contract DotnsNameEscrowTest is BaseDotns {
     }
 
     function test_transfer_no_rebind_when_to_equals_position_recipient() public {
-        // Defensive: if `chargeTransferFee` is ever invoked with `to == position.recipient`
-        // (only reachable through a future code path or a direct registrar-pranked call), the
-        // rebind branch must not fire. The position stays funded with the same recipient, no
-        // refund entry is credited, and the fee leg behaves exactly as for any other payable
-        // transfer. Drives the call from the registrar's address so the `onlyRegistrar` guard
-        // passes without trying to perform an NFT move.
+        // Defensive: if `rebindPosition` is ever invoked with `to == position.recipient` (only
+        // reachable through a future code path or a direct registrar-pranked call), the rebind
+        // branch must not fire. The position stays funded with the same recipient and no refund
+        // entry is credited. Drives the call from the registrar's address so the `onlyRegistrar`
+        // guard passes without trying to perform an NFT move.
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
         IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
@@ -538,17 +530,10 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(before.amount, BASE_DEPOSIT, "precondition: deposit at BASE_DEPOSIT");
 
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
-        uint256 protocolFeesBefore = dotnsNameEscrow.protocolFees();
         uint256 refundCountBefore = dotnsNameEscrow.pendingRefundCount(ed);
 
-        uint256 fee = popRules.price(LABEL);
-        vm.deal(address(dotnsRegistrar), fee);
         vm.prank(address(dotnsRegistrar));
-        dotnsNameEscrow.chargeTransferFee{value: fee}(
-            IDotnsNameEscrow.ChargeTransferFeeParams({
-                tokenId: tokenId, transferFee: fee, payer: leonardo, to: ed
-            })
-        );
+        dotnsNameEscrow.rebindPosition(tokenId, ed);
 
         IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(pos.recipient, ed, "position recipient untouched when to == recipient");
@@ -558,11 +543,6 @@ contract DotnsNameEscrowTest is BaseDotns {
             dotnsNameEscrow.reserves(address(0)),
             reservesBefore,
             "reserves unchanged when no refund fires"
-        );
-        assertEq(
-            dotnsNameEscrow.protocolFees() - protocolFeesBefore,
-            fee,
-            "fee leg still settles to protocol fees"
         );
         assertEq(
             dotnsNameEscrow.pendingRefundCount(ed),
@@ -667,9 +647,7 @@ contract DotnsNameEscrowTest is BaseDotns {
         assertEq(midPos.recipient, leonardo, "position rebinds to leonardo on the first hop");
         assertEq(midPos.amount, BASE_DEPOSIT, "deposit amount untouched on the first hop");
 
-        // Same-tier free transfer; quote must agree this is a zero-fee move that still rebinds.
-        uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, tiago);
-        assertEq(quotedFee, 0, "follow-up same-tier transfer must be free");
+        // Same-tier transfer; it still rebinds.
 
         vm.prank(leonardo);
         dotnsRegistrar.transferFrom(leonardo, tiago, tokenId);
@@ -849,5 +827,84 @@ contract DotnsNameEscrowTest is BaseDotns {
             balanceBefore + BASE_DEPOSIT,
             "withdraw should still transfer correct amount"
         );
+    }
+
+    // withdrawProtocolFees: governance spends the protocol fee balance, and nothing else
+
+    /// @notice Credits `amount` to the protocol fee balance and backs it with native value, as
+    ///         the transfer fees of earlier implementations left it.
+    function _seedProtocolFees(uint256 amount) internal {
+        stdstore.target(address(dotnsNameEscrow)).sig("protocolFees()").checked_write(amount);
+        vm.deal(address(dotnsNameEscrow), address(dotnsNameEscrow).balance + amount);
+    }
+
+    function test_withdrawProtocolFees_moves_fees_to_recipient() public {
+        _seedProtocolFees(5 ether);
+        address treasury = makeAddr("treasury");
+
+        _mockOriginIsRoot(true);
+        vm.expectEmit(true, false, false, true, address(dotnsNameEscrow));
+        emit IDotnsNameEscrow.ProtocolFeesWithdrawn(treasury, 3 ether);
+        dotnsNameEscrow.withdrawProtocolFees(treasury, 3 ether);
+        _mockOriginIsRoot(false);
+
+        assertEq(treasury.balance, 3 ether, "recipient receives the amount");
+        assertEq(dotnsNameEscrow.protocolFees(), 2 ether, "balance is debited by the amount");
+    }
+
+    function test_withdrawProtocolFees_reverts_without_root() public {
+        _seedProtocolFees(1 ether);
+
+        vm.expectRevert(IDotnsNameEscrow.NotRoot.selector);
+        vm.prank(owner);
+        dotnsNameEscrow.withdrawProtocolFees(owner, 1 ether);
+    }
+
+    function test_withdrawProtocolFees_cannot_reach_deposits() public {
+        // A live deposit backs the escrow balance, but only the protocol fee balance is spendable.
+        uint256 tokenId = _registerNoStatus(LABEL, ed);
+        _seedProtocolFees(1 ether);
+        uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
+
+        _mockOriginIsRoot(true);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsNameEscrow.ProtocolFeesExceeded.selector, 1 ether + 1, 1 ether
+            )
+        );
+        dotnsNameEscrow.withdrawProtocolFees(owner, 1 ether + 1);
+        _mockOriginIsRoot(false);
+
+        assertEq(dotnsNameEscrow.reserves(address(0)), reservesBefore);
+        assertEq(dotnsNameEscrow.getReleasePosition(tokenId).amount, BASE_DEPOSIT);
+    }
+
+    function test_withdrawProtocolFees_rejects_zero_recipient_and_amount() public {
+        _seedProtocolFees(1 ether);
+        _mockOriginIsRoot(true);
+
+        vm.expectRevert(IDotnsNameEscrow.InvalidRecipient.selector);
+        dotnsNameEscrow.withdrawProtocolFees(address(0), 1 ether);
+
+        vm.expectRevert(IDotnsNameEscrow.InvalidAmount.selector);
+        dotnsNameEscrow.withdrawProtocolFees(owner, 0);
+
+        _mockOriginIsRoot(false);
+    }
+
+    function test_withdrawProtocolFees_reverts_when_recipient_rejects_value() public {
+        _seedProtocolFees(1 ether);
+        address rejecter = address(new ValueRejecter());
+
+        _mockOriginIsRoot(true);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsNameEscrow.ProtocolFeeTransferFailed.selector, rejecter, 1 ether
+            )
+        );
+        dotnsNameEscrow.withdrawProtocolFees(rejecter, 1 ether);
+        _mockOriginIsRoot(false);
+
+        assertEq(dotnsNameEscrow.protocolFees(), 1 ether, "a failed payout debits nothing");
     }
 }
