@@ -213,6 +213,129 @@ contract NameGrantFlow is BaseDotns {
         vm.stopPrank();
     }
 
+    /// @dev A Root dispatch takes no grant, but the released token still exists, so it has to
+    ///      reclaim rather than mint, the same as the grant path.
+    function test_a_root_dispatch_reclaims_a_released_grant() public {
+        string memory nameLabel = "rgov";
+        uint256 tokenId = _tokenIdForLabel(nameLabel);
+
+        _grantName(nameLabel, ed);
+        _registerReserved(nameLabel, ed, ed);
+        _releaseAndWaitOutRedeemWindow(ed, tokenId);
+
+        _registerReservedAsRoot(nameLabel, tiago);
+
+        assertEq(
+            IERC721(address(dotnsRegistrar)).ownerOf(tokenId), tiago, "Root reclaimed the name"
+        );
+        assertEq(dotnsRegistry.owner(_nodeOf(nameLabel)), tiago, "the registry follows the holder");
+
+        IDotnsNameEscrow.ReleasePosition memory position =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(position.recipient, tiago, "the reclaim seeds a fresh position for the new holder");
+        assertEq(position.amount, 0, "a Root mint is free, so nothing is refundable");
+        assertFalse(position.released, "the new position starts outside the released phase");
+    }
+
+    /// @dev A long label can come back from a paid registration that still holds its deposit. The
+    ///      reclaim must settle that deposit to the previous holder, not drop it or hand it on.
+    function test_a_granted_reclaim_credits_the_previous_holders_deposit() public {
+        string memory nameLabel = "depositbacked01";
+        uint256 tokenId = _tokenIdForLabel(nameLabel);
+
+        _commitAndRegister(nameLabel, ed, false);
+        uint256 deposit = dotnsNameEscrow.getReleasePosition(tokenId).amount;
+        assertGt(deposit, 0, "a direct registration locks a deposit");
+
+        _releaseAndWaitOutRedeemWindow(ed, tokenId);
+        uint256 pendingBefore = dotnsNameEscrow.pendingWithdrawal(ed);
+
+        _grantName(nameLabel, tiago);
+        _registerReserved(nameLabel, tiago, tiago);
+
+        assertEq(
+            dotnsNameEscrow.pendingWithdrawal(ed) - pendingBefore,
+            deposit,
+            "the previous holder can pull their unwithdrawn deposit"
+        );
+        IDotnsNameEscrow.ReleasePosition memory position =
+            dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(position.recipient, tiago, "the new holder gets a fresh position");
+        assertEq(position.amount, 0, "the old deposit does not carry over to a free grant");
+    }
+
+    /// @dev A reservation the previous holder still owns on the name's base name is garbage once
+    ///      the name moves on. Left alone, it blocks the base name for everyone else until it
+    ///      expires.
+    function test_a_granted_reclaim_clears_the_previous_holders_reservation() public {
+        _assertReclaimClearsStaleReservation("staleslotgrant", false);
+    }
+
+    /// @dev Same clean-up under Root. Root only rules out reading `msg.sender` in this frame;
+    ///      `PopRules` still sees the controller as its caller.
+    function test_a_root_reclaim_clears_the_previous_holders_reservation() public {
+        _assertReclaimClearsStaleReservation("staleslotroot", true);
+    }
+
+    /// @dev Only the previous holder's slot is garbage. A slot someone else holds is still theirs.
+    function test_a_reclaim_keeps_a_reservation_held_by_someone_else() public {
+        string memory nameLabel = "otherslotgrant";
+        uint256 tokenId = _tokenIdForLabel(nameLabel);
+
+        _grantName(nameLabel, ed);
+        _registerReserved(nameLabel, ed, ed);
+        _plantReservation(nameLabel, leonardo);
+        _releaseAndWaitOutRedeemWindow(ed, tokenId);
+
+        _grantName(nameLabel, tiago);
+        _registerReserved(nameLabel, tiago, tiago);
+
+        (address holder,) = popRules.getBaseNameReservation(nameLabel);
+        assertEq(holder, leonardo, "a reservation the previous holder did not own survives");
+    }
+
+    /// @notice Reclaims `nameLabel` through `registerReserved` while the previous holder still
+    ///         owns a reservation on its base name, and asserts the reservation is gone.
+    function _assertReclaimClearsStaleReservation(string memory nameLabel, bool asRoot) private {
+        uint256 tokenId = _tokenIdForLabel(nameLabel);
+
+        _grantName(nameLabel, ed);
+        _registerReserved(nameLabel, ed, ed);
+        _plantReservation(nameLabel, ed);
+        _releaseAndWaitOutRedeemWindow(ed, tokenId);
+
+        (address holder,) = popRules.getBaseNameReservation(nameLabel);
+        assertEq(holder, ed, "the previous holder still owns a live reservation");
+
+        if (asRoot) {
+            _registerReservedAsRoot(nameLabel, tiago);
+        } else {
+            _grantName(nameLabel, tiago);
+            _registerReserved(nameLabel, tiago, tiago);
+        }
+
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(tokenId), tiago, "the name was reclaimed");
+        (holder,) = popRules.getBaseNameReservation(nameLabel);
+        assertEq(holder, address(0), "the previous holder's reservation is cleared");
+    }
+
+    /// @notice Writes a base-name reservation for `user`, standing in for a sibling controller
+    ///         such as the PoP queue head.
+    function _plantReservation(string memory baseName, address user) private {
+        _authoriseTestAsController();
+        popRules.reserveBaseNameForPop(baseName, user);
+    }
+
+    /// @notice Releases `tokenId` from `holder` into escrow and waits until it is reclaimable.
+    function _releaseAndWaitOutRedeemWindow(address holder, uint256 tokenId) private {
+        vm.startPrank(holder);
+        dotnsRegistrar.approve(address(dotnsNameEscrow), tokenId);
+        dotnsNameEscrow.release(tokenId);
+        vm.stopPrank();
+
+        vm.warp(dotnsNameEscrow.getReleasePosition(tokenId).redeemableUntil);
+    }
+
     /// @notice Commit-reveal a reserved registration for `nameOwner`, submitted by `submitter`.
     function _registerReserved(
         string memory nameLabel,
