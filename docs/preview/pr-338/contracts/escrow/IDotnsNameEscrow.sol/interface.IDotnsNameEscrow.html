@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/9c87ca04f03492d91531dd63ad5d8e7979ab6729/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/e62bf245582f0fb278f2671cf908f02451ab2b36/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Name Escrow Interface</p>
 <p>Escrows refundable deposits for registered names and manages the release lifecycle.</p>
@@ -260,35 +260,54 @@ contract receiver. Emits @custom:emits OverpaymentRefunded once the credit lands
 <tr><td><code>recipient</code></td><td><code>address</code></td><td>Address whose pending balance should grow by <code>msg.value</code>.</td></tr>
 </tbody></table>
 </div>
-<h3 id="chargetransferfee"><a class="header" href="#chargetransferfee">chargeTransferFee</a></h3>
-<p>Charges the transfer fee and rebinds the token's escrow position to the new holder.</p>
+<h3 id="rebindposition"><a class="header" href="#rebindposition">rebindPosition</a></h3>
+<p>Rebinds the token's escrow position to the name's new holder.</p>
 <p>Only the configured registrar may call this, otherwise @custom:reverts NotRegistrar.
-When a fee is owed, the attached value must cover it or @custom:reverts
-InsufficientValue. Whenever a position exists for the token and the NFT is leaving its
-prior recipient, the position recipient is rebound to the new holder so the deposit
-(when funded) and the lifecycle marker (when zero-amount) both follow the NFT. The
-escrow does not refund anyone at transfer time; the only path back to the locked
-deposit is for the current holder to release into escrow and wait the cooldown.
-Emits @custom:emits CrossTierFeePaid (non-registration) when a non-zero fee is credited
-to the protocol fee pot, and credits any surplus value to the payer on the time-locked
-refund ledger via @custom:emits RefundCredited.</p>
-<pre><code class="language-solidity">function chargeTransferFee(ChargeTransferFeeParams calldata params)
-    external
-    payable
-    returns (uint256 charged);
+Whenever a position exists for the token and the NFT is leaving its prior recipient,
+the position recipient becomes <code>to</code>, so the deposit (when funded) and the lifecycle
+marker (when zero-amount) both follow the NFT. The escrow refunds nobody at transfer
+time; the only path back to the locked deposit is for the current holder to release
+into escrow and wait the cooldown. A released position @custom:reverts AlreadyReleased.</p>
+<pre><code class="language-solidity">function rebindPosition(uint256 tokenId, address to) external;
 </code></pre>
-<p><strong>Returns</strong></p>
+<p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>charged</code></td><td><code>uint256</code></td><td>Amount actually credited to the protocol fee pot.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token whose position follows the transfer.</td></tr>
+<tr><td><code>to</code></td><td><code>address</code></td><td>NFT recipient.</td></tr>
 </tbody></table>
 </div>
 <h3 id="protocolfees"><a class="header" href="#protocolfees">protocolFees</a></h3>
-<p>Returns the cumulative protocol fee balance, non-refundable and accumulating.</p>
+<p>Returns the protocol fee balance the escrow holds.</p>
+<p>Nothing credits it: it holds the transfer fees collected by earlier implementations.
+Only @custom:function withdrawProtocolFees spends it.</p>
 <pre><code class="language-solidity">function protocolFees() external view returns (uint256 balance);
 </code></pre>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>balance</code></td><td><code>uint256</code></td><td>Current protocol fee balance, in wei.</td></tr>
+</tbody></table>
+</div>
+<h3 id="withdrawprotocolfees"><a class="header" href="#withdrawprotocolfees">withdrawProtocolFees</a></h3>
+<p>Moves <code>amount</code> of the protocol fee balance to <code>to</code>.</p>
+<p>Callable only under a Root origin, otherwise @custom:reverts NotRoot. Spends the
+protocol fee balance alone: deposits, pending withdrawals and refund entries belong to
+their holders and stay out of reach. A zero <code>to</code> @custom:reverts InvalidRecipient, a
+zero <code>amount</code> @custom:reverts InvalidAmount, an <code>amount</code> above the balance</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: ProtocolFeesExceeded, and a recipient that rejects the value</p>
+</li>
+<li>
+<p>reverts: ProtocolFeeTransferFailed. Emits @custom:emits ProtocolFeesWithdrawn.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function withdrawProtocolFees(address to, uint256 amount) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>to</code></td><td><code>address</code></td><td>Address that receives the value.</td></tr>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native value to move, in wei.</td></tr>
 </tbody></table>
 </div>
 <h3 id="release"><a class="header" href="#release">release</a></h3>
@@ -578,25 +597,6 @@ InvalidPageSize.</p>
 <p>Emitted when a recipient pulls their accumulated pending refund balance.</p>
 <pre><code class="language-solidity">event WithdrawalClaimed(address indexed recipient, uint256 amount);
 </code></pre>
-<h3 id="refundcredited"><a class="header" href="#refundcredited">RefundCredited</a></h3>
-<p>Emitted when a refund is credited to the time-locked refund ledger.</p>
-<pre><code class="language-solidity">event RefundCredited(
-    address indexed recipient,
-    uint256 indexed entryId,
-    uint256 amount,
-    uint64 availableAt,
-    uint256 indexed tokenId
-);
-</code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address that may claim the entry once <code>availableAt</code> has elapsed.</td></tr>
-<tr><td><code>entryId</code></td><td><code>uint256</code></td><td>Newly-assigned identifier for the credited entry.</td></tr>
-<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native value credited.</td></tr>
-<tr><td><code>availableAt</code></td><td><code>uint64</code></td><td>Earliest block timestamp at which the recipient may claim.</td></tr>
-<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token associated with the credit, retained for traceability.</td></tr>
-</tbody></table>
-</div>
 <h3 id="refundclaimed"><a class="header" href="#refundclaimed">RefundClaimed</a></h3>
 <p>Emitted when a recipient claims a single refund entry.</p>
 <pre><code class="language-solidity">event RefundClaimed(address indexed recipient, uint256 indexed entryId, uint256 amount);
@@ -641,23 +641,14 @@ deposit stays locked, so no value event accompanies this.</p>
 <tr><td><code>recipient</code></td><td><code>address</code></td><td>Address the NFT was returned to, which is also the position recipient.</td></tr>
 </tbody></table>
 </div>
-<h3 id="crosstierfeepaid"><a class="header" href="#crosstierfeepaid">CrossTierFeePaid</a></h3>
-<p>Emitted when a transfer fee is paid into the protocol fee pot.</p>
-<pre><code class="language-solidity">event CrossTierFeePaid(
-    uint256 indexed tokenId,
-    address indexed payer,
-    address indexed recipient,
-    uint256 amount,
-    bool isRegistration
-);
+<h3 id="protocolfeeswithdrawn"><a class="header" href="#protocolfeeswithdrawn">ProtocolFeesWithdrawn</a></h3>
+<p>Emitted when governance moves protocol fees out of the escrow.</p>
+<pre><code class="language-solidity">event ProtocolFeesWithdrawn(address indexed to, uint256 amount);
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td></td></tr>
-<tr><td><code>payer</code></td><td><code>address</code></td><td>Original <code>msg.sender</code> whose value funded the fee.</td></tr>
-<tr><td><code>recipient</code></td><td><code>address</code></td><td></td></tr>
-<tr><td><code>amount</code></td><td><code>uint256</code></td><td></td></tr>
-<tr><td><code>isRegistration</code></td><td><code>bool</code></td><td>Always false: a registration locks a refundable deposit and pays no fee, so only @custom:function chargeTransferFee emits this.</td></tr>
+<tr><td><code>to</code></td><td><code>address</code></td><td>Address that received the value.</td></tr>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native value moved, debited from the protocol fee balance.</td></tr>
 </tbody></table>
 </div>
 <h3 id="overpaymentrefunded"><a class="header" href="#overpaymentrefunded">OverpaymentRefunded</a></h3>
@@ -673,13 +664,21 @@ deposit stays locked, so no value event accompanies this.</p>
 <p>Thrown when the caller is not the configured registrar.</p>
 <pre><code class="language-solidity">error NotRegistrar(address caller);
 </code></pre>
+<h3 id="notroot"><a class="header" href="#notroot">NotRoot</a></h3>
+<p>Thrown when a governance call does not run under a Root origin.</p>
+<pre><code class="language-solidity">error NotRoot();
+</code></pre>
+<h3 id="protocolfeesexceeded"><a class="header" href="#protocolfeesexceeded">ProtocolFeesExceeded</a></h3>
+<p>Thrown when a protocol fee withdrawal asks for more than the balance holds.</p>
+<pre><code class="language-solidity">error ProtocolFeesExceeded(uint256 amount, uint256 available);
+</code></pre>
+<h3 id="protocolfeetransferfailed"><a class="header" href="#protocolfeetransferfailed">ProtocolFeeTransferFailed</a></h3>
+<p>Thrown when the recipient of a protocol fee withdrawal rejects the value.</p>
+<pre><code class="language-solidity">error ProtocolFeeTransferFailed(address to, uint256 amount);
+</code></pre>
 <h3 id="invalidrecipient"><a class="header" href="#invalidrecipient">InvalidRecipient</a></h3>
 <p>Thrown when the supplied refund recipient is invalid (e.g. zero address).</p>
 <pre><code class="language-solidity">error InvalidRecipient();
-</code></pre>
-<h3 id="insufficientvalue"><a class="header" href="#insufficientvalue">InsufficientValue</a></h3>
-<p>Thrown when the attached call value is insufficient to cover the computed charge.</p>
-<pre><code class="language-solidity">error InsufficientValue();
 </code></pre>
 <h3 id="insufficientfunds"><a class="header" href="#insufficientfunds">InsufficientFunds</a></h3>
 <p>Thrown when the per-asset reserve cannot cover the refund owed.</p>
@@ -858,28 +857,6 @@ can release into escrow and pull the refund.</p>
 <tr><td><code>recipient</code></td><td><code>address</code></td><td>Initial refund recipient; rebound to the current NFT holder on transfer.</td></tr>
 </tbody></table>
 </div>
-<h3 id="chargetransferfeeparams"><a class="header" href="#chargetransferfeeparams">ChargeTransferFeeParams</a></h3>
-<p>Inputs for charging transfer friction and rebinding the escrow position.</p>
-<p>The fee charged is the name's own price returned by @custom:function
-PopRules.transferFloor, settled to the protocol fee pot. The deposit, when present,
-travels with the NFT: the position is rebound to the recipient so the new holder is
-the only address that can later release into escrow and unlock the locked value.
-There is no transfer-time refund path.</p>
-<pre><code class="language-solidity">struct ChargeTransferFeeParams {
-    uint256 tokenId;
-    uint256 transferFee;
-    address payer;
-    address to;
-}
-</code></pre>
-<p><strong>Properties</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token whose escrow position is charged and rebound to the recipient.</td></tr>
-<tr><td><code>transferFee</code></td><td><code>uint256</code></td><td>The name's own curve price on a downward or cross-reach transfer.</td></tr>
-<tr><td><code>payer</code></td><td><code>address</code></td><td>Original sender of the registrar transfer entrypoint.</td></tr>
-<tr><td><code>to</code></td><td><code>address</code></td><td>NFT recipient. Becomes the new position recipient whenever a position exists.</td></tr>
-</tbody></table>
-</div>
 <h3 id="releaseposition"><a class="header" href="#releaseposition">ReleasePosition</a></h3>
 <p>Canonical escrow state for a token.</p>
 <p>Tracks the phased lifecycle as two flags: <code>released</code> flips on <code>release</code> (NFT in escrow,
@@ -907,10 +884,10 @@ ledger). The position is deleted on <code>reclaim</code>, freeing the slot for r
 </tbody></table>
 </div>
 <h3 id="refundentry-1"><a class="header" href="#refundentry-1">RefundEntry</a></h3>
-<p>Time-locked refund entry produced when the protocol owes a recipient value
-outside the registration-overpayment path.</p>
-<p>Every credit creates a fresh entry with its own <code>availableAt</code>; later credits do not
-reset earlier entries' clocks. Recipients claim entries individually or in batches.</p>
+<p>Time-locked refund entry for value a transfer overpaid under earlier
+implementations.</p>
+<p>Nothing creates new entries; recipients claim the existing ones individually or in
+batches once <code>availableAt</code> has elapsed.</p>
 <pre><code class="language-solidity">struct RefundEntry {
     address recipient;
     uint256 amount;
