@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/4255a52dac2c79b8ec64f2c0aca2388ed835d0ff/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/4759c9b3546559877498a3a3a016d67fdb2353c9/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -302,7 +302,9 @@ Availability covers both a never-minted label and one the escrow still holds pas
 redeem window, so this path reclaims from escrow when the token already exists, exactly as</p>
 </li>
 <li>
-<p>function: register does. It then seeds a zero-amount escrow release position keyed
+<p>function: register does. Like @custom:function register, a reclaim first clears a
+base-name reservation that the previous holder still owns, so it does not outlive their
+hold on the name. It then seeds a zero-amount escrow release position keyed
 to <code>registration.owner</code>. The grant is free, so there is nothing to refund, but the position
 is what makes the name releasable: without it the holder cannot release, the name never
 becomes reclaimable, and a reserved-tier label leaves circulation permanently. The escrow

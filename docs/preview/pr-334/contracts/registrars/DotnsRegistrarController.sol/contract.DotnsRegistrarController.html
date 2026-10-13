@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/4255a52dac2c79b8ec64f2c0aca2388ed835d0ff/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/4759c9b3546559877498a3a3a016d67fdb2353c9/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, ReentrancyGuardTransient, <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -423,6 +423,33 @@ commit-reveal-specific policy.</p>
 <p>Returns the configured name escrow from the protocol registry.</p>
 <pre><code class="language-solidity">function _escrow() internal view returns (address escrow);
 </code></pre>
+<h3 id="_clearstalereservation"><a class="header" href="#_clearstalereservation">_clearStaleReservation</a></h3>
+<p>Clears the base-name reservation that the previous holder of a reclaimed name still
+owns.</p>
+<p>Shared by both registration paths so their reclaim clean-up cannot drift apart. The
+previous holder may own a reservation on the name's base name, written by a sibling
+controller (e.g. the PoP queue head stamp). Once the name moves on, that slot is
+garbage, and left alone it blocks the base name for everyone else until it expires.
+Only a slot owned by the previous holder is cleared; a slot held by anyone else is
+still theirs and stays. Must run before <code>escrow.reclaim</code>, which deletes the position
+the previous holder is read from. Reads no <code>msg.sender</code>, so it is safe under a Root
+origin: <code>PopRules</code> sees this controller as its caller either way.</p>
+<pre><code class="language-solidity">function _clearStaleReservation(
+    IPopRules rules,
+    address escrow,
+    uint256 tokenId,
+    string calldata label
+)
+    internal;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>rules</code></td><td><code>IPopRules</code></td><td>Configured PopRules.</td></tr>
+<tr><td><code>escrow</code></td><td><code>address</code></td><td>Configured name escrow.</td></tr>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token being reclaimed.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Label being registered.</td></tr>
+</tbody></table>
+</div>
 <h3 id="_reclaimfromescrow"><a class="header" href="#_reclaimfromescrow">_reclaimFromEscrow</a></h3>
 <p>Takes a name out of escrow custody and repoints the forward registry at its new
 holder.</p>
