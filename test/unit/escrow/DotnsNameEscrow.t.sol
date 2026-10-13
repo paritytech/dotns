@@ -480,30 +480,23 @@ contract DotnsNameEscrowTest is BaseDotns {
         );
     }
 
-    function test_transfer_charges_friction_and_rebinds_position() public {
-        // Downward cross-tier transfer of a funded NoStatus name: the friction fee settles to
-        // protocol fees and the deposit travels with the NFT. There is no transfer-time refund:
-        // `position.recipient` rebinds to the new holder, the locked deposit follows, and only
-        // the new holder can later release into escrow. Promoting `ed` to Personhood before the
-        // transfer forces `PopRules.transferFloor` to return the base fee D while the position
-        // still carries the original `BASE_DEPOSIT` deposit, so both legs of `chargeTransferFee`
-        // run in one call.
+    function test_downgrade_transfer_is_free_and_rebinds_position() public {
+        // A personhood holder moving an open name to a NoStatus account pays nothing: the
+        // deposit travels with the NFT, reserves stay put, and nobody is refunded at transfer
+        // time. Promoting `ed` to Personhood after registration makes the move a downgrade.
         uint256 tokenId = _registerNoStatus(LABEL, ed);
 
         _grantPersonhood(ed);
 
-        uint256 startingPrice = popRules.price(LABEL);
-        uint256 quotedFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-        assertEq(quotedFee, startingPrice, "Personhood holder downgrading to NoStatus pays D");
+        assertEq(dotnsRegistrar.quoteTransferFee(tokenId, leonardo), 0, "an open name moves free");
 
         uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
-        uint256 protocolFeesBefore = dotnsNameEscrow.protocolFees();
+        uint256 escrowBalanceBefore = address(dotnsNameEscrow).balance;
         uint256 edRefundsBefore = dotnsNameEscrow.pendingRefundCount(ed);
         uint256 leonardoRefundsBefore = dotnsNameEscrow.pendingRefundCount(leonardo);
 
-        vm.deal(ed, quotedFee);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: quotedFee}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(pos.recipient, leonardo, "position must rebind to the new holder");
@@ -515,9 +508,9 @@ contract DotnsNameEscrowTest is BaseDotns {
             "reserves must not move when the deposit follows the NFT"
         );
         assertEq(
-            dotnsNameEscrow.protocolFees() - protocolFeesBefore,
-            startingPrice,
-            "friction fee settles to protocol fees independently of the deposit"
+            address(dotnsNameEscrow).balance,
+            escrowBalanceBefore,
+            "no value reaches the escrow on a transfer"
         );
         assertEq(
             dotnsNameEscrow.pendingRefundCount(ed),
@@ -758,126 +751,72 @@ contract DotnsNameEscrowTest is BaseDotns {
         tokenId = _tokenIdForLabel(label);
     }
 
-    /// @notice Verified payer sponsoring a NoStatus owner on a NoStatus-tier label pays
-    ///         exactly D under the max-not-sum rule.
-    /// @dev `priced.price` equals D because the owner is NoStatus, and `transferFloor` returns
-    ///      D because the payer's Personhood tier downgrades into the owner's NoStatus tier. The
-    ///      controller charges `max(priced.price, friction) = D` and routes the entire charge
-    ///      into protocol fees; the owner-side refundable position is seeded with zero
-    ///      amount, so reserves must not move.
-    function test_cross_payer_verified_sponsors_nostatus_pays_only_D() public {
-        string memory label = "crosspayr01";
+    /// @notice A cross-payer registration locks the price as the owner's refundable deposit.
+    /// @dev The payer is debited the price and the owner's position holds it, so reserves grow
+    ///      by the same amount: the sponsor gives the owner the deposit.
+    function _assertCrossPayerDeposit(
+        string memory label,
+        address payer,
+        address nameOwner
+    )
+        internal
+    {
+        uint256 ownPrice = popRules.price(label);
+        uint256 priorReserves = dotnsNameEscrow.reserves(address(0));
+        uint256 priorBalance = payer.balance;
 
+        uint256 tokenId = _crossPayerRegister(label, payer, nameOwner, ownPrice);
+
+        assertEq(priorBalance - payer.balance, ownPrice, "payer is debited exactly the price");
+        assertEq(
+            dotnsNameEscrow.reserves(address(0)) - priorReserves,
+            ownPrice,
+            "the charge is held as a refundable deposit"
+        );
+
+        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
+        assertEq(pos.recipient, nameOwner, "position recipient must be the registrant");
+        assertEq(pos.amount, ownPrice, "the owner holds the deposit");
+    }
+
+    /// @notice A verified payer sponsoring a NoStatus owner on an open label gives the owner a
+    ///         deposit of the price.
+    function test_cross_payer_verified_sponsors_nostatus_funds_owner_deposit() public {
         _grantPersonhood(leonardo);
         // ed left at default NoStatus tier.
-
-        uint256 priorProtocolFees = dotnsNameEscrow.protocolFees();
-        uint256 priorReserves = dotnsNameEscrow.reserves(address(0));
-        uint256 priorBalance = leonardo.balance;
-
-        uint256 tokenId = _crossPayerRegister(label, leonardo, ed, BASE_DEPOSIT);
-
-        // Protocol fees must grow by exactly D and reserves must stay flat: the entire charge
-        // routes to the friction reserve on the cross-payer path under the max rule.
-        assertEq(
-            dotnsNameEscrow.protocolFees() - priorProtocolFees,
-            BASE_DEPOSIT,
-            "protocol fees must grow by exactly D on cross-payer NoStatus sponsorship"
-        );
-        assertEq(
-            dotnsNameEscrow.reserves(address(0)),
-            priorReserves,
-            "reserves must not move when the cross-payer charge routes entirely to protocol fees"
-        );
-        assertEq(
-            priorBalance - leonardo.balance,
-            BASE_DEPOSIT,
-            "payer must be debited exactly D, never above"
-        );
-
-        // The owner-side position is seeded with zero amount so the release lifecycle stays
-        // reachable; the recipient sentinel binds to the registrant.
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
-        assertEq(pos.recipient, ed, "position recipient must be the registrant");
-        assertEq(pos.amount, 0, "no refundable deposit seeded for cross-payer registration");
+        _assertCrossPayerDeposit("crosspayr01", leonardo, ed);
     }
 
-    /// @notice A cross-payer sponsoring a verified owner pays the name's own curve price into
-    ///         protocol fees; personhood buys the owner access, not a free ride for the sponsor.
-    /// @dev `priced.price` is the curve price for the owner and `transferFloor` is at most that
-    ///      same price, so the controller charges the owner-side price and `_settleEscrow` routes
-    ///      it through `depositProtocolFee`, seeding a zero-amount refundable position.
-    function test_cross_payer_pays_the_curve_into_fees() public {
-        string memory label = BASE_LABEL_A;
-
+    /// @notice A cross-payer sponsoring a verified owner on a band-gated label gives the owner a
+    ///         deposit of the curve price; personhood buys the owner access, not a discount.
+    function test_cross_payer_funds_owner_deposit_at_the_curve() public {
         _grantPersonhood(leonardo);
         _grantPersonhood(ed);
-
-        uint256 ownPrice = popRules.price(label);
-        uint256 priorProtocolFees = dotnsNameEscrow.protocolFees();
-        uint256 priorReserves = dotnsNameEscrow.reserves(address(0));
-        uint256 priorBalance = leonardo.balance;
-
-        uint256 tokenId = _crossPayerRegister(label, leonardo, ed, ownPrice);
-
-        assertEq(
-            dotnsNameEscrow.protocolFees() - priorProtocolFees,
-            ownPrice,
-            "cross-payer charge settles to protocol fees"
-        );
-        assertEq(
-            dotnsNameEscrow.reserves(address(0)),
-            priorReserves,
-            "reserves must not move on the cross-payer path"
-        );
-        assertEq(
-            priorBalance - leonardo.balance, ownPrice, "payer is debited the cross-payer charge"
-        );
-
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
-        assertEq(pos.recipient, ed, "position recipient must be the registrant");
-        assertEq(pos.amount, 0, "cross-payer registration seeds no refundable deposit");
+        _assertCrossPayerDeposit(BASE_LABEL_A, leonardo, ed);
     }
 
-    /// @notice A cross-payer whose tier downgrades into the owner's is still charged only the
-    ///         name's own price, never the owner price plus the downgrade friction.
-    /// @dev The owner-side price is the curve price and the downgrade friction can at most equal
-    ///      it, so `max(ownerPrice, friction)` collapses to the owner price. The whole charge
-    ///      routes to protocol fees with no refundable deposit.
-    function test_cross_payer_downgrade_charges_only_owner_price() public {
+    /// @notice A sponsor whose tier is above the owner's still pays only the name's price, all
+    ///         of it into the owner's deposit.
+    function test_cross_payer_downgrade_funds_owner_deposit() public {
         // DEVICE_LABEL_A carries the gateway's separator, which the public path this test drives
         // rejects, so the label here is a flat one in the same tier.
-        string memory label = "michael01";
-
         _grantPersonhood(leonardo);
         _grantDevicehood(ed);
+        _assertCrossPayerDeposit("michael01", leonardo, ed);
+    }
 
-        uint256 ownPrice = popRules.price(label);
-        uint256 priorProtocolFees = dotnsNameEscrow.protocolFees();
-        uint256 priorReserves = dotnsNameEscrow.reserves(address(0));
-        uint256 priorBalance = leonardo.balance;
+    /// @notice The owner of a cross-paid name gets the sponsor's deposit back on release.
+    function test_cross_payer_deposit_refunds_the_owner() public {
+        _grantPersonhood(leonardo);
+        uint256 tokenId = _crossPayerRegister("crosspayr02", leonardo, ed, BASE_DEPOSIT);
 
-        uint256 tokenId = _crossPayerRegister(label, leonardo, ed, ownPrice);
+        _approveAndRelease(tokenId, ed);
+        vm.warp(block.timestamp + ESCROW_COOLDOWN + 1);
 
-        assertEq(
-            dotnsNameEscrow.protocolFees() - priorProtocolFees,
-            ownPrice,
-            "downgrade never exceeds the name's own price"
-        );
-        assertEq(
-            dotnsNameEscrow.reserves(address(0)),
-            priorReserves,
-            "reserves stay flat on the cross-payer path"
-        );
-        assertEq(
-            priorBalance - leonardo.balance,
-            ownPrice,
-            "payer is debited the owner-side price, not the sum"
-        );
-
-        IDotnsNameEscrow.ReleasePosition memory pos = dotnsNameEscrow.getReleasePosition(tokenId);
-        assertEq(pos.recipient, ed, "position recipient must be the registrant");
-        assertEq(pos.amount, 0, "no refundable deposit seeded for cross-payer registration");
+        vm.prank(ed);
+        dotnsNameEscrow.withdraw(tokenId);
+        assertEq(dotnsNameEscrow.pendingWithdrawal(ed), BASE_DEPOSIT, "the owner is refunded");
+        assertEq(dotnsNameEscrow.pendingWithdrawal(leonardo), 0, "the sponsor is not");
     }
 
     function test_solvency_after_force_sent_funds() public {

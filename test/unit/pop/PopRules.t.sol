@@ -268,12 +268,19 @@ contract PopRulesTests is BaseDotns {
     }
 
     function test_transferFloor_matches_model() public {
-        // A Personhood sender handing a NoStatus name to a NoStatus recipient pays the name's own
-        // price, which is the registered model's amount for its base length.
-        string memory label = "longnamehere";
+        // A Personhood sender handing a band-gated name to a NoStatus recipient pays the name's
+        // own price, which is the registered model's amount for its base length.
+        string memory label = "lights";
         _grantPersonhood(ed);
         uint256 floor = popRules.transferFloor(label, ed, leonardo);
         assertEq(floor, costModelRegistry.priceForBaseLength(bytes(label).length));
+    }
+
+    function test_transferFloor_is_zero_for_open_names() public {
+        // A name open to all moves for free, even when a Personhood holder hands it to a
+        // NoStatus account.
+        _grantPersonhood(ed);
+        assertEq(popRules.transferFloor("longnamehere", ed, leonardo), 0);
     }
 
     function test_pricingVersion_matches_registry() public view {

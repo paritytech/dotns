@@ -52,8 +52,8 @@ contract EscrowHandler is Test {
     mapping(uint256 tokenId => string label) public labelByTokenId;
 
     /// @notice Cumulative native amount credited into protocol fees by handler-driven flows.
-    /// @dev Increments via cross-tier register (`depositProtocolFee`) and payable `transferFrom`
-    ///      (`chargeTransferFee`). Protocol fees only ever accrue, so a conservation invariant
+    /// @dev Increments via payable `transferFrom` (`chargeTransferFee`). Protocol fees only
+    ///      ever accrue, so a conservation invariant
     ///      asserts this equals `escrow.protocolFees()`.
     uint256 public ghost_protocolFeesPaidIn;
 
@@ -160,10 +160,9 @@ contract EscrowHandler is Test {
     /// @dev Bounds inputs with `bound()` to keep handler runs within meaningful state.
     ///      Picks a payer and an owner from the actor set (different where possible),
     ///      randomly aligns or splits their PoP statuses, and dispatches the controller
-    ///      `register()` call from the payer. Routes to the deposit, depositProtocolFee,
-    ///      or skip branch depending on the resulting tier prices. Revert-safe: if the
-    ///      computed price is zero on both sides (Devicehood/Personhood no-cost path) the call
-    ///      still completes but ghost state is only updated where state actually changed.
+    ///      `register()` call from the payer. The charge is the owner-side price, locked as
+    ///      the owner's refundable deposit. Revert-safe: a zero price skips the call, and a
+    ///      reverting registration leaves ghost state untouched.
     /// @param ownerSeed Seed selecting the registrant.
     /// @param payerSeed Seed selecting the payer.
     /// @param statusSeed Seed selecting the random tier-elevation policy.
@@ -212,49 +211,26 @@ contract EscrowHandler is Test {
         uint256 minAge = controller.minCommitmentAge();
         vm.warp(block.timestamp + minAge + 1);
 
-        // Cross-tier path uses priceWithoutCheck for the owner.
-        uint256 ownerPrice = popRules.priceWithoutCheck(label, ownerAddr).price;
-        // `payerPrice` is read for documentation continuity even though the A1
-        // max-not-sum charge no longer adds it on top of `ownerPrice`. Bind into
-        // a local so the read is observable in traces and a future branch
-        // expansion can reuse it without re-reading from the oracle.
-        uint256 payerPrice = popRules.priceWithoutCheck(label, payer).price;
-        payerPrice;
+        // Cross-tier path uses priceWithoutCheck for the owner, and the whole charge becomes the
+        // owner's refundable deposit.
+        uint256 charge = popRules.priceWithoutCheck(label, ownerAddr).price;
 
-        // Under the A1 max-not-sum rule the controller charges
-        // `max(priced.price, friction)` on the cross-payer path and routes the
-        // whole charge into protocol fees via `depositProtocolFee`. The
-        // refundable deposit position is seeded at zero amount, so the only
-        // mutation invariant tracking has to mirror here is the protocol-fee leg.
         bytes32 labelhash = keccak256(bytes(label));
         bytes32 node = keccak256(abi.encodePacked(DOT_NODE, labelhash));
         uint256 tokenId = uint256(node);
 
-        // The handler picks the registrar's required value live so it stays in
-        // sync with whatever the A1 formula returns for the current tier mix.
-        // `priceWithoutCheck` gives the owner-side price and `transferFloor`
-        // returns the payer-to-owner friction; the max collapses both into the
-        // single charge the controller demands.
-        uint256 frictionForCharge = popRules.transferFloor(label, payer, ownerAddr);
-        uint256 charge = ownerPrice > frictionForCharge ? ownerPrice : frictionForCharge;
-
-        // Skip when no value moves: a zero charge produces a free zero-amount
-        // position with no protocol-fee or reserves delta, so adding it to the
-        // ghost-state token set adds noise without exercising any new branch.
+        // Skip when no value moves: a zero charge produces a free zero-amount position with no
+        // reserves delta, so adding it to the ghost-state token set adds noise without
+        // exercising any new branch.
         if (charge == 0) return;
 
         vm.prank(payer);
         try controller.register{value: charge}(registration) {
             _depositedTokenIds.push(tokenId);
             labelByTokenId[tokenId] = label;
-            // Cross-payer registrations seed a zero-amount refundable position;
-            // ghost-state mirrors that by leaving `depositAmounts` at zero.
-            depositAmounts[tokenId] = 0;
-
-            // The whole cross-payer charge becomes protocol fee. Accumulate the
-            // independently-computed `charge` so the conservation invariant verifies the
-            // escrow credited exactly what the caller was charged, not an echo of its own state.
-            ghost_protocolFeesPaidIn += charge;
+            // Mirror the independently-computed charge so the reserves invariant verifies the
+            // escrow locked exactly what the payer was charged, not an echo of its own state.
+            depositAmounts[tokenId] = charge;
         } catch {
             return;
         }

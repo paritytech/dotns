@@ -20,17 +20,6 @@ interface IDotnsNameEscrow {
         address recipient;
     }
 
-    /// @notice Parameters for recording a cross-paid registration fee into the protocol fee pot.
-    /// @dev The pot is non-refundable and only accumulates; it never backs a refund. `payer` is
-    ///      preserved purely for event accounting since the fee itself is non-refundable.
-    /// @param payer Original `msg.sender` of the controller's `register` call.
-    /// @param recipient The NFT registrant the fee was paid on behalf of.
-    struct ProtocolFeeDepositParams {
-        uint256 tokenId;
-        address payer;
-        address recipient;
-    }
-
     /// @notice Inputs for charging transfer friction and rebinding the escrow position.
     /// @dev The fee charged is the name's own price returned by @custom:function
     ///      PopRules.transferFloor, settled to the protocol fee pot. The deposit, when present,
@@ -147,10 +136,10 @@ interface IDotnsNameEscrow {
     /// @param recipient Address the NFT was returned to, which is also the position recipient.
     event NameRedeemed(uint256 indexed tokenId, address indexed recipient);
 
-    /// @notice Emitted when a cross-paid fee is paid into the protocol fee pot.
+    /// @notice Emitted when a transfer fee is paid into the protocol fee pot.
     /// @param payer Original `msg.sender` whose value funded the fee.
-    /// @param isRegistration True when emitted from `depositProtocolFee`; false from
-    /// `chargeTransferFee`.
+    /// @param isRegistration Always false: a registration locks a refundable deposit and pays no
+    /// fee, so only @custom:function chargeTransferFee emits this.
     event CrossTierFeePaid(
         uint256 indexed tokenId,
         address indexed payer,
@@ -309,8 +298,8 @@ interface IDotnsNameEscrow {
     /// @notice Records an asset deposit position for a token.
     /// @dev Only the configured controller may call this, otherwise @custom:reverts NotController.
     ///      `params.amount` must equal `msg.value`, otherwise @custom:reverts InvalidAmount; a
-    ///      zero amount is accepted so cross-payer and free-tier registrations can still seed a
-    ///      position that the release lifecycle can advance. Only native deposits are accepted
+    ///      zero amount is accepted so free registrations can still seed a position that the
+    ///      release lifecycle can advance. Only native deposits are accepted
     ///      today, so a non-zero `params.asset` triggers @custom:reverts AssetNotSupported, and
     ///      a zero `params.recipient` triggers @custom:reverts InvalidRecipient. The slot for
     ///      `params.tokenId` must be empty (sentinel: `position.recipient == address(0)`):
@@ -318,12 +307,6 @@ interface IDotnsNameEscrow {
     ///      position already in the released phase triggers @custom:reverts AlreadyReleased.
     ///      Emits @custom:emits NativeDepositRecorded once the deposit is booked.
     function deposit(DepositParams calldata params) external payable;
-
-    /// @notice Records a cross-paid registration fee into the protocol fee pot.
-    /// @dev Only the configured controller may call this, otherwise @custom:reverts NotController.
-    ///      `msg.value` must be non-zero, otherwise @custom:reverts InvalidAmount. Emits
-    ///      @custom:emits CrossTierFeePaid with `isRegistration = true` once the fee is booked.
-    function depositProtocolFee(ProtocolFeeDepositParams calldata params) external payable;
 
     /// @notice Credits `msg.value` to `recipient`'s pull-payment ledger so the caller can later
     ///         pull the balance with @custom:func claimWithdrawal.

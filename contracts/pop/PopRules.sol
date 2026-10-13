@@ -307,6 +307,8 @@ contract PopRules is
         _requireLabel(name);
         if (from == to) return 0;
         (PopStatus required,, uint256 baseLength) = _classifyValidatedName(name);
+        // A name open to all moves freely: any recipient could have registered it.
+        if (required == PopStatus.NoStatus) return 0;
         uint256 ownPrice = _priceValidatedName(baseLength);
 
         PopStatus toTier = _personhoodTier(to);

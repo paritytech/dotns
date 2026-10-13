@@ -313,7 +313,9 @@ interface IPopRules {
 
     /// @notice Transfer-time floor: the greater of the recipient-reach component and the
     ///         sender-tier-downgrade component, each priced at the name's own length.
-    /// @dev Re-prices the name at its own length on every move: returns the name's curve price when
+    /// @dev A name open to all (base length nine or more) always returns zero: any recipient could
+    ///      have registered it, so moving it costs nothing whatever the tiers. Any other name is
+    ///      re-priced at its own length on every move: returns the name's curve price when
     ///      either (i) the recipient does not meet the label's required tier, or (ii) the
     ///      recipient's personhood tier is strictly below the sender's, and zero when neither
     ///      holds. Passing a name to a wallet that could never have registered it therefore costs

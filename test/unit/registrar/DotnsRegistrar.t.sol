@@ -362,9 +362,9 @@ contract DotnsRegistrarTests is BaseDotns {
     }
 
     function test_transfer_reverts_when_fee_required_but_no_value_attached() public {
-        string memory label = "feerequired01";
-        // Grant personhood to ed so the mint succeeds, but leave leonardo at NoStatus so the
-        // transfer floor charges a non-zero downgrade fee.
+        string memory label = "feegated";
+        // Grant personhood to ed so the mint succeeds, but leave leonardo at NoStatus, below the
+        // band of a base length of eight, so the transfer floor charges a non-zero fee.
         _register(label, ed, IPopRules.PopStatus.Personhood);
         uint256 tokenId = _tokenIdForLabel(label);
 

@@ -152,15 +152,14 @@ interface IDotnsRegistrarController is IDotnsController {
     /// configured escrow address from the protocol registry (otherwise
     /// @custom:reverts EscrowNotConfigured). Splits on direct vs cross-payer at
     /// `msg.sender == registration.owner`. The direct path runs `priceWithCheck` (PoP-status
-    /// + reservation gate) and routes the charge to a refundable escrow deposit owned by
-    /// `registration.owner`. The cross-payer path skips the PoP-status revert in
+    /// + reservation gate). The cross-payer path skips the PoP-status revert in
     /// `priceWithCheck` but applies it directly via @custom:reverts OwnerStatusInsufficient
     /// when the owner's recorded tier does not meet the label's required tier, and still
     /// rejects governance-reserved labels with @custom:reverts GovernanceReserved and live
-    /// cross-user base-name reservations with @custom:reverts NameReserved. The cross-payer charge
-    /// is the owner-side registration price; the path applies no separate transfer friction. The
-    /// charge routes to the escrow protocol fee pot while seeding a zero-amount deposit slot so
-    /// the release lifecycle stays reachable. The reveal prices the name at the committed
+    /// cross-user base-name reservations with @custom:reverts NameReserved. Both paths charge the
+    /// registration price and lock it as a refundable escrow deposit owned by
+    /// `registration.owner`, so a payer who registers for someone else gives that owner the
+    /// deposit. The reveal prices the name at the committed
     /// `pricingVersion`, so a model change between commit and reveal leaves the amount unchanged,
     /// and rejects a total charge above the committed ceiling with @custom:reverts PriceExceedsMax
     /// before checking payment. The caller must supply at least the charge

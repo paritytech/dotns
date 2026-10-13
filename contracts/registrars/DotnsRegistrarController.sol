@@ -243,7 +243,7 @@ contract DotnsRegistrarController is
                 .setOwner(node, registration.owner);
         }
 
-        _settleEscrow(escrow, tokenId, registration.owner, isDirect, totalCharged);
+        _settleEscrow(escrow, tokenId, registration.owner, totalCharged);
 
         if (msg.value > totalCharged) {
             uint256 refund = msg.value - totalCharged;
@@ -256,36 +256,23 @@ contract DotnsRegistrarController is
         }
     }
 
-    /// @notice Settles every escrow side-effect of a successful registration.
-    /// @dev Extracted to keep `register` under the stack-depth ceiling. On a direct
-    ///      registration the full `chargeAmount` lands in the refundable deposit position
-    ///      keyed to `nameOwner`. On a cross-payer registration the deposit position is
-    ///      seeded with a zero amount so the release lifecycle stays reachable, and the same
-    ///      `chargeAmount` routes to the protocol fee pot via `depositProtocolFee` keyed to
-    ///      `msg.sender` as the payer.
+    /// @notice Locks the registration charge as the owner's refundable deposit.
+    /// @dev Extracted to keep `register` under the stack-depth ceiling. The deposit position is
+    ///      keyed to `nameOwner` whoever paid, so a cross-payer registration gives the owner the
+    ///      deposit.
     function _settleEscrow(
         address escrow,
         uint256 tokenId,
         address nameOwner,
-        bool isDirect,
         uint256 chargeAmount
     )
         internal
     {
-        uint256 depositAmount = isDirect ? chargeAmount : 0;
-        IDotnsNameEscrow(payable(escrow)).deposit{value: depositAmount}(
+        IDotnsNameEscrow(payable(escrow)).deposit{value: chargeAmount}(
             IDotnsNameEscrow.DepositParams({
-                tokenId: tokenId, asset: address(0), amount: depositAmount, recipient: nameOwner
+                tokenId: tokenId, asset: address(0), amount: chargeAmount, recipient: nameOwner
             })
         );
-
-        if (!isDirect && chargeAmount > 0) {
-            IDotnsNameEscrow(payable(escrow)).depositProtocolFee{value: chargeAmount}(
-                IDotnsNameEscrow.ProtocolFeeDepositParams({
-                    tokenId: tokenId, payer: msg.sender, recipient: nameOwner
-                })
-            );
-        }
     }
 
     /// @inheritdoc IDotnsRegistrarController

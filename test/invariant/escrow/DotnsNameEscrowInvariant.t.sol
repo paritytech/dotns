@@ -76,7 +76,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
 
     /// @notice The handler's mirror of protocol-fee inflows must equal the escrow's on-chain
     ///         protocol-fee balance. Protocol fees only ever accrue, so every inflow the handler
-    ///         tracks (cross-tier register and payable transfer) must sum to exactly the balance.
+    ///         tracks (payable transfers) must sum to exactly the balance.
     function invariant_protocol_fees_match_tracked_inflows() public view {
         assertEq(
             handler.ghost_protocolFeesPaidIn(),

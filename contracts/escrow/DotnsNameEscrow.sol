@@ -82,7 +82,7 @@ contract DotnsNameEscrow is
     mapping(uint256 tokenId => uint256 indexPlusOne) private _releasedIndexPlusOne;
 
     /// @notice Cumulative balance of non-refundable protocol fees; only accumulates.
-    /// @dev Credited by cross-paid registration fees and transfer fees. Never debited: protocol
+    /// @dev Credited by transfer fees. Never debited: protocol
     ///      fees do not back refunds, which draw solely on the per-asset reserve.
     uint256 public protocolFees;
 
@@ -273,9 +273,9 @@ contract DotnsNameEscrow is
 
         ReleasePosition storage position = _positions[params.tokenId];
 
-        // Use `recipient` as the "is this slot funded?" sentinel so zero-amount
-        // positions (seeded by cross-paid registrations, which pay a fee rather than a deposit)
-        // still count as present and cannot be re-seeded with a different recipient.
+        // Use `recipient` as the "is this slot funded?" sentinel so zero-amount positions
+        // (seeded by free registrations) still count as present and cannot be re-seeded with a
+        // different recipient.
         require(position.recipient == address(0), PositionAlreadyFunded(params.tokenId));
         require(!position.released, AlreadyReleased(params.tokenId));
 
@@ -294,27 +294,6 @@ contract DotnsNameEscrow is
         require(msg.value != 0, InvalidAmount());
         _pendingWithdrawals[recipient] += msg.value;
         emit OverpaymentRefunded(recipient, msg.value);
-    }
-
-    /// @inheritdoc IDotnsNameEscrow
-    function depositProtocolFee(ProtocolFeeDepositParams calldata params)
-        external
-        payable
-        override
-        onlyController
-    {
-        require(msg.value > 0, InvalidAmount());
-
-        protocolFees += msg.value;
-
-        emit CrossTierFeePaid(
-            params.tokenId,
-            params.payer,
-            params.recipient,
-            msg.value,
-            /* isRegistration */
-            true
-        );
     }
 
     /// @inheritdoc IDotnsNameEscrow
@@ -373,8 +352,8 @@ contract DotnsNameEscrow is
 
         ReleasePosition storage position = _positions[tokenId];
         // Recipient is the canonical "is this position present?" sentinel; zero-amount positions
-        // seeded for cross-paid registrations are still releasable so every minted name has a
-        // reachable lifecycle.
+        // seeded for free registrations are still releasable so every minted name has a reachable
+        // lifecycle.
         require(position.recipient != address(0), DepositNotConfigured(tokenId));
         require(!position.released, AlreadyReleased(tokenId));
 
@@ -460,9 +439,8 @@ contract DotnsNameEscrow is
         // Nothing to settle: return before touching `claimed`. That flag is what `redeem` reads to
         // decide whether the holder has already been paid for the name, so setting it here would
         // make a zero-amount `withdraw`, which pays nothing and emits nothing, silently forfeit
-        // the holder's right to recover their own name for no consideration at all. Cross-paid
-        // registrations seed exactly these positions, as does any name whose curve price is zero,
-        // and `withdraw` is a path holders will take.
+        // the holder's right to recover their own name for no consideration at all. Free
+        // registrations seed exactly these positions, and `withdraw` is a path holders will take.
         if (owed == 0) return;
 
         // Effects: from here the deposit really is being handed over, so the flag is set.
