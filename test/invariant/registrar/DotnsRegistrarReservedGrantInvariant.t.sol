@@ -2,6 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
+import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {ReservedGrantHandler} from "./ReservedGrantHandler.t.sol";
 
 /// @title dotNS Reserved Grant Invariant Suite
@@ -106,6 +107,25 @@ contract DotnsRegistrarReservedGrantInvariantTest is BaseDotns {
             handler.pendingLabelCount() + handler.mintedLabelsList().length,
             "a grant is neither pending nor minted"
         );
+    }
+
+    /// @notice Every granted name stays inside the release lifecycle. The mint is free, so the
+    /// position it seeds carries no value, but `DotnsNameEscrow.release` gates on the recipient
+    /// field: a name minted without one can never be released, never becomes reclaimable and
+    /// never returns to circulation. Asserted over the whole minted set rather than a flag,
+    /// because the failure is a missing write, which leaves nothing behind to observe.
+    function invariant_every_granted_name_is_releasable() public view {
+        string[] memory labels = handler.mintedLabelsList();
+        for (uint256 i = 0; i < labels.length; i++) {
+            uint256 tokenId = handler.tokenIdOf(labels[i]);
+            IDotnsNameEscrow.ReleasePosition memory position =
+                dotnsNameEscrow.getReleasePosition(tokenId);
+
+            assertEq(
+                position.recipient, dotnsRegistrar.ownerOf(tokenId), "no position, or it drifted"
+            );
+            assertEq(position.amount, 0, "a free mint must not lock a refundable deposit");
+        }
     }
 
     /// @notice No reserved mint writes a reverse record. Beneficiaries here receive names only

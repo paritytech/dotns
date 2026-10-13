@@ -274,9 +274,9 @@ contract DotnsNameEscrow is
 
         ReleasePosition storage position = _positions[params.tokenId];
 
-        // Use `recipient` as the "is this slot funded?" sentinel so zero-amount positions
-        // (seeded by free registrations) still count as present and cannot be re-seeded with a
-        // different recipient.
+        // Use `recipient` as the "is this slot funded?" sentinel so zero-amount positions (seeded
+        // by grant-backed reserved registrations, which pay nothing) still count as present and
+        // cannot be re-seeded with a different recipient.
         require(position.recipient == address(0), PositionAlreadyFunded(params.tokenId));
         require(!position.released, AlreadyReleased(params.tokenId));
 
@@ -342,8 +342,8 @@ contract DotnsNameEscrow is
 
         ReleasePosition storage position = _positions[tokenId];
         // Recipient is the canonical "is this position present?" sentinel; zero-amount positions
-        // seeded for free registrations are still releasable so every minted name has a reachable
-        // lifecycle.
+        // seeded for grant-backed reserved registrations are still releasable so every minted name
+        // has a reachable lifecycle.
         require(position.recipient != address(0), DepositNotConfigured(tokenId));
         require(!position.released, AlreadyReleased(tokenId));
 
