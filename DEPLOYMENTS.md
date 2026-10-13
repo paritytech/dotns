@@ -295,6 +295,8 @@ Before deploying to a live network, diff its manifest against `deployments/expec
 
 Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label to one beneficiary address and is single use: `registerReserved` requires a grant naming `registration.owner`, spends it on the mint, and refuses a second attempt. See the [README economics section](./README.md#economics) for what a grant does and does not confer; this section covers the mechanics.
 
+`registerReserved` also needs `nameEscrow` registered, and reverts with `EscrowNotConfigured` without it. The mint charges nothing, but it seeds a zero-amount escrow release position so the granted name stays inside the normal release lifecycle; a name minted without one could never be released and would leave circulation permanently. For the same reason the path reclaims from escrow instead of minting when the escrow still holds the token, which is how a released reserved-tier label is granted again.
+
 **Every admin action on the whitelist is a substrate Root dispatch.** Granting, revoking, accepting, rejecting, reserving, setting the request window and retuning the caps all require it. No signed account can do any of them, the contract owner included: the owner's authority is deployment and upgrade, not allocation. A signed call reverts with `NotGovernance`. There is no operator role and no address allowlist.
 
 That is the point of the design. As a security measure, no single key can grant a name; a grant costs a referendum, or on a test network a sudo-dispatched Root call.
