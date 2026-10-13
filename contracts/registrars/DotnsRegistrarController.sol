@@ -175,20 +175,13 @@ contract DotnsRegistrarController is
         uint256 tokenId = uint256(node);
         bool isReclaim = registrar.exists(tokenId);
 
-        string memory baseName = rules.stripDigits(registration.label);
-        bool baseNameCanonical = baseName.isSingleLabelMemory();
-        // Reclaim hands the name back from a prior occupant who may hold a sibling-controller's
-        // base-name reservation, which is garbage once the name moves on, so clear it. Non-reclaim
-        // paths intentionally leave an existing reservation in place: the slot belongs to the
-        // sibling controller that wrote it (e.g. the PoP queue head stamp), and clearing it from
-        // here would brick that controller's release and advance paths.
-        if (baseNameCanonical && isReclaim) {
-            (address reservationOwner,) = rules.getBaseNameReservation(baseName);
-            address expectedOwner =
-                IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId).recipient;
-            if (reservationOwner != address(0) && reservationOwner == expectedOwner) {
-                rules.releaseReservationForReclaim(baseName, expectedOwner);
-            }
+        // Runs before pricing: the price reads below enforce reservations against the new owner,
+        // so a slot the previous holder left behind would otherwise block this registration.
+        // Non-reclaim paths intentionally leave an existing reservation in place: the slot belongs
+        // to the sibling controller that wrote it (e.g. the PoP queue head stamp), and clearing it
+        // from here would brick that controller's release and advance paths.
+        if (isReclaim) {
+            _clearStaleReservation(rules, escrow, tokenId, registration.label);
         }
 
         bool isDirect = msg.sender == registration.owner;
@@ -327,11 +320,13 @@ contract DotnsRegistrarController is
             registration, labelhash, node, 0, false, IDotnsReverseResolver(address(0)), isReclaim
         );
 
-        // One deliberate divergence from @custom:function register, which also clears a sibling
-        // controller's stale base-name reservation before reclaiming. This path does not, because
-        // it reads no `IPopRules` state at all, and keeping it that way is what lets the whole
-        // function stay callable under a Root origin.
         if (isReclaim) {
+            _clearStaleReservation(
+                IPopRules(protocolRegistry.get(DotnsConstants.POP_RULES)),
+                escrow,
+                tokenId,
+                registration.label
+            );
             _reclaimFromEscrow(escrow, tokenId, node, registration.owner);
         }
 
@@ -457,6 +452,39 @@ contract DotnsRegistrarController is
     function _escrow() internal view returns (address escrow) {
         escrow = protocolRegistry.get(DotnsConstants.NAME_ESCROW);
         require(escrow != address(0), EscrowNotConfigured());
+    }
+
+    /// @notice Clears the base-name reservation that the previous holder of a reclaimed name still
+    ///         owns.
+    /// @dev Shared by both registration paths so their reclaim clean-up cannot drift apart. The
+    ///      previous holder may own a reservation on the name's base name, written by a sibling
+    ///      controller (e.g. the PoP queue head stamp). Once the name moves on, that slot is
+    ///      garbage, and left alone it blocks the base name for everyone else until it expires.
+    ///      Only a slot owned by the previous holder is cleared; a slot held by anyone else is
+    ///      still theirs and stays. Must run before `escrow.reclaim`, which deletes the position
+    ///      the previous holder is read from. Reads no `msg.sender`, so it is safe under a Root
+    ///      origin: `PopRules` sees this controller as its caller either way.
+    /// @param rules Configured PopRules.
+    /// @param escrow Configured name escrow.
+    /// @param tokenId Token being reclaimed.
+    /// @param label Label being registered.
+    function _clearStaleReservation(
+        IPopRules rules,
+        address escrow,
+        uint256 tokenId,
+        string calldata label
+    )
+        internal
+    {
+        string memory baseName = rules.stripDigits(label);
+        if (!baseName.isSingleLabelMemory()) return;
+
+        (address reservationOwner,) = rules.getBaseNameReservation(baseName);
+        address previousHolder =
+            IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId).recipient;
+        if (reservationOwner != address(0) && reservationOwner == previousHolder) {
+            rules.releaseReservationForReclaim(baseName, previousHolder);
+        }
     }
 
     /// @notice Takes a name out of escrow custody and repoints the forward registry at its new

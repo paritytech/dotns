@@ -196,7 +196,9 @@ interface IDotnsRegistrarController is IDotnsController {
     ///
     /// Availability covers both a never-minted label and one the escrow still holds past its
     /// redeem window, so this path reclaims from escrow when the token already exists, exactly as
-    /// @custom:function register does. It then seeds a zero-amount escrow release position keyed
+    /// @custom:function register does. Like @custom:function register, a reclaim first clears a
+    /// base-name reservation that the previous holder still owns, so it does not outlive their
+    /// hold on the name. It then seeds a zero-amount escrow release position keyed
     /// to `registration.owner`. The grant is free, so there is nothing to refund, but the position
     /// is what makes the name releasable: without it the holder cannot release, the name never
     /// becomes reclaimable, and a reserved-tier label leaves circulation permanently. The escrow
