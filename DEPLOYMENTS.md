@@ -4,7 +4,7 @@ Current deployment addresses and developer deployment notes for dotNS contracts.
 
 ## What this file is for
 
-This file is the operational companion to the README. It explains how to run the local ETH-RPC adapter, how to deploy dotNS, where deployment manifests are written, and which addresses are currently live on the supported Paseo environments.
+This file is the operational companion to the README. It explains how to run the local ETH-RPC adapter, how to deploy dotNS, where deployment manifests are written, and which addresses are currently live on each supported network.
 
 > For a short, do-this-in-order checklist (including how to target **any** Polkadot chain, not just the Paseo environments), see [`DEPLOYMENT_CHECKLIST.md`](./DEPLOYMENT_CHECKLIST.md).
 
@@ -481,12 +481,13 @@ The deployment manifest for a network is the only place in this repository that 
 deployments/<network>/<chain-id>.json
 ```
 
-Every network deployed through the shared CREATE3 factory lands on the same address set, so those manifests agree with each other; a chain deployed through a different factory has its own set, and a chain id alone does not identify one, since several networks report the same id. Only the TLD differs per network among the networks below.
+Every network deployed through the shared CREATE3 factory lands on the same address set, so those manifests agree with each other; a chain deployed through a different factory has its own set, and a chain id alone does not identify one, since several networks report the same id. The Paseo networks below share one set and differ only in TLD. Polkadot Asset Hub was deployed through a different factory, so it has its own set.
 
 | Network | TLD |
 | --- | --- |
 | Paseo Asset Hub Previewnet | `.testnet` |
 | Paseo Asset Hub Next V2 | `.paseo` |
+| Polkadot Asset Hub | `.dot` |
 
 Each release also publishes the same addresses as `deployments.json`, attached to the release and at the root of `dotns-abis-<tag>.zip`, for consumers outside this repository. See [`RELEASE_ARTIFACTS.md`](./RELEASE_ARTIFACTS.md).
 
