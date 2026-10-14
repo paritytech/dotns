@@ -522,9 +522,8 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
-        uint256 fee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: fee}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
 
@@ -544,13 +543,11 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
-        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: outboundFee}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
-        uint256 returnFee = dotnsRegistrar.quoteTransferFee(tokenId, ed);
         vm.prank(leonardo);
-        dotnsRegistrar.transferFrom{value: returnFee}(leonardo, ed, tokenId);
+        dotnsRegistrar.transferFrom(leonardo, ed, tokenId);
 
         ILabelStore edStore = ILabelStore(storeFactory.getLabelStore(ed));
         assertEq(edStore.getLabel(bytes32(tokenId)), string.concat(nameLabel, ".dot"));
@@ -567,9 +564,8 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         uint256 tokenId = _tokenIdForLabel(nameLabel);
         assertEq(dotnsReverseResolver.nameOf(ed), "primarymove01.dot");
 
-        uint256 _xferFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: _xferFee}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
         assertEq(dotnsReverseResolver.nameOf(ed), "");
@@ -596,9 +592,8 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         uint256 tokenId = _tokenIdForLabel(nameLabel);
 
-        uint256 _xferFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
-        dotnsRegistrar.safeTransferFrom{value: _xferFee}(ed, leonardo, tokenId);
+        dotnsRegistrar.safeTransferFrom(ed, leonardo, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
 
@@ -633,9 +628,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
-        uint256 priced = popRules.priceWithoutCheck(popfullLabel, ownerAddr).price;
-        uint256 friction = popRules.transferFloor(popfullLabel, payer, ownerAddr);
-        uint256 charge = priced > friction ? priced : friction;
+        uint256 charge = popRules.priceWithoutCheck(popfullLabel, ownerAddr).price;
 
         vm.deal(payer, charge);
         vm.prank(payer);
@@ -660,10 +653,8 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         vm.prank(ed);
         dotnsRegistrar.setApprovalForAll(tiago, true);
 
-        uint256 xferFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-        vm.deal(tiago, xferFee);
         vm.prank(tiago);
-        dotnsRegistrar.transferFrom{value: xferFee}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
 
@@ -685,9 +676,8 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         assertEq(storeFactory.getLabelStore(leonardo), address(0));
 
-        uint256 _xferFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: _xferFee}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
         // Label-less mints (gateway-cold PoP path) carry no label to mirror, so the registrar
@@ -696,15 +686,14 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         assertEq(storeFactory.getLabelStore(leonardo), address(0));
     }
 
-    /// @notice A zero-fee NoStatus to NoStatus transfer must still rebind the escrow
-    ///         position to the new holder, because the deposit follows the NFT and
-    ///         only the current holder can later release it.
-    /// @dev Exercises the position-sync path in the registrar: with the transfer floor
-    ///      at zero (NoStatus to NoStatus), the registrar still consults the escrow
-    ///      whenever a live position points at a recipient other than the destination,
+    /// @notice A NoStatus to NoStatus transfer must rebind the escrow position to the new
+    ///         holder, because the deposit follows the NFT and only the current holder can
+    ///         later release it.
+    /// @dev Exercises the position-sync path in the registrar: the registrar consults the
+    ///      escrow whenever a live position points at a recipient other than the destination,
     ///      so the position rebinds. No reserve movement, no refund entry, and no
     ///      transfer-time payout fires.
-    function test_transfer_zero_fee_rebinds_position_to_new_holder() public {
+    function test_transfer_rebinds_position_to_new_holder() public {
         string memory nameLabel = NOSTATUS_LABEL_A;
 
         _register(nameLabel, ed, IPopRules.PopStatus.NoStatus);
@@ -714,15 +703,12 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         assertEq(before.amount, BASE_DEPOSIT, "NoStatus mint must seed BASE_DEPOSIT deposit");
         assertEq(before.recipient, ed, "deposit recipient must be original registrant at mint");
 
-        uint256 transferFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-        assertEq(transferFee, 0, "NoStatus to NoStatus transfer floor is zero");
-
         uint256 priorReserve = dotnsNameEscrow.reserves(address(0));
         uint256 priorPendingRefundsEd = dotnsNameEscrow.pendingRefundCount(ed);
         uint256 priorPendingRefundsLeonardo = dotnsNameEscrow.pendingRefundCount(leonardo);
 
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: 0}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         IDotnsNameEscrow.ReleasePosition memory after_ = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(after_.amount, BASE_DEPOSIT, "deposit amount must travel with the NFT");
@@ -768,7 +754,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         // Outbound leg ed to leonardo rebinds the position to leonardo.
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: 0}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         IDotnsNameEscrow.ReleasePosition memory between =
             dotnsNameEscrow.getReleasePosition(tokenId);
@@ -777,7 +763,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         // Return leg leonardo back to ed rebinds the position back to ed.
         vm.prank(leonardo);
-        dotnsRegistrar.transferFrom{value: 0}(leonardo, ed, tokenId);
+        dotnsRegistrar.transferFrom(leonardo, ed, tokenId);
 
         IDotnsNameEscrow.ReleasePosition memory after_ = dotnsNameEscrow.getReleasePosition(tokenId);
         assertEq(after_.amount, BASE_DEPOSIT, "deposit must travel through the return hop");

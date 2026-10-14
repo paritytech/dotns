@@ -43,14 +43,11 @@ contract NoStatusDepositLifecycle is BaseDotns {
             "no refund must exist before the transfer"
         );
 
-        // Transfer the NFT away from the depositor. Same-tier NoStatus floor is
-        // zero, so msg.value is zero; the escrow is still consulted so the
-        // position rebinds to the new holder.
-        uint256 transferFee = dotnsRegistrar.quoteTransferFee(tokenId, recipient);
-        assertEq(transferFee, 0, "NoStatus to NoStatus transfer floor is zero");
+        // Transfer the NFT away from the depositor. Transfers are free; the escrow is
+        // consulted so the position rebinds to the new holder.
 
         vm.prank(depositor);
-        dotnsRegistrar.transferFrom{value: 0}(depositor, recipient, tokenId);
+        dotnsRegistrar.transferFrom(depositor, recipient, tokenId);
 
         IDotnsNameEscrow.ReleasePosition memory afterTransfer =
             dotnsNameEscrow.getReleasePosition(tokenId);

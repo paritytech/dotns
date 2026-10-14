@@ -20,34 +20,6 @@ interface IDotnsNameEscrow {
         address recipient;
     }
 
-    /// @notice Parameters for recording a cross-paid registration fee into the protocol fee pot.
-    /// @dev The pot is non-refundable and only accumulates; it never backs a refund. `payer` is
-    ///      preserved purely for event accounting since the fee itself is non-refundable.
-    /// @param payer Original `msg.sender` of the controller's `register` call.
-    /// @param recipient The NFT registrant the fee was paid on behalf of.
-    struct ProtocolFeeDepositParams {
-        uint256 tokenId;
-        address payer;
-        address recipient;
-    }
-
-    /// @notice Inputs for charging transfer friction and rebinding the escrow position.
-    /// @dev The fee charged is the name's own price returned by @custom:function
-    ///      PopRules.transferFloor, settled to the protocol fee pot. The deposit, when present,
-    ///      travels with the NFT: the position is rebound to the recipient so the new holder is
-    ///      the only address that can later release into escrow and unlock the locked value.
-    ///      There is no transfer-time refund path.
-    /// @param tokenId Token whose escrow position is charged and rebound to the recipient.
-    /// @param transferFee The name's own curve price on a downward or cross-reach transfer.
-    /// @param payer Original sender of the registrar transfer entrypoint.
-    /// @param to NFT recipient. Becomes the new position recipient whenever a position exists.
-    struct ChargeTransferFeeParams {
-        uint256 tokenId;
-        uint256 transferFee;
-        address payer;
-        address to;
-    }
-
     /// @notice Canonical escrow state for a token.
     /// @dev Tracks the phased lifecycle as two flags: `released` flips on `release` (NFT in escrow,
     ///      cooldown started); `claimed` flips on `withdraw` (refund credited to the pull-payment
@@ -68,10 +40,10 @@ interface IDotnsNameEscrow {
         uint64 redeemableUntil;
     }
 
-    /// @notice Time-locked refund entry produced when the protocol owes a recipient value
-    ///         outside the registration-overpayment path.
-    /// @dev Every credit creates a fresh entry with its own `availableAt`; later credits do not
-    ///      reset earlier entries' clocks. Recipients claim entries individually or in batches.
+    /// @notice Time-locked refund entry for value a transfer overpaid under earlier
+    ///         implementations.
+    /// @dev Nothing creates new entries; recipients claim the existing ones individually or in
+    ///      batches once `availableAt` has elapsed.
     /// @param recipient Address that may claim this entry once `availableAt` has elapsed.
     /// @param amount Native value credited.
     /// @param availableAt Earliest block timestamp at which the recipient may claim.
@@ -109,20 +81,6 @@ interface IDotnsNameEscrow {
     /// @notice Emitted when a recipient pulls their accumulated pending refund balance.
     event WithdrawalClaimed(address indexed recipient, uint256 amount);
 
-    /// @notice Emitted when a refund is credited to the time-locked refund ledger.
-    /// @param recipient Address that may claim the entry once `availableAt` has elapsed.
-    /// @param entryId Newly-assigned identifier for the credited entry.
-    /// @param amount Native value credited.
-    /// @param availableAt Earliest block timestamp at which the recipient may claim.
-    /// @param tokenId Token associated with the credit, retained for traceability.
-    event RefundCredited(
-        address indexed recipient,
-        uint256 indexed entryId,
-        uint256 amount,
-        uint64 availableAt,
-        uint256 indexed tokenId
-    );
-
     /// @notice Emitted when a recipient claims a single refund entry.
     /// @param recipient Address that pulled the entry.
     /// @param entryId Identifier of the claimed entry, now deleted.
@@ -147,17 +105,10 @@ interface IDotnsNameEscrow {
     /// @param recipient Address the NFT was returned to, which is also the position recipient.
     event NameRedeemed(uint256 indexed tokenId, address indexed recipient);
 
-    /// @notice Emitted when a cross-paid fee is paid into the protocol fee pot.
-    /// @param payer Original `msg.sender` whose value funded the fee.
-    /// @param isRegistration True when emitted from `depositProtocolFee`; false from
-    /// `chargeTransferFee`.
-    event CrossTierFeePaid(
-        uint256 indexed tokenId,
-        address indexed payer,
-        address indexed recipient,
-        uint256 amount,
-        bool isRegistration
-    );
+    /// @notice Emitted when governance moves protocol fees out of the escrow.
+    /// @param to Address that received the value.
+    /// @param amount Native value moved, debited from the protocol fee balance.
+    event ProtocolFeesWithdrawn(address indexed to, uint256 amount);
 
     /// @notice Emitted when overpayment is refunded to the payer.
     event OverpaymentRefunded(address indexed payer, uint256 amount);
@@ -168,11 +119,17 @@ interface IDotnsNameEscrow {
     /// @notice Thrown when the caller is not the configured registrar.
     error NotRegistrar(address caller);
 
+    /// @notice Thrown when a governance call does not run under a Root origin.
+    error NotRoot();
+
+    /// @notice Thrown when a protocol fee withdrawal asks for more than the balance holds.
+    error ProtocolFeesExceeded(uint256 amount, uint256 available);
+
+    /// @notice Thrown when the recipient of a protocol fee withdrawal rejects the value.
+    error ProtocolFeeTransferFailed(address to, uint256 amount);
+
     /// @notice Thrown when the supplied refund recipient is invalid (e.g. zero address).
     error InvalidRecipient();
-
-    /// @notice Thrown when the attached call value is insufficient to cover the computed charge.
-    error InsufficientValue();
 
     /// @notice Thrown when the per-asset reserve cannot cover the refund owed.
     /// @param available Reserve balance available for the asset.
@@ -309,8 +266,8 @@ interface IDotnsNameEscrow {
     /// @notice Records an asset deposit position for a token.
     /// @dev Only the configured controller may call this, otherwise @custom:reverts NotController.
     ///      `params.amount` must equal `msg.value`, otherwise @custom:reverts InvalidAmount; a
-    ///      zero amount is accepted so cross-payer and free-tier registrations can still seed a
-    ///      position that the release lifecycle can advance. Only native deposits are accepted
+    ///      zero amount is accepted so free registrations can still seed a position that the
+    ///      release lifecycle can advance. Only native deposits are accepted
     ///      today, so a non-zero `params.asset` triggers @custom:reverts AssetNotSupported, and
     ///      a zero `params.recipient` triggers @custom:reverts InvalidRecipient. The slot for
     ///      `params.tokenId` must be empty (sentinel: `position.recipient == address(0)`):
@@ -318,12 +275,6 @@ interface IDotnsNameEscrow {
     ///      position already in the released phase triggers @custom:reverts AlreadyReleased.
     ///      Emits @custom:emits NativeDepositRecorded once the deposit is booked.
     function deposit(DepositParams calldata params) external payable;
-
-    /// @notice Records a cross-paid registration fee into the protocol fee pot.
-    /// @dev Only the configured controller may call this, otherwise @custom:reverts NotController.
-    ///      `msg.value` must be non-zero, otherwise @custom:reverts InvalidAmount. Emits
-    ///      @custom:emits CrossTierFeePaid with `isRegistration = true` once the fee is booked.
-    function depositProtocolFee(ProtocolFeeDepositParams calldata params) external payable;
 
     /// @notice Credits `msg.value` to `recipient`'s pull-payment ledger so the caller can later
     ///         pull the balance with @custom:func claimWithdrawal.
@@ -335,26 +286,33 @@ interface IDotnsNameEscrow {
     /// @param recipient Address whose pending balance should grow by `msg.value`.
     function creditOverpayment(address recipient) external payable;
 
-    /// @notice Charges the transfer fee and rebinds the token's escrow position to the new holder.
+    /// @notice Rebinds the token's escrow position to the name's new holder.
     /// @dev Only the configured registrar may call this, otherwise @custom:reverts NotRegistrar.
-    ///      When a fee is owed, the attached value must cover it or @custom:reverts
-    ///      InsufficientValue. Whenever a position exists for the token and the NFT is leaving its
-    ///      prior recipient, the position recipient is rebound to the new holder so the deposit
-    ///      (when funded) and the lifecycle marker (when zero-amount) both follow the NFT. The
-    ///      escrow does not refund anyone at transfer time; the only path back to the locked
-    ///      deposit is for the current holder to release into escrow and wait the cooldown.
-    ///      Emits @custom:emits CrossTierFeePaid (non-registration) when a non-zero fee is credited
-    ///      to the protocol fee pot, and credits any surplus value to the payer on the time-locked
-    ///      refund ledger via @custom:emits RefundCredited.
-    /// @return charged Amount actually credited to the protocol fee pot.
-    function chargeTransferFee(ChargeTransferFeeParams calldata params)
-        external
-        payable
-        returns (uint256 charged);
+    ///      Whenever a position exists for the token and the NFT is leaving its prior recipient,
+    ///      the position recipient becomes `to`, so the deposit (when funded) and the lifecycle
+    ///      marker (when zero-amount) both follow the NFT. The escrow refunds nobody at transfer
+    ///      time; the only path back to the locked deposit is for the current holder to release
+    ///      into escrow and wait the cooldown. A released position @custom:reverts AlreadyReleased.
+    /// @param tokenId Token whose position follows the transfer.
+    /// @param to NFT recipient.
+    function rebindPosition(uint256 tokenId, address to) external;
 
-    /// @notice Returns the cumulative protocol fee balance, non-refundable and accumulating.
+    /// @notice Returns the protocol fee balance the escrow holds.
+    /// @dev Nothing credits it: it holds the transfer fees collected by earlier implementations.
+    ///      Only @custom:function withdrawProtocolFees spends it.
     /// @return balance Current protocol fee balance, in wei.
     function protocolFees() external view returns (uint256 balance);
+
+    /// @notice Moves `amount` of the protocol fee balance to `to`.
+    /// @dev Callable only under a Root origin, otherwise @custom:reverts NotRoot. Spends the
+    ///      protocol fee balance alone: deposits, pending withdrawals and refund entries belong to
+    ///      their holders and stay out of reach. A zero `to` @custom:reverts InvalidRecipient, a
+    ///      zero `amount` @custom:reverts InvalidAmount, an `amount` above the balance
+    ///      @custom:reverts ProtocolFeesExceeded, and a recipient that rejects the value
+    ///      @custom:reverts ProtocolFeeTransferFailed. Emits @custom:emits ProtocolFeesWithdrawn.
+    /// @param to Address that receives the value.
+    /// @param amount Native value to move, in wei.
+    function withdrawProtocolFees(address to, uint256 amount) external;
 
     /// @notice Releases a token into escrow and starts the withdrawal cooldown.
     /// @dev First step of the phased lifecycle. The caller must be the current NFT holder and the

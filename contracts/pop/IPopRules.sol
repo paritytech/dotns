@@ -311,30 +311,6 @@ interface IPopRules {
         view
         returns (PriceWithMeta memory metadata);
 
-    /// @notice Transfer-time floor: the greater of the recipient-reach component and the
-    ///         sender-tier-downgrade component, each priced at the name's own length.
-    /// @dev Re-prices the name at its own length on every move: returns the name's curve price when
-    ///      either (i) the recipient does not meet the label's required tier, or (ii) the
-    ///      recipient's personhood tier is strictly below the sender's, and zero when neither
-    ///      holds. Passing a name to a wallet that could never have registered it therefore costs
-    ///      the name's own curve price. The two components overlap on pure
-    ///      tier mismatches, so the function takes their maximum rather than their sum to avoid
-    ///      double-charging. Consumed by @custom:function DotnsRegistrar.quoteTransferFee.
-    ///      A label that is neither a single lowercase ASCII DNS label nor a device name triggers
-    ///      @custom:reverts PopError.
-    /// @param name Domain label being transferred.
-    /// @param from Current holder of the name.
-    /// @param to Incoming holder of the name.
-    /// @return floor Transfer-time floor in wei: the name's own curve price, or zero.
-    function transferFloor(
-        string calldata name,
-        address from,
-        address to
-    )
-        external
-        view
-        returns (uint256 floor);
-
     /// @notice Returns whether `name` can key a reservation: a base name with no trailing digits.
     /// @dev A device name always ends in two digits, so it never qualifies. Non-canonical labels
     ///      trigger @custom:reverts PopError.

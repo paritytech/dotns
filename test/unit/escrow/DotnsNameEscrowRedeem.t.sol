@@ -14,14 +14,13 @@ import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 ///         and the deposit settlement that makes the second possible without stranding value.
 /// @dev The defect these cover: reclaim used to gate on the `claimed` flag, which is only set by
 ///      `withdraw`. A holder who released a name and never withdrew removed the label from
-///      circulation permanently. For the zero-amount positions seeded by cross-payer registrations
+///      circulation permanently. For the zero-amount positions seeded by free registrations
 ///      there is nothing to withdraw, so that was the default outcome rather than an edge case.
 contract DotnsNameEscrowRedeemTest is BaseDotns {
     /// @notice 14-char label classifying as NoStatus, so registration seeds a funded position.
     string internal constant FUNDED_LABEL = "redeemlabela01";
 
-    /// @notice 6-char digit-free label classifying as Personhood, registered on the cross-payer
-    ///         path so its deposit position carries a zero amount.
+    /// @notice 6-char digit-free label minted with a zero-amount position.
     string internal constant FREE_LABEL = "redeem";
 
     /// @notice Register `label` for `nameOwner` at `status` and return its tokenId.
@@ -37,45 +36,26 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
         tokenId = _tokenIdForLabel(label);
     }
 
-    /// @notice Register `label` for `nameOwner` on the cross-payer path (`payer` pays, `nameOwner`
-    ///         receives the name) and return its tokenId.
-    /// @dev A cross-payer registration routes the whole charge to the protocol fee pot and seeds a
-    ///      zero-amount refundable position keyed to `nameOwner`, which is the registration shape
-    ///      that produces a zero-amount position. `nameOwner` must carry `status`, because the
-    ///      controller prices the owner's tier on this path.
-    function _registerCrossPayer(
+    /// @notice Mint `label` to `nameOwner` with a zero-amount position and return its tokenId.
+    /// @dev A free registration seeds a zero-amount position; every paid one locks the price as a
+    ///      deposit, whoever pays. Mints and seeds directly as the controller, which is all the
+    ///      escrow lifecycle reads.
+    function _mintWithZeroPosition(
         string memory label,
-        address nameOwner,
-        address payer,
-        IPopRules.PopStatus status
+        address nameOwner
     )
         internal
         returns (uint256 tokenId)
     {
-        _setUserPopStatus(nameOwner, status);
-
-        bytes32 secret = keccak256(abi.encodePacked(label, nameOwner, block.timestamp));
-        IDotnsRegistrarController.Registration memory registration =
-            IDotnsRegistrarController.Registration({
-                label: label,
-                owner: nameOwner,
-                secret: secret,
-                reserved: true,
-                maxPrice: type(uint256).max,
-                pricingVersion: popRules.pricingVersion()
-            });
-
-        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
-        vm.prank(payer);
-        dotnsRegistrarController.commit(commitment);
-
-        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
-
-        uint256 charge = popRules.priceWithoutCheck(label, nameOwner).price;
-        vm.prank(payer);
-        dotnsRegistrarController.register{value: charge}(registration);
-
         tokenId = _tokenIdForLabel(label);
+        vm.startPrank(address(dotnsRegistrarController));
+        dotnsRegistrar.register(tokenId, nameOwner, label);
+        dotnsNameEscrow.deposit(
+            IDotnsNameEscrow.DepositParams({
+                tokenId: tokenId, asset: address(0), amount: 0, recipient: nameOwner
+            })
+        );
+        vm.stopPrank();
     }
 
     /// @notice Approve the escrow for `tokenId` and release it as `caller`.
@@ -322,8 +302,7 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
     ///      right to recover their own name for no consideration whatsoever. `withdraw` is also a
     ///      step a holder has every reason to make before a name can be recycled.
     function test_zero_amount_withdrawal_does_not_forfeit_the_redeem_right() public {
-        uint256 tokenId =
-            _registerCrossPayer(FREE_LABEL, ed, leonardo, IPopRules.PopStatus.Personhood);
+        uint256 tokenId = _mintWithZeroPosition(FREE_LABEL, ed);
         assertEq(_positionOf(tokenId).amount, 0, "this case needs a zero-amount position");
 
         _approveAndRelease(tokenId, ed);
@@ -435,19 +414,14 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
 
     // the zero-amount case: what the bug actually was
 
-    /// @dev The headline regression test. A cross-payer registration seeds a zero-amount position,
+    /// @dev The headline regression test. A free registration seeds a zero-amount position,
     ///      so its holder has nothing to withdraw and therefore no reason ever to call `withdraw`.
     ///      Under a `released && claimed` reclaim gate that would make the name permanently
     ///      unregisterable.
     function test_zero_amount_release_becomes_reclaimable_without_any_withdrawal() public {
-        uint256 tokenId =
-            _registerCrossPayer(FREE_LABEL, ed, leonardo, IPopRules.PopStatus.Personhood);
+        uint256 tokenId = _mintWithZeroPosition(FREE_LABEL, ed);
 
-        assertEq(
-            _positionOf(tokenId).amount,
-            0,
-            "a cross-payer registration seeds a zero-amount position"
-        );
+        assertEq(_positionOf(tokenId).amount, 0, "a free registration seeds a zero-amount position");
 
         _approveAndRelease(tokenId, ed);
 

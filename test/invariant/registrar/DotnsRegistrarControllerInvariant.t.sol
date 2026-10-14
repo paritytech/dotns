@@ -103,7 +103,7 @@ contract DotnsRegistrarControllerInvariantTest is BaseDotns {
 
     /// @notice Every unit of native value the escrow holds is accounted for by exactly one ledger.
     /// @dev The escrow's balance is the sum of three obligations: `tokenReserved`, the deposits
-    ///      held against live positions; `protocolFees`, the accumulated cross-tier fees; and
+    ///      held against live positions; `protocolFees`, which nothing credits; and
     ///      `_pendingWithdrawals`, the amounts credited to recipients and awaiting collection.
     ///      Value only ever moves between these three, never into or out of the set, so their total
     ///      tracks the balance exactly.
