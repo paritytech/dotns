@@ -315,11 +315,12 @@ interface IDotnsNameEscrow {
     function release(uint256 tokenId) external;
 
     /// @notice Clears the records and subnames of a name the escrow holds in custody.
-    /// @dev @custom:function release clears a name as it takes custody, so this is needed only for
-    ///      a name that entered custody before release cleared names, and is otherwise a harmless
-    ///      repeat. Permissionless, because the escrow is the name's owner while it holds it and
-    ///      clearing is the state release promises. The position must be released, otherwise
-    ///      @custom:reverts NotReleased.
+    /// @dev @custom:function release clears a name as it takes custody, and @custom:function redeem
+    ///      and @custom:function reclaim clear it again as it leaves, so this is needed only to
+    ///      clear, while it is still in custody, a name that entered custody without being cleared.
+    ///      Anywhere else it is a harmless repeat. Permissionless, because the escrow is the name's
+    ///      owner while it holds it and clearing is the state release promises. The position must
+    ///      be released, otherwise @custom:reverts NotReleased.
     /// @param tokenId Token held in custody.
     function clearReleasedName(uint256 tokenId) external;
 
@@ -363,7 +364,9 @@ interface IDotnsNameEscrow {
     ///      previous recipient's pull-payment balance, claimable through @custom:function
     ///      claimWithdrawal with no deadline. That is what keeps a name recyclable when its
     ///      previous holder never returns: the value follows them, the name does not wait for them.
-    ///      Emits @custom:emits RefundWithdrawn on settlement.
+    ///      Emits @custom:emits RefundWithdrawn on settlement. The name is cleared before it leaves
+    ///      custody (@custom:function IDotnsRegistry.clear), so the new owner starts clean even
+    ///      for a name whose release did not clear it.
     /// @param newOwner Address of the new registrant taking over the name.
     function reclaim(uint256 tokenId, address newOwner) external;
 
@@ -387,7 +390,8 @@ interface IDotnsNameEscrow {
     ///      No value moves. The position keeps its recipient, asset and amount, so the deposit
     ///      stays locked exactly as it was before the release, and the name is releasable again
     ///      later on a fresh pair of clocks. The records and subnames the release cleared do not
-    ///      come back: the holder gets the name back clean. Excluding
+    ///      come back: the holder gets the name back clean, and the name is cleared once more on
+    ///      the way out so that holds for a name whose release did not clear it. Excluding
     ///      withdrawn positions is deliberate: a holder who has already pulled the deposit would
     ///      otherwise recover the name without it being deposit-backed, breaking the one-deposit-
     ///      per-live-name bound. The choice is therefore exclusive — take the value back, or take
