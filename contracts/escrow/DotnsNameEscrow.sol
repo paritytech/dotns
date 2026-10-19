@@ -713,6 +713,11 @@ contract DotnsNameEscrow is
         delete _positions[tokenId];
         _removeReleasedToken(tokenId);
 
+        // Release already cleared the name, unless it entered custody without being cleared.
+        // Clearing again on the way out closes that gap without anyone having to find those names
+        // first, and costs nothing else: nobody can write to a name while the escrow holds it.
+        _clearName(tokenId);
+
         _registrar().safeTransferFrom(address(this), newOwner, tokenId);
 
         emit NameReclaimed(tokenId, previousRecipient, newOwner);
@@ -764,6 +769,11 @@ contract DotnsNameEscrow is
 
         _removeReleasedToken(tokenId);
 
+        // Release already cleared the name, unless it entered custody without being cleared.
+        // Clearing again on the way out closes that gap without anyone having to find those names
+        // first, and costs nothing else: nobody can write to a name while the escrow holds it.
+        _clearName(tokenId);
+
         _registrar().safeTransferFrom(address(this), msg.sender, tokenId);
 
         emit NameRedeemed(tokenId, msg.sender);
@@ -808,9 +818,15 @@ contract DotnsNameEscrow is
     }
 
     /// @notice Clears every record and subname of a name the escrow holds.
+    /// @dev A name with no registry record has nothing to clear, because records and subnames can
+    ///      only be written for a node the registry knows, and the registry admits no clear for a
+    ///      node it holds no record of. Such a name is skipped, so it still releases, redeems and
+    ///      reclaims as it always could.
     /// @param tokenId Token in custody; its node is `bytes32(tokenId)`.
     function _clearName(uint256 tokenId) internal {
-        IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY)).clear(bytes32(tokenId));
+        IDotnsRegistry registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
+        bytes32 node = bytes32(tokenId);
+        if (registry.recordExists(node)) registry.clear(node);
     }
 
     /// @notice Returns the configured registrar from the protocol registry.
