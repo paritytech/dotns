@@ -33,7 +33,30 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
-    uint256[50] private __gap;
+    /// @notice Versions that let a node, or everything beneath it, be cleared at constant cost.
+    /// @dev Neither records nor subnames can be listed, so clearing never visits them. It bumps a
+    ///      version instead, and readers compare against it:
+    ///      - `records` is the version a node's resolver records are stamped with. Bumping it makes
+    ///        every record of the node read as unset.
+    ///      - `subnames` is the version a new child is created under. Bumping it makes every child,
+    ///        and through them every deeper subname, stop resolving.
+    ///      - `parentSubnames` is the parent's `subnames` at the moment this subname was created.
+    ///      Kept apart from `records` because @custom:function setOwner rewrites a whole `Record`,
+    ///      and a version reset to zero would bring back every record written under it.
+    struct NodeVersions {
+        uint64 records;
+        uint64 subnames;
+        uint64 parentSubnames;
+    }
+
+    /// @notice Node => its versions.
+    mapping(bytes32 node => NodeVersions versions) private _versions;
+
+    /// @notice Subname => its parent. Zero for tokenised names, and for a subname created before
+    ///         parents were recorded until it is linked (@custom:function linkSubname).
+    mapping(bytes32 node => bytes32 parent) private _parentOf;
+
+    uint256[48] private __gap;
 
     /// @notice Restricts access to the current owner of `node`.
     modifier authorised(bytes32 node) {
@@ -100,7 +123,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
 
         Record storage existing = records[subnode];
         address reverseResolver = protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER);
-        if (existing.exists) {
+        _linkIfUnlinked(subnode, parentNode);
+        if (existing.exists && _isLive(subnode)) {
             address previousOwner = existing.owner;
             // Reset the resolver pointer on reassignment so the prior subnode owner's resolver
             // (and any malicious wiring they staged before losing the subnode) cannot be inherited
@@ -120,7 +144,16 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
                 _writeSubnodeToStore(newOwner, subnode, fullName);
             }
         } else {
+            // A subname still on record but cut off by a clear above it is created again from
+            // nothing: bumping its own versions keeps the records and subnames it held before out
+            // of reach of the new holder, who may well be the same address.
+            if (existing.exists) {
+                _clearRecordVersion(subnode);
+                _clearSubnameVersion(subnode);
+            }
             records[subnode] = Record({owner: newOwner, resolver: reverseResolver, exists: true});
+            _parentOf[subnode] = parentNode;
+            _versions[subnode].parentSubnames = _versions[parentNode].subnames;
             if (record.persist) {
                 string memory fullName =
                     string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
@@ -178,11 +211,72 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
 
         bytes32 subnode =
             LabelUtils.namehashUnder(record.parentNode, LabelUtils.labelhash(subLabel));
+        _linkIfUnlinked(subnode, record.parentNode);
         Record storage existing = records[subnode];
-        require(existing.exists, NotAuthorised());
+        require(existing.exists && _isLive(subnode), NotAuthorised());
 
         existing.resolver = record.resolver;
         emit NewResolver(subnode, record.resolver);
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    function clearRecords(bytes32 node) external override authorised(node) {
+        _clearRecords(node);
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    function clearSubnames(bytes32 node) external override authorised(node) {
+        _clearSubnameVersion(node);
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    function clear(bytes32 node) external override authorised(node) {
+        _clearRecords(node);
+        _clearSubnameVersion(node);
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    function deleteSubname(
+        bytes32 parentNode,
+        bytes32 labelhash
+    )
+        external
+        override
+        authorised(parentNode)
+    {
+        bytes32 subnode = LabelUtils.namehashUnder(parentNode, labelhash);
+        _linkIfUnlinked(subnode, parentNode);
+        Record storage existing = records[subnode];
+        require(existing.exists && _isLive(subnode), SubnameNotFound(subnode));
+
+        // A zero owner with `exists` unset is what a node that was never created looks like, so
+        // every read treats the subname as absent and every deeper subname fails its walk here.
+        existing.owner = address(0);
+        existing.resolver = address(0);
+        existing.exists = false;
+        _clearRecordVersion(subnode);
+        _clearSubnameVersion(subnode);
+
+        emit NewOwner(parentNode, labelhash, address(0));
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    function linkSubname(bytes32 parentNode, bytes32 labelhash) external override {
+        bytes32 subnode = LabelUtils.namehashUnder(parentNode, labelhash);
+        Record storage existing = records[subnode];
+        require(existing.exists && existing.owner != address(0), SubnameNotFound(subnode));
+        _linkIfUnlinked(subnode, parentNode);
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    function recordVersion(bytes32 node)
+        external
+        view
+        override
+        returns (bool live, uint64 version)
+    {
+        live = _isLive(node);
+        version = _versions[node].records;
     }
 
     /// @inheritdoc IDotnsRegistry
@@ -192,7 +286,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         // collapsing the lookup to a single SLOAD. The slower `exists` SLOAD only runs on the
         // tokenised-or-missing branch.
         address storedOwner = record.owner;
-        if (storedOwner != address(0)) return storedOwner;
+        if (storedOwner != address(0)) return _isLive(node) ? storedOwner : address(0);
         if (!record.exists) return address(0);
         IDotnsRegistrar registrar = IDotnsRegistrar(protocolRegistry.get(DotnsConstants.REGISTRAR));
         return registrar.ownerOf(uint256(node));
@@ -200,12 +294,12 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
 
     /// @inheritdoc IDotnsRegistry
     function resolver(bytes32 node) external view override returns (address) {
-        return records[node].resolver;
+        return _isLive(node) ? records[node].resolver : address(0);
     }
 
     /// @inheritdoc IDotnsRegistry
     function recordExists(bytes32 node) external view override returns (bool) {
-        return records[node].exists;
+        return records[node].exists && _isLive(node);
     }
 
     /// @inheritdoc IDotnsRegistry
@@ -290,7 +384,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         // subnode path saves one slot read.
         address storedOwner = record.owner;
         if (storedOwner != address(0)) {
-            return storedOwner == account;
+            return storedOwner == account && _isLive(node);
         }
 
         if (!record.exists) return false;
@@ -303,6 +397,64 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         // the single-token approval so the common case terminates on one STATICCALL.
         if (registrar.isApprovedForAll(tokenOwner, account)) return true;
         return registrar.getApproved(tokenId) == account;
+    }
+
+    /// @notice Returns whether `node` currently resolves.
+    /// @dev A tokenised name, or a node that was never created or was deleted, carries a zero
+    ///      stored owner, and resolves exactly when its record exists. A subname resolves while the
+    ///      subname version it was created under is still its parent's, and its parent resolves in
+    ///      turn, so the walk ends at the tokenised name above it. Clearing therefore costs the
+    ///      same at any depth, and the depth is paid on reads instead. A subname with no recorded
+    ///      parent predates parent tracking, and ends the walk as resolving until @custom:function
+    ///      linkSubname or a write through its parent links it.
+    /// @param node Node identifier.
+    /// @return live True when `node` resolves.
+    function _isLive(bytes32 node) internal view returns (bool live) {
+        while (true) {
+            Record storage record = records[node];
+            if (record.owner == address(0)) return record.exists;
+
+            bytes32 parent = _parentOf[node];
+            if (parent == bytes32(0)) return true;
+            if (_versions[node].parentSubnames != _versions[parent].subnames) return false;
+            node = parent;
+        }
+    }
+
+    /// @notice Links `subnode` to `parentNode` when it is a subname with no recorded parent.
+    /// @dev The caller derives `subnode` from `parentNode`, which is what proves the parent. The
+    ///      subname is linked under its parent's first subname version, which is the version it
+    ///      was created under: every subname without a recorded parent was created before any
+    ///      clear could happen.
+    /// @param subnode The subname.
+    /// @param parentNode Its parent.
+    function _linkIfUnlinked(bytes32 subnode, bytes32 parentNode) internal {
+        if (records[subnode].owner == address(0) || _parentOf[subnode] != bytes32(0)) return;
+        _parentOf[subnode] = parentNode;
+        emit SubnameLinked(subnode, parentNode);
+    }
+
+    /// @notice Clears every record of `node` and returns its resolver pointer to the default.
+    /// @param node Node to clear.
+    function _clearRecords(bytes32 node) internal {
+        _clearRecordVersion(node);
+        address reverseResolver = protocolRegistry.get(DotnsConstants.REVERSE_RESOLVER);
+        records[node].resolver = reverseResolver;
+        emit NewResolver(node, reverseResolver);
+    }
+
+    /// @notice Bumps the record version of `node`.
+    /// @param node Node identifier.
+    function _clearRecordVersion(bytes32 node) internal {
+        uint64 version = ++_versions[node].records;
+        emit RecordsCleared(node, version);
+    }
+
+    /// @notice Bumps the subname version of `node`.
+    /// @param node Node identifier.
+    function _clearSubnameVersion(bytes32 node) internal {
+        uint64 version = ++_versions[node].subnames;
+        emit SubnamesCleared(node, version);
     }
 
     /// @notice Internal check for registrar-authorised controller privileges.
