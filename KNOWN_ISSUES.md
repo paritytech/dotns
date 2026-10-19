@@ -8,6 +8,7 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 | :- | :---- | :--- | :------------ |
 | 1 | Deferred LabelStore deployment | Runtime | Runtime allows root-origin contract deployment |
 | 2 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
+| 3 | Clearing hides records rather than erasing them | Current implementation | Deliberate; no change planned |
 
 ## 1. Deferred LabelStore deployment
 
@@ -30,3 +31,17 @@ The gateway path does not write a dedicated user-status mapping. It materialises
 **Resolution:** a dedicated status mapping could be added if a use case requires it; the current design is deliberate, not a defect.
 
 See [README → DotnsPopController](./README.md#dotnspopcontroller).
+
+## 3. Clearing hides records rather than erasing them
+
+**Type:** current implementation.
+
+A name's text records and its subnames cannot be listed on chain, so clearing a name, on release or on demand, never visits them. It bumps a version, and every read compares against it. The cleared bytes stay in storage, unreachable, and their storage deposit is not refunded; a later write to the same record reuses the slot. A cleared subname also keeps its row in its holder's `LabelStore`, which has no delete path, so a consumer listing a holder's names must check each one against `DotnsRegistry.owner`, as it already must after a transfer.
+
+Subnames created before the registry recorded parents are reached by a clear above them only once they are linked (`linkSubname`, permissionless). Until then a clear above them leaves them resolving.
+
+**Workaround:** run the backfill in [DEPLOYMENTS.md](./DEPLOYMENTS.md#upgrading-to-record-and-subname-clearing) right after the registry upgrade, so every existing subname is linked before anything is cleared.
+
+**Resolution:** deliberate. Visiting every record and subname would make a clear cost grow without bound with what the name holds.
+
+See [README → Clearing records and subnames](./README.md#clearing-records-and-subnames).
