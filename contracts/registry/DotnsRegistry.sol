@@ -188,8 +188,9 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         // Nor does it cover the nodes beneath: a subname carries its own owner in `records`,
         // and `_isAuthorised` returns on that owner before it ever consults the registrar, so a
         // seller keeps write authority over every subname whose stored owner is still the
-        // seller, until the buyer reassigns each one through `setSubnodeOwner`. A subname
-        // created for someone else stays with that owner and leaves the seller no write path.
+        // seller, until the buyer reassigns or deletes each one, or clears them all through
+        // `clearSubnames`. A subname created for someone else stays with that owner and leaves
+        // the seller no write path.
         // The set is derivable from this contract's `NewOwner` events, which index the parent.
         // Owner remains the zero sentinel so reads delegate to the registrar's ERC-721 holder.
         records[node] = Record({
