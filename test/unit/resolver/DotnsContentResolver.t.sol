@@ -37,7 +37,7 @@ contract DotnsContentResolverTests is BaseDotns {
         string memory textValue = "bafytextcid1";
 
         vm.expectEmit(true, true, false, true);
-        emit IDotnsContentResolver.TextUpdated(node, textKey, textKey, textValue);
+        emit IDotnsContentResolver.TextUpdated(node, textKey, textValue);
 
         vm.startPrank(nameOwner);
         dotnsContentResolver.setText(node, textKey, textValue);
@@ -65,7 +65,7 @@ contract DotnsContentResolverTests is BaseDotns {
         string memory textValue = "operatorCid";
 
         vm.expectEmit(true, true, false, true);
-        emit IDotnsContentResolver.TextUpdated(node, textKey, textKey, textValue);
+        emit IDotnsContentResolver.TextUpdated(node, textKey, textValue);
 
         vm.startPrank(operator);
         dotnsContentResolver.setText(node, textKey, textValue);
@@ -74,8 +74,9 @@ contract DotnsContentResolverTests is BaseDotns {
         assertEq(dotnsContentResolver.text(node, textKey), textValue);
     }
 
-    /// @notice The text key is recoverable from the log alone, so an indexer can list a node's
-    ///         keys without knowing them in advance.
+    /// @notice Every text write logs both events: `TextUpdated`, unchanged for consumers that
+    ///         filter on it, and `TextChanged`, from which the key is recoverable without knowing
+    ///         it in advance.
     function test_set_text_logs_the_key_readably() public {
         bytes32 node = _register("textrecord03", ed, IPopRules.PopStatus.NoStatus);
 
@@ -84,12 +85,22 @@ contract DotnsContentResolverTests is BaseDotns {
         dotnsContentResolver.setText(node, "com.twitter", "@dotns");
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertEq(logs.length, 1);
-        assertEq(logs[0].topics[0], IDotnsContentResolver.TextUpdated.selector);
-        assertEq(logs[0].topics[1], node);
-        assertEq(logs[0].topics[2], keccak256("com.twitter"), "the indexed copy is the key hash");
+        assertEq(logs.length, 2);
 
-        (string memory key, string memory value) = abi.decode(logs[0].data, (string, string));
+        assertEq(logs[0].topics[0], IDotnsContentResolver.TextUpdated.selector);
+        assertEq(
+            logs[0].topics[0],
+            keccak256("TextUpdated(bytes32,string,string)"),
+            "the TextUpdated signature consumers filter on"
+        );
+        assertEq(logs[0].topics[1], node);
+        assertEq(logs[0].topics[2], keccak256("com.twitter"));
+        assertEq(abi.decode(logs[0].data, (string)), "@dotns");
+
+        assertEq(logs[1].topics[0], IDotnsContentResolver.TextChanged.selector);
+        assertEq(logs[1].topics[1], node);
+        assertEq(logs[1].topics[2], keccak256("com.twitter"), "the indexed copy is the key hash");
+        (string memory key, string memory value) = abi.decode(logs[1].data, (string, string));
         assertEq(key, "com.twitter", "the data copy is the key itself");
         assertEq(value, "@dotns");
     }
