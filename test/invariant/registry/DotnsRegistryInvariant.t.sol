@@ -24,7 +24,8 @@ contract DotnsRegistryInvariantTest is BaseDotns {
             dotnsRegistry,
             dotnsRegistrar,
             popRules,
-            protocolRegistry.tldNode()
+            protocolRegistry.tldNode(),
+            dotnsResolver
         );
 
         vm.deal(address(handler), 1000 ether);
@@ -43,6 +44,7 @@ contract DotnsRegistryInvariantTest is BaseDotns {
         excludeContract(address(dotnsRegistrar));
         excludeContract(address(popRules));
         excludeContract(address(storeFactory));
+        excludeContract(address(dotnsResolver));
 
         _seedCoverage();
     }
@@ -59,6 +61,23 @@ contract DotnsRegistryInvariantTest is BaseDotns {
             if (handler.dottedSubLabelAttempts() > 0 && handler.subnodeCount() > 0) break;
             handler.registerAndCreateSubnode(seed, seed, seed);
         }
+
+        // A nested subnode with a record, and a cleared subtree, so every run starts with both a
+        // live chain and a cleared one in front of the invariants.
+        uint256 before = handler.subnodeCount();
+        for (uint256 seed; seed < 64 && handler.subnodeCount() == before; ++seed) {
+            handler.createNestedSubnode(0, seed, seed);
+        }
+        assertGt(handler.subnodeCount(), before, "seeding created no nested subnode");
+        handler.writeAddress(before, 1);
+
+        before = handler.subnodeCount();
+        for (uint256 seed; seed < 64 && handler.subnodeCount() == before; ++seed) {
+            handler.registerAndCreateSubnode(seed, seed + 1, seed);
+        }
+        assertGt(handler.subnodeCount(), before, "seeding created no subnode to clear");
+        handler.writeAddress(before, 2);
+        handler.clearBaseSubnames(handler.getRegisteredLabels().length - 1);
     }
 
     /// @notice Fails the run if the campaign never created a subnode or never offered a dotted
@@ -70,6 +89,7 @@ contract DotnsRegistryInvariantTest is BaseDotns {
     ///      actually been put in front of the registry.
     function afterInvariant() public view {
         assertGt(handler.subnodeCount(), 0, "campaign created no subnode");
+        assertGt(handler.clearCount(), 0, "campaign cleared nothing");
         assertGt(handler.dottedSubLabelAttempts(), 0, "campaign offered no dotted sub-label");
         assertEq(
             handler.dottedSubLabelRejections(),
@@ -155,24 +175,52 @@ contract DotnsRegistryInvariantTest is BaseDotns {
         }
     }
 
-    /// @notice The registry's recorded subnode owner must equal the handler's tracked owner
-    ///         for every subnode created during the run.
+    /// @notice A subnode that resolves reports the tracked owner, who is authorised for it; a
+    ///         subnode cleared from above, or deleted, reports no owner and authorises nobody.
     function invariant_subnode_owner_authorized() public view {
         bytes32[] memory subnodes = handler.getSubnodeHashes();
         address[] memory owners = handler.getSubnodeOwners();
 
         for (uint256 i; i < subnodes.length; ++i) {
-            address currentOwner = dotnsRegistry.owner(subnodes[i]);
-            assertEq(currentOwner, owners[i], "Registry owner must match tracked owner");
+            bool live = handler.isLive(i);
+            assertEq(
+                dotnsRegistry.owner(subnodes[i]),
+                live ? owners[i] : address(0),
+                "registry owner must match the model"
+            );
+            assertEq(
+                dotnsRegistry.isAuthorised(subnodes[i], owners[i]),
+                live,
+                "only a subnode that resolves carries authority"
+            );
         }
     }
 
-    /// @notice Once a subnode has been created it must always report `recordExists() == true`.
-    function invariant_subnodes_always_exist() public view {
+    /// @notice A subnode exists exactly while nothing above it has been cleared or deleted since
+    ///         it was created.
+    function invariant_subnodes_exist_exactly_while_live() public view {
         bytes32[] memory subnodes = handler.getSubnodeHashes();
 
         for (uint256 i; i < subnodes.length; ++i) {
-            assertTrue(dotnsRegistry.recordExists(subnodes[i]), "Subnode must exist after creation");
+            assertEq(
+                dotnsRegistry.recordExists(subnodes[i]),
+                handler.isLive(i),
+                "subnode existence must match the model"
+            );
+        }
+    }
+
+    /// @notice A subnode's address record reads as written while the subnode resolves and its
+    ///         records were not cleared, and as unset otherwise, at every depth.
+    function invariant_address_records_follow_clears() public view {
+        bytes32[] memory subnodes = handler.getSubnodeHashes();
+
+        for (uint256 i; i < subnodes.length; ++i) {
+            assertEq(
+                dotnsResolver.addressOf(subnodes[i]),
+                handler.expectedAddressAt(i),
+                "address record must match the model"
+            );
         }
     }
 }

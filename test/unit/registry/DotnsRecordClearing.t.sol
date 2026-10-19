@@ -408,4 +408,81 @@ contract DotnsRecordClearingTest is BaseDotns {
         assertEq(dotnsRegistry.parentOf(grandchildNode), childNode);
         assertEq(dotnsRegistry.parentOf(node), bytes32(0), "a tokenised name has no parent");
     }
+
+    // names whose release did not clear them, and names with no registry record
+
+    /// @dev Storage slot of `DotnsRegistry._versions`. Zeroing a node's entry reproduces a name
+    ///      released by an escrow that did not clear on release.
+    uint256 internal constant VERSIONS_SLOT = 2;
+
+    /// @dev Storage slot of `DotnsRegistry.records`.
+    uint256 internal constant RECORDS_SLOT = 0;
+
+    function _releaseWithoutClearing() internal {
+        _release();
+        vm.store(address(dotnsRegistry), keccak256(abi.encode(node, VERSIONS_SLOT)), bytes32(0));
+        _assertRecordsSet(node, "uncleared name in custody");
+        assertEq(dotnsRegistry.owner(childNode), tiago, "uncleared subname in custody");
+    }
+
+    function test_version_slot_constant_points_at_the_versions_mapping() public {
+        _release();
+        assertTrue(
+            vm.load(address(dotnsRegistry), keccak256(abi.encode(node, VERSIONS_SLOT)))
+                != bytes32(0)
+        );
+    }
+
+    function test_redeem_clears_a_name_its_release_did_not_clear() public {
+        _releaseWithoutClearing();
+
+        vm.prank(ed);
+        dotnsNameEscrow.redeem(tokenId);
+
+        _assertRecordsUnset(node, "name");
+        _assertSubnameGone(childNode, "child");
+        _assertSubnameGone(grandchildNode, "grandchild");
+    }
+
+    function test_reclaim_clears_a_name_its_release_did_not_clear() public {
+        _releaseWithoutClearing();
+        vm.warp(dotnsNameEscrow.getReleasePosition(tokenId).redeemableUntil);
+
+        _register(LABEL, leonardo, IPopRules.PopStatus.NoStatus);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
+        _assertRecordsUnset(node, "name");
+        _assertSubnameGone(childNode, "child");
+    }
+
+    function test_clearReleasedName_clears_a_name_still_in_custody() public {
+        _releaseWithoutClearing();
+
+        dotnsNameEscrow.clearReleasedName(tokenId);
+
+        _assertRecordsUnset(node, "name");
+        _assertSubnameGone(childNode, "child");
+    }
+
+    function test_release_redeem_and_reclaim_still_work_for_a_name_with_no_registry_record()
+        public
+    {
+        // A token whose registry record is missing: owner, resolver and the exists flag zeroed.
+        bytes32 base = keccak256(abi.encode(node, RECORDS_SLOT));
+        vm.store(address(dotnsRegistry), base, bytes32(0));
+        vm.store(address(dotnsRegistry), bytes32(uint256(base) + 1), bytes32(0));
+        assertFalse(dotnsRegistry.recordExists(node));
+
+        _release();
+        assertEq(dotnsRegistrar.ownerOf(tokenId), address(dotnsNameEscrow));
+
+        vm.prank(ed);
+        dotnsNameEscrow.redeem(tokenId);
+        assertEq(dotnsRegistrar.ownerOf(tokenId), ed);
+
+        _release();
+        vm.warp(dotnsNameEscrow.getReleasePosition(tokenId).redeemableUntil);
+        _register(LABEL, leonardo, IPopRules.PopStatus.NoStatus);
+        assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
+    }
 }
