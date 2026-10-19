@@ -41,6 +41,9 @@ interface IDotnsContentResolver {
     function setContenthash(bytes32 node, bytes calldata hash) external;
 
     /// @notice Returns the content hash associated with a node.
+    /// @dev A record reads as unset once the node is cleared (@custom:function
+    ///      IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+    ///      even though the bytes written before stay in storage.
     /// @param node The node to query.
     /// @return hash The stored content hash bytes, or empty if unset.
     function contenthash(bytes32 node) external view returns (bytes memory hash);
@@ -56,6 +59,9 @@ interface IDotnsContentResolver {
     function setText(bytes32 node, string calldata key, string calldata value) external;
 
     /// @notice Returns a text record for a node.
+    /// @dev A record reads as unset once the node is cleared (@custom:function
+    ///      IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+    ///      even though the bytes written before stay in storage.
     /// @param node The node to query.
     /// @param key Text record key.
     /// @return value Stored text value, or empty string if unset.
