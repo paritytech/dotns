@@ -21,6 +21,10 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 /// @dev Writes are gated on node ownership in the forward registry, not on a
 ///      privileged writer address. Address records describe where a name points
 ///      and only the current node owner has the authority to set that target.
+///      Each record is stamped with the node's record version from the registry
+///      (@custom:function IDotnsRegistry.recordVersion), and a read returns the zero address
+///      unless the node still resolves and the stamp is current. That is how a cleared name, or
+///      a name beneath a cleared one, stops resolving without its records being visited.
 /// @custom:security-contact admin@parity.io
 contract DotnsResolver is
     Initializable,
@@ -39,12 +43,10 @@ contract DotnsResolver is
     /// @notice Node => resolved address.
     mapping(bytes32 node => address owner) private addresses;
 
-    /// @notice Restricts access to the owner of `node` as recorded in the registry.
-    /// @param node Node identifier.
-    modifier onlyNodeOwner(bytes32 node) {
-        _onlyNodeOwner(node);
-        _;
-    }
+    /// @notice Node => registry record version its address was written under.
+    /// @dev Zero for every record written before stamps existed, which matches the version every
+    ///      node starts at, so those records stay readable until the node is first cleared.
+    mapping(bytes32 node => uint64 version) private addressVersions;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -71,13 +73,18 @@ contract DotnsResolver is
     }
 
     /// @inheritdoc IDotnsResolver
-    function setAddress(bytes32 node, address value) external override onlyNodeOwner(node) {
+    function setAddress(bytes32 node, address value) external override {
+        IDotnsRegistry registry = _onlyNodeOwner(node);
+        (, uint64 version) = registry.recordVersion(node);
         addresses[node] = value;
+        if (addressVersions[node] != version) addressVersions[node] = version;
         emit AddressSet(node, value);
     }
 
     /// @inheritdoc IDotnsResolver
     function addressOf(bytes32 node) external view override returns (address value) {
+        (bool live, uint64 version) = _registry().recordVersion(node);
+        if (!live || addressVersions[node] != version) return address(0);
         return addresses[node];
     }
 
@@ -88,12 +95,19 @@ contract DotnsResolver is
     }
 
     /// @notice Internal ownership check for a registry node.
-    /// @dev Resolves the registry lazily through `protocolRegistry` so a registry
-    ///      upgrade or rewire is picked up automatically without a resolver upgrade.
     /// @param node Node identifier.
-    function _onlyNodeOwner(bytes32 node) internal view {
-        IDotnsRegistry _registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
-        require(_registry.owner(node) == msg.sender, NotAuthorised(node, msg.sender));
+    /// @return registry The forward registry, returned so the caller reads it once.
+    function _onlyNodeOwner(bytes32 node) internal view returns (IDotnsRegistry registry) {
+        registry = _registry();
+        require(registry.owner(node) == msg.sender, NotAuthorised(node, msg.sender));
+    }
+
+    /// @notice Returns the forward registry.
+    /// @dev Resolved lazily through `protocolRegistry` so a registry upgrade or rewire is picked
+    ///      up automatically without a resolver upgrade.
+    /// @return registry The forward registry.
+    function _registry() internal view returns (IDotnsRegistry registry) {
+        registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol

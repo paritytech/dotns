@@ -27,6 +27,9 @@ interface IDotnsResolver {
     function setAddress(bytes32 node, address value) external;
 
     /// @notice Returns the resolved address for a node.
+    /// @dev A record reads as unset once the node is cleared (@custom:function
+    ///      IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+    ///      even though the bytes written before stay in storage.
     /// @param node The node identifier.
     /// @return value The resolved address, or zero if unset.
     function addressOf(bytes32 node) external view returns (address value);
