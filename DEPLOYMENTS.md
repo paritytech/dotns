@@ -238,6 +238,38 @@ cast call "$ESCROW_PROXY" 'releasedTokens(uint256,uint256)(uint256[])' 0 200 --r
 
 If that set is non-empty and any of it matters, the options are to let the holders reclaim or withdraw before the upgrade, or to notify them that the grace period will not cover their name.
 
+## Upgrading to record and subname clearing
+
+Releasing a name clears its records and subnames, and owners can clear them on demand. Four proxies take part. The registry holds the versions every clear bumps, the two record resolvers stamp each record with the version it was written under, and the escrow clears a name as it takes custody on release. None of them gains a configuration value, so a bare `upgradeTo` is enough for each, but the order matters.
+
+1. **Registry, then both resolvers.** The resolvers read `recordVersion` from the registry on every read and write, so they revert against a registry that lacks it. Upgrade them in the same session.
+2. **Link the existing subnames.** A subname created before this upgrade has no recorded parent, and a clear above it does not reach it until it is linked. Every level is linked separately, because an unlinked subname cannot name its parent. `linkSubname` is permissionless and the script below finds every candidate from the registry's `NewOwner` events.
+3. **Escrow.** `release` calls `clear` on the registry, so an escrow upgraded before the registry reverts on every release.
+4. **Clear the names already in custody.** Release clears a name as it takes custody, so names released before step 3 still carry their records. `clearReleasedName` is permissionless; the same script covers it with `--escrow`.
+
+Records need no migration. Every node starts at record version zero, which is also the stamp every record written before the upgrade carries, so existing records stay readable until their node is first cleared.
+
+```bash
+# dry run: lists what is still to link and what sits in custody
+bun scripts/js/link-subnames.mjs --rpc-url "$RPC_URL" \
+  --registry "$REGISTRY_PROXY" --escrow "$ESCROW_PROXY"
+
+# submit, from any funded key
+PRIVATE_KEY=0x... bun scripts/js/link-subnames.mjs --rpc-url "$RPC_URL" \
+  --registry "$REGISTRY_PROXY" --escrow "$ESCROW_PROXY" --send
+```
+
+Pass `--step <blocks>` when the RPC endpoint caps the block range of `eth_getLogs`, and `--from-block` to start at the registry's deployment block. Both jobs are safe to repeat. A clear that lands between steps 1 and 2 is not lost: a subname linked after its parent was cleared reads as cleared from the moment it is linked. Until then it still resolves, which is why linking follows the registry upgrade directly.
+
+Verify before considering the upgrade done. A second dry run should report nothing left to link, and:
+
+```bash
+cast call "$REGISTRY_PROXY" 'recordVersion(bytes32)(bool,uint64)' "$NODE" --rpc-url "$RPC_URL"   # a name never cleared: true, 0
+cast call "$REGISTRY_PROXY" 'MAX_SUBNAME_DEPTH()(uint256)' --rpc-url "$RPC_URL"   # expect 8
+```
+
+Two consumer-facing changes ship with this upgrade. `DotnsContentResolver.TextUpdated` gains a readable `key` argument, which changes the event's signature, so indexers and SDKs that filter on the old topic must move to the new one. And the registry emits `RecordsCleared` and `SubnamesCleared`: a consumer that caches records or subnames must drop the node's records, or everything beneath it, on each.
+
 ## Deployment pipeline
 
 The fresh-deploy pipeline is split across five stages:
