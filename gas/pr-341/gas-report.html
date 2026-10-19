@@ -1,0 +1,1282 @@
+<!DOCTYPE html><html lang="en" class="dark"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dotNS Gas Report</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class'}</script>
+</head>
+<body class="bg-gray-950 text-gray-300 min-h-screen">
+<div class="max-w-6xl mx-auto px-4 py-8">
+<div class="mb-8">
+<h1 class="text-2xl font-bold text-white mb-1">dotNS Gas Report</h1>
+<p class="text-sm text-gray-500">Generated 2026-10-19 10:09 UTC | 9 contracts</p>
+</div>
+<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<span class="font-semibold text-white">DotnsContentResolver</span>
+<span class="text-xs text-gray-500">Deploy: 1,161,908 <span class="text-red-400">(+146,490)</span></span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Function</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Master (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Current (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Diff</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Min</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Max</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Calls</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">contenthash</td>
+<td class="py-2 px-3 font-mono text-right">7,571</td>
+<td class="py-2 px-3 font-mono text-right">36,614</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+29,043</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">30,252</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">46,303</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">59</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">initialize</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">677</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">isApprovedForAll</td>
+<td class="py-2 px-3 font-mono text-right">2,854</td>
+<td class="py-2 px-3 font-mono text-right">2,854</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,854</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,854</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setApprovalForAll</td>
+<td class="py-2 px-3 font-mono text-right">24,563</td>
+<td class="py-2 px-3 font-mono text-right">24,563</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">24,563</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">24,563</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setContenthash</td>
+<td class="py-2 px-3 font-mono text-right">90,726</td>
+<td class="py-2 px-3 font-mono text-right">74,147</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-16,579</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">55,753</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">116,575</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">91</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setText</td>
+<td class="py-2 px-3 font-mono text-right">67,697</td>
+<td class="py-2 px-3 font-mono text-right">70,860</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+3,163</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">65,465</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">75,910</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">78</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">text</td>
+<td class="py-2 px-3 font-mono text-right">3,326</td>
+<td class="py-2 px-3 font-mono text-right">35,928</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+32,602</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">30,461</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">46,611</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">46</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">version</td>
+<td class="py-2 px-3 font-mono text-right">13,397</td>
+<td class="py-2 px-3 font-mono text-right">13,445</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+48</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,445</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,445</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<span class="font-semibold text-white">DotnsProtocolRegistry</span>
+<span class="text-xs text-gray-500">Deploy: 1,118,912 <span class="text-gray-500">(0)</span></span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Function</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Master (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Current (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Diff</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Min</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Max</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Calls</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">expectedCodehash</td>
+<td class="py-2 px-3 font-mono text-right">2,651</td>
+<td class="py-2 px-3 font-mono text-right">2,651</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,651</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,651</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">7</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">get</td>
+<td class="py-2 px-3 font-mono text-right">1,743</td>
+<td class="py-2 px-3 font-mono text-right">1,747</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+4</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">536</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,536</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">158,660</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">initialize</td>
+<td class="py-2 px-3 font-mono text-right">2,284</td>
+<td class="py-2 px-3 font-mono text-right">2,198</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-86</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">95,244</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">694</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">isRegisteredAddress</td>
+<td class="py-2 px-3 font-mono text-right">2,120</td>
+<td class="py-2 px-3 font-mono text-right">2,108</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-12</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,772</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4,550</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">owner</td>
+<td class="py-2 px-3 font-mono text-right">2,485</td>
+<td class="py-2 px-3 font-mono text-right">2,485</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,485</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,485</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">protocolVersion</td>
+<td class="py-2 px-3 font-mono text-right">2,806</td>
+<td class="py-2 px-3 font-mono text-right">2,806</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,799</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,808</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">20</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">proxiableUUID</td>
+<td class="py-2 px-3 font-mono text-right">309</td>
+<td class="py-2 px-3 font-mono text-right">309</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">309</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">309</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">remove</td>
+<td class="py-2 px-3 font-mono text-right">13,835</td>
+<td class="py-2 px-3 font-mono text-right">13,835</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,567</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">19,556</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">8</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">set</td>
+<td class="py-2 px-3 font-mono text-right">7,342</td>
+<td class="py-2 px-3 font-mono text-right">7,123</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-219</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">48,836</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">11,386</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setExpectedCodehash</td>
+<td class="py-2 px-3 font-mono text-right">20,100</td>
+<td class="py-2 px-3 font-mono text-right">20,100</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,639</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">28,403</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">8</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setProtocolVersion</td>
+<td class="py-2 px-3 font-mono text-right">16,638</td>
+<td class="py-2 px-3 font-mono text-right">16,638</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,666</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">29,845</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">tld</td>
+<td class="py-2 px-3 font-mono text-right">2,317</td>
+<td class="py-2 px-3 font-mono text-right">2,313</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-4</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,818</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">14,143</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">tldNode</td>
+<td class="py-2 px-3 font-mono text-right">1,714</td>
+<td class="py-2 px-3 font-mono text-right">1,715</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+1</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,248</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">23,967</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">upgradeToAndCall</td>
+<td class="py-2 px-3 font-mono text-right">10,660</td>
+<td class="py-2 px-3 font-mono text-right">10,660</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10,660</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10,660</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">version</td>
+<td class="py-2 px-3 font-mono text-right">2,891</td>
+<td class="py-2 px-3 font-mono text-right">2,891</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,887</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,896</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<span class="font-semibold text-white">DotnsRegistrar</span>
+<span class="text-xs text-gray-500">Deploy: 2,606,047 <span class="text-red-400">(+25,893)</span></span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Function</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Master (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Current (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Diff</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Min</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Max</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Calls</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">addController</td>
+<td class="py-2 px-3 font-mono text-right">7,618</td>
+<td class="py-2 px-3 font-mono text-right">7,408</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-210</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">26,202</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1,889</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">approve</td>
+<td class="py-2 px-3 font-mono text-right">26,788</td>
+<td class="py-2 px-3 font-mono text-right">26,790</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+2</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">9,745</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">26,845</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">311</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">available</td>
+<td class="py-2 px-3 font-mono text-right">2,991</td>
+<td class="py-2 px-3 font-mono text-right">2,994</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+3</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,924</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">26,004</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4,857</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">balanceOf</td>
+<td class="py-2 px-3 font-mono text-right">2,793</td>
+<td class="py-2 px-3 font-mono text-right">2,793</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,793</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,793</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">controllers</td>
+<td class="py-2 px-3 font-mono text-right">1,630</td>
+<td class="py-2 px-3 font-mono text-right">1,639</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+9</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">985</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,985</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">17,290</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">exists</td>
+<td class="py-2 px-3 font-mono text-right">1,251</td>
+<td class="py-2 px-3 font-mono text-right">1,246</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-5</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">600</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,600</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">7,154</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">getApproved</td>
+<td class="py-2 px-3 font-mono text-right">2,753</td>
+<td class="py-2 px-3 font-mono text-right">2,753</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,750</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4,750</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">576</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">initialize</td>
+<td class="py-2 px-3 font-mono text-right">363</td>
+<td class="py-2 px-3 font-mono text-right">349</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-14</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">117,023</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">680</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">isApprovedForAll</td>
+<td class="py-2 px-3 font-mono text-right">3,230</td>
+<td class="py-2 px-3 font-mono text-right">3,230</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,230</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,230</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">269</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">isSoulbound</td>
+<td class="py-2 px-3 font-mono text-right">2,756</td>
+<td class="py-2 px-3 font-mono text-right">2,756</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,756</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,756</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">8</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">labelOf</td>
+<td class="py-2 px-3 font-mono text-right">27,934</td>
+<td class="py-2 px-3 font-mono text-right">27,934</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,857</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">48,175</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">owner</td>
+<td class="py-2 px-3 font-mono text-right">2,688</td>
+<td class="py-2 px-3 font-mono text-right">2,688</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,688</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,688</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">ownerOf</td>
+<td class="py-2 px-3 font-mono text-right">1,536</td>
+<td class="py-2 px-3 font-mono text-right">1,529</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-7</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">757</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,757</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">14,055</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">quoteTransferFee</td>
+<td class="py-2 px-3 font-mono text-right">89,780</td>
+<td class="py-2 px-3 font-mono text-right">89,780</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">675</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">93,457</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">799</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">register</td>
+<td class="py-2 px-3 font-mono text-right">329,482</td>
+<td class="py-2 px-3 font-mono text-right">330,272</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+790</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,718</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">482,129</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">6,553</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">removeController</td>
+<td class="py-2 px-3 font-mono text-right">7,704</td>
+<td class="py-2 px-3 font-mono text-right">7,704</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,055</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">9,254</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setApprovalForAll</td>
+<td class="py-2 px-3 font-mono text-right">24,863</td>
+<td class="py-2 px-3 font-mono text-right">24,863</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">24,863</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">24,863</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">7</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">supportsInterface</td>
+<td class="py-2 px-3 font-mono text-right">263</td>
+<td class="py-2 px-3 font-mono text-right">263</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">263</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">263</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">transferFrom</td>
+<td class="py-2 px-3 font-mono text-right">517,241</td>
+<td class="py-2 px-3 font-mono text-right">516,957</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-284</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">15,171</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">540,447</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">814</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">upgradeToAndCall</td>
+<td class="py-2 px-3 font-mono text-right">3,279</td>
+<td class="py-2 px-3 font-mono text-right">3,279</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,279</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,279</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">version</td>
+<td class="py-2 px-3 font-mono text-right">13,577</td>
+<td class="py-2 px-3 font-mono text-right">13,577</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,562</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,592</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<span class="font-semibold text-white">DotnsRegistrarController</span>
+<span class="text-xs text-gray-500">Deploy: 2,978,656 <span class="text-gray-500">(0)</span></span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Function</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Master (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Current (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Diff</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Min</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Max</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Calls</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">MAX_ALLOWED_COMMITMENT_AGE</td>
+<td class="py-2 px-3 font-mono text-right">290</td>
+<td class="py-2 px-3 font-mono text-right">290</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">290</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">290</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">available</td>
+<td class="py-2 px-3 font-mono text-right">28,362</td>
+<td class="py-2 px-3 font-mono text-right">28,362</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1,094</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">44,927</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">7</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">commit</td>
+<td class="py-2 px-3 font-mono text-right">63,895</td>
+<td class="py-2 px-3 font-mono text-right">63,896</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+1</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">29,101</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">63,909</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">5,371</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">commitments</td>
+<td class="py-2 px-3 font-mono text-right">2,550</td>
+<td class="py-2 px-3 font-mono text-right">2,550</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,550</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,550</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">6</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">initialize</td>
+<td class="py-2 px-3 font-mono text-right">218</td>
+<td class="py-2 px-3 font-mono text-right">209</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-9</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">47,586</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">680</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">makeCommitment</td>
+<td class="py-2 px-3 font-mono text-right">1,324</td>
+<td class="py-2 px-3 font-mono text-right">1,324</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1,324</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1,324</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">5,371</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">maxCommitmentAge</td>
+<td class="py-2 px-3 font-mono text-right">2,635</td>
+<td class="py-2 px-3 font-mono text-right">2,635</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,635</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,635</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">minCommitmentAge</td>
+<td class="py-2 px-3 font-mono text-right">2,528</td>
+<td class="py-2 px-3 font-mono text-right">2,528</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,528</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,528</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">5,365</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">register</td>
+<td class="py-2 px-3 font-mono text-right">680,394</td>
+<td class="py-2 px-3 font-mono text-right">681,990</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+1,596</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">456</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">812,294</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,794</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">registerReserved</td>
+<td class="py-2 px-3 font-mono text-right">444,925</td>
+<td class="py-2 px-3 font-mono text-right">445,022</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+97</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">9,013</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">692,477</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1,574</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">supportsInterface</td>
+<td class="py-2 px-3 font-mono text-right">277</td>
+<td class="py-2 px-3 font-mono text-right">277</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">261</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">293</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">version</td>
+<td class="py-2 px-3 font-mono text-right">13,508</td>
+<td class="py-2 px-3 font-mono text-right">13,508</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,508</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,508</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<span class="font-semibold text-white">DotnsRegistry</span>
+<span class="text-xs text-gray-500">Deploy: 2,037,104 <span class="text-red-400">(+363,488)</span></span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Function</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Master (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Current (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Diff</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Min</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Max</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Calls</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">MAX_SUBNAME_DEPTH</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">255</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+255</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">255</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">255</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">clear</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">40,919</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+40,919</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">23,869</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">53,969</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">312</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">clearRecords</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">58,859</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+58,859</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">56,850</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">60,869</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">clearSubnames</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">51,646</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+51,646</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">51,646</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">51,646</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">5</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">deleteSubname</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">54,680</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+54,680</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">35,677</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">71,643</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">initialize</td>
+<td class="py-2 px-3 font-mono text-right">215</td>
+<td class="py-2 px-3 font-mono text-right">208</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-7</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">70,807</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">679</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">isAuthorised</td>
+<td class="py-2 px-3 font-mono text-right">11,234</td>
+<td class="py-2 px-3 font-mono text-right">10,332</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-902</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">9,391</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">11,274</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">linkSubname</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">22,214</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+22,214</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,614</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">28,748</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">owner</td>
+<td class="py-2 px-3 font-mono text-right">14,144</td>
+<td class="py-2 px-3 font-mono text-right">18,048</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+3,904</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,576</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">61,127</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,007</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">parentOf</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">2,775</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+2,775</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,775</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,775</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">protocolRegistry</td>
+<td class="py-2 px-3 font-mono text-right">2,500</td>
+<td class="py-2 px-3 font-mono text-right">2,602</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+102</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,602</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,602</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">recordExists</td>
+<td class="py-2 px-3 font-mono text-right">2,693</td>
+<td class="py-2 px-3 font-mono text-right">3,135</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+442</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,886</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">22,843</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1,825</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">recordVersion</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">5,651</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+5,651</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1,661</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">20,450</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">399</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">resolver</td>
+<td class="py-2 px-3 font-mono text-right">2,347</td>
+<td class="py-2 px-3 font-mono text-right">15,130</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+12,783</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4,569</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">22,325</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">300</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setOwner</td>
+<td class="py-2 px-3 font-mono text-right">37,287</td>
+<td class="py-2 px-3 font-mono text-right">37,457</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+170</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10,371</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">58,271</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">6,532</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setResolver</td>
+<td class="py-2 px-3 font-mono text-right">9,150</td>
+<td class="py-2 px-3 font-mono text-right">20,340</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+11,190</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">20,340</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">20,340</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">263</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setSubnodeOwner</td>
+<td class="py-2 px-3 font-mono text-right">213,734</td>
+<td class="py-2 px-3 font-mono text-right">240,879</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+27,145</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">29,121</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">520,183</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,446</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setSubnodeResolver</td>
+<td class="py-2 px-3 font-mono text-right">40,364</td>
+<td class="py-2 px-3 font-mono text-right">43,805</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+3,441</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">30,581</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">60,093</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">version</td>
+<td class="py-2 px-3 font-mono text-right">13,451</td>
+<td class="py-2 px-3 font-mono text-right">13,601</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+150</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,601</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,601</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<span class="font-semibold text-white">DotnsResolver</span>
+<span class="text-xs text-gray-500">Deploy: 757,714 <span class="text-red-400">(+90,818)</span></span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Function</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Master (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Current (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Diff</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Min</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Max</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Calls</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">addressOf</td>
+<td class="py-2 px-3 font-mono text-right">2,537</td>
+<td class="py-2 px-3 font-mono text-right">34,373</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+31,836</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">27,638</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">45,601</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">46</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">initialize</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">677</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setAddress</td>
+<td class="py-2 px-3 font-mono text-right">59,137</td>
+<td class="py-2 px-3 font-mono text-right">67,345</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+8,208</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">30,030</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">73,876</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">80</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">version</td>
+<td class="py-2 px-3 font-mono text-right">13,350</td>
+<td class="py-2 px-3 font-mono text-right">13,350</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,350</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,350</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<span class="font-semibold text-white">DotnsReverseResolver</span>
+<span class="text-xs text-gray-500">Deploy: 1,247,768 <span class="text-gray-500">(0)</span></span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Function</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Master (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Current (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Diff</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Min</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Max</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Calls</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">claimReverseRecord</td>
+<td class="py-2 px-3 font-mono text-right">59,725</td>
+<td class="py-2 px-3 font-mono text-right">61,333</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+1,608</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">45,209</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">73,563</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">7</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">initialize</td>
+<td class="py-2 px-3 font-mono text-right">216</td>
+<td class="py-2 px-3 font-mono text-right">207</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-9</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">70,534</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">679</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">nameOf</td>
+<td class="py-2 px-3 font-mono text-right">17,408</td>
+<td class="py-2 px-3 font-mono text-right">17,297</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-111</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,351</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">57,429</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,927</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">protocolRegistry</td>
+<td class="py-2 px-3 font-mono text-right">2,412</td>
+<td class="py-2 px-3 font-mono text-right">2,412</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,412</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,412</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setReverseName</td>
+<td class="py-2 px-3 font-mono text-right">29,503</td>
+<td class="py-2 px-3 font-mono text-right">29,503</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10,405</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">40,548</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,608</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">version</td>
+<td class="py-2 px-3 font-mono text-right">13,382</td>
+<td class="py-2 px-3 font-mono text-right">13,382</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,382</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,382</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<span class="font-semibold text-white">PopRules</span>
+<span class="text-xs text-gray-500">Deploy: 2,122,534 <span class="text-green-400">(-12)</span></span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Function</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Master (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Current (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Diff</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Min</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Max</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Calls</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">MAX_RESERVATION_TIME</td>
+<td class="py-2 px-3 font-mono text-right">395</td>
+<td class="py-2 px-3 font-mono text-right">395</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">395</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">395</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">classifyName</td>
+<td class="py-2 px-3 font-mono text-right">10,510</td>
+<td class="py-2 px-3 font-mono text-right">10,516</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+6</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,620</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,875</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,408</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">getBaseNameReservation</td>
+<td class="py-2 px-3 font-mono text-right">9,695</td>
+<td class="py-2 px-3 font-mono text-right">9,715</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+20</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">6,985</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">11,009</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">33</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">initialize</td>
+<td class="py-2 px-3 font-mono text-right">108</td>
+<td class="py-2 px-3 font-mono text-right">104</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-4</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">70,634</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">678</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">isBaseName</td>
+<td class="py-2 px-3 font-mono text-right">4,961</td>
+<td class="py-2 px-3 font-mono text-right">4,953</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-8</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4,681</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">7,524</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">518</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">isBaseNameReserved</td>
+<td class="py-2 px-3 font-mono text-right">8,225</td>
+<td class="py-2 px-3 font-mono text-right">8,225</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4,821</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10,173</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">824</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">price</td>
+<td class="py-2 px-3 font-mono text-right">31,374</td>
+<td class="py-2 px-3 font-mono text-right">31,524</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+150</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">19,082</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">46,681</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,082</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">priceWithCheck</td>
+<td class="py-2 px-3 font-mono text-right">35,663</td>
+<td class="py-2 px-3 font-mono text-right">35,685</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+22</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,790</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">52,863</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">4,180</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">priceWithCheckAtVersion</td>
+<td class="py-2 px-3 font-mono text-right">29,418</td>
+<td class="py-2 px-3 font-mono text-right">29,463</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+45</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">11,329</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">32,397</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,259</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">priceWithoutCheck</td>
+<td class="py-2 px-3 font-mono text-right">38,804</td>
+<td class="py-2 px-3 font-mono text-right">38,810</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+6</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">8,667</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">41,043</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">265</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">priceWithoutCheckAtVersion</td>
+<td class="py-2 px-3 font-mono text-right">30,034</td>
+<td class="py-2 px-3 font-mono text-right">30,034</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">28,176</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">30,582</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">526</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">pricingVersion</td>
+<td class="py-2 px-3 font-mono text-right">18,553</td>
+<td class="py-2 px-3 font-mono text-right">18,553</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">18,553</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">18,553</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">5,372</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">releaseBaseName</td>
+<td class="py-2 px-3 font-mono text-right">30,577</td>
+<td class="py-2 px-3 font-mono text-right">30,577</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">21,862</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">40,876</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">41</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">releaseReservationForReclaim</td>
+<td class="py-2 px-3 font-mono text-right">19,652</td>
+<td class="py-2 px-3 font-mono text-right">19,652</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">19,483</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">19,821</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">reserveBaseName</td>
+<td class="py-2 px-3 font-mono text-right">62,080</td>
+<td class="py-2 px-3 font-mono text-right">62,080</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">37,406</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">74,370</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">773</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">reserveBaseNameForPop</td>
+<td class="py-2 px-3 font-mono text-right">57,347</td>
+<td class="py-2 px-3 font-mono text-right">57,339</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-8</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">12,151</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">76,965</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">451</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">setShortNamesEnabled</td>
+<td class="py-2 px-3 font-mono text-right">117</td>
+<td class="py-2 px-3 font-mono text-right">112</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-5</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">9,231</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">687</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">shortNamesEnabled</td>
+<td class="py-2 px-3 font-mono text-right">2,758</td>
+<td class="py-2 px-3 font-mono text-right">2,758</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,758</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,758</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">stripDigits</td>
+<td class="py-2 px-3 font-mono text-right">6,639</td>
+<td class="py-2 px-3 font-mono text-right">6,673</td>
+<td class="py-2 px-3 font-mono text-right text-red-400">+34</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,641</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10,954</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">17</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">transferFloor</td>
+<td class="py-2 px-3 font-mono text-right">25,824</td>
+<td class="py-2 px-3 font-mono text-right">25,824</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,552</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">33,413</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1,599</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">version</td>
+<td class="py-2 px-3 font-mono text-right">13,489</td>
+<td class="py-2 px-3 font-mono text-right">13,489</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,489</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,489</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+</tbody></table></div>
+</div>
+<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">
+<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+<span class="font-semibold text-white">StoreFactory</span>
+<span class="text-xs text-gray-500">Deploy: 3,417,912 <span class="text-gray-500">(0)</span></span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-sm">
+<thead><tr class="border-b border-gray-800">
+<th class="py-2 px-3 text-left font-semibold text-gray-400">Function</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Master (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Current (avg)</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Diff</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Min</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Max</th>
+<th class="py-2 px-3 text-right font-semibold text-gray-400">Calls</th>
+</tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">claimUserStore</td>
+<td class="py-2 px-3 font-mono text-right">267,561</td>
+<td class="py-2 px-3 font-mono text-right">267,561</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,040</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">267,938</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">795</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">deployLabelStoreFor</td>
+<td class="py-2 px-3 font-mono text-right">268,040</td>
+<td class="py-2 px-3 font-mono text-right">268,012</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-28</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,582</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">291,307</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">8,654</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">getLabelStore</td>
+<td class="py-2 px-3 font-mono text-right">1,925</td>
+<td class="py-2 px-3 font-mono text-right">1,925</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">517</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,517</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">18,767</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">getLabelStoreCount</td>
+<td class="py-2 px-3 font-mono text-right">2,660</td>
+<td class="py-2 px-3 font-mono text-right">2,660</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,660</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,660</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">getLabelStores</td>
+<td class="py-2 px-3 font-mono text-right">6,476</td>
+<td class="py-2 px-3 font-mono text-right">6,476</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,843</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10,892</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">getUserStore</td>
+<td class="py-2 px-3 font-mono text-right">2,451</td>
+<td class="py-2 px-3 font-mono text-right">2,451</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,451</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,451</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">getUserStoreCount</td>
+<td class="py-2 px-3 font-mono text-right">2,572</td>
+<td class="py-2 px-3 font-mono text-right">2,572</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,572</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,572</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">getUserStores</td>
+<td class="py-2 px-3 font-mono text-right">8,323</td>
+<td class="py-2 px-3 font-mono text-right">8,323</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">8,323</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">8,323</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">initialize</td>
+<td class="py-2 px-3 font-mono text-right">31,643</td>
+<td class="py-2 px-3 font-mono text-right">30,451</td>
+<td class="py-2 px-3 font-mono text-right text-green-400">-1,192</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,096,120</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">690</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">labelStoreBeacon</td>
+<td class="py-2 px-3 font-mono text-right">2,659</td>
+<td class="py-2 px-3 font-mono text-right">2,659</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,659</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,659</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">owner</td>
+<td class="py-2 px-3 font-mono text-right">2,603</td>
+<td class="py-2 px-3 font-mono text-right">2,603</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,603</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,603</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">protocolRegistry</td>
+<td class="py-2 px-3 font-mono text-right">2,483</td>
+<td class="py-2 px-3 font-mono text-right">2,483</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,483</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,483</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">proxiableUUID</td>
+<td class="py-2 px-3 font-mono text-right">358</td>
+<td class="py-2 px-3 font-mono text-right">358</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">358</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">358</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">upgradeLabelStoreImplementation</td>
+<td class="py-2 px-3 font-mono text-right">14,859</td>
+<td class="py-2 px-3 font-mono text-right">14,859</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,685</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">22,939</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">5</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">upgradeToAndCall</td>
+<td class="py-2 px-3 font-mono text-right">6,882</td>
+<td class="py-2 px-3 font-mono text-right">6,882</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">3,060</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">10,705</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">upgradeUserStoreImplementation</td>
+<td class="py-2 px-3 font-mono text-right">22,973</td>
+<td class="py-2 px-3 font-mono text-right">22,973</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">22,973</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">22,973</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">userStoreBeacon</td>
+<td class="py-2 px-3 font-mono text-right">2,271</td>
+<td class="py-2 px-3 font-mono text-right">2,271</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,271</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">2,271</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">11</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">version</td>
+<td class="py-2 px-3 font-mono text-right">13,424</td>
+<td class="py-2 px-3 font-mono text-right">13,424</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">0</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,424</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">13,424</td>
+<td class="py-2 px-3 font-mono text-right text-gray-500">1</td>
+</tr>
+</tbody></table></div>
+</div>
+</div></body></html>
