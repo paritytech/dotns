@@ -105,7 +105,8 @@ contract DotnsContentResolver is
         uint64 currentVersion = _requireNodeOwnerOrOperator(node);
         textRecords[node][key] = value;
         if (textVersions[node][key] != currentVersion) textVersions[node][key] = currentVersion;
-        emit TextUpdated(node, key, key, value);
+        emit TextUpdated(node, key, value);
+        emit TextChanged(node, key, key, value);
     }
 
     /// @inheritdoc IDotnsContentResolver
