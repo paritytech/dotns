@@ -283,10 +283,10 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         external
         view
         override
-        returns (bool live, uint64 version)
+        returns (bool live, uint64 recordsVersion)
     {
         live = _isLive(node);
-        version = _versions[node].records;
+        recordsVersion = _versions[node].records;
     }
 
     /// @inheritdoc IDotnsRegistry
@@ -475,15 +475,15 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice Bumps the record version of `node`.
     /// @param node Node identifier.
     function _clearRecordVersion(bytes32 node) internal {
-        uint64 version = ++_versions[node].records;
-        emit RecordsCleared(node, version);
+        uint64 nextVersion = ++_versions[node].records;
+        emit RecordsCleared(node, nextVersion);
     }
 
     /// @notice Bumps the subname version of `node`.
     /// @param node Node identifier.
     function _clearSubnameVersion(bytes32 node) internal {
-        uint64 version = ++_versions[node].subnames;
-        emit SubnamesCleared(node, version);
+        uint64 nextVersion = ++_versions[node].subnames;
+        emit SubnamesCleared(node, nextVersion);
     }
 
     /// @notice Internal check for registrar-authorised controller privileges.

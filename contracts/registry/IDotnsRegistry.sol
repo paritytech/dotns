@@ -290,14 +290,15 @@ interface IDotnsRegistry {
 
     /// @notice Returns whether `node` resolves and the record version its records are written
     ///         under.
-    /// @dev Resolvers stamp each write with `version` and treat a record whose stamp differs, or
-    ///      any record of a node that does not resolve, as unset. A tokenised name resolves while
-    ///      its record exists; a subname resolves while no ancestor has cleared or deleted it.
+    /// @dev Resolvers stamp each write with `recordsVersion` and treat a record whose stamp
+    ///      differs, or any record of a node that does not resolve, as unset. A tokenised name
+    ///      resolves while its record exists; a subname resolves while no ancestor has cleared or
+    ///      deleted it.
     ///      Version 0 is the version every node starts at, so records written before versions
     ///      existed carry a matching stamp and stay readable until the node is first cleared.
     ///      Checking a subname walks its ancestors, so the cost grows with its depth.
     /// @param node Node identifier.
     /// @return live True when `node` currently resolves.
-    /// @return version Record version of `node`.
-    function recordVersion(bytes32 node) external view returns (bool live, uint64 version);
+    /// @return recordsVersion Record version of `node`.
+    function recordVersion(bytes32 node) external view returns (bool live, uint64 recordsVersion);
 }

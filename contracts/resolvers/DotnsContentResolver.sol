@@ -86,9 +86,11 @@ contract DotnsContentResolver is
 
     /// @inheritdoc IDotnsContentResolver
     function setContenthash(bytes32 node, bytes calldata hash) external override {
-        uint64 version = _requireNodeOwnerOrOperator(node);
+        uint64 currentVersion = _requireNodeOwnerOrOperator(node);
         contenthashes[node] = hash;
-        if (contenthashVersions[node] != version) contenthashVersions[node] = version;
+        if (contenthashVersions[node] != currentVersion) {
+            contenthashVersions[node] = currentVersion;
+        }
         emit ContentHashUpdated(node, hash);
     }
 
@@ -100,9 +102,9 @@ contract DotnsContentResolver is
 
     /// @inheritdoc IDotnsContentResolver
     function setText(bytes32 node, string calldata key, string calldata value) external override {
-        uint64 version = _requireNodeOwnerOrOperator(node);
+        uint64 currentVersion = _requireNodeOwnerOrOperator(node);
         textRecords[node][key] = value;
-        if (textVersions[node][key] != version) textVersions[node][key] = version;
+        if (textVersions[node][key] != currentVersion) textVersions[node][key] = currentVersion;
         emit TextUpdated(node, key, key, value);
     }
 
@@ -148,8 +150,12 @@ contract DotnsContentResolver is
     ///      delegation that grants no power over ownership or transfers. The cheap owner and
     ///      local-operator checks run before the cross-contract registry call.
     /// @param node Node identifier.
-    /// @return version Record version of `node`, which the caller stamps the write with.
-    function _requireNodeOwnerOrOperator(bytes32 node) internal view returns (uint64 version) {
+    /// @return currentVersion Record version of `node`, which the caller stamps the write with.
+    function _requireNodeOwnerOrOperator(bytes32 node)
+        internal
+        view
+        returns (uint64 currentVersion)
+    {
         IDotnsRegistry _registry = _forwardRegistry();
         address nodeOwner = _registry.owner(node);
         require(
@@ -157,7 +163,7 @@ contract DotnsContentResolver is
                 || _registry.isAuthorised(node, msg.sender),
             NotAuthorised(node, msg.sender)
         );
-        (, version) = _registry.recordVersion(node);
+        (, currentVersion) = _registry.recordVersion(node);
     }
 
     /// @notice Returns whether a record stamped `stamp` is readable for `node`.
@@ -167,8 +173,8 @@ contract DotnsContentResolver is
     /// @param stamp Record version the record was written under.
     /// @return current True when `node` resolves and `stamp` is its current record version.
     function _isCurrent(bytes32 node, uint64 stamp) internal view returns (bool current) {
-        (bool live, uint64 version) = _forwardRegistry().recordVersion(node);
-        current = live && stamp == version;
+        (bool live, uint64 currentVersion) = _forwardRegistry().recordVersion(node);
+        current = live && stamp == currentVersion;
     }
 
     /// @notice Returns the forward registry, resolved lazily so a rewire needs no upgrade here.
