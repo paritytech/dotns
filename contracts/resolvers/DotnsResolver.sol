@@ -75,16 +75,16 @@ contract DotnsResolver is
     /// @inheritdoc IDotnsResolver
     function setAddress(bytes32 node, address value) external override {
         IDotnsRegistry registry = _onlyNodeOwner(node);
-        (, uint64 version) = registry.recordVersion(node);
+        (, uint64 currentVersion) = registry.recordVersion(node);
         addresses[node] = value;
-        if (addressVersions[node] != version) addressVersions[node] = version;
+        if (addressVersions[node] != currentVersion) addressVersions[node] = currentVersion;
         emit AddressSet(node, value);
     }
 
     /// @inheritdoc IDotnsResolver
     function addressOf(bytes32 node) external view override returns (address value) {
-        (bool live, uint64 version) = _registry().recordVersion(node);
-        if (!live || addressVersions[node] != version) return address(0);
+        (bool live, uint64 currentVersion) = _registry().recordVersion(node);
+        if (!live || addressVersions[node] != currentVersion) return address(0);
         return addresses[node];
     }
 
