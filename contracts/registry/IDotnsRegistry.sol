@@ -183,9 +183,11 @@ interface IDotnsRegistry {
     ///      it: a subname stores its own owner, and @custom:function isAuthorised returns on that
     ///      owner before consulting the registrar, so after the sale the seller keeps write
     ///      authority over every subname whose stored owner is still the seller, until the buyer
-    ///      reassigns each one through @custom:function setSubnodeOwner. A subname created for
-    ///      someone else stays with that owner and leaves the seller no write path. The set is
-    ///      derivable from @custom:emits NewOwner, which indexes the parent node. Stores
+    ///      reassigns each one through @custom:function setSubnodeOwner, deletes it through
+    ///      @custom:function deleteSubname, or clears them all at once through
+    ///      @custom:function clearSubnames. A subname created for someone else stays with that
+    ///      owner and leaves the seller no write path. The set is derivable from
+    ///      @custom:emits NewOwner, which indexes the parent node. Stores
     ///      `owner = address(0)` as a sentinel so reads delegate to `IDotnsRegistrar.ownerOf` and
     ///      ERC-721 transfers remain authoritative. Emits
     ///      @custom:emits NodeTransferred on success.
