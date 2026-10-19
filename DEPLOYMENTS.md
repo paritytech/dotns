@@ -240,14 +240,12 @@ If that set is non-empty and any of it matters, the options are to let the holde
 
 ## Upgrading to record and subname clearing
 
-Releasing a name clears its records and subnames, and owners can clear them on demand. Four proxies take part. The registry holds the versions every clear bumps, the two record resolvers stamp each record with the version it was written under, and the escrow clears a name as it takes custody on release. None of them gains a configuration value, so a bare `upgradeTo` is enough for each, but the order matters.
+Releasing a name clears its records and subnames, and owners can clear them on demand. Four proxies take part. The registry holds the versions every clear bumps, the two record resolvers stamp each record with the version it was written under, and the escrow clears a name as it takes custody on release and again as it hands it back. None of them gains a configuration value, so a bare `upgradeTo` is enough for each, but the order matters.
 
 1. **Registry, then both resolvers.** The resolvers read `recordVersion` from the registry on every read and write, so they revert against a registry that lacks it. Upgrade them in the same session.
 2. **Link the existing subnames.** A subname created before this upgrade has no recorded parent, and a clear above it does not reach it until it is linked. Every level is linked separately, because an unlinked subname cannot name its parent. `linkSubname` is permissionless and the script below finds every candidate from the registry's `NewOwner` events.
-3. **Escrow.** `release` calls `clear` on the registry, so an escrow upgraded before the registry reverts on every release.
-4. **Clear the names already in custody.** Release clears a name as it takes custody, so names released before step 3 still carry their records. `clearReleasedName` is permissionless; the same script covers it with `--escrow`.
-
-Records need no migration. Every node starts at record version zero, which is also the stamp every record written before the upgrade carries, so existing records stay readable until their node is first cleared.
+3. **Escrow.** `release`, `redeem` and `reclaim` call `clear` on the registry, so an escrow upgraded before the registry reverts on all three.
+4. **Clear the names already in custody.** A name released before step 3 still carries its records while it sits in escrow. `redeem` and `reclaim` clear it on the way out, so nobody receives it uncleared, but until then it keeps resolving to what its previous holder wrote. `clearReleasedName` clears it in place; it is permissionless, and the same script covers it with `--escrow`.
 
 ```bash
 # dry run: lists what is still to link and what sits in custody
@@ -268,7 +266,31 @@ cast call "$REGISTRY_PROXY" 'recordVersion(bytes32)(bool,uint64)' "$NODE" --rpc-
 cast call "$REGISTRY_PROXY" 'MAX_SUBNAME_DEPTH()(uint256)' --rpc-url "$RPC_URL"   # expect 8
 ```
 
-Two consumer-facing changes ship with this upgrade. `DotnsContentResolver.TextUpdated` gains a readable `key` argument, which changes the event's signature, so indexers and SDKs that filter on the old topic must move to the new one. And the registry emits `RecordsCleared` and `SubnamesCleared`: a consumer that caches records or subnames must drop the node's records, or everything beneath it, on each.
+### What existing integrations keep
+
+The upgrade is additive. Every existing function, event and error keeps its selector and its arguments, and every existing call keeps working:
+
+- Records written before the upgrade stay readable. Every node starts at record version zero, which is also the stamp those records carry, so nothing is migrated and a record changes only when its node is cleared.
+- Subnames created before the upgrade keep resolving, under the same owners, until a name above them is cleared.
+- Registration, transfer, release, withdraw, redeem and reclaim take the same calls and arguments. A transfer still clears nothing.
+- `TextUpdated` is unchanged. `TextChanged` is emitted alongside it and carries the key readably.
+- Storage only grows: the registry takes two slots from its gap, and both resolvers append their stamp mappings after their existing storage. Check it against the release the network runs before upgrading, by pointing the OpenZeppelin validator at that release's build info:
+
+  ```bash
+  for c in DotnsRegistry DotnsResolver DotnsContentResolver DotnsNameEscrow; do
+    npx @openzeppelin/upgrades-core@1.44.2 validate out/build-info --contract "$c" \
+      --reference "previous:$c" --referenceBuildInfoDirs path/to/previous
+  done
+  ```
+
+  where `path/to/previous` is a directory named `previous` holding the build info files (`out/build-info/*.json`) from a clean build of the deployed tag.
+
+### What existing integrations see change
+
+- A name that is cleared, or a subname beneath one, reads as empty. For a cleared subname `owner`, `resolver` and `recordExists` return zero and false, and `isAuthorised` returns false. A consumer that caches records or subnames must drop them on `RecordsCleared` and `SubnamesCleared`, one event per clear, since descendants emit nothing of their own.
+- Creating a subname more than `MAX_SUBNAME_DEPTH` levels below its second-level name reverts with `SubnameTooDeep`. Subnames that already sit deeper keep working and can still be reassigned.
+- Resolver reads make one call into the registry, and reads of a subname walk the levels above it, so a contract that resolves names on chain pays a little more gas. `release`, `redeem` and `reclaim` each make one or two more calls.
+- Creating a subname writes its parent and its parent's version, two more storage slots. That includes every device name the gateway issues, which costs about 28k more gas (around 5%) in the test suite. Confirm the gateway pallet's gas limit for issuance leaves that headroom before upgrading.
 
 ## Deployment pipeline
 
