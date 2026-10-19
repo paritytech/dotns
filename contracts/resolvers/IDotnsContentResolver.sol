@@ -15,14 +15,23 @@ interface IDotnsContentResolver {
     event ContentHashUpdated(bytes32 indexed node, bytes hash);
 
     /// @notice Emitted when a node's text record is updated.
-    /// @dev The key is emitted twice. An indexed string is logged only as its keccak256 hash, which
-    ///      lets a consumer filter by key but never recover it, so `key` repeats it in the data
-    ///      where it stays readable. That is what lets an indexer list a node's text keys.
+    /// @dev An indexed string is logged only as its keccak256 hash, so this event lets a consumer
+    ///      filter by key but never recover the key. @custom:emits TextChanged is emitted
+    ///      alongside it with the key readable.
     /// @param node The node whose text record was updated.
-    /// @param indexedKey The text record key, as a topic for filtering.
+    /// @param key The text record key, logged as its hash.
+    /// @param value The new text record value.
+    event TextUpdated(bytes32 indexed node, string indexed key, string value);
+
+    /// @notice Emitted with every @custom:emits TextUpdated, carrying the key readably.
+    /// @dev The key appears twice: indexed, as a hash to filter on, and in the data, where an
+    ///      indexer can read it and so list the keys a node has set. The shape matches the ENS
+    ///      public resolver's `TextChanged`, so tooling built for it reads this event unchanged.
+    /// @param node The node whose text record was updated.
+    /// @param indexedKey The text record key, logged as its hash.
     /// @param key The text record key, readable.
     /// @param value The new text record value.
-    event TextUpdated(bytes32 indexed node, string indexed indexedKey, string key, string value);
+    event TextChanged(bytes32 indexed node, string indexed indexedKey, string key, string value);
 
     /// @notice Emitted when an operator is approved or revoked.
     /// @param owner The owner of the nodes.
