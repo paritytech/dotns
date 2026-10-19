@@ -27,6 +27,14 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     using StoreUtils for IStoreFactory;
     using StringUtils for *;
 
+    /// @notice Deepest a new subname may sit below its second-level name: a subname directly under
+    ///         `alice` is at depth 1, one under `child.alice` at depth 2.
+    /// @dev Bounds the read cost, not the clear cost. Clearing is constant at any depth, but
+    ///      deciding whether a subname still resolves walks every level above it, and every
+    ///      read of a subname (owner, authority, each resolver record) pays that walk. Checked only
+    ///      when a subname is created, so a deeper subname that already exists keeps working.
+    uint256 public constant MAX_SUBNAME_DEPTH = 8;
+
     /// @notice Mapping of node identifiers to records.
     mapping(bytes32 node => Record record) private records;
 
@@ -147,6 +155,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
             // A subname still on record but cut off by a clear above it is created again from
             // nothing: bumping its own versions keeps the records and subnames it held before out
             // of reach of the new holder, who may well be the same address.
+            uint256 depth = _labelCount(parentLabel);
+            require(depth <= MAX_SUBNAME_DEPTH, SubnameTooDeep(depth, MAX_SUBNAME_DEPTH));
             if (existing.exists) {
                 _clearRecordVersion(subnode);
                 _clearSubnameVersion(subnode);
@@ -277,6 +287,11 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     {
         live = _isLive(node);
         version = _versions[node].records;
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    function parentOf(bytes32 node) external view override returns (bytes32 parent) {
+        parent = _parentOf[node];
     }
 
     /// @inheritdoc IDotnsRegistry
@@ -418,6 +433,20 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
             if (parent == bytes32(0)) return true;
             if (_versions[node].parentSubnames != _versions[parent].subnames) return false;
             node = parent;
+        }
+    }
+
+    /// @notice Returns the number of labels in a dotted name path, which is the depth below its
+    ///         second-level name of a subname created under it.
+    /// @dev `path` has already passed `isNamePath`, so it has no empty segment and no leading or
+    ///      trailing dot, and the count is one more than the number of dots.
+    /// @param path Dotted parent path without the TLD.
+    /// @return count Number of labels in `path`.
+    function _labelCount(string calldata path) internal pure returns (uint256 count) {
+        bytes calldata raw = bytes(path);
+        count = 1;
+        for (uint256 i; i < raw.length; ++i) {
+            if (raw[i] == bytes1(0x2e)) ++count;
         }
     }
 

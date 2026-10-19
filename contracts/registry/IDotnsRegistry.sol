@@ -94,6 +94,12 @@ interface IDotnsRegistry {
     /// @param node The subname.
     error SubnameNotFound(bytes32 node);
 
+    /// @notice Thrown when a new subname would sit deeper below its second-level name than
+    ///         `MAX_SUBNAME_DEPTH` allows.
+    /// @param depth Depth the subname would have.
+    /// @param maxDepth Deepest allowed.
+    error SubnameTooDeep(uint256 depth, uint256 maxDepth);
+
     /// @notice Thrown when a sublabel is not a canonical lowercase ASCII DNS label.
     error InvalidLabel();
 
@@ -141,7 +147,10 @@ interface IDotnsRegistry {
     ///      resolver record is written either way. A `record.persist` of false defers the store
     ///      write and is restricted to registered controllers
     ///      (@custom:function IDotnsRegistrar.controllers), otherwise @custom:reverts
-    /// NotAuthorised. Emits @custom:emits NewOwner on each successful assignment.
+    /// NotAuthorised. Creating a subname, as opposed to reassigning one that resolves, requires it
+    ///      to sit at most `MAX_SUBNAME_DEPTH` levels below its second-level name, otherwise
+    ///      @custom:reverts SubnameTooDeep. Emits @custom:emits NewOwner on each successful
+    ///      assignment.
     function setSubnodeOwner(SubnodeRecord calldata record) external returns (bytes32 subnode);
 
     /// @notice Sets the resolver for an existing subnode.
@@ -191,6 +200,14 @@ interface IDotnsRegistry {
     ///      success.
     /// @param resolverAddr Resolver contract address (zero clears).
     function setResolver(bytes32 node, address resolverAddr) external;
+
+    /// @notice Returns the recorded parent of a subname.
+    /// @dev Zero for a tokenised name, for a node that was never created, and for a subname
+    ///      created before parents were recorded and not linked since (@custom:function
+    ///      linkSubname). A backfill reads it to find the subnames still to link.
+    /// @param node Node identifier.
+    /// @return parent Recorded parent node, or zero.
+    function parentOf(bytes32 node) external view returns (bytes32 parent);
 
     /// @notice Returns the owner of a node.
     /// @dev For tokenised nodes the stored owner is the zero sentinel; the implementation falls
