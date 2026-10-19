@@ -357,4 +357,55 @@ contract DotnsRecordClearingTest is BaseDotns {
         assertEq(version, 0);
         _assertTreeIntact();
     }
+
+    // depth
+
+    /// @dev Builds a chain of subnames under the name, `levels` deep, each owned by `ed`, and
+    ///      returns the deepest node and its parent path.
+    function _chain(uint256 levels) internal returns (bytes32 deepest, string memory deepestPath) {
+        bytes32 parentNode = node;
+        string memory parentPath = LABEL;
+        for (uint256 i; i < levels; ++i) {
+            parentNode = _createSubname(parentNode, "l", parentPath, ed, ed);
+            deepestPath = parentPath;
+            parentPath = string.concat("l.", parentPath);
+        }
+        deepest = parentNode;
+    }
+
+    function test_subname_at_the_maximum_depth_is_created_and_cleared_from_the_top() public {
+        uint256 maxDepth = dotnsRegistry.MAX_SUBNAME_DEPTH();
+        (bytes32 deepest,) = _chain(maxDepth);
+        assertEq(dotnsRegistry.owner(deepest), ed);
+
+        vm.prank(ed);
+        dotnsRegistry.clearSubnames(node);
+
+        assertEq(dotnsRegistry.owner(deepest), address(0), "the deepest subname is cleared too");
+    }
+
+    function test_revert_subname_one_level_past_the_maximum_depth() public {
+        uint256 maxDepth = dotnsRegistry.MAX_SUBNAME_DEPTH();
+        (bytes32 deepest, string memory deepestPath) = _chain(maxDepth);
+
+        vm.prank(ed);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsRegistry.SubnameTooDeep.selector, maxDepth + 1, maxDepth)
+        );
+        dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: deepest,
+                subLabel: "l",
+                parentLabel: string.concat("l.", deepestPath),
+                owner: ed,
+                persist: true
+            })
+        );
+    }
+
+    function test_parentOf_reports_the_recorded_parent() public view {
+        assertEq(dotnsRegistry.parentOf(childNode), node);
+        assertEq(dotnsRegistry.parentOf(grandchildNode), childNode);
+        assertEq(dotnsRegistry.parentOf(node), bytes32(0), "a tokenised name has no parent");
+    }
 }
