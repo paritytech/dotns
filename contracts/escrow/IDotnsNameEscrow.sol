@@ -307,7 +307,21 @@ interface IDotnsNameEscrow {
     ///      holder's exclusive redeem phase and opens permissionless reclaim. Both are snapshots
     ///      so later policy changes never move an in-flight position. A release attempted while
     ///      `redeemWindow` is unseeded triggers @custom:reverts RedeemWindowNotConfigured.
+    ///      Releasing gives up the name's records and subnames along with the name: once the token
+    ///      is in custody the escrow, as its owner, calls @custom:function IDotnsRegistry.clear, so
+    ///      every record reads as unset and every subname stops resolving from this call on, and
+    ///      whoever gets the name next, through @custom:function redeem or
+    ///      @custom:function reclaim, starts clean.
     function release(uint256 tokenId) external;
+
+    /// @notice Clears the records and subnames of a name the escrow holds in custody.
+    /// @dev @custom:function release clears a name as it takes custody, so this is needed only for
+    ///      a name that entered custody before release cleared names, and is otherwise a harmless
+    ///      repeat. Permissionless, because the escrow is the name's owner while it holds it and
+    ///      clearing is the state release promises. The position must be released, otherwise
+    ///      @custom:reverts NotReleased.
+    /// @param tokenId Token held in custody.
+    function clearReleasedName(uint256 tokenId) external;
 
     /// @notice Credits the refundable deposit for a released token to the recipient's pending
     /// balance.
@@ -371,8 +385,9 @@ interface IDotnsNameEscrow {
     ///      below `redeemableUntil`; a position failing any of those is not redeemable and
     ///      @custom:reverts NotRedeemable.
     ///      No value moves. The position keeps its recipient, asset and amount, so the deposit
-    ///      stays locked exactly as it was before the release and the name returns to its
-    ///      pre-release state, releasable again later on a fresh pair of clocks. Excluding
+    ///      stays locked exactly as it was before the release, and the name is releasable again
+    ///      later on a fresh pair of clocks. The records and subnames the release cleared do not
+    ///      come back: the holder gets the name back clean. Excluding
     ///      withdrawn positions is deliberate: a holder who has already pulled the deposit would
     ///      otherwise recover the name without it being deposit-backed, breaking the one-deposit-
     ///      per-live-name bound. The choice is therefore exclusive — take the value back, or take

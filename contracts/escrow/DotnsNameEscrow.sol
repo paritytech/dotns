@@ -14,6 +14,7 @@ import {
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
@@ -367,7 +368,17 @@ contract DotnsNameEscrow is
 
         _addReleasedToken(tokenId);
 
+        // Cleared once custody has moved, because the registry admits the escrow as the name's
+        // owner and needs no escrow-specific authority to let it clear.
+        _clearName(tokenId);
+
         emit NameReleased(tokenId, msg.sender, asset, amount, availableAt, redeemUntil);
+    }
+
+    /// @inheritdoc IDotnsNameEscrow
+    function clearReleasedName(uint256 tokenId) external override nonReentrant {
+        require(_positions[tokenId].released, NotReleased(tokenId));
+        _clearName(tokenId);
     }
 
     /// @inheritdoc IDotnsNameEscrow
@@ -710,6 +721,12 @@ contract DotnsNameEscrow is
     /// @return versionString Declared release as bare semver, empty when never declared.
     function version() external view virtual returns (string memory versionString) {
         versionString = protocolRegistry.protocolVersion();
+    }
+
+    /// @notice Clears every record and subname of a name the escrow holds.
+    /// @param tokenId Token in custody; its node is `bytes32(tokenId)`.
+    function _clearName(uint256 tokenId) internal {
+        IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY)).clear(bytes32(tokenId));
     }
 
     /// @notice Returns the configured registrar from the protocol registry.
