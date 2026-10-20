@@ -20,10 +20,12 @@ interface IDotnsResolver {
 
     /// @notice Sets the resolved address for a node.
     /// @dev The caller must be the current owner of `node` in the forward registry, otherwise
-    ///      @custom:reverts NotAuthorised. Emits @custom:emits AddressSet on every successful
+    ///      @custom:reverts NotAuthorised. A zero `value` deletes the record: its storage is
+    ///      zeroed and the storage deposit released to the caller, which is how an owner reclaims
+    ///      it before giving the name up. Emits @custom:emits AddressSet on every successful
     ///      write.
     /// @param node The node identifier.
-    /// @param value The address to associate with the node.
+    /// @param value The address to associate with the node, or zero to delete the record.
     function setAddress(bytes32 node, address value) external;
 
     /// @notice Returns the resolved address for a node.
