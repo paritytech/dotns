@@ -52,9 +52,8 @@ contract DotnsContentResolver is
     uint256[50] private __gap;
 
     /// @notice Node => registry record version its content hash was written under.
-    /// @dev Zero for every record written before stamps existed, which matches the version every
-    ///      node starts at, so those records stay readable until the node is first cleared. The
-    ///      same holds for `textVersions`.
+    /// @dev Zero matches the record version every node starts at, so a content hash stamped zero
+    ///      reads as set until its node is first cleared. The same holds for `textVersions`.
     mapping(bytes32 node => uint64 version) private contenthashVersions;
 
     /// @notice Node => text key => registry record version the value was written under.
@@ -110,9 +109,10 @@ contract DotnsContentResolver is
     function setText(bytes32 node, string calldata key, string calldata value) external override {
         uint64 currentVersion = _requireNodeOwnerOrOperator(node);
         if (bytes(value).length == 0) {
-            // An empty value is a delete: the value and its stamp are both zeroed so their
-            // storage deposit is released to the caller. This also frees a key left behind by a
-            // clear, which no read can reach any more but which still holds storage.
+            // An empty value is a delete: the value and its stamp are both zeroed, so their
+            // storage deposit is released to the signer of the transaction. This also frees a key
+            // left behind by a clear, which no read can reach any more but which still holds
+            // storage.
             delete textRecords[node][key];
             delete textVersions[node][key];
         } else {

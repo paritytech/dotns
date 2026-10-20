@@ -149,7 +149,10 @@ interface IDotnsRegistry {
     ///      (@custom:function IDotnsRegistrar.controllers), otherwise @custom:reverts
     /// NotAuthorised. Creating a subname, as opposed to reassigning one that resolves, requires it
     ///      to sit at most `MAX_SUBNAME_DEPTH` levels below its second-level name, otherwise
-    ///      @custom:reverts SubnameTooDeep. Emits @custom:emits NewOwner on each successful
+    ///      @custom:reverts SubnameTooDeep. A subname still on record but cut off by a clear above
+    ///      it is created again from nothing: its versions are bumped, emitting
+    ///      @custom:emits RecordsCleared and @custom:emits SubnamesCleared, so none of its old
+    ///      records or subnames come back. Emits @custom:emits NewOwner on each successful
     ///      assignment.
     function setSubnodeOwner(SubnodeRecord calldata record) external returns (bytes32 subnode);
 
@@ -164,7 +167,7 @@ interface IDotnsRegistry {
     ///      (otherwise @custom:reverts InvalidLabel) and `record.parentLabel` must be a name
     ///      path of at most `StringUtils.MAX_NAME_PATH_OCTETS` octets whose namehash matches
     ///      `record.parentNode` (otherwise
-    ///      @custom:reverts ParentLabelMismatch). The resulting subnode must already exist,
+    ///      @custom:reverts ParentLabelMismatch). The resulting subnode must exist and resolve,
     ///      otherwise @custom:reverts NotAuthorised. Emits @custom:emits NewResolver on
     ///      success.
     function setSubnodeResolver(SubnodeResolverRecord calldata record) external;
@@ -204,9 +207,10 @@ interface IDotnsRegistry {
     function setResolver(bytes32 node, address resolverAddr) external;
 
     /// @notice Returns the recorded parent of a subname.
-    /// @dev Zero for a tokenised name, for a node that was never created, and for a subname
-    ///      created before parents were recorded and not linked since (@custom:function
-    ///      linkSubname). A backfill reads it to find the subnames still to link.
+    /// @dev Zero for a tokenised name, for a node that was never created or was deleted, and for
+    ///      a subname whose parent was never recorded and that has not been linked since
+    ///      (@custom:function linkSubname). A backfill reads it to find the subnames still to
+    ///      link.
     /// @param node Node identifier.
     /// @return parent Recorded parent node, or zero.
     function parentOf(bytes32 node) external view returns (bytes32 parent);
@@ -260,8 +264,8 @@ interface IDotnsRegistry {
 
     /// @notice Clears every record and every subname of `node`.
     /// @dev Equivalent to @custom:function clearRecords followed by @custom:function clearSubnames
-    ///      in one call, with the same authority. `DotnsNameEscrow.release` calls it once it holds
-    ///      the token, which is what makes a released name start clean for whoever gets it next.
+    ///      in one call, with the same authority. The escrow calls it on release, once it holds the
+    ///      token, which is what makes a released name start clean for whoever gets it next.
     /// @param node Node to clear.
     function clear(bytes32 node) external;
 
@@ -270,22 +274,25 @@ interface IDotnsRegistry {
     /// @dev Callable by anyone @custom:function isAuthorised admits for `parentNode`, otherwise
     ///      @custom:reverts NotAuthorised: subnames are parent-sovereign, so the parent decides,
     ///      not the subname's holder. The subname's record and parent link are zeroed, releasing
-    ///      their storage deposit to the caller; one version slot stays so the subname, created
-    ///      again, starts empty. Subnames beneath it are cleared but keep their storage, so a
-    ///      parent that wants every deposit back deletes from the deepest subname up. The subname
-    ///      must currently resolve, otherwise @custom:reverts SubnameNotFound. Emits @custom:emits
-    ///      NewOwner with a zero owner, the deletion convention indexers already follow, and
-    ///      @custom:emits RecordsCleared and @custom:emits SubnamesCleared for the subname.
+    ///      their storage deposit to the signer of the transaction; one version slot stays so the
+    ///      subname, created again, starts empty. Subnames beneath it are cleared but keep their
+    ///      storage, so freeing every deposit means deleting from the deepest subname up, each by
+    ///      whoever holds that subname's parent. The subname must currently resolve, otherwise
+    ///      @custom:reverts SubnameNotFound. Emits @custom:emits NewOwner with a zero owner, the
+    ///      deletion convention indexers already follow, and @custom:emits RecordsCleared and
+    ///      @custom:emits SubnamesCleared for the subname.
     /// @param parentNode Parent of the subname.
     /// @param labelhash Labelhash of the subname under `parentNode`.
     function deleteSubname(bytes32 parentNode, bytes32 labelhash) external;
 
-    /// @notice Records the parent of a subname created before parents were recorded, so that
-    ///         clearing an ancestor reaches it.
+    /// @notice Records the parent of a subname whose parent was never recorded, so that clearing
+    ///         an ancestor reaches it.
     /// @dev Permissionless: the parent is proven by the namehash, since `subnode` is
     ///      `keccak256(parentNode, labelhash)`, so a caller cannot link a subname anywhere else.
     ///      The subname is linked as created under its parent's first subname version, so a subname
-    ///      whose ancestor was cleared before it was linked reads as cleared once linked. Every
+    ///      whose ancestor was cleared before it was linked reads as cleared once it and every
+    ///      level between it and that ancestor are linked; an unlinked level still ends the walk
+    ///      as resolving. Every
     ///      write path that names a parent links it as a side effect; this entry point covers the
     ///      rest. @custom:reverts SubnameNotFound when no subname exists there. A subname already
     ///      linked is left as it is. Emits @custom:emits SubnameLinked when it links.
@@ -299,8 +306,8 @@ interface IDotnsRegistry {
     ///      differs, or any record of a node that does not resolve, as unset. A tokenised name
     ///      resolves while its record exists; a subname resolves while no ancestor has cleared or
     ///      deleted it.
-    ///      Version 0 is the version every node starts at, so records written before versions
-    ///      existed carry a matching stamp and stay readable until the node is first cleared.
+    ///      Version 0 is the version every node starts at, and a record stamped 0 matches it, so a
+    ///      node that was never cleared reads every record stamped 0.
     ///      Checking a subname walks its ancestors, so the cost grows with its depth.
     /// @param node Node identifier.
     /// @return live True when `node` currently resolves.

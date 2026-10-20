@@ -309,27 +309,14 @@ interface IDotnsNameEscrow {
     ///      `redeemWindow` is unseeded triggers @custom:reverts RedeemWindowNotConfigured.
     ///      Releasing gives up the name's records and subnames along with the name: once the token
     ///      is in custody the escrow, as its owner, deletes the address and content hash, which
-    ///      releases their storage deposit to the caller, and calls
+    ///      releases their storage deposit to the signer of this transaction, and calls
     ///      @custom:function IDotnsRegistry.clear, so every text record reads as unset and every
-    ///      subname stops resolving from this call on. Whoever gets the name next, through
-    ///      @custom:function redeem or @custom:function reclaim, starts clean. Text records and
-    ///      subnames keep their storage and its deposit; a holder who wants that deposit back
-    ///      deletes them before releasing.
+    ///      linked subname stops resolving from this call on (a subname with no recorded parent
+    ///      is reached once @custom:function IDotnsRegistry.linkSubname links it). Whoever gets
+    ///      the name next, through @custom:function redeem or @custom:function reclaim, starts
+    ///      clean. Text records and subnames keep their storage and its deposit; a holder who wants
+    ///      that deposit back deletes them before releasing.
     function release(uint256 tokenId) external;
-
-    /// @notice Clears, once, every name the escrow holds in custody, for names that entered
-    ///         custody without being cleared.
-    /// @dev @custom:function release clears a name as it takes custody, and that is the only point
-    ///      a name is cleared, so a name that entered custody without being cleared would otherwise
-    ///      be handed back with its records through @custom:function redeem or
-    ///      @custom:function reclaim. Meant to run as the post-upgrade call of `upgradeToAndCall`,
-    ///      so nothing can be redeemed or reclaimed between the upgrade and the clear. Owner-only
-    ///      (@custom:reverts OwnableUnauthorizedAccount) and callable once per proxy
-    ///      (@custom:reverts InvalidInitialization on a second call). It clears lazily only and
-    ///      deletes no record outright: deleting would release storage deposit the holders paid to
-    ///      the signer of this call instead. Walks every name in custody in one call, so check
-    ///      @custom:function releasedTokenCount before relying on it.
-    function clearCustodyOnUpgrade() external;
 
     /// @notice Credits the refundable deposit for a released token to the recipient's pending
     /// balance.
