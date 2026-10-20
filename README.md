@@ -129,6 +129,8 @@ Once `redeemableUntil` passes, `reclaim` is permissionless through the ordinary 
 
 Releasing a name gives up its records and subnames along with it. The moment the escrow takes custody it clears the name, so every address, content hash and text record reads as unset and every subname beneath it, at any depth, stops resolving. Whoever gets the name next, the same holder through `redeem` or a new owner through `reclaim`, starts clean.
 
+Storage on Asset Hub carries a deposit, locked when a slot is first written and released to whoever signs the transaction that zeroes it. Release deletes the address and content hash outright, so their deposit returns to the holder releasing the name. Text records and subnames cannot be listed, so release only hides them and their deposit stays locked. A holder who wants it back deletes them before releasing (see [Clearing records and subnames](#clearing-records-and-subnames)); after release that path moves with the name.
+
 Gateway-issued (soulbound) names never enter this lifecycle. Releasing a name transfers it into escrow custody, and a soulbound name reverts on any transfer, so it holds no position and has no release, redeem, or reclaim path. It stays with the person who earned it.
 
 ### Cost-model versioning
@@ -237,7 +239,12 @@ Neither a name's text records nor its subnames can be listed on chain, so cleari
 - `clear(node)` does both. The escrow calls it on release.
 - `deleteSubname(parent, labelhash)` removes one subname and everything beneath it. Subnames are parent-sovereign, so this is the parent's call, not the subname holder's.
 
-All four take the same authority as any other write to the node. A cleared or deleted subname can be created again and starts empty, even for the same holder. The bytes written before stay in storage but nothing reads them. Consumers that index records or subnames learn of a clear from the registry's `RecordsCleared` and `SubnamesCleared` events, one per clear, since descendants emit nothing of their own.
+All four take the same authority as any other write to the node. A cleared or deleted subname can be created again and starts empty, even for the same holder. A clear leaves the bytes written before in storage, where nothing reads them, and their storage deposit stays locked.
+
+Deleting is how an owner gets that deposit back, and only what the owner knows about can be deleted:
+
+- Writing an empty value deletes a record: `setAddress(node, address(0))`, `setContenthash(node, "")`, `setText(node, key, "")`. The value and its version stamp are both zeroed. This also frees a text key a clear has already hidden.
+- `deleteSubname` zeroes the subname's record and its parent link. One version slot stays, so the subname, created again, cannot pick up its old records or children. Subnames beneath it are cleared but keep their storage, so to free everything, delete from the deepest subname up. Consumers that index records or subnames learn of a clear from the registry's `RecordsCleared` and `SubnamesCleared` events, one per clear, since descendants emit nothing of their own.
 
 Records written before versions existed carry stamp zero, the version every node starts at, so they stay readable until the node is first cleared. Subnames created before parents were recorded need linking (`linkSubname`, permissionless) before a clear above them reaches them; see [DEPLOYMENTS.md](./DEPLOYMENTS.md).
 
