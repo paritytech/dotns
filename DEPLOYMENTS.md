@@ -277,7 +277,7 @@ The upgrade is additive. Every existing function, event and error keeps its sele
 - Records written before the upgrade stay readable. Every node starts at record version zero, which is also the stamp those records carry, so nothing is migrated and a record changes only when its node is cleared.
 - Subnames created before the upgrade keep resolving, under the same owners, until a name above them is cleared.
 - Registration, transfer, release, withdraw, redeem and reclaim take the same calls and arguments. A transfer still clears nothing.
-- Every record setter keeps its signature. Writing an empty value now deletes the record and zeroes its slots, where it used to store the empty value; reads return the same empty result either way.
+- Every record setter keeps its signature and behaviour. Writing an empty value frees the record's storage, as storing a zero always has, and frees its version stamp with it.
 - `TextUpdated` is unchanged. `TextChanged` is emitted alongside it and carries the key readably.
 - Storage only grows: the registry takes two slots from its gap, and both resolvers append their stamp mappings after their existing storage. Check it against the release the network runs before upgrading, by pointing the OpenZeppelin validator at that release's build info:
 
