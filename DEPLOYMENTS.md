@@ -244,7 +244,7 @@ Releasing a name clears its records and subnames, and owners can clear them on d
 
 1. **Registry, then both resolvers.** The resolvers read `recordVersion` from the registry on every read and write, so they revert against a registry that lacks it. Upgrade them in the same session.
 2. **Link the existing subnames.** A subname created before this upgrade has no recorded parent, and a clear above it does not reach it until it is linked. Every level is linked separately, because an unlinked subname cannot name its parent. `linkSubname` is permissionless and the script below finds every candidate from the registry's `NewOwner` events.
-3. **Escrow, clearing what it already holds in the same transaction.** `release` calls the registry and both resolvers, so an escrow upgraded before them reverts on every release. Release is also the only point a name is cleared, so a name released before this step would be handed back by `redeem` or `reclaim` with its records. `clearCustodyOnUpgrade` clears every name in custody, and running it as the post-upgrade call of `upgradeToAndCall` leaves no moment for one to leave uncleared. It is owner-only, runs once per proxy, walks every name in custody in one call (check `releasedTokenCount` first), and clears lazily only: deleting records there would release the deposit their holders paid to whoever signs the upgrade.
+3. **Escrow, clearing what it already holds in the same transaction.** `release` calls the registry and both resolvers, so an escrow upgraded before them reverts on every release. Redeem and reclaim do not clear again, so a name released before this step would be handed back by them with its records. `clearCustodyOnUpgrade` clears every name in custody, and running it as the post-upgrade call of `upgradeToAndCall` leaves no moment for one to leave uncleared. It is owner-only, runs once per proxy, walks every name in custody in one call (check `releasedTokenCount` first), and clears lazily only: deleting records there would release the deposit their holders paid to whoever signs the upgrade. It uses initializer version 2, so a fresh deployment, which has nothing in custody to recover, never calls it, and a later upgrade that needs a reinitializer starts at 3. `upgradeToAndCall` takes one call, so on an escrow whose `redeemWindow` is still unseeded, send `updateRedeemWindow` straight after it; until then `release` reverts with `RedeemWindowNotConfigured`, which is the safe failure. Check with `redeemWindow()` first (Polkadot mainnet reports 86400).
 
 ```bash
 # dry run: lists what is still to link, and what sits in custody for step 3
@@ -261,7 +261,7 @@ cast send "$ESCROW_PROXY" 'upgradeToAndCall(address,bytes)' "$NEW_ESCROW_IMPL" \
   --account "$DEPLOYER" --rpc-url "$RPC_URL"
 ```
 
-Pass `--step <blocks>` when the RPC endpoint caps the block range of `eth_getLogs`, and `--from-block` to start at the registry's deployment block. Linking is safe to repeat. A clear that lands between steps 1 and 2 is not lost: a subname linked after its parent was cleared reads as cleared from the moment it is linked. Until then it still resolves, which is why linking follows the registry upgrade directly.
+Pass `--step <blocks>` when the RPC endpoint caps the block range of `eth_getLogs`, and `--from-block` to start at the registry's deployment block. Linking is safe to repeat. A clear that lands between steps 1 and 2 is not lost: a subname linked after a name above it was cleared reads as cleared once it and every level between them are linked. Until then it still resolves, which is why linking follows the registry upgrade directly.
 
 Verify before considering the upgrade done. A second dry run should report nothing left to link, and:
 
@@ -274,8 +274,8 @@ cast call "$REGISTRY_PROXY" 'MAX_SUBNAME_DEPTH()(uint256)' --rpc-url "$RPC_URL" 
 
 The upgrade is additive. Every existing function, event and error keeps its selector and its arguments, and every existing call keeps working:
 
-- Records written before the upgrade stay readable. Every node starts at record version zero, which is also the stamp those records carry, so nothing is migrated and a record changes only when its node is cleared.
-- Subnames created before the upgrade keep resolving, under the same owners, until a name above them is cleared.
+- Records written before the upgrade stay readable. Every node starts at record version zero, which is also the stamp those records carry, so nothing is migrated and a record reads as unset only once its node, or a name above it, is cleared.
+- Subnames created before the upgrade keep resolving, under the same owners, until a name above them is cleared and they are linked.
 - Registration, transfer, release, withdraw, redeem and reclaim take the same calls and arguments. A transfer still clears nothing.
 - Every record setter keeps its signature and behaviour. Writing an empty value frees the record's storage, as storing a zero always has, and frees its version stamp with it.
 - `TextUpdated` is unchanged. `TextChanged` is emitted alongside it and carries the key readably.
@@ -294,8 +294,8 @@ The upgrade is additive. Every existing function, event and error keeps its sele
 
 - A name that is cleared, or a subname beneath one, reads as empty. For a cleared subname `owner`, `resolver` and `recordExists` return zero and false, and `isAuthorised` returns false. A consumer that caches records or subnames must drop them on `RecordsCleared` and `SubnamesCleared`, one event per clear, since descendants emit nothing of their own.
 - Creating a subname more than `MAX_SUBNAME_DEPTH` levels below its second-level name reverts with `SubnameTooDeep`. Subnames that already sit deeper keep working and can still be reassigned.
-- Resolver reads make one call into the registry, and reads of a subname walk the levels above it, so a contract that resolves names on chain pays a little more gas. `release` makes three more calls: it deletes the address and content hash and clears the name.
-- Creating a subname writes its parent and its parent's version, two more storage slots. That includes every device name the gateway issues, which costs about 28k more gas (around 5%) in the test suite. Confirm the gateway pallet's gas limit for issuance leaves that headroom before upgrading.
+- Resolver reads make two calls they did not make before (the protocol registry lookup and `recordVersion`), and reads of a subname walk the levels above it, so a contract that resolves names on chain pays a little more gas. `release` makes three more writes, deleting the address and content hash and clearing the name, each with its own lookups.
+- Creating a subname writes its parent, one more storage slot, and its parent's subname version too once that parent has been cleared. That includes every device name the gateway issues, which costs about 28k more gas (around 5%) in the test suite. Confirm the gateway pallet's gas limit for issuance leaves that headroom before upgrading.
 
 ## Deployment pipeline
 
