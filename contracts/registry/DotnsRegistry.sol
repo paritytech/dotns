@@ -60,8 +60,9 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice Node => its versions.
     mapping(bytes32 node => NodeVersions versions) private _versions;
 
-    /// @notice Subname => its parent. Zero for tokenised names, and for a subname created before
-    ///         parents were recorded until it is linked (@custom:function linkSubname).
+    /// @notice Subname => its parent. Zero for tokenised names, for deleted subnames, and for a
+    ///         subname whose parent was never recorded until it is linked
+    ///         (@custom:function linkSubname).
     mapping(bytes32 node => bytes32 parent) private _parentOf;
 
     uint256[48] private __gap;
@@ -258,11 +259,15 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         bytes32 subnode = LabelUtils.namehashUnder(parentNode, labelhash);
         _linkIfUnlinked(subnode, parentNode);
         Record storage existing = records[subnode];
-        require(existing.exists && _isLive(subnode), SubnameNotFound(subnode));
+        require(
+            existing.owner != address(0) && existing.exists && _isLive(subnode),
+            SubnameNotFound(subnode)
+        );
 
         // The record and the parent link are zeroed, which releases their storage deposit to the
-        // caller, and a node with no record is what a node that was never created looks like, so
-        // every read treats the subname as absent and every deeper subname fails its walk here.
+        // signer of the transaction. A node with no record is what a node that was never created
+        // looks like, so every read treats the subname as absent and every deeper subname fails
+        // its walk here.
         // The versions are the one slot that stays, and are bumped rather than zeroed: a subname
         // created here again must not match the stamps of records written for this one, nor the
         // subnames created beneath it, none of which can be listed to delete.
@@ -302,8 +307,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     function owner(bytes32 node) external view override returns (address) {
         Record storage record = records[node];
         // Read `owner` first: a non-zero stored owner proves the record exists and is a subnode,
-        // collapsing the lookup to a single SLOAD. The slower `exists` SLOAD only runs on the
-        // tokenised-or-missing branch.
+        // which then resolves only while every level above it does, so the subnode branch walks
+        // its ancestors. The `exists` SLOAD only runs on the tokenised-or-missing branch.
         address storedOwner = record.owner;
         if (storedOwner != address(0)) return _isLive(node) ? storedOwner : address(0);
         if (!record.exists) return address(0);
@@ -399,8 +404,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         Record storage record = records[node];
 
         // Read `owner` first: a non-zero stored owner means this is a subnode with an explicit
-        // owner and the existence flag is implied. Skipping the `exists` SLOAD on the common
-        // subnode path saves one slot read.
+        // owner and the existence flag is implied. The owner is compared before the ancestor walk
+        // so a caller who is not the owner costs one slot read.
         address storedOwner = record.owner;
         if (storedOwner != address(0)) {
             return storedOwner == account && _isLive(node);
@@ -424,8 +429,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     ///      subname version it was created under is still its parent's, and its parent resolves in
     ///      turn, so the walk ends at the tokenised name above it. Clearing therefore costs the
     ///      same at any depth, and the depth is paid on reads instead. A subname with no recorded
-    ///      parent predates parent tracking, and ends the walk as resolving until @custom:function
-    ///      linkSubname or a write through its parent links it.
+    ///      parent ends the walk as resolving, because nothing above it can be checked, until
+    ///      @custom:function linkSubname or a write through its parent links it.
     /// @param node Node identifier.
     /// @return live True when `node` resolves.
     function _isLive(bytes32 node) internal view returns (bool live) {
@@ -457,8 +462,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice Links `subnode` to `parentNode` when it is a subname with no recorded parent.
     /// @dev The caller derives `subnode` from `parentNode`, which is what proves the parent. The
     ///      subname is linked under its parent's first subname version, which is the version it
-    ///      was created under: every subname without a recorded parent was created before any
-    ///      clear could happen.
+    ///      was created under: every path that creates a subname records its parent, so one with no
+    ///      recorded parent was created while its parent's subname version was still zero.
     /// @param subnode The subname.
     /// @param parentNode Its parent.
     function _linkIfUnlinked(bytes32 subnode, bytes32 parentNode) internal {
