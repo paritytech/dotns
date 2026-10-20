@@ -5,6 +5,11 @@ import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
+import {DotnsNameEscrow} from "../../../contracts/escrow/DotnsNameEscrow.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /// @title DotnsRecordClearingTest
 /// @notice Clearing a name's records and subnames: on release, on demand by the owner, and when a
@@ -173,18 +178,6 @@ contract DotnsRecordClearingTest is BaseDotns {
         assertEq(dotnsRegistry.owner(childNode), tiago);
         _assertRecordsUnset(childNode, "recreated child");
         _assertSubnameGone(grandchildNode, "grandchild of the recreated child");
-    }
-
-    function test_clearReleasedName_is_permissionless_while_in_custody() public {
-        _release();
-        vm.prank(leonardo);
-        dotnsNameEscrow.clearReleasedName(tokenId);
-        _assertRecordsUnset(node, "name");
-    }
-
-    function test_revert_clearReleasedName_outside_custody() public {
-        vm.expectRevert(abi.encodeWithSelector(IDotnsNameEscrow.NotReleased.selector, tokenId));
-        dotnsNameEscrow.clearReleasedName(tokenId);
     }
 
     // transfer
@@ -409,18 +402,24 @@ contract DotnsRecordClearingTest is BaseDotns {
         assertEq(dotnsRegistry.parentOf(node), bytes32(0), "a tokenised name has no parent");
     }
 
-    // names whose release did not clear them, and names with no registry record
-
-    /// @dev Storage slot of `DotnsRegistry._versions`. Zeroing a node's entry reproduces a name
-    ///      released by an escrow that did not clear on release.
-    uint256 internal constant VERSIONS_SLOT = 2;
+    // names that entered custody without being cleared, and names with no registry record
 
     /// @dev Storage slot of `DotnsRegistry.records`.
     uint256 internal constant RECORDS_SLOT = 0;
 
+    /// @dev Storage slot of `DotnsRegistry._versions`.
+    uint256 internal constant VERSIONS_SLOT = 2;
+
+    /// @dev Releases the name while the registry reports no record for it, which makes release
+    ///      skip the clear, the way an escrow that did not clear on release left it.
     function _releaseWithoutClearing() internal {
+        vm.mockCall(
+            address(dotnsRegistry),
+            abi.encodeCall(IDotnsRegistry.recordExists, (node)),
+            abi.encode(false)
+        );
         _release();
-        vm.store(address(dotnsRegistry), keccak256(abi.encode(node, VERSIONS_SLOT)), bytes32(0));
+        vm.clearMockedCalls();
         _assertRecordsSet(node, "uncleared name in custody");
         assertEq(dotnsRegistry.owner(childNode), tiago, "uncleared subname in custody");
     }
@@ -433,35 +432,183 @@ contract DotnsRecordClearingTest is BaseDotns {
         );
     }
 
-    function test_redeem_clears_a_name_its_release_did_not_clear() public {
+    function test_only_release_clears_redeem_hands_back_what_custody_holds() public {
         _releaseWithoutClearing();
 
         vm.prank(ed);
         dotnsNameEscrow.redeem(tokenId);
 
+        // Nothing clears on the way out, which is why names already in custody at the upgrade
+        // are cleared by `clearCustodyOnUpgrade` before anyone can redeem them.
+        _assertRecordsSet(node, "name");
+    }
+
+    function test_clearCustodyOnUpgrade_clears_every_name_in_custody_as_the_upgrade_call() public {
+        _releaseWithoutClearing();
+
+        DotnsNameEscrow implementation = new DotnsNameEscrow();
+        vm.prank(owner);
+        dotnsNameEscrow.upgradeToAndCall(
+            address(implementation), abi.encodeCall(IDotnsNameEscrow.clearCustodyOnUpgrade, ())
+        );
+
         _assertRecordsUnset(node, "name");
         _assertSubnameGone(childNode, "child");
         _assertSubnameGone(grandchildNode, "grandchild");
+
+        vm.prank(ed);
+        dotnsNameEscrow.redeem(tokenId);
+        _assertRecordsUnset(node, "redeemed name");
     }
 
-    function test_reclaim_clears_a_name_its_release_did_not_clear() public {
+    function test_clearCustodyOnUpgrade_clears_lazily_and_deletes_nothing() public {
         _releaseWithoutClearing();
-        vm.warp(dotnsNameEscrow.getReleasePosition(tokenId).redeemableUntil);
 
-        _register(LABEL, leonardo, IPopRules.PopStatus.NoStatus);
+        vm.prank(owner);
+        dotnsNameEscrow.clearCustodyOnUpgrade();
 
-        assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
-        _assertRecordsUnset(node, "name");
-        _assertSubnameGone(childNode, "child");
+        // The deposit for these slots was paid by the holder; deleting them here would release it
+        // to the signer of this call instead.
+        assertTrue(vm.load(address(dotnsResolver), _addressSlot(node)) != bytes32(0));
+        assertTrue(vm.load(address(dotnsContentResolver), _contenthashSlot(node)) != bytes32(0));
     }
 
-    function test_clearReleasedName_clears_a_name_still_in_custody() public {
-        _releaseWithoutClearing();
+    function test_revert_clearCustodyOnUpgrade_a_second_time() public {
+        vm.prank(owner);
+        dotnsNameEscrow.clearCustodyOnUpgrade();
 
-        dotnsNameEscrow.clearReleasedName(tokenId);
+        vm.prank(owner);
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        dotnsNameEscrow.clearCustodyOnUpgrade();
+    }
 
-        _assertRecordsUnset(node, "name");
-        _assertSubnameGone(childNode, "child");
+    function test_revert_clearCustodyOnUpgrade_from_anyone_but_the_owner() public {
+        vm.prank(leonardo);
+        vm.expectRevert(
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, leonardo)
+        );
+        dotnsNameEscrow.clearCustodyOnUpgrade();
+    }
+
+    // storage that a delete actually frees
+
+    /// @dev Storage slots of the resolver mappings, checked by
+    ///      `test_resolver_slot_constants_point_at_the_record_mappings`.
+    uint256 internal constant ADDRESSES_SLOT = 51;
+    uint256 internal constant ADDRESS_VERSIONS_SLOT = 52;
+    uint256 internal constant CONTENTHASHES_SLOT = 0;
+    uint256 internal constant TEXT_RECORDS_SLOT = 1;
+    uint256 internal constant CONTENTHASH_VERSIONS_SLOT = 54;
+    uint256 internal constant TEXT_VERSIONS_SLOT = 55;
+
+    function _addressSlot(bytes32 target) internal pure returns (bytes32) {
+        return keccak256(abi.encode(target, ADDRESSES_SLOT));
+    }
+
+    function _addressStampSlot(bytes32 target) internal pure returns (bytes32) {
+        return keccak256(abi.encode(target, ADDRESS_VERSIONS_SLOT));
+    }
+
+    function _contenthashSlot(bytes32 target) internal pure returns (bytes32) {
+        return keccak256(abi.encode(target, CONTENTHASHES_SLOT));
+    }
+
+    function _contenthashStampSlot(bytes32 target) internal pure returns (bytes32) {
+        return keccak256(abi.encode(target, CONTENTHASH_VERSIONS_SLOT));
+    }
+
+    function _textSlot(bytes32 target, string memory key) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(key, keccak256(abi.encode(target, TEXT_RECORDS_SLOT))));
+    }
+
+    function _textStampSlot(bytes32 target, string memory key) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(key, keccak256(abi.encode(target, TEXT_VERSIONS_SLOT))));
+    }
+
+    function _assertZero(address target, bytes32 slot, string memory what) internal view {
+        assertEq(vm.load(target, slot), bytes32(0), what);
+    }
+
+    /// @dev Writes every record type under a non-zero record version, so both the values and
+    ///      their stamps occupy storage.
+    function _writeStampedRecords() internal {
+        vm.prank(ed);
+        dotnsRegistry.clearRecords(node);
+        _writeRecords(node, ed);
+    }
+
+    function test_resolver_slot_constants_point_at_the_record_mappings() public {
+        _writeStampedRecords();
+        assertTrue(vm.load(address(dotnsResolver), _addressSlot(node)) != bytes32(0));
+        assertTrue(vm.load(address(dotnsResolver), _addressStampSlot(node)) != bytes32(0));
+        assertTrue(vm.load(address(dotnsContentResolver), _contenthashSlot(node)) != bytes32(0));
+        assertTrue(
+            vm.load(address(dotnsContentResolver), _contenthashStampSlot(node)) != bytes32(0)
+        );
+        assertTrue(vm.load(address(dotnsContentResolver), _textSlot(node, TEXT_KEY)) != bytes32(0));
+        assertTrue(
+            vm.load(address(dotnsContentResolver), _textStampSlot(node, TEXT_KEY)) != bytes32(0)
+        );
+    }
+
+    function test_writing_empty_deletes_each_record_and_its_stamp() public {
+        _writeStampedRecords();
+
+        vm.startPrank(ed);
+        dotnsResolver.setAddress(node, address(0));
+        dotnsContentResolver.setContenthash(node, "");
+        dotnsContentResolver.setText(node, TEXT_KEY, "");
+        vm.stopPrank();
+
+        _assertRecordsUnset(node, "deleted");
+        _assertZero(address(dotnsResolver), _addressSlot(node), "address");
+        _assertZero(address(dotnsResolver), _addressStampSlot(node), "address stamp");
+        _assertZero(address(dotnsContentResolver), _contenthashSlot(node), "content hash");
+        _assertZero(address(dotnsContentResolver), _contenthashStampSlot(node), "hash stamp");
+        _assertZero(address(dotnsContentResolver), _textSlot(node, TEXT_KEY), "text");
+        _assertZero(address(dotnsContentResolver), _textStampSlot(node, TEXT_KEY), "text stamp");
+    }
+
+    function test_writing_empty_frees_a_text_key_a_clear_left_behind() public {
+        vm.prank(ed);
+        dotnsRegistry.clearRecords(node);
+        assertTrue(vm.load(address(dotnsContentResolver), _textSlot(node, TEXT_KEY)) != bytes32(0));
+
+        vm.prank(ed);
+        dotnsContentResolver.setText(node, TEXT_KEY, "");
+
+        _assertZero(address(dotnsContentResolver), _textSlot(node, TEXT_KEY), "stale text");
+    }
+
+    function test_release_deletes_address_and_content_hash_and_hides_text() public {
+        _writeStampedRecords();
+        _release();
+
+        _assertZero(address(dotnsResolver), _addressSlot(node), "address");
+        _assertZero(address(dotnsResolver), _addressStampSlot(node), "address stamp");
+        _assertZero(address(dotnsContentResolver), _contenthashSlot(node), "content hash");
+        _assertZero(address(dotnsContentResolver), _contenthashStampSlot(node), "hash stamp");
+
+        // Text keys cannot be listed, so release hides them and their storage stays.
+        assertEq(dotnsContentResolver.text(node, TEXT_KEY), "");
+        assertTrue(vm.load(address(dotnsContentResolver), _textSlot(node, TEXT_KEY)) != bytes32(0));
+    }
+
+    function test_deleteSubname_zeroes_the_record_and_the_parent_link() public {
+        vm.prank(ed);
+        dotnsRegistry.deleteSubname(node, keccak256(bytes(CHILD)));
+
+        bytes32 base = keccak256(abi.encode(childNode, RECORDS_SLOT));
+        _assertZero(address(dotnsRegistry), base, "record owner slot");
+        _assertZero(address(dotnsRegistry), bytes32(uint256(base) + 1), "record resolver slot");
+        _assertZero(
+            address(dotnsRegistry), keccak256(abi.encode(childNode, PARENT_OF_SLOT)), "parent link"
+        );
+        assertTrue(
+            vm.load(address(dotnsRegistry), keccak256(abi.encode(childNode, VERSIONS_SLOT)))
+                != bytes32(0),
+            "the versions stay, so a subname created here again starts empty"
+        );
     }
 
     function test_release_redeem_and_reclaim_still_work_for_a_name_with_no_registry_record()
