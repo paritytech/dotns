@@ -1,14 +1,13 @@
 #!/usr/bin/env bun
-// Brings names and subnames that predate record and subname clearing into it.
+// Links every subname that has no recorded parent, so that clearing a name above it reaches it.
 //
-// Two jobs, both safe to repeat and both permissionless on chain:
+// Clearing a name reaches the subnames beneath it only through their recorded parents, and a
+// subname created before parents were recorded has none. Each level is linked on its own, because
+// an unlinked subname cannot name its parent. Candidates come from the registry's `NewOwner`
+// events. `linkSubname` is permissionless and a repeat run links nothing twice.
 //
-//   1. Link every subname that has no recorded parent. Clearing a name reaches the subnames beneath
-//      it only through their recorded parents, and a subname created before parents were recorded
-//      has none. Each level is linked on its own, because an unlinked subname cannot name its
-//      parent. Candidates come from the registry's `NewOwner` events.
-//   2. Clear every name the escrow already holds (`--escrow`). Release clears a name as it takes
-//      custody, so only names released before that need it.
+// With `--escrow`, it also lists the names the escrow holds in custody, which is the set
+// `clearCustodyOnUpgrade` clears during the escrow upgrade. It never sends anything to the escrow.
 //
 // Reads only, unless `--send` is given, which signs with PRIVATE_KEY.
 //
@@ -42,7 +41,6 @@ const REGISTRY_ABI = parseAbi([
 const ESCROW_ABI = parseAbi([
   "function releasedTokenCount() view returns (uint256)",
   "function releasedTokens(uint256 start, uint256 limit) view returns (uint256[])",
-  "function clearReleasedName(uint256 tokenId)",
 ]);
 
 const ZERO = `0x${"0".repeat(64)}`;
@@ -157,9 +155,8 @@ async function main() {
     console.log(`  ${subnode} parent=${parent} labelhash=${label}`);
   }
 
-  let custody = [];
   if (args.escrow) {
-    custody = await releasedTokens(client, args.escrow);
+    const custody = await releasedTokens(client, args.escrow);
     console.log(`names in escrow custody: ${custody.length}`);
     for (const tokenId of custody) console.log(`  ${tokenId}`);
   }
@@ -182,16 +179,6 @@ async function main() {
       abi: REGISTRY_ABI,
       functionName: "linkSubname",
       args: [parent, label],
-    })),
-  );
-  await sendAll(
-    client,
-    wallet,
-    custody.map((tokenId) => ({
-      address: args.escrow,
-      abi: ESCROW_ABI,
-      functionName: "clearReleasedName",
-      args: [tokenId],
     })),
   );
   console.log("done");
