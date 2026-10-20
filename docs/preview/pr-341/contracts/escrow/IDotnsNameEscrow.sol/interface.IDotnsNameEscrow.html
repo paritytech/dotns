@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/5126604e9b2455bc6df010c50b8965325e178ccc/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/28b7a9bdc47e31f1bcfef5bba6d364064f561118/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Name Escrow Interface</p>
 <p>Escrows refundable deposits for registered names and manages the release lifecycle.</p>
@@ -322,31 +322,43 @@ holder's exclusive redeem phase and opens permissionless reclaim. Both are snaps
 so later policy changes never move an in-flight position. A release attempted while
 <code>redeemWindow</code> is unseeded triggers @custom:reverts RedeemWindowNotConfigured.
 Releasing gives up the name's records and subnames along with the name: once the token
-is in custody the escrow, as its owner, calls @custom:function IDotnsRegistry.clear, so
-every record reads as unset and every subname stops resolving from this call on, and
-whoever gets the name next, through @custom:function redeem or</p>
+is in custody the escrow, as its owner, deletes the address and content hash, which
+releases their storage deposit to the caller, and calls</p>
 </li>
 <li>
-<p>function: reclaim, starts clean.</p>
+<p>function: IDotnsRegistry.clear, so every text record reads as unset and every
+subname stops resolving from this call on. Whoever gets the name next, through</p>
+</li>
+<li>
+<p>function: redeem or @custom:function reclaim, starts clean. Text records and
+subnames keep their storage and its deposit; a holder who wants that deposit back
+deletes them before releasing.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function release(uint256 tokenId) external;
 </code></pre>
-<h3 id="clearreleasedname"><a class="header" href="#clearreleasedname">clearReleasedName</a></h3>
-<p>Clears the records and subnames of a name the escrow holds in custody.</p>
-<p>@custom:function release clears a name as it takes custody, and @custom:function redeem
-and @custom:function reclaim clear it again as it leaves, so this is needed only to
-clear, while it is still in custody, a name that entered custody without being cleared.
-Anywhere else it is a harmless repeat. Permissionless, because the escrow is the name's
-owner while it holds it and clearing is the state release promises. The position must
-be released, otherwise @custom:reverts NotReleased.</p>
-<pre><code class="language-solidity">function clearReleasedName(uint256 tokenId) external;
+<h3 id="clearcustodyonupgrade"><a class="header" href="#clearcustodyonupgrade">clearCustodyOnUpgrade</a></h3>
+<p>Clears, once, every name the escrow holds in custody, for names that entered
+custody without being cleared.</p>
+<p>@custom:function release clears a name as it takes custody, and that is the only point
+a name is cleared, so a name that entered custody without being cleared would otherwise
+be handed back with its records through @custom:function redeem or</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: reclaim. Meant to run as the post-upgrade call of <code>upgradeToAndCall</code>,
+so nothing can be redeemed or reclaimed between the upgrade and the clear. Owner-only
+(@custom:reverts OwnableUnauthorizedAccount) and callable once per proxy
+(@custom:reverts InvalidInitialization on a second call). It clears lazily only and
+deletes no record outright: deleting would release storage deposit the holders paid to
+the signer of this call instead. Walks every name in custody in one call, so check</p>
+</li>
+<li>
+<p>function: releasedTokenCount before relying on it.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function clearCustodyOnUpgrade() external;
 </code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token held in custody.</td></tr>
-</tbody></table>
-</div>
 <h3 id="withdraw"><a class="header" href="#withdraw">withdraw</a></h3>
 <p>Credits the refundable deposit for a released token to the recipient's pending
 balance.</p>
@@ -406,9 +418,8 @@ still holds value, this call settles it: the amount is debited from <code>tokenR
 previous recipient's pull-payment balance, claimable through @custom:function
 claimWithdrawal with no deadline. That is what keeps a name recyclable when its
 previous holder never returns: the value follows them, the name does not wait for them.
-Emits @custom:emits RefundWithdrawn on settlement. The name is cleared before it leaves
-custody (@custom:function IDotnsRegistry.clear), so the new owner starts clean even
-for a name whose release did not clear it.</p>
+Emits @custom:emits RefundWithdrawn on settlement. The name arrives as release left it:
+cleared, so the new owner starts clean.</p>
 <pre><code class="language-solidity">function reclaim(uint256 tokenId, address newOwner) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -444,8 +455,7 @@ reverts: NotRedeemable.
 No value moves. The position keeps its recipient, asset and amount, so the deposit
 stays locked exactly as it was before the release, and the name is releasable again
 later on a fresh pair of clocks. The records and subnames the release cleared do not
-come back: the holder gets the name back clean, and the name is cleared once more on
-the way out so that holds for a name whose release did not clear it. Excluding
+come back: the holder gets the name back clean. Excluding
 withdrawn positions is deliberate: a holder who has already pulled the deposit would
 otherwise recover the name without it being deposit-backed, breaking the one-deposit-
 per-live-name bound. The choice is therefore exclusive — take the value back, or take

@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/5126604e9b2455bc6df010c50b8965325e178ccc/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/28b7a9bdc47e31f1bcfef5bba6d364064f561118/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -396,10 +396,15 @@ beneath it.</p>
 <ul>
 <li>
 <p>reverts: NotAuthorised: subnames are parent-sovereign, so the parent decides,
-not the subname's holder. The subname must currently resolve, otherwise</p>
+not the subname's holder. The subname's record and parent link are zeroed, releasing
+their storage deposit to the caller; one version slot stays so the subname, created
+again, starts empty. Subnames beneath it are cleared but keep their storage, so a
+parent that wants every deposit back deletes from the deepest subname up. The subname
+must currently resolve, otherwise @custom:reverts SubnameNotFound. Emits @custom:emits
+NewOwner with a zero owner, the deletion convention indexers already follow, and</p>
 </li>
 <li>
-<p>emits: SubnamesCleared for the subname.</p>
+<p>emits: RecordsCleared and @custom:emits SubnamesCleared for the subname.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function deleteSubname(
