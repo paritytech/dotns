@@ -239,14 +239,14 @@ Neither a name's text records nor its subnames can be listed on chain, so cleari
 - `clear(node)` does both. The escrow calls it on release.
 - `deleteSubname(parent, labelhash)` removes one subname and everything beneath it. Subnames are parent-sovereign, so this is the parent's call, not the subname holder's.
 
-All four take the same authority as any other write to the node. A cleared or deleted subname can be created again and starts empty, even for the same holder. A clear leaves the bytes written before in storage, where nothing reads them, and their storage deposit stays locked.
+All four take the same authority as any other write to the node, or for `deleteSubname` to its parent. A cleared or deleted subname can be created again and starts empty, even for the same holder. A clear leaves the bytes written before in storage, where nothing reads them, and their storage deposit stays locked.
 
 Deleting is how an owner gets that deposit back, and only what the owner knows about can be deleted:
 
 - Writing an empty value deletes a record: `setAddress(node, address(0))`, `setContenthash(node, "")`, `setText(node, key, "")`. The value and its version stamp are both zeroed. This also frees a text key a clear has already hidden.
 - `deleteSubname` zeroes the subname's record and its parent link. One version slot stays, so the subname, created again, cannot pick up its old records or children. Subnames beneath it are cleared but keep their storage, so to free everything, delete from the deepest subname up. Consumers that index records or subnames learn of a clear from the registry's `RecordsCleared` and `SubnamesCleared` events, one per clear, since descendants emit nothing of their own.
 
-Records written before versions existed carry stamp zero, the version every node starts at, so they stay readable until the node is first cleared. Subnames created before parents were recorded need linking (`linkSubname`, permissionless) before a clear above them reaches them; see [DEPLOYMENTS.md](./DEPLOYMENTS.md).
+A record stamped zero matches the version every node starts at, so it stays readable until its node is first cleared. A subname with no recorded parent needs linking (`linkSubname`, permissionless) before a clear above it reaches it, and so does every level between it and that clear; see [DEPLOYMENTS.md](./DEPLOYMENTS.md#upgrading-to-record-and-subname-clearing).
 
 The registry exposes isAuthorised(node, account) as the canonical check for whether an address may manage a node: the stored owner for a subname, or the ERC-721 holder, a single-token approvee, or an operator-for-all on the registrar for a tokenised name. Sibling contracts consult this view so a single registrar-level approval delegates management across the protocol rather than each contract maintaining its own approval list.
 
@@ -379,6 +379,7 @@ The protocol carries a handful of constraints worth knowing before deploying or 
 - **Deferred LabelStore deployment** (runtime). See [DotnsPopController](#early-testnet-quirk-labelstore-deployment).
 - **No standalone user-status mapping** (current implementation). See [DotnsPopController](#dotnspopcontroller).
 - **Clearing hides records rather than erasing them** (current implementation). See [Clearing records and subnames](#clearing-records-and-subnames).
+- **Root-written storage refunds deposits nobody paid** (runtime). Releasing or reclaiming a name governance minted zeroes storage Root wrote, refunding a deposit that was never charged. See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md#4-root-written-storage-refunds-deposits-nobody-paid).
 
 ## License
 
