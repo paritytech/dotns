@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/7d79cd7ce5bb4aced52ec32d9618c97ed6c2e25a/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/752ab235cae7c2d95ffb3727bce24e5266adf6a3/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -216,8 +216,9 @@ when a subname is created, so a deeper subname that already exists keeps working
 <pre><code class="language-solidity">mapping(bytes32 node =&gt; NodeVersions versions) private _versions
 </code></pre>
 <h3 id="_parentof"><a class="header" href="#_parentof">_parentOf</a></h3>
-<p>Subname =&gt; its parent. Zero for tokenised names, and for a subname created before
-parents were recorded until it is linked (@custom:function linkSubname).</p>
+<p>Subname =&gt; its parent. Zero for tokenised names, for deleted subnames, and for a
+subname whose parent was never recorded until it is linked
+(@custom:function linkSubname).</p>
 <pre><code class="language-solidity">mapping(bytes32 node =&gt; bytes32 parent) private _parentOf
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
@@ -265,8 +266,17 @@ oz-upgrades-unsafe-allow: constructor</p>
 <h3 id="setsubnodeowner"><a class="header" href="#setsubnodeowner">setSubnodeOwner</a></h3>
 <p>Creates or reassigns a subnode and assigns its owner.</p>
 <p>Callable only by the current owner of <code>record.parentNode</code>, otherwise</p>
-<p><strong>Note:</strong>
-reverts: NotAuthorised. The new owner address must be non-zero, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotAuthorised. The new owner address must be non-zero, otherwise</p>
+</li>
+<li>
+<p>emits: RecordsCleared and @custom:emits SubnamesCleared, so none of its old
+records or subnames come back. Emits @custom:emits NewOwner on each successful
+assignment.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function setSubnodeOwner(SubnodeRecord calldata record)
     external
     override
@@ -379,8 +389,8 @@ Emits @custom:emits SubnamesCleared.</p>
 <h3 id="clear"><a class="header" href="#clear">clear</a></h3>
 <p>Clears every record and every subname of <code>node</code>.</p>
 <p>Equivalent to @custom:function clearRecords followed by @custom:function clearSubnames
-in one call, with the same authority. <code>DotnsNameEscrow.release</code> calls it once it holds
-the token, which is what makes a released name start clean for whoever gets it next.</p>
+in one call, with the same authority. The escrow calls it on release, once it holds the
+token, which is what makes a released name start clean for whoever gets it next.</p>
 <pre><code class="language-solidity">function clear(bytes32 node) external override authorised(node);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -397,14 +407,13 @@ beneath it.</p>
 <li>
 <p>reverts: NotAuthorised: subnames are parent-sovereign, so the parent decides,
 not the subname's holder. The subname's record and parent link are zeroed, releasing
-their storage deposit to the caller; one version slot stays so the subname, created
-again, starts empty. Subnames beneath it are cleared but keep their storage, so a
-parent that wants every deposit back deletes from the deepest subname up. The subname
-must currently resolve, otherwise @custom:reverts SubnameNotFound. Emits @custom:emits
-NewOwner with a zero owner, the deletion convention indexers already follow, and</p>
+their storage deposit to the signer of the transaction; one version slot stays so the
+subname, created again, starts empty. Subnames beneath it are cleared but keep their
+storage, so freeing every deposit means deleting from the deepest subname up, each by
+whoever holds that subname's parent. The subname must currently resolve, otherwise</p>
 </li>
 <li>
-<p>emits: RecordsCleared and @custom:emits SubnamesCleared for the subname.</p>
+<p>emits: SubnamesCleared for the subname.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function deleteSubname(
@@ -422,12 +431,14 @@ NewOwner with a zero owner, the deletion convention indexers already follow, and
 </tbody></table>
 </div>
 <h3 id="linksubname"><a class="header" href="#linksubname">linkSubname</a></h3>
-<p>Records the parent of a subname created before parents were recorded, so that
-clearing an ancestor reaches it.</p>
+<p>Records the parent of a subname whose parent was never recorded, so that clearing
+an ancestor reaches it.</p>
 <p>Permissionless: the parent is proven by the namehash, since <code>subnode</code> is
 <code>keccak256(parentNode, labelhash)</code>, so a caller cannot link a subname anywhere else.
 The subname is linked as created under its parent's first subname version, so a subname
-whose ancestor was cleared before it was linked reads as cleared once linked. Every
+whose ancestor was cleared before it was linked reads as cleared once it and every
+level between it and that ancestor are linked; an unlinked level still ends the walk
+as resolving. Every
 write path that names a parent links it as a side effect; this entry point covers the
 rest. @custom:reverts SubnameNotFound when no subname exists there. A subname already
 linked is left as it is. Emits @custom:emits SubnameLinked when it links.</p>
@@ -446,8 +457,8 @@ under.</p>
 differs, or any record of a node that does not resolve, as unset. A tokenised name
 resolves while its record exists; a subname resolves while no ancestor has cleared or
 deleted it.
-Version 0 is the version every node starts at, so records written before versions
-existed carry a matching stamp and stay readable until the node is first cleared.
+Version 0 is the version every node starts at, and a record stamped 0 matches it, so a
+node that was never cleared reads every record stamped 0.
 Checking a subname walks its ancestors, so the cost grows with its depth.</p>
 <pre><code class="language-solidity">function recordVersion(bytes32 node)
     external
@@ -468,9 +479,10 @@ Checking a subname walks its ancestors, so the cost grows with its depth.</p>
 </div>
 <h3 id="parentof"><a class="header" href="#parentof">parentOf</a></h3>
 <p>Returns the recorded parent of a subname.</p>
-<p>Zero for a tokenised name, for a node that was never created, and for a subname
-created before parents were recorded and not linked since (@custom:function
-linkSubname). A backfill reads it to find the subnames still to link.</p>
+<p>Zero for a tokenised name, for a node that was never created or was deleted, and for
+a subname whose parent was never recorded and that has not been linked since
+(@custom:function linkSubname). A backfill reads it to find the subnames still to
+link.</p>
 <pre><code class="language-solidity">function parentOf(bytes32 node) external view override returns (bytes32 parent);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -566,8 +578,9 @@ stored owner, and resolves exactly when its record exists. A subname resolves wh
 subname version it was created under is still its parent's, and its parent resolves in
 turn, so the walk ends at the tokenised name above it. Clearing therefore costs the
 same at any depth, and the depth is paid on reads instead. A subname with no recorded
-parent predates parent tracking, and ends the walk as resolving until @custom:function
-linkSubname or a write through its parent links it.</p>
+parent ends the walk as resolving, because nothing above it can be checked, until</p>
+<p><strong>Note:</strong>
+function: linkSubname or a write through its parent links it.</p>
 <pre><code class="language-solidity">function _isLive(bytes32 node) internal view returns (bool live);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -601,8 +614,8 @@ trailing dot, and the count is one more than the number of dots.</p>
 <p>Links <code>subnode</code> to <code>parentNode</code> when it is a subname with no recorded parent.</p>
 <p>The caller derives <code>subnode</code> from <code>parentNode</code>, which is what proves the parent. The
 subname is linked under its parent's first subname version, which is the version it
-was created under: every subname without a recorded parent was created before any
-clear could happen.</p>
+was created under: every path that creates a subname records its parent, so one with no
+recorded parent was created while its parent's subname version was still zero.</p>
 <pre><code class="language-solidity">function _linkIfUnlinked(bytes32 subnode, bytes32 parentNode) internal;
 </code></pre>
 <p><strong>Parameters</strong></p>

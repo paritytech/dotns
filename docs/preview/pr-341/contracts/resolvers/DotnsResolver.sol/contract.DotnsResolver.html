@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsresolver"><a class="header" href="#dotnsresolver">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/7d79cd7ce5bb4aced52ec32d9618c97ed6c2e25a/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/752ab235cae7c2d95ffb3727bce24e5266adf6a3/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
@@ -210,8 +210,8 @@ security-contact: admin@parity.io</p>
 </code></pre>
 <h3 id="addressversions"><a class="header" href="#addressversions">addressVersions</a></h3>
 <p>Node =&gt; registry record version its address was written under.</p>
-<p>Zero for every record written before stamps existed, which matches the version every
-node starts at, so those records stay readable until the node is first cleared.</p>
+<p>Zero matches the record version every node starts at, so an address stamped zero
+reads as set until its node is first cleared.</p>
 <pre><code class="language-solidity">mapping(bytes32 node =&gt; uint64 version) private addressVersions
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
@@ -244,10 +244,10 @@ setup completes.</p>
 <p>Sets the resolved address for a node.</p>
 <p>The caller must be the current owner of <code>node</code> in the forward registry, otherwise</p>
 <p><strong>Note:</strong>
-reverts: NotAuthorised. A zero <code>value</code> deletes the record: its storage is
-zeroed and the storage deposit released to the caller, which is how an owner reclaims
-it before giving the name up. Emits @custom:emits AddressSet on every successful
-write.</p>
+reverts: NotAuthorised. A zero <code>value</code> deletes the record: its storage is zeroed
+and the storage deposit released to the signer of the transaction, which is how an
+owner reclaims it before giving the name up. Emits @custom:emits AddressSet on every
+successful write.</p>
 <pre><code class="language-solidity">function setAddress(bytes32 node, address value) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>

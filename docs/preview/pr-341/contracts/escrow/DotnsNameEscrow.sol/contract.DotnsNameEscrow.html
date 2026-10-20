@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/7d79cd7ce5bb4aced52ec32d9618c97ed6c2e25a/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/752ab235cae7c2d95ffb3727bce24e5266adf6a3/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
@@ -529,29 +529,38 @@ so later policy changes never move an in-flight position. A release attempted wh
 <code>redeemWindow</code> is unseeded triggers @custom:reverts RedeemWindowNotConfigured.
 Releasing gives up the name's records and subnames along with the name: once the token
 is in custody the escrow, as its owner, deletes the address and content hash, which
-releases their storage deposit to the caller, and calls</p>
+releases their storage deposit to the signer of this transaction, and calls</p>
 </li>
 <li>
 <p>function: IDotnsRegistry.clear, so every text record reads as unset and every
-subname stops resolving from this call on. Whoever gets the name next, through</p>
+linked subname stops resolving from this call on (a subname with no recorded parent
+is reached once @custom:function IDotnsRegistry.linkSubname links it). Whoever gets
+the name next, through @custom:function redeem or @custom:function reclaim, starts
+clean. Text records and subnames keep their storage and its deposit; a holder who wants
+that deposit back deletes them before releasing.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function release(uint256 tokenId) external override nonReentrant;
 </code></pre>
 <h3 id="clearcustodyonupgrade"><a class="header" href="#clearcustodyonupgrade">clearCustodyOnUpgrade</a></h3>
-<p>Clears, once, every name the escrow holds in custody, for names that entered
-custody without being cleared.</p>
-<p>@custom:function release clears a name as it takes custody, and that is the only point
-a name is cleared, so a name that entered custody without being cleared would otherwise
-be handed back with its records through @custom:function redeem or</p>
-<p><strong>Note:</strong>
-function: reclaim. Meant to run as the post-upgrade call of <code>upgradeToAndCall</code>,
-so nothing can be redeemed or reclaimed between the upgrade and the clear. Owner-only
-(@custom:reverts OwnableUnauthorizedAccount) and callable once per proxy
-(@custom:reverts InvalidInitialization on a second call). It clears lazily only and
-deletes no record outright: deleting would release storage deposit the holders paid to
-the signer of this call instead. Walks every name in custody in one call, so check</p>
-<pre><code class="language-solidity">function clearCustodyOnUpgrade() external override onlyOwner reinitializer(2);
+<p>Clears, once, every name the escrow holds in custody that entered custody without
+being cleared.</p>
+<p>Release clears a name as it takes custody, and redeem and reclaim hand it back as it
+is, so a name that entered custody uncleared would otherwise leave it with its records.
+Meant to run as the post-upgrade call of <code>upgradeToAndCall</code>, so nothing can be
+redeemed or reclaimed between the upgrade and the clear. A deployment that never held
+such names never needs it. Owner-only (@custom:reverts OwnableUnauthorizedAccount) and
+callable once per proxy (@custom:reverts InvalidInitialization on a second call); it
+takes initializer version 2, so a later upgrade that needs a reinitializer starts at 3.
+It clears lazily only and deletes no record outright: deleting would release the
+storage deposit the holders paid to the signer of this call instead. Walks every name
+in custody in one call, so check @custom:function releasedTokenCount before relying on
+it. Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
+through ERC-165 stays the same.
+The one-time <code>clearCustodyOnUpgrade</code> upgrade call is declared on <code>DotnsNameEscrow</code>
+only: adding it in the interface would change the interface id the escrow reports through
+ERC-165.</p>
+<pre><code class="language-solidity">function clearCustodyOnUpgrade() external onlyOwner reinitializer(2);
 </code></pre>
 <h3 id="withdraw"><a class="header" href="#withdraw">withdraw</a></h3>
 <p>Credits the refundable deposit for a released token to the recipient's pending
@@ -817,14 +826,14 @@ registry.</p>
 </div>
 <h3 id="_clearname"><a class="header" href="#_clearname">_clearName</a></h3>
 <p>Clears every record and subname of a name the escrow holds.</p>
-<p>The address and the content hash are one slot each per name, so they are deleted
-outright when <code>deleteRecords</code> is set, and their storage deposit is released to the
-signer of the transaction. Text records and subnames cannot be listed, so the registry
-clear hides them at constant cost and their storage stays.
+<p>The address and the content hash are each one record per name, at a fixed place, so
+they are deleted outright when <code>deleteRecords</code> is set, and their storage deposit is
+released to the signer of the transaction. Text records and subnames cannot be listed,
+so the registry clear hides them at constant cost and their storage stays.
 A name with no registry record has nothing to clear, because records and subnames can
 only be written for a node the registry knows, and the registry admits no clear for a
-node it holds no record of. Such a name is skipped, so it still releases, redeems and
-reclaims as it always could.</p>
+node it holds no record of. Such a name is skipped, so release, redeem and reclaim
+still work for it.</p>
 <pre><code class="language-solidity">function _clearName(uint256 tokenId, bool deleteRecords) internal;
 </code></pre>
 <p><strong>Parameters</strong></p>
