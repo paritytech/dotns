@@ -20,9 +20,9 @@ import {IPersonhood} from "../../../contracts/external/personhood/IPersonhood.so
 ///         create subnodes and nested subnodes, reassign subnodes, write address records,
 ///         clear records and subnames, delete subnodes, and transfer base domains.
 /// @dev Clearing never visits the nodes it clears, so the suite keeps an independent model of
-///      which subnodes should still resolve: every node has an epoch that a clear, a delete or a
-///      re-creation moves on, and a subnode resolves while the epoch of its parent is still the
-///      one it was created under, all the way up. The invariants compare the registry and the
+///      which subnodes should still resolve: every node has an epoch that a subname clear, a delete
+///      or a re-creation moves on, and a subnode resolves while the epoch of its parent is still
+/// the one it was created under, all the way up. The invariants compare the registry and the
 ///      resolver against that model.
 contract RegistryHandler is Test {
     /// @notice Node hash of the suite's TLD, injected from the deployed protocol registry.
@@ -98,9 +98,6 @@ contract RegistryHandler is Test {
 
     /// @notice Subnode => its index plus one, so a node is tracked once.
     mapping(bytes32 node => uint256 indexPlusOne) internal _indexOf;
-
-    /// @notice Number of clears and deletes that landed, for coverage.
-    uint256 public clearCount;
 
     /// @notice Sub-labels the registry rejected.
     uint256 public rejectedSubLabelCount;
@@ -269,7 +266,6 @@ contract RegistryHandler is Test {
         vm.prank(_subnodeOwners[index]);
         registry.clearRecords(_subnodeHashes[index]);
         _subnodeAddress[index] = address(0);
-        ++clearCount;
     }
 
     /// @notice The owner of a subnode that still resolves clears every subname beneath it.
@@ -282,7 +278,6 @@ contract RegistryHandler is Test {
         vm.prank(_subnodeOwners[index]);
         registry.clearSubnames(_subnodeHashes[index]);
         ++_subnodeEpoch[index];
-        ++clearCount;
     }
 
     /// @notice The holder of a base domain clears every subname beneath it.
@@ -294,7 +289,6 @@ contract RegistryHandler is Test {
         vm.prank(registrar.ownerOf(uint256(node)));
         registry.clearSubnames(node);
         ++_baseEpoch[node];
-        ++clearCount;
     }
 
     /// @notice The parent of a subnode that still resolves deletes it.
@@ -315,7 +309,6 @@ contract RegistryHandler is Test {
         _subnodeDeleted[index] = true;
         ++_subnodeEpoch[index];
         _subnodeAddress[index] = address(0);
-        ++clearCount;
     }
 
     /// @notice Whether the model says the subnode at `index` still resolves.

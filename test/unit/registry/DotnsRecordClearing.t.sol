@@ -4,6 +4,10 @@ pragma solidity ^0.8.34;
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
+import {IDotnsResolver} from "../../../contracts/resolvers/IDotnsResolver.sol";
+import {IDotnsContentResolver} from "../../../contracts/resolvers/IDotnsContentResolver.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {DotnsNameEscrow} from "../../../contracts/escrow/DotnsNameEscrow.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -14,9 +18,9 @@ import {
 /// @title DotnsRecordClearingTest
 /// @notice Clearing a name's records and subnames: on release, on demand by the owner, and when a
 ///         parent deletes a subname. A transfer clears nothing.
-/// @dev Every case checks all three resolver record types (address, content hash, text) and a
-///      subname two levels deep, because each record type is stamped separately and a subname
-///      only stops resolving through the walk over its ancestors.
+/// @dev The lifecycle cases check all three resolver record types (address, content hash, text)
+///      and a subname two levels deep, because each record type is stamped separately and a
+///      subname only stops resolving through the walk over its ancestors.
 contract DotnsRecordClearingTest is BaseDotns {
     /// @notice 13-char label, NoStatus, so registration seeds a funded release position.
     string internal constant LABEL = "clearablename";
@@ -239,6 +243,10 @@ contract DotnsRecordClearingTest is BaseDotns {
 
     function test_parent_deletes_a_subname_and_everything_beneath_it() public {
         bytes32 labelhash = keccak256(bytes(CHILD));
+        vm.expectEmit(true, false, false, true, address(dotnsRegistry));
+        emit IDotnsRegistry.RecordsCleared(childNode, 1);
+        vm.expectEmit(true, false, false, true, address(dotnsRegistry));
+        emit IDotnsRegistry.SubnamesCleared(childNode, 1);
         vm.expectEmit(true, true, false, true, address(dotnsRegistry));
         emit IDotnsRegistry.NewOwner(node, labelhash, address(0));
 
@@ -281,14 +289,75 @@ contract DotnsRecordClearingTest is BaseDotns {
 
         assertFalse(dotnsRegistry.isAuthorised(childNode, tiago));
         vm.prank(tiago);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsResolver.NotAuthorised.selector, childNode, tiago)
+        );
         dotnsResolver.setAddress(childNode, tiago);
     }
 
-    // records and subnames that predate parent tracking
+    function test_revert_setSubnodeResolver_on_a_cleared_subname() public {
+        vm.prank(ed);
+        dotnsRegistry.clearSubnames(node);
+
+        vm.prank(ed);
+        vm.expectRevert(IDotnsRegistry.NotAuthorised.selector);
+        dotnsRegistry.setSubnodeResolver(
+            IDotnsRegistry.SubnodeResolverRecord({
+                parentNode: node, subLabel: CHILD, parentLabel: LABEL, resolver: address(1)
+            })
+        );
+    }
+
+    function test_clearRecords_emits_the_new_version_and_resets_the_resolver_pointer() public {
+        vm.prank(ed);
+        dotnsRegistry.setResolver(node, address(0xCAFE));
+
+        vm.expectEmit(true, false, false, true, address(dotnsRegistry));
+        emit IDotnsRegistry.RecordsCleared(node, 1);
+        vm.expectEmit(true, false, false, true, address(dotnsRegistry));
+        emit IDotnsRegistry.NewResolver(node, address(dotnsReverseResolver));
+        vm.prank(ed);
+        dotnsRegistry.clearRecords(node);
+
+        assertEq(dotnsRegistry.resolver(node), address(dotnsReverseResolver));
+        (, uint64 version) = dotnsRegistry.recordVersion(node);
+        assertEq(version, 1);
+    }
+
+    function test_release_redeem_and_release_again_clears_again() public {
+        _release();
+        vm.prank(ed);
+        dotnsNameEscrow.redeem(tokenId);
+
+        _writeRecords(node, ed);
+        _createSubname(node, CHILD, LABEL, tiago, ed);
+        _assertRecordsSet(node, "rewritten name");
+
+        _release();
+
+        _assertRecordsUnset(node, "name released twice");
+        _assertSubnameGone(childNode, "recreated child");
+        (, uint64 version) = dotnsRegistry.recordVersion(node);
+        assertEq(version, 2);
+    }
+
+    function test_release_still_clears_with_no_resolver_wired() public {
+        vm.startPrank(owner);
+        protocolRegistry.remove(DotnsConstants.RESOLVER);
+        protocolRegistry.remove(DotnsConstants.CONTENT_RESOLVER);
+        vm.stopPrank();
+
+        _release();
+
+        _assertSubnameGone(childNode, "child");
+        (, uint64 version) = dotnsRegistry.recordVersion(node);
+        assertEq(version, 1, "the registry clear still runs");
+    }
+
+    // subnames with no recorded parent
 
     /// @dev Storage slot of `DotnsRegistry._parentOf`. Clearing an entry reproduces a subname
-    ///      created before parents were recorded.
+    ///      whose parent was never recorded.
     uint256 internal constant PARENT_OF_SLOT = 3;
 
     function _unlink(bytes32 subnode) internal {
@@ -342,9 +411,44 @@ contract DotnsRecordClearingTest is BaseDotns {
         dotnsRegistry.linkSubname(node, labelhash);
     }
 
+    function test_revert_linkSubname_on_a_tokenised_name() public {
+        bytes32 labelhash = keccak256(bytes(LABEL));
+        vm.expectRevert(abi.encodeWithSelector(IDotnsRegistry.SubnameNotFound.selector, node));
+        dotnsRegistry.linkSubname(_tldNode(), labelhash);
+    }
+
+    function test_linkSubname_on_a_linked_subname_changes_nothing() public {
+        vm.recordLogs();
+        dotnsRegistry.linkSubname(node, keccak256(bytes(CHILD)));
+        assertEq(vm.getRecordedLogs().length, 0, "no SubnameLinked for a subname already linked");
+        assertEq(dotnsRegistry.parentOf(childNode), node);
+    }
+
+    function test_linkSubname_emits_when_it_links() public {
+        _unlink(childNode);
+        vm.expectEmit(true, true, false, true, address(dotnsRegistry));
+        emit IDotnsRegistry.SubnameLinked(childNode, node);
+        dotnsRegistry.linkSubname(node, keccak256(bytes(CHILD)));
+    }
+
+    function test_a_write_through_the_parent_links_an_unlinked_subname() public {
+        _unlink(childNode);
+        vm.prank(ed);
+        dotnsRegistry.clearSubnames(node);
+        assertEq(dotnsRegistry.owner(childNode), tiago, "unlinked child still resolves");
+
+        // Reassigning it through its parent links it first, so it is seen as cleared and is
+        // created again from nothing.
+        _createSubname(node, CHILD, LABEL, leonardo, ed);
+
+        assertEq(dotnsRegistry.parentOf(childNode), node);
+        assertEq(dotnsRegistry.owner(childNode), leonardo);
+        _assertRecordsUnset(childNode, "child created again");
+    }
+
     function test_records_written_before_any_clear_stay_readable() public view {
-        // Every node starts at record version zero, which is also the stamp every record written
-        // before stamps existed carries, so nothing needs migrating to stay readable.
+        // Every node starts at record version zero, which is also the stamp of a record written
+        // while its node was never cleared, so such a record needs no migrating to stay readable.
         (bool live, uint64 version) = dotnsRegistry.recordVersion(node);
         assertTrue(live);
         assertEq(version, 0);
@@ -419,7 +523,13 @@ contract DotnsRecordClearingTest is BaseDotns {
             abi.encode(false)
         );
         _release();
-        vm.clearMockedCalls();
+        // Answer as the registry would from here on. `clearMockedCalls` would also drop the
+        // personhood mocks the base suite relies on for later registrations.
+        vm.mockCall(
+            address(dotnsRegistry),
+            abi.encodeCall(IDotnsRegistry.recordExists, (node)),
+            abi.encode(true)
+        );
         _assertRecordsSet(node, "uncleared name in custody");
         assertEq(dotnsRegistry.owner(childNode), tiago, "uncleared subname in custody");
     }
@@ -446,19 +556,37 @@ contract DotnsRecordClearingTest is BaseDotns {
     function test_clearCustodyOnUpgrade_clears_every_name_in_custody_as_the_upgrade_call() public {
         _releaseWithoutClearing();
 
+        // A second name in custody, released with no registry record, which the upgrade call
+        // skips rather than failing on.
+        string memory other = "othernameheld";
+        uint256 otherToken = uint256(_register(other, leonardo, IPopRules.PopStatus.NoStatus));
+        bytes32 recordSlot = keccak256(abi.encode(bytes32(otherToken), RECORDS_SLOT));
+        vm.store(address(dotnsRegistry), recordSlot, bytes32(0));
+        vm.store(address(dotnsRegistry), bytes32(uint256(recordSlot) + 1), bytes32(0));
+        vm.startPrank(leonardo);
+        dotnsRegistrar.approve(address(dotnsNameEscrow), otherToken);
+        dotnsNameEscrow.release(otherToken);
+        vm.stopPrank();
+        assertEq(dotnsNameEscrow.releasedTokenCount(), 2);
+
         DotnsNameEscrow implementation = new DotnsNameEscrow();
         vm.prank(owner);
         dotnsNameEscrow.upgradeToAndCall(
-            address(implementation), abi.encodeCall(IDotnsNameEscrow.clearCustodyOnUpgrade, ())
+            address(implementation), abi.encodeCall(DotnsNameEscrow.clearCustodyOnUpgrade, ())
         );
 
         _assertRecordsUnset(node, "name");
         _assertSubnameGone(childNode, "child");
         _assertSubnameGone(grandchildNode, "grandchild");
 
+        // Redeem and reclaim hand back what the upgrade call cleared.
         vm.prank(ed);
         dotnsNameEscrow.redeem(tokenId);
         _assertRecordsUnset(node, "redeemed name");
+
+        vm.warp(dotnsNameEscrow.getReleasePosition(otherToken).redeemableUntil);
+        _register(other, tiago, IPopRules.PopStatus.NoStatus);
+        assertEq(dotnsRegistrar.ownerOf(otherToken), tiago);
     }
 
     function test_clearCustodyOnUpgrade_clears_lazily_and_deletes_nothing() public {
@@ -567,6 +695,36 @@ contract DotnsRecordClearingTest is BaseDotns {
         _assertZero(address(dotnsContentResolver), _contenthashStampSlot(node), "hash stamp");
         _assertZero(address(dotnsContentResolver), _textSlot(node, TEXT_KEY), "text");
         _assertZero(address(dotnsContentResolver), _textStampSlot(node, TEXT_KEY), "text stamp");
+    }
+
+    function test_deleting_a_text_record_emits_both_text_events() public {
+        vm.recordLogs();
+        vm.prank(ed);
+        dotnsContentResolver.setText(node, TEXT_KEY, "");
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(logs.length, 2);
+        assertEq(logs[0].topics[0], IDotnsContentResolver.TextUpdated.selector);
+        assertEq(logs[1].topics[0], IDotnsContentResolver.TextChanged.selector);
+    }
+
+    function test_deleting_deepest_first_frees_every_subname_record() public {
+        vm.prank(tiago);
+        dotnsRegistry.deleteSubname(childNode, keccak256(bytes(GRANDCHILD)));
+        vm.prank(ed);
+        dotnsRegistry.deleteSubname(node, keccak256(bytes(CHILD)));
+
+        bytes32[2] memory subnodes = [childNode, grandchildNode];
+        for (uint256 i; i < 2; ++i) {
+            bytes32 base = keccak256(abi.encode(subnodes[i], RECORDS_SLOT));
+            _assertZero(address(dotnsRegistry), base, "record owner slot");
+            _assertZero(address(dotnsRegistry), bytes32(uint256(base) + 1), "record resolver slot");
+            _assertZero(
+                address(dotnsRegistry),
+                keccak256(abi.encode(subnodes[i], PARENT_OF_SLOT)),
+                "parent link"
+            );
+        }
     }
 
     function test_writing_empty_frees_a_text_key_a_clear_left_behind() public {

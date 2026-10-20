@@ -63,7 +63,7 @@ contract DotnsRegistryInvariantTest is BaseDotns {
         }
 
         // A nested subnode with a record, and a cleared subtree, so every run starts with both a
-        // live chain and a cleared one in front of the invariants.
+        // live chain and a cleared one in front of the invariants, whatever the fuzzer calls.
         uint256 before = handler.subnodeCount();
         for (uint256 seed; seed < 64 && handler.subnodeCount() == before; ++seed) {
             handler.createNestedSubnode(0, seed, seed);
@@ -89,7 +89,6 @@ contract DotnsRegistryInvariantTest is BaseDotns {
     ///      actually been put in front of the registry.
     function afterInvariant() public view {
         assertGt(handler.subnodeCount(), 0, "campaign created no subnode");
-        assertGt(handler.clearCount(), 0, "campaign cleared nothing");
         assertGt(handler.dottedSubLabelAttempts(), 0, "campaign offered no dotted sub-label");
         assertEq(
             handler.dottedSubLabelRejections(),
