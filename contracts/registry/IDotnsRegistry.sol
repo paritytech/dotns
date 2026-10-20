@@ -269,10 +269,13 @@ interface IDotnsRegistry {
     ///         beneath it.
     /// @dev Callable by anyone @custom:function isAuthorised admits for `parentNode`, otherwise
     ///      @custom:reverts NotAuthorised: subnames are parent-sovereign, so the parent decides,
-    ///      not the subname's holder. The subname must currently resolve, otherwise
-    ///      @custom:reverts SubnameNotFound. Emits @custom:emits NewOwner with a zero owner, the
-    ///      deletion convention indexers already follow, and @custom:emits RecordsCleared and
-    ///      @custom:emits SubnamesCleared for the subname.
+    ///      not the subname's holder. The subname's record and parent link are zeroed, releasing
+    ///      their storage deposit to the caller; one version slot stays so the subname, created
+    ///      again, starts empty. Subnames beneath it are cleared but keep their storage, so a
+    ///      parent that wants every deposit back deletes from the deepest subname up. The subname
+    ///      must currently resolve, otherwise @custom:reverts SubnameNotFound. Emits @custom:emits
+    ///      NewOwner with a zero owner, the deletion convention indexers already follow, and
+    ///      @custom:emits RecordsCleared and @custom:emits SubnamesCleared for the subname.
     /// @param parentNode Parent of the subname.
     /// @param labelhash Labelhash of the subname under `parentNode`.
     function deleteSubname(bytes32 parentNode, bytes32 labelhash) external;

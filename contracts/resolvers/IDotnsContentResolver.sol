@@ -47,8 +47,9 @@ interface IDotnsContentResolver {
     /// @notice Sets the content hash for a node.
     /// @dev The caller must own the node in the dotNS registry or be an approved operator,
     ///      otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an
-    ///      IPFS CID); the resolver stores them as-is and never interprets the payload. Emits
-    ///      @custom:emits ContentHashUpdated on every successful write.
+    ///      IPFS CID); the resolver stores them as-is and never interprets the payload. An empty
+    ///      `hash` deletes the record: its storage is zeroed and the storage deposit released to
+    ///      the caller. Emits @custom:emits ContentHashUpdated on every successful write.
     /// @param node The node whose content hash is being set.
     /// @param hash Opaque content hash bytes.
     function setContenthash(bytes32 node, bytes calldata hash) external;
@@ -64,8 +65,10 @@ interface IDotnsContentResolver {
     /// @notice Sets a text record for a node.
     /// @dev The caller must own the node in the dotNS registry or be an approved operator,
     ///      otherwise @custom:reverts NotAuthorised. Text records are arbitrary key/value strings
-    ///      (e.g. `avatar`, `url`, `description`). Emits @custom:emits TextUpdated on every
-    ///      successful write.
+    ///      (e.g. `avatar`, `url`, `description`). An empty `value` deletes the record: its storage
+    ///      is zeroed and the storage deposit released to the caller. That also works for a key a
+    ///      clear has already hidden, which still holds storage until it is deleted. Emits
+    ///      @custom:emits TextUpdated on every successful write.
     /// @param node The node whose text record is being set.
     /// @param key Text record key (e.g., "ipfs", "avatar").
     /// @param value Text record value.

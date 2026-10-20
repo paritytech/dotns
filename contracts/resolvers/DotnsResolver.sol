@@ -75,9 +75,16 @@ contract DotnsResolver is
     /// @inheritdoc IDotnsResolver
     function setAddress(bytes32 node, address value) external override {
         IDotnsRegistry registry = _onlyNodeOwner(node);
-        (, uint64 currentVersion) = registry.recordVersion(node);
-        addresses[node] = value;
-        if (addressVersions[node] != currentVersion) addressVersions[node] = currentVersion;
+        if (value == address(0)) {
+            // A zero address is a delete: both slots are zeroed so their storage deposit is
+            // released to the caller, rather than a zero being stamped under a new version.
+            delete addresses[node];
+            delete addressVersions[node];
+        } else {
+            (, uint64 currentVersion) = registry.recordVersion(node);
+            addresses[node] = value;
+            if (addressVersions[node] != currentVersion) addressVersions[node] = currentVersion;
+        }
         emit AddressSet(node, value);
     }
 

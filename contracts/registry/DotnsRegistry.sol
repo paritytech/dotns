@@ -260,11 +260,14 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         Record storage existing = records[subnode];
         require(existing.exists && _isLive(subnode), SubnameNotFound(subnode));
 
-        // A zero owner with `exists` unset is what a node that was never created looks like, so
+        // The record and the parent link are zeroed, which releases their storage deposit to the
+        // caller, and a node with no record is what a node that was never created looks like, so
         // every read treats the subname as absent and every deeper subname fails its walk here.
-        existing.owner = address(0);
-        existing.resolver = address(0);
-        existing.exists = false;
+        // The versions are the one slot that stays, and are bumped rather than zeroed: a subname
+        // created here again must not match the stamps of records written for this one, nor the
+        // subnames created beneath it, none of which can be listed to delete.
+        delete records[subnode];
+        delete _parentOf[subnode];
         _clearRecordVersion(subnode);
         _clearSubnameVersion(subnode);
 

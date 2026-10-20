@@ -87,9 +87,15 @@ contract DotnsContentResolver is
     /// @inheritdoc IDotnsContentResolver
     function setContenthash(bytes32 node, bytes calldata hash) external override {
         uint64 currentVersion = _requireNodeOwnerOrOperator(node);
-        contenthashes[node] = hash;
-        if (contenthashVersions[node] != currentVersion) {
-            contenthashVersions[node] = currentVersion;
+        if (hash.length == 0) {
+            // An empty hash is a delete; see `setText`.
+            delete contenthashes[node];
+            delete contenthashVersions[node];
+        } else {
+            contenthashes[node] = hash;
+            if (contenthashVersions[node] != currentVersion) {
+                contenthashVersions[node] = currentVersion;
+            }
         }
         emit ContentHashUpdated(node, hash);
     }
@@ -103,8 +109,18 @@ contract DotnsContentResolver is
     /// @inheritdoc IDotnsContentResolver
     function setText(bytes32 node, string calldata key, string calldata value) external override {
         uint64 currentVersion = _requireNodeOwnerOrOperator(node);
-        textRecords[node][key] = value;
-        if (textVersions[node][key] != currentVersion) textVersions[node][key] = currentVersion;
+        if (bytes(value).length == 0) {
+            // An empty value is a delete: the value and its stamp are both zeroed so their
+            // storage deposit is released to the caller. This also frees a key left behind by a
+            // clear, which no read can reach any more but which still holds storage.
+            delete textRecords[node][key];
+            delete textVersions[node][key];
+        } else {
+            textRecords[node][key] = value;
+            if (textVersions[node][key] != currentVersion) {
+                textVersions[node][key] = currentVersion;
+            }
+        }
         emit TextUpdated(node, key, value);
         emit TextChanged(node, key, key, value);
     }
