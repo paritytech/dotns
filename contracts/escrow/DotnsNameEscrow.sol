@@ -15,6 +15,8 @@ import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Recei
 import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
+import {IDotnsResolver} from "../resolvers/IDotnsResolver.sol";
+import {IDotnsContentResolver} from "../resolvers/IDotnsContentResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
@@ -368,17 +370,21 @@ contract DotnsNameEscrow is
 
         _addReleasedToken(tokenId);
 
-        // Cleared once custody has moved, because the registry admits the escrow as the name's
-        // owner and needs no escrow-specific authority to let it clear.
-        _clearName(tokenId);
+        // Cleared once custody has moved, because the registry and the resolvers admit the escrow
+        // as the name's owner and need no escrow-specific authority to let it clear. This is the
+        // only point a name is cleared: redeem and reclaim hand back a name release already
+        // cleared.
+        _clearName(tokenId, true);
 
         emit NameReleased(tokenId, msg.sender, asset, amount, availableAt, redeemUntil);
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function clearReleasedName(uint256 tokenId) external override nonReentrant {
-        require(_positions[tokenId].released, NotReleased(tokenId));
-        _clearName(tokenId);
+    function clearCustodyOnUpgrade() external override onlyOwner reinitializer(2) {
+        uint256 count = _releasedTokens.length;
+        for (uint256 i; i < count; ++i) {
+            _clearName(_releasedTokens[i], false);
+        }
     }
 
     /// @inheritdoc IDotnsNameEscrow
@@ -629,11 +635,6 @@ contract DotnsNameEscrow is
         delete _positions[tokenId];
         _removeReleasedToken(tokenId);
 
-        // Release already cleared the name, unless it entered custody without being cleared.
-        // Clearing again on the way out closes that gap without anyone having to find those names
-        // first, and costs nothing else: nobody can write to a name while the escrow holds it.
-        _clearName(tokenId);
-
         _registrar().safeTransferFrom(address(this), newOwner, tokenId);
 
         emit NameReclaimed(tokenId, previousRecipient, newOwner);
@@ -685,11 +686,6 @@ contract DotnsNameEscrow is
 
         _removeReleasedToken(tokenId);
 
-        // Release already cleared the name, unless it entered custody without being cleared.
-        // Clearing again on the way out closes that gap without anyone having to find those names
-        // first, and costs nothing else: nobody can write to a name while the escrow holds it.
-        _clearName(tokenId);
-
         _registrar().safeTransferFrom(address(this), msg.sender, tokenId);
 
         emit NameRedeemed(tokenId, msg.sender);
@@ -734,15 +730,30 @@ contract DotnsNameEscrow is
     }
 
     /// @notice Clears every record and subname of a name the escrow holds.
-    /// @dev A name with no registry record has nothing to clear, because records and subnames can
+    /// @dev The address and the content hash are one slot each per name, so they are deleted
+    ///      outright when `deleteRecords` is set, and their storage deposit is released to the
+    ///      signer of the transaction. Text records and subnames cannot be listed, so the registry
+    ///      clear hides them at constant cost and their storage stays.
+    ///      A name with no registry record has nothing to clear, because records and subnames can
     ///      only be written for a node the registry knows, and the registry admits no clear for a
     ///      node it holds no record of. Such a name is skipped, so it still releases, redeems and
     ///      reclaims as it always could.
     /// @param tokenId Token in custody; its node is `bytes32(tokenId)`.
-    function _clearName(uint256 tokenId) internal {
+    /// @param deleteRecords Whether to delete the address and content hash outright.
+    function _clearName(uint256 tokenId, bool deleteRecords) internal {
         IDotnsRegistry registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
         bytes32 node = bytes32(tokenId);
-        if (registry.recordExists(node)) registry.clear(node);
+        if (!registry.recordExists(node)) return;
+
+        if (deleteRecords) {
+            address resolver = protocolRegistry.get(DotnsConstants.RESOLVER);
+            if (resolver != address(0)) IDotnsResolver(resolver).setAddress(node, address(0));
+            address contentResolver = protocolRegistry.get(DotnsConstants.CONTENT_RESOLVER);
+            if (contentResolver != address(0)) {
+                IDotnsContentResolver(contentResolver).setContenthash(node, "");
+            }
+        }
+        registry.clear(node);
     }
 
     /// @notice Returns the configured registrar from the protocol registry.
