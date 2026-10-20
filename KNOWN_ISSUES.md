@@ -41,9 +41,9 @@ A name's text records and its subnames cannot be listed on chain, so clearing a 
 
 Release deletes the address and content hash outright, since each is one slot per name, so their deposit returns to the holder releasing it. Only text records and subnames are left locked.
 
-Subnames created before the registry recorded parents are reached by a clear above them only once they are linked (`linkSubname`, permissionless). Until then a clear above them leaves them resolving.
+A subname with no recorded parent is reached by a clear above it only once it, and every level between it and the clear, is linked (`linkSubname`, permissionless). Until then a clear above it leaves it resolving.
 
-**Workaround:** getting the deposit back is the owner's job, and has to happen before the name is released or transferred, because the delete path moves with the name. Delete each text key with `setText(node, key, "")` and each subname with `deleteSubname`, deepest first; see [README → Clearing records and subnames](./README.md#clearing-records-and-subnames). For subnames that predate parent tracking, run the backfill in [DEPLOYMENTS.md](./DEPLOYMENTS.md#upgrading-to-record-and-subname-clearing) right after the registry upgrade, so every existing subname is linked before anything is cleared.
+**Workaround:** getting the deposit back is the owner's job, and has to happen before the name is released or transferred, because the delete path moves with the name. Delete each text key with `setText(node, key, "")` and each subname with `deleteSubname`, deepest first; see [README → Clearing records and subnames](./README.md#clearing-records-and-subnames). For subnames with no recorded parent, run the backfill in [DEPLOYMENTS.md](./DEPLOYMENTS.md#upgrading-to-record-and-subname-clearing) right after the registry upgrade, so every existing subname is linked before anything is cleared.
 
 **Resolution:** deliberate. Visiting every record and subname would make a clear cost grow without bound with what the name holds.
 
