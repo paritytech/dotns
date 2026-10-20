@@ -2,7 +2,7 @@
 // Links every subname that has no recorded parent, so that clearing a name above it reaches it.
 //
 // Clearing a name reaches the subnames beneath it only through their recorded parents, and a
-// subname created before parents were recorded has none. Each level is linked on its own, because
+// subname the registry has no parent for is out of its reach until linked. Each level is linked on its own, because
 // an unlinked subname cannot name its parent. Candidates come from the registry's `NewOwner`
 // events. `linkSubname` is permissionless and a repeat run links nothing twice.
 //
@@ -25,6 +25,7 @@ import {
   keccak256,
   parseAbi,
   parseAbiItem,
+  toHex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -46,6 +47,11 @@ const ESCROW_ABI = parseAbi([
 const ZERO = `0x${"0".repeat(64)}`;
 const PAGE = 100n;
 
+function parseBlock(flag, raw) {
+  if (!/^\d+$/.test(raw)) throw new Error(`${flag} must be a non-negative whole number`);
+  return BigInt(raw);
+}
+
 function parseArgs(argv) {
   const args = { send: false, fromBlock: 0n, step: 0n };
   for (let i = 0; i < argv.length; i++) {
@@ -58,8 +64,8 @@ function parseArgs(argv) {
     if (flag === "--rpc-url") args.rpcUrl = value();
     else if (flag === "--registry") args.registry = value();
     else if (flag === "--escrow") args.escrow = value();
-    else if (flag === "--from-block") args.fromBlock = BigInt(value());
-    else if (flag === "--step") args.step = BigInt(value());
+    else if (flag === "--from-block") args.fromBlock = parseBlock(flag, value());
+    else if (flag === "--step") args.step = parseBlock(flag, value());
     else if (flag === "--send") args.send = true;
     else throw new Error(`unknown flag ${flag}`);
   }
@@ -98,12 +104,19 @@ async function unlinkedSubnames(client, registry, logs) {
       args: [entry.subnode],
     });
     if (!exists) continue;
-    const parent = await client.readContract({
-      address: registry,
-      abi: REGISTRY_ABI,
-      functionName: "parentOf",
-      args: [entry.subnode],
-    });
+    let parent;
+    try {
+      parent = await client.readContract({
+        address: registry,
+        abi: REGISTRY_ABI,
+        functionName: "parentOf",
+        args: [entry.subnode],
+      });
+    } catch (error) {
+      throw new Error(
+        `parentOf reverted on ${registry}: is the registry upgraded yet? (${error.shortMessage ?? error.message})`,
+      );
+    }
     if (parent === ZERO) pending.push(entry);
   }
   return { scanned: seen.size, pending };
@@ -158,7 +171,7 @@ async function main() {
   if (args.escrow) {
     const custody = await releasedTokens(client, args.escrow);
     console.log(`names in escrow custody: ${custody.length}`);
-    for (const tokenId of custody) console.log(`  ${tokenId}`);
+    for (const tokenId of custody) console.log(`  ${toHex(tokenId, { size: 32 })}`);
   }
 
   if (!args.send) {
