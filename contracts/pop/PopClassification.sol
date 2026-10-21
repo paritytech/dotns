@@ -13,6 +13,9 @@ import {IPopRules} from "./IPopRules.sol";
 ///      callers that apply the same rules inside their own call. Calling the library in place of
 ///      PopRules saves a proxied external call for logic that reads no state. Inputs are the
 ///      label bytes only; validating the label's shape is the caller's job.
+/// @dev Every contract that uses these rules compiles them in, so a change to them takes effect
+///      in each contract only when that contract is upgraded. Upgrade PopRules and
+///      @custom:contract DotnsPopController together whenever these rules change.
 /// @custom:security-contact admin@parity.io
 library PopClassification {
     using StringUtils for *;

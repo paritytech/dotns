@@ -441,6 +441,27 @@ contract PopRulesTests is BaseDotns {
         assertEq(holder, tiago);
     }
 
+    function test_reservations_reject_a_zero_user() public {
+        _authoriseTestAsController();
+        bytes memory zeroOwner =
+            abi.encodeWithSelector(IPopRules.PopError.selector, "Reservation owner cannot be zero");
+
+        vm.expectRevert(zeroOwner);
+        popRules.reserveBaseNameForPop("longnamebob", address(0));
+        vm.expectRevert(zeroOwner);
+        popRules.reserveBaseName("bobbyy", address(0));
+    }
+
+    function test_reassignBaseNameForPop_rejects_a_zero_user() public {
+        _authoriseTestAsController();
+        popRules.reserveBaseNameForPop("longnamebob", leonardo);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPopRules.PopError.selector, "Reservation owner cannot be zero")
+        );
+        popRules.reassignBaseNameForPop("longnamebob", address(0));
+    }
+
     function test_reassignBaseNameForPop_reverts_for_non_controller() public {
         vm.prank(ed);
         vm.expectRevert(IPopRules.NotRegistry.selector);

@@ -144,7 +144,8 @@ interface IPopRules {
     ///      controller. Its length window bounds the base name and does not name a tier:
     ///      Devicehood is decided by the separated label shape. The caller passes the base name; a
     ///      non-canonical label, a trailing digit, or a length outside `[6, 8]` triggers
-    ///      @custom:reverts PopError. Cross-user collision on a live slot triggers @custom:reverts
+    ///      @custom:reverts PopError, as does a zero `user`. Cross-user collision on a live slot
+    ///      triggers @custom:reverts
     ///      PopError so the caller cannot silently overwrite another user's reservation; same-user
     ///      refresh and writes into an empty or expired slot emit @custom:emits BaseNameReserved.
     /// @param baseName The base name, with no trailing digits.
@@ -160,7 +161,8 @@ interface IPopRules {
     ///      registrar's `controllers` set may call this, otherwise @custom:reverts NotRegistry.
     ///      Does not apply the 6-8 base-length window that @custom:function reserveBaseName
     ///      enforces, but does require the input to be canonical with no trailing digits; a
-    ///      non-canonical label or one with trailing digits triggers @custom:reverts PopError. If
+    ///      non-canonical label, one with trailing digits or a zero `user` triggers
+    ///      @custom:reverts PopError. If
     ///      the slot is already live and held by a different user, @custom:reverts PopError so the
     ///      caller's local bookkeeping and PopRules state stay in lockstep; if it is live for the
     ///      same user, expiry is refreshed to `block.timestamp + MAX_RESERVATION_TIME`. Emits
@@ -187,8 +189,8 @@ interface IPopRules {
     ///      @custom:reverts NotRegistry. A live slot may only be moved by the controller that
     ///      wrote it, otherwise @custom:reverts PopError, which is the authority that controller
     ///      already has to release it; an empty or expired slot may be written by any authorised
-    ///      controller. Non-canonical labels and labels with trailing digits trigger
-    ///      @custom:reverts PopError. The new reservation expires at
+    ///      controller. Non-canonical labels, labels with trailing digits and a zero `user`
+    ///      trigger @custom:reverts PopError. The new reservation expires at
     ///      `block.timestamp + MAX_RESERVATION_TIME` and is stamped by the caller. Emits
     ///      @custom:emits BaseNameReleased and then @custom:emits BaseNameReserved, the same
     ///      events as the two calls it replaces. Used by the PoP controller when a queue head

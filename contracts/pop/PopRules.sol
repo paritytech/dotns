@@ -590,6 +590,7 @@ contract PopRules is
             _countTrailingDigits(baseName) == 0,
             PopError("Reservation base name must have no trailing digits")
         );
+        require(userAddress != address(0), PopError("Reservation owner cannot be zero"));
         Reservation memory reservation = reservations[baseName];
         // The same gate as `releaseBaseName`: only the controller that wrote a live slot may
         // move it, so this grants nothing a release followed by a reservation would not.
@@ -642,6 +643,7 @@ contract PopRules is
     ///      `baseName` is canonical and carries no trailing digits; this helper does no input
     ///      validation of its own so each public entry can layer additional eligibility checks.
     function _writeReservation(string calldata baseName, address userAddress) internal {
+        require(userAddress != address(0), PopError("Reservation owner cannot be zero"));
         Reservation memory existing = reservations[baseName];
         bool liveSlot = _isLive(existing);
         if (liveSlot) {

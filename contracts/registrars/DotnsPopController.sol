@@ -25,6 +25,7 @@ import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {ILabelStore} from "../store/ILabelStore.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {SubnodeUtils} from "../utils/SubnodeUtils.sol";
+import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
@@ -723,8 +724,7 @@ contract DotnsPopController is
         } else {
             // The empty label keeps the registrar from writing a `LabelStore`; the store write
             // happens below, or is deferred to the pending-claim queue.
-            _registrarOf(deps).register(uint256(node), user, "");
-            _registryOf(deps).setOwner(node, user);
+            RegistrationUtils.registerName(_registrarOf(deps), _registryOf(deps), node, user, "");
         }
 
         if (chatKeyBytes.length != 0 || deviceLabelhash != bytes32(0)) {
@@ -1174,14 +1174,7 @@ contract DotnsPopController is
     /// @dev Reverts with @custom:reverts IDotnsRegistry.NotAuthorised when someone else holds the
     /// container, so a name registered elsewhere is never used as a device container.
     function _ensureDeviceContainer(Deps memory deps, bytes32 parentNode) internal {
-        IDotnsRegistrar registrar = _registrarOf(deps);
-        IDotnsRegistry registry = _registryOf(deps);
-        if (!registrar.exists(uint256(parentNode))) {
-            registrar.register(uint256(parentNode), address(this), "");
-            registry.setOwner(parentNode, address(this));
-        } else {
-            require(registry.owner(parentNode) == address(this), IDotnsRegistry.NotAuthorised());
-        }
+        SubnodeUtils.ensureParent(_registrarOf(deps), _registryOf(deps), parentNode);
         _deviceContainers[parentNode] = true;
     }
 
