@@ -181,6 +181,22 @@ interface IPopRules {
     /// @param baseName The base name whose reservation should be cleared (no trailing digits).
     function releaseBaseName(string calldata baseName) external;
 
+    /// @notice Moves a base-name reservation to `user`, as @custom:function releaseBaseName
+    ///         followed by @custom:function reserveBaseNameForPop would, in one call.
+    /// @dev Only a controller in the registrar's `controllers` set may call this, otherwise
+    ///      @custom:reverts NotRegistry. A live slot may only be moved by the controller that
+    ///      wrote it, otherwise @custom:reverts PopError, which is the authority that controller
+    ///      already has to release it; an empty or expired slot may be written by any authorised
+    ///      controller. Non-canonical labels and labels with trailing digits trigger
+    ///      @custom:reverts PopError. The new reservation expires at
+    ///      `block.timestamp + MAX_RESERVATION_TIME` and is stamped by the caller. Emits
+    ///      @custom:emits BaseNameReleased and then @custom:emits BaseNameReserved, the same
+    ///      events as the two calls it replaces. Used by the PoP controller when a queue head
+    ///      changes hands, so the move costs one cross-contract call.
+    /// @param baseName The base name, with no trailing digits.
+    /// @param user The address receiving reservation rights.
+    function reassignBaseNameForPop(string calldata baseName, address user) external;
+
     /// @notice Clears a reservation when the slot owner matches `expectedOwner`, allowing any
     ///         registrar-authorised controller (not only the stamping one) to release the slot.
     /// @dev Narrower than @custom:function releaseBaseName: callers must prove they know the

@@ -174,9 +174,34 @@ The first, issueDeviceName, issues a device name to a user. The gateway-facing i
 
 The second, issuePersonhoodName, issues a personhood name. The label is lowercase ASCII letters only, the same rule the device-name stem follows, so a hyphen or an interior digit is rejected even though both are valid in a public name. Whether the call is a claim against a prior reservation or a fresh standalone issuance is derived from on-chain reservation state; the caller does not choose. The link argument selects the chat-key source: inherit from a prior device name, or accept a fresh one in the payload. When inheriting, the call also writes the device link (personhood => device) and personhood link (device => personhood) records on the PoP resolver in the same transaction so downstream consumers can resolve either direction without scanning events.
 
-Each personhood name carries a head/tail-indexed reservation queue with a capacity of MAX_RESERVATION_QUEUE and a governance-configurable reservationDuration. The queue head is mirrored into PopRules on every head transition (enqueue-from-empty, expiry-driven promotion, non-expiry head removal, claim-wipes-queue), so the public commit-reveal flow sees the same cross-flow lock through its existing PopRules price check. The gateway path is symmetric: issuePersonhoodName consults the live PopRules slot before mint and rejects with `NotHolder` when another user holds the base name, so PopRules is the single cross-flow authority in both directions. issuePersonhoodName additionally rejects device-name-classified and governance-reserved labels with `InvalidPersonhoodLabel`. Every exit from a queue emits an event (`ReservationClaimed`, `ReservationEvicted`, `ReservationRelinquished`, `ReservationExpired`), so an indexer can rebuild the queues from events alone. Expiry advancement is permissionless: anyone can call expireReservation to garbage-collect a stale head, which is what the pallet does on its own cadence.
+Each personhood name has a reservation queue of up to `MAX_RESERVATION_QUEUE` users. Only the user at the front can claim the name. A reservation lasts `reservationDuration` (7 days by default); once it expires, the user behind takes the front only after a call clears the expired reservation from the front (see [Clearing expired reservations](#clearing-expired-reservations)).
+
+PopRules records the user at the front of the queue as the holder of the personhood name. The controller updates the record whenever the front changes: when the first user joins, when the front user leaves, when a call clears expired reservations, and when a claim ends the queue. The public commit-reveal flow checks PopRules when pricing a name, so a queued name is reserved there too, and only the user at the front can buy it.
+
+`issuePersonhoodName` lets only the user at the front claim a queued name, while their reservation is still running, and rejects anyone else with `NotHolder`. It also rejects device names and governance-reserved labels with `InvalidPersonhoodLabel`. Another controller authorised on the registrar could write its own PopRules reservation for a name with no queue here; none does today, and `issuePersonhoodName` would reject other users with `NotHolder` in that case too.
+
+Every way of leaving a queue emits an event: `ReservationClaimed`, `ReservationRelinquished` or `ReservationExpired`. Together with `ReservationQueued`, these let an indexer rebuild every queue. A claim ends the reservation of everyone in the queue, so `ReservationClaimed` covers the users behind the claimant too.
 
 The gateway pallet binds three deprecated entrypoints, reserveLiteName, reserveBaseName and registerBaseName, through `IDotnsPopControllerLegacy`. Each forwards to issueDeviceName, issueDeviceNameWithReservation and issuePersonhoodName respectively with the same selector it always had, and its label errors are `InvalidLiteLabel` and `InvalidBaseLabel`, the ones the pallet decodes. New integrations use the current entrypoints.
+
+#### Clearing expired reservations
+
+An expired reservation keeps its place at the front of the queue until a call clears it. Until then, the next user cannot claim the name, and the expired user still holds it in PopRules and can register it through the public flow.
+
+Two calls clear a queue:
+
+- **A gateway call** clears the expired reservations at the front before doing its own work, but only when there are at most `MAX_QUEUE_STEPS_PER_CALL` (4), counting entries left empty by users who dropped out, because the gateway pallet calls the controller under a fixed weight limit. Facing more, it clears none: a reservation still joins the queue at the back, and a claim reverts with `NotHolder`.
+- **`expireReservation(label)`** clears the whole queue in one call. Anyone can call it; the gateway pallet never does.
+
+Apps should therefore call `expireReservation(label)` before a gateway reservation or claim whenever the name's queue is not empty (`reservationMeta(labelhash)` reports its entries). The call changes nothing when no reservation has expired.
+
+#### Gateway call budget
+
+Other measures keep gateway calls within the same weight limit:
+
+- **Expiry and claims write nothing per entry.** Clearing only moves the queue's front past expired entries, and a claim ends the whole queue at once. Users left behind read as having no reservation (`userReservation` and `reservationEntry` return empty) until they reserve again. A claim emits only `ReservationClaimed`, which ends the reservation of every user in that name's queue; indexers apply it to the open `ReservationQueued` events for the name. Expiry still emits `ReservationExpired` for each entry it clears.
+- **Containers can be prepared.** The first device name in a numeric container also mints the container. `prepareDeviceContainer` (permissionless) mints it ahead of time, so the gateway call does not pay for it.
+- **One call per reservation move.** When the front of a queue changes hands, the controller moves the PopRules reservation with `reassignBaseNameForPop`, which emits the same events as a release followed by a reservation.
 
 #### Early testnet quirk: LabelStore deployment
 

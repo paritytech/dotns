@@ -20,10 +20,10 @@ import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {IDotnsPopResolver} from "../resolvers/IDotnsPopResolver.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
+import {PopClassification} from "../pop/PopClassification.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {ILabelStore} from "../store/ILabelStore.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
-import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {SubnodeUtils} from "../utils/SubnodeUtils.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
@@ -40,8 +40,8 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 /// Enforcement:
 /// Devicehood and personhood are attested off-chain by the gateway before the call reaches this
 /// contract, so the on-chain personhood precompile is not re-queried on the gateway path.
-/// Every issuance path still calls @custom:function IPopRules.classifyName to reject
-/// governance-reserved labels (@custom:reverts InvalidPersonhoodLabel for personhood names,
+/// Every issuance path applies PopRules' naming rules (@custom:contract PopClassification) to
+/// reject governance-reserved labels (@custom:reverts InvalidPersonhoodLabel for personhood names,
 /// @custom:reverts InvalidDeviceLabel for device names). A device name is accepted with any
 /// two-digit suffix whose stem is not governance-reserved, regardless of stem length. Native-token
 /// pricing is bypassed entirely; the gateway pays no rent.
@@ -67,9 +67,8 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 /// gateway reservations without ever importing this contract. PopRules is the single
 /// cross-flow authority; the queue here is the intra-PoP ordering layer on top of it.
 ///
-/// Shared primitives: labelhash / namehash via @custom:contract LabelUtils; the mint +
-/// forward-registry + store-write triad via @custom:contract RegistrationUtils; chat-key and
-/// device-link persistence via
+/// Shared primitives: labelhash / namehash via @custom:contract LabelUtils; classification via
+/// @custom:contract PopClassification; chat-key and device-link persistence via
 /// @custom:contract IDotnsPopResolver. Keeping per-name records on the resolver preserves the
 /// "Store = labels only" invariant.
 /// @custom:security-contact admin@parity.io
@@ -98,6 +97,13 @@ contract DotnsPopController is
     /// can fail closed before the mint instead of bubbling the resolver's revert after partial
     /// state has been committed.
     uint256 private constant CHAT_KEY_LENGTH = 65;
+
+    /// @notice Most expired entries one gateway call clears from the front of a reservation
+    /// queue.
+    /// @dev A gateway call runs under a fixed weight limit, and each entry visited costs a
+    /// storage read. A gateway call facing more expired entries clears none of them;
+    /// @custom:function expireReservation clears the whole queue.
+    uint256 public constant MAX_QUEUE_STEPS_PER_CALL = 4;
 
     /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
@@ -146,8 +152,26 @@ contract DotnsPopController is
     ///      boundary, which is the question it is asking.
     mapping(string label => bool issued) internal _popIssued;
 
+    /// @notice Numeric containers this contract has minted or verified as its own.
+    /// @dev Lets device-name issuance skip the registrar and registry checks on every later
+    /// issuance in the same container. See @custom:function _registerDeviceSubname.
+    mapping(bytes32 parentNode => bool ready) internal _deviceContainers;
+
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
-    uint256[50] private __gap;
+    uint256[49] private __gap;
+
+    /// @notice Contract addresses one call reads from the protocol registry, each at most once.
+    /// @dev Filled on first use by the `_...Of` getters and passed by reference through the call.
+    /// A gateway call runs under a fixed weight limit and every registry lookup is a proxied
+    /// external call, so each address is read once per call and reused.
+    struct Deps {
+        IPopRules rules;
+        IDotnsRegistrar registrar;
+        IDotnsRegistry registry;
+        IDotnsPopResolver popResolver;
+        IStoreFactory storeFactory;
+        bytes32 tldNode;
+    }
 
     /// @notice Restricts calls to a Root origin.
     modifier onlyRoot() {
@@ -193,12 +217,14 @@ contract DotnsPopController is
 
     /// @inheritdoc IDotnsPopController
     function issueDeviceName(DeviceNameIssuance calldata params) external override onlyRoot {
-        _issueDeviceName(_popRules(), params, false);
+        Deps memory deps;
+        _issueDeviceName(deps, params, false);
     }
 
     /// @inheritdoc IDotnsPopControllerLegacy
     function reserveLiteName(DeviceNameIssuance calldata params) external override onlyRoot {
-        _issueDeviceName(_popRules(), params, true);
+        Deps memory deps;
+        _issueDeviceName(deps, params, true);
     }
 
     /// @inheritdoc IDotnsPopController
@@ -225,11 +251,12 @@ contract DotnsPopController is
         override
         onlyRoot
     {
-        IPopRules rules = _popRules();
-        (bytes32 reservedHash,) = _validateReservablePersonhoodLabel(rules, params.label, false);
-        _advanceExpiredHead(reservedHash);
-        _dropUserReservation(params.user);
-        _enqueueReservation(rules, reservedHash, params.label, params.user);
+        Deps memory deps;
+        (bytes32 reservedHash,) = _validateReservablePersonhoodLabel(deps, params.label, false);
+        bool slotKept =
+            _advanceExpiredHead(deps, reservedHash, MAX_QUEUE_STEPS_PER_CALL, true, address(0));
+        _dropUserReservation(deps, params.user);
+        _enqueueReservation(deps, reservedHash, params.label, params.user, slotKept);
     }
 
     /// @inheritdoc IDotnsPopController
@@ -256,20 +283,22 @@ contract DotnsPopController is
     )
         internal
     {
-        IPopRules rules = _popRules();
+        Deps memory deps;
         bytes32 reservedHash;
         bool hasReservation = bytes(params.reservedLabel).length != 0;
         if (hasReservation) {
-            (reservedHash,) =
-                _validateReservablePersonhoodLabel(rules, params.reservedLabel, legacy);
+            (reservedHash,) = _validateReservablePersonhoodLabel(deps, params.reservedLabel, legacy);
         }
 
-        _issueDeviceName(rules, params.issuance, legacy);
+        _issueDeviceName(deps, params.issuance, legacy);
 
         if (hasReservation) {
-            _advanceExpiredHead(reservedHash);
-            _dropUserReservation(params.issuance.user);
-            _enqueueReservation(rules, reservedHash, params.reservedLabel, params.issuance.user);
+            bool slotKept =
+                _advanceExpiredHead(deps, reservedHash, MAX_QUEUE_STEPS_PER_CALL, true, address(0));
+            _dropUserReservation(deps, params.issuance.user);
+            _enqueueReservation(
+                deps, reservedHash, params.reservedLabel, params.issuance.user, slotKept
+            );
         }
     }
 
@@ -283,7 +312,7 @@ contract DotnsPopController is
     /// undecodable PopRules string. `legacy` selects @custom:reverts InvalidLiteLabel over
     /// @custom:reverts InvalidDeviceLabel for the callers that decode the legacy error.
     function _issueDeviceName(
-        IPopRules rules,
+        Deps memory deps,
         DeviceNameIssuance calldata params,
         bool legacy
     )
@@ -292,15 +321,15 @@ contract DotnsPopController is
         _requireDeviceLabel(params.label.isDeviceLabel(), legacy);
         _requireValidChatKey(params.chatKey);
 
-        (IPopRules.PopStatus required,) = rules.classifyName(params.label);
+        (IPopRules.PopStatus required,,) = PopClassification.classify(params.label);
         // The shape check fixes the suffix, so classification lands on Devicehood (stem 6-8),
         // NoStatus (stem 9 or more), or Reserved (stem 5 or fewer). Accept the first two; a
         // stem short enough to be governance-reserved is not issued from this path.
         _requireDeviceLabel(required != IPopRules.PopStatus.Reserved, legacy);
-        (bytes32 labelhash, bytes32 node) = _validateDeviceLabel(params.label, legacy);
+        (bytes32 labelhash, bytes32 node) = _validateDeviceLabel(deps, params.label, legacy);
 
         _completeGatewayRegistration(
-            params.user, params.label, labelhash, node, params.chatKey, bytes32(0)
+            deps, params.user, params.label, labelhash, node, params.chatKey, bytes32(0)
         );
 
         emit DeviceNameIssued(labelhash, params.user, params.label);
@@ -315,45 +344,39 @@ contract DotnsPopController is
         address user = params.user;
         string calldata label = params.label;
 
-        (bytes32 labelhash, bytes32 node) = _validatePersonhoodLabel(label, legacy);
+        Deps memory deps;
+        (bytes32 labelhash, bytes32 node) = _validatePersonhoodLabel(deps, label, legacy);
 
-        IPopRules rules = _popRules();
-        (IPopRules.PopStatus required,) = rules.classifyName(label);
+        (IPopRules.PopStatus required,,) = PopClassification.classify(label);
         _requirePersonhoodLabel(
             required != IPopRules.PopStatus.Reserved && required != IPopRules.PopStatus.Devicehood,
             legacy
         );
 
-        _advanceExpiredHead(labelhash);
-
-        // Cross-flow guard: after the local queue has had a chance to release its own
-        // PopRules slot via head-advance, any remaining live slot was written by a sibling
-        // controller. Reject when held by another user so PopRules stays the single
-        // cross-flow authority in both directions; the public flow reads this slot through
-        // `priceWithCheck` and writes none of its own.
-        (bool slotLive, address slotOwner,) = rules.isBaseNameReserved(label);
-        require(!slotLive || slotOwner == user, NotHolder(user, labelhash));
+        _advanceExpiredHead(deps, labelhash, MAX_QUEUE_STEPS_PER_CALL, false, user);
 
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
-        ReservationEntry memory headEntry = meta.head < meta.tail
-            ? _reservationEntries[labelhash][meta.head]
-            : ReservationEntry({owner: address(0), joinedAt: 0});
-        bool isClaim = _userReservations[user].labelhash == labelhash && meta.head < meta.tail
-            && headEntry.owner == user;
-
-        if (!isClaim && meta.head < meta.tail) {
-            if (
-                headEntry.owner != address(0) && headEntry.owner != user
-                    && !_isExpired(headEntry.joinedAt)
-            ) {
-                revert NotHolder(user, labelhash);
-            }
+        bool isClaim;
+        if (meta.head < meta.tail) {
+            // The queue holds this label's PopRules slot, so the queue alone decides: only the
+            // user at the front with an active reservation may take the name. A front left
+            // expired, because clearing it would exceed this call's limit, lets nobody.
+            ReservationEntry memory headEntry = _reservationEntries[labelhash][meta.head];
+            isClaim = headEntry.owner == user && !_isExpired(headEntry.joinedAt);
+            require(isClaim, NotHolder(user, labelhash));
+        } else {
+            // Cross-flow guard: with no queue here, a live slot was written by a sibling
+            // controller. Reject when held by another user so PopRules stays the single
+            // cross-flow authority in both directions; the public flow reads this slot through
+            // `priceWithCheck` and writes none of its own.
+            (bool slotLive, address slotOwner,) = _rulesOf(deps).isBaseNameReserved(label);
+            require(!slotLive || slotOwner == user, NotHolder(user, labelhash));
         }
 
         if (isClaim) {
-            _clearQueue(labelhash, user);
+            _clearQueue(deps, labelhash);
         } else {
-            _dropUserReservation(user);
+            _dropUserReservation(deps, user);
         }
 
         bytes32 deviceLabelhash;
@@ -361,20 +384,21 @@ contract DotnsPopController is
         bytes memory chatKeyToPersist;
         if (link.kind == LinkKind.DeviceName) {
             _requireDeviceLabel(link.deviceLabel.isDeviceLabel(), legacy);
-            (deviceLabelhash, deviceNode) = _validateDeviceLabel(link.deviceLabel, legacy);
+            (deviceLabelhash, deviceNode) = _validateDeviceLabel(deps, link.deviceLabel, legacy);
             // A device name is a subnode, so its owner lives in the registry record rather than
             // the registrar's ERC-721 ledger.
             require(
-                _registry().owner(deviceNode) == user, DeviceNameNotOwned(user, deviceLabelhash)
+                _registryOf(deps).owner(deviceNode) == user,
+                DeviceNameNotOwned(user, deviceLabelhash)
             );
-            chatKeyToPersist = _popResolver().chatKey(deviceNode);
+            chatKeyToPersist = _popResolverOf(deps).chatKey(deviceNode);
         } else {
             _requireValidChatKey(link.chatKey);
             chatKeyToPersist = link.chatKey;
         }
 
         _completeGatewayRegistration(
-            user, label, labelhash, node, chatKeyToPersist, deviceLabelhash
+            deps, user, label, labelhash, node, chatKeyToPersist, deviceLabelhash
         );
 
         emit PersonhoodNameIssued(labelhash, user, label);
@@ -388,16 +412,34 @@ contract DotnsPopController is
 
     /// @inheritdoc IDotnsPopController
     function expireReservation(string calldata label) external override {
-        (bytes32 labelhash,) = _validatePersonhoodLabel(label, false);
-        _advanceExpiredHead(labelhash);
+        Deps memory deps;
+        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label, false);
+        // A signed call outside the gateway's limit: it always has room to clear the whole queue.
+        _advanceExpiredHead(deps, labelhash, MAX_RESERVATION_QUEUE, false, address(0));
+    }
+
+    /// @inheritdoc IDotnsPopController
+    function prepareDeviceContainer(string calldata suffix) external override {
+        bytes memory raw = bytes(suffix);
+        require(raw.length == StringUtils.DEVICE_SUFFIX_DIGITS, InvalidDeviceLabel());
+        for (uint256 i; i < raw.length; ++i) {
+            require(raw[i] >= 0x30 && raw[i] <= 0x39, InvalidDeviceLabel());
+        }
+        Deps memory deps;
+        bytes32 parentNode =
+            LabelUtils.namehashUnder(_tldNodeOf(deps), LabelUtils.labelhashMemory(suffix));
+        if (!_deviceContainers[parentNode]) _ensureDeviceContainer(deps, parentNode);
     }
 
     /// @inheritdoc IDotnsPopController
     function relinquishReservation() external override {
+        UserReservation memory reservation = _userReservations[msg.sender];
         require(
-            _userReservations[msg.sender].labelhash != bytes32(0), NoActiveReservation(msg.sender)
+            reservation.labelhash != bytes32(0) && !_isEvicted(reservation),
+            NoActiveReservation(msg.sender)
         );
-        _dropUserReservation(msg.sender);
+        Deps memory deps;
+        _dropUserReservation(deps, msg.sender);
     }
 
     /// @inheritdoc IDotnsPopController
@@ -428,7 +470,8 @@ contract DotnsPopController is
         internal
         returns (uint256 settledCount, bool moreRemaining)
     {
-        IStoreFactory factory = _storeFactory();
+        Deps memory deps;
+        IStoreFactory factory = _storeFactoryOf(deps);
         address store = factory.getLabelStore(user);
 
         PendingClaim[] storage queue = _pendingClaimQueue[user];
@@ -443,7 +486,7 @@ contract DotnsPopController is
             --remaining;
             string memory label = queue[remaining].label;
             queue.pop();
-            store = _settlePendingLabel(factory, store, user, label);
+            store = _settlePendingLabel(deps, factory, store, user, label);
         }
 
         moreRemaining = remaining != 0;
@@ -457,6 +500,7 @@ contract DotnsPopController is
     /// empty queue never leaves a fresh store behind with nothing in it. Returns the (possibly
     /// newly deployed) store so the caller threads it through the remaining entries.
     function _settlePendingLabel(
+        Deps memory deps,
         IStoreFactory factory,
         address store,
         address user,
@@ -469,8 +513,8 @@ contract DotnsPopController is
         // A device name settled its ownership as a subnode, so its store entry keys the same
         // hierarchical node; a personhood name keys the second-level node under the TLD.
         bytes32 node = label.isDeviceLabelMemory()
-            ? _deviceSubnode(label)
-            : LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash);
+            ? _deviceSubnode(deps, label)
+            : LabelUtils.namehashUnder(_tldNodeOf(deps), labelhash);
         if (store == address(0)) {
             store = factory.deployLabelStoreFor(user);
         }
@@ -487,7 +531,8 @@ contract DotnsPopController is
         override
         returns (bool reserved, address holder)
     {
-        (bytes32 labelhash,) = _validatePersonhoodLabel(label, false);
+        Deps memory deps;
+        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label, false);
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         if (meta.head >= meta.tail) return (false, address(0));
 
@@ -526,6 +571,8 @@ contract DotnsPopController is
         override
         returns (address entryOwner, uint64 joinedAt)
     {
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        if (index < meta.head || index >= meta.tail) return (address(0), 0);
         ReservationEntry memory entry = _reservationEntries[labelhash][index];
         return (entry.owner, entry.joinedAt);
     }
@@ -537,7 +584,8 @@ contract DotnsPopController is
         override
         returns (UserReservation memory reservation)
     {
-        return _userReservations[user];
+        reservation = _userReservations[user];
+        if (_isEvicted(reservation)) delete reservation;
     }
 
     /// @inheritdoc IDotnsPopController
@@ -634,11 +682,10 @@ contract DotnsPopController is
     /// @notice Mints a name, wires forward registry, persists PoP-flow records (chat key,
     /// device link) on the PoP resolver, and either writes the label into the owner's
     /// existing `LabelStore` or stashes a pending claim when the owner has none yet.
-    /// @dev The mint + forward-registry pair is delegated to
-    /// @custom:function RegistrationUtils.registerAndStore so this flow and the public
-    /// commit-reveal flow share exactly one implementation of that sequence. The label is
-    /// passed empty so the registrar does not deploy a `LabelStore`; the mint origin cannot
-    /// run the `LabelStore` constructor. PoP-flow per-name records
+    /// @dev The mint + forward-registry pair runs against the registrar and registry this call
+    /// already resolved, so the gateway's call reads each address once. The label is passed
+    /// empty so the registrar does not deploy a `LabelStore`; the mint origin cannot run the
+    /// `LabelStore` constructor. PoP-flow per-name records
     /// (chat key, device link) are persisted eagerly on @custom:contract IDotnsPopResolver
     /// here, before the label is written, so the resolver carries the full identity record
     /// from mint time regardless of whether the owner already has a `LabelStore`. The Store
@@ -647,6 +694,7 @@ contract DotnsPopController is
     /// @custom:emits NameRegistered to @custom:function settlePendingClaims when the claim
     /// settles.
     function _completeGatewayRegistration(
+        Deps memory deps,
         address user,
         string memory label,
         bytes32 labelhash,
@@ -666,34 +714,21 @@ contract DotnsPopController is
             // A device name is issued once. Its subnode already existing means a duplicate
             // issuance, which would rehome the identity and overwrite its records, so it is
             // rejected.
-            require(!_registry().recordExists(node), DeviceNameAlreadyIssued());
+            require(!_registryOf(deps).recordExists(node), DeviceNameAlreadyIssued());
             (string memory stem, string memory suffix) = label.splitDeviceLabel();
             // Take the node from the registry write itself, so the chat-key and store writes below
             // land on exactly the node the record was created at rather than a separately derived
             // one that could drift from it.
-            node = SubnodeUtils.registerSubname(
-                SubnodeUtils.SubnameContext({
-                    protocolRegistry: protocolRegistry,
-                    parentLabel: suffix,
-                    subLabel: stem,
-                    owner: user,
-                    persist: false
-                })
-            );
+            node = _registerDeviceSubname(deps, suffix, stem, user);
         } else {
-            RegistrationUtils.registerAndStore(
-                RegistrationUtils.RegistrationContext({
-                    protocolRegistry: protocolRegistry,
-                    user: user,
-                    label: "",
-                    labelhash: labelhash,
-                    node: node
-                })
-            );
+            // The empty label keeps the registrar from writing a `LabelStore`; the store write
+            // happens below, or is deferred to the pending-claim queue.
+            _registrarOf(deps).register(uint256(node), user, "");
+            _registryOf(deps).setOwner(node, user);
         }
 
         if (chatKeyBytes.length != 0 || deviceLabelhash != bytes32(0)) {
-            IDotnsPopResolver resolver = _popResolver();
+            IDotnsPopResolver resolver = _popResolverOf(deps);
             if (chatKeyBytes.length != 0) {
                 resolver.setChatKey(node, chatKeyBytes);
             }
@@ -702,7 +737,7 @@ contract DotnsPopController is
             }
         }
 
-        address store = _storeFactory().getLabelStore(user);
+        address store = _storeFactoryOf(deps).getLabelStore(user);
         if (store == address(0)) {
             _stashPendingClaim(user, label, labelhash);
         } else {
@@ -753,10 +788,11 @@ contract DotnsPopController is
     /// its existing `priceWithCheck` guard. Subsequent waiters only live in the local queue
     /// until they are promoted.
     function _enqueueReservation(
-        IPopRules rules,
+        Deps memory deps,
         bytes32 labelhash,
         string memory reservedLabel,
-        address user
+        address user,
+        bool slotKept
     )
         internal
     {
@@ -775,69 +811,102 @@ contract DotnsPopController is
         _userReservations[user] = UserReservation({labelhash: labelhash, index: index});
 
         if (becomesHead) {
-            _reservedBaseLabel[labelhash] = reservedLabel;
-            rules.reserveBaseNameForPop(reservedLabel, user);
+            if (slotKept) {
+                // The queue was emptied in this call with its PopRules slot and label kept, so
+                // the slot moves straight to the new head.
+                _rulesOf(deps).reassignBaseNameForPop(reservedLabel, user);
+            } else {
+                _reservedBaseLabel[labelhash] = reservedLabel;
+                _rulesOf(deps).reserveBaseNameForPop(reservedLabel, user);
+            }
         }
 
         emit ReservationQueued(labelhash, user, index - meta.head);
     }
 
-    /// @notice Wipes the entire reservation queue for `labelhash` and releases the
-    /// corresponding PopRules reservation.
-    /// @dev Used when `claimant` claims their reservation: every other waiter is evicted
-    /// (@custom:emits ReservationEvicted for each one) and their per-user tracking state is
-    /// cleared, and PopRules is told the slot is free so future public registrations are unblocked
-    /// (the claim itself just minted the name, so there is nothing left to reserve).
-    function _clearQueue(bytes32 labelhash, address claimant) internal {
-        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
-        for (uint64 i = meta.head; i < meta.tail; i++) {
-            ReservationEntry memory entry = _reservationEntries[labelhash][i];
-            if (entry.owner != address(0)) {
-                delete _userReservations[entry.owner];
-                if (entry.owner != claimant) {
-                    emit ReservationEvicted(labelhash, entry.owner);
-                }
-            }
-            delete _reservationEntries[labelhash][i];
-        }
-        delete _reservationMeta[labelhash];
-        _releasePopRulesSlot(labelhash);
+    /// @notice Ends the reservation queue for `labelhash` when its head claims the name, and
+    /// releases the corresponding PopRules reservation.
+    /// @dev The claim mints the name, so nothing is left to reserve and PopRules is told the slot
+    /// is free. Every entry, the claimant's and each waiter's, is evicted lazily, so the claim
+    /// costs the same whatever the queue holds: the head moves to the tail, which ends the queue,
+    /// and entries and pointers stay where they are, below the new head.
+    /// @custom:function _isEvicted reads such a pointer as no reservation, and the user's next
+    /// reservation clears it. @custom:emits ReservationClaimed, emitted by the caller, therefore
+    /// ends the reservation of every waiter in the queue.
+    function _clearQueue(Deps memory deps, bytes32 labelhash) internal {
+        uint64 tail = _reservationMeta[labelhash].tail;
+        _reservationMeta[labelhash] = ReservationQueueMeta({head: tail, tail: tail});
+        _releasePopRulesSlot(deps, labelhash);
     }
 
-    /// @notice Advances the queue head past every expired entry at the head of the queue.
-    /// @dev Reset semantics matter: when the queue empties (head catches tail), the meta slot
-    /// is deleted AND the PopRules base-name slot is released, so the public commit-reveal
-    /// flow can register the label again. When a new live head emerges, PopRules is re-synced
-    /// to that head so reservations cannot be paid around by another address. Emits
-    /// @custom:emits ReservationExpired once per expired entry reaped from the head.
-    function _advanceExpiredHead(bytes32 labelhash) internal {
+    /// @notice Returns whether `reservation` points at an entry the queue's head has moved past.
+    /// @dev Expiry and claims leave entries and pointers in place and move the head past them
+    /// (see @custom:function _advanceExpiredHead and @custom:function _clearQueue), so a pointer
+    /// below its queue's head is no reservation. Queue indices only ever grow, so such a pointer
+    /// never matches an entry queued later under the same label.
+    function _isEvicted(UserReservation memory reservation) internal view returns (bool) {
+        return reservation.labelhash != bytes32(0)
+            && reservation.index < _reservationMeta[reservation.labelhash].head;
+    }
+
+    /// @notice Clears the expired entries at the front of the queue, if at most `maxSteps` of them
+    /// stand before an active reservation or the end of the queue; otherwise leaves the queue as
+    /// it is.
+    /// @dev All or nothing, so PopRules always names the user at the front of the queue: a call
+    /// that cannot finish within its limit changes nothing, and a later call with room to finish
+    /// (such as the permissionless @custom:function expireReservation) clears the queue. Every
+    /// entry visited costs a storage read, and a gateway call runs under a fixed weight limit.
+    /// Clearing writes nothing per entry: entries and pointers stay below the new front, where
+    /// they read as gone (@custom:function _isEvicted), and queue indices only ever grow.
+    /// When clearing reaches an active reservation, PopRules moves to that user, unless it is
+    /// `claimant`, whose claim in the same call releases the slot. When it empties the queue,
+    /// the PopRules slot is released, unless the caller is `refilling` it in the same call: then
+    /// the slot and its label are kept and `slotKept` is returned, so the slot moves to the new
+    /// user in one PopRules call. @custom:emits ReservationExpired once per expired entry cleared.
+    function _advanceExpiredHead(
+        Deps memory deps,
+        bytes32 labelhash,
+        uint256 maxSteps,
+        bool refilling,
+        address claimant
+    )
+        internal
+        returns (bool slotKept)
+    {
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         uint64 head = meta.head;
         uint64 tail = meta.tail;
+        // An empty queue holds no PopRules slot and no label, so there is nothing to clear.
+        if (head == tail) return false;
+        address activeHead;
+        // Read once: every entry visited compares against it.
+        uint64 duration = reservationDuration;
+        address[] memory expired = new address[](maxSteps);
+        uint256 steps;
 
-        while (head < tail) {
+        for (; head < tail; ++head) {
             ReservationEntry memory entry = _reservationEntries[labelhash][head];
-            if (entry.owner == address(0)) {
-                // `owner == 0` implies the slot is fully zero (it can only have arrived here
-                // via a prior full-slot `delete`), so skip the no-op SSTORE.
-                head++;
-                continue;
+            if (entry.owner != address(0) && entry.joinedAt + duration >= block.timestamp) {
+                activeHead = entry.owner;
+                break;
             }
-            if (!_isExpired(entry.joinedAt)) break;
+            // Clearing that cannot finish within the limit clears nothing.
+            if (steps == maxSteps) return false;
+            // An empty entry is one its owner already left.
+            expired[steps++] = entry.owner;
+        }
+        if (steps == 0) return false;
 
-            delete _userReservations[entry.owner];
-            delete _reservationEntries[labelhash][head];
-            emit ReservationExpired(labelhash, entry.owner);
-            head++;
+        _reservationMeta[labelhash] = ReservationQueueMeta({head: head, tail: tail});
+        for (uint256 k; k < steps; ++k) {
+            if (expired[k] != address(0)) emit ReservationExpired(labelhash, expired[k]);
         }
 
         if (head == tail) {
-            delete _reservationMeta[labelhash];
-            _releasePopRulesSlot(labelhash);
-        } else if (head != meta.head) {
-            _reservationMeta[labelhash] = ReservationQueueMeta({head: head, tail: tail});
-            address newHead = _reservationEntries[labelhash][head].owner;
-            _syncPopRulesToHead(labelhash, newHead);
+            if (refilling) return true;
+            _releasePopRulesSlot(deps, labelhash);
+        } else if (activeHead != claimant) {
+            _syncPopRulesToHead(deps, labelhash, activeHead);
         }
     }
 
@@ -846,21 +915,27 @@ contract DotnsPopController is
     /// claim: an explicit relinquish, a standalone personhood-name issuance, and a re-reservation
     /// that moves the user to another queue. @custom:emits ReservationRelinquished only when the
     /// user held an entry, so an indexer can rebuild every queue from events alone.
-    function _dropUserReservation(address user) internal {
-        bytes32 labelhash = _userReservations[user].labelhash;
+    function _dropUserReservation(Deps memory deps, address user) internal {
+        UserReservation memory reservation = _userReservations[user];
+        bytes32 labelhash = reservation.labelhash;
         if (labelhash == bytes32(0)) return;
-        _removeUserFromQueue(user);
+        if (_isEvicted(reservation)) {
+            // A claim already ended this reservation; only the pointer is left to clear.
+            delete _userReservations[user];
+            return;
+        }
+        _removeUserFromQueue(deps, user);
         emit ReservationRelinquished(labelhash, user);
     }
 
     /// @notice Removes `user` from whichever reservation queue they currently occupy.
-    /// @dev For a head removal, we delete the entry without bumping `meta.head` and delegate
-    /// the advance to `_advanceExpiredHead`. Its existing zero-owner skip walks past the
-    /// freshly-deleted slot, and its `head != meta.head` branch fires the PopRules resync
-    /// in the one place head promotion is actually handled. Non-head removals leave the
-    /// queue shape intact, so no advance or resync is needed. Emits nothing itself; callers go
-    /// through @custom:function _dropUserReservation.
-    function _removeUserFromQueue(address user) internal {
+    /// @dev The user's entry is deleted in place. When it was the front of the queue,
+    /// @custom:function _advanceExpiredHead clears the queue from there with room for the whole
+    /// queue: the emptied entry counts as one cleared entry, and PopRules moves to the next
+    /// user with an active reservation, or is released when none is left. Removing any other
+    /// entry leaves the front and PopRules unchanged. Emits nothing itself; callers go through
+    /// @custom:function _dropUserReservation.
+    function _removeUserFromQueue(Deps memory deps, address user) internal {
         UserReservation memory userRes = _userReservations[user];
         bytes32 labelhash = userRes.labelhash;
         if (labelhash == bytes32(0)) return;
@@ -872,7 +947,8 @@ contract DotnsPopController is
         delete _reservationEntries[labelhash][entryIndex];
 
         if (entryIndex == queueMeta.head) {
-            _advanceExpiredHead(labelhash);
+            // The user leaving held PopRules, so the queue is always cleared to the next user.
+            _advanceExpiredHead(deps, labelhash, MAX_RESERVATION_QUEUE, false, address(0));
         }
     }
 
@@ -884,6 +960,7 @@ contract DotnsPopController is
     /// and the reservation queue. `legacy` selects the label error, as in
     /// @custom:function _requireDeviceLabel.
     function _validateDeviceLabel(
+        Deps memory deps,
         string memory deviceLabel,
         bool legacy
     )
@@ -893,7 +970,7 @@ contract DotnsPopController is
     {
         _requireDeviceLabel(deviceLabel.isDeviceLabelMemory(), legacy);
         labelhash = LabelUtils.labelhashMemory(deviceLabel);
-        node = _deviceSubnode(deviceLabel);
+        node = _deviceSubnode(deps, deviceLabel);
     }
 
     /// @notice Derives the hierarchical subnode for a device name `<stem>.<suffix>`.
@@ -903,8 +980,15 @@ contract DotnsPopController is
     /// consumer agrees on one node.
     /// @param deviceLabel Device name held in memory, e.g. `alice.01`.
     /// @return subnode Namehash of `stem` under `suffix.tld`.
-    function _deviceSubnode(string memory deviceLabel) internal view returns (bytes32 subnode) {
-        subnode = SubnodeUtils.deviceSubnodeOf(protocolRegistry.tldNode(), deviceLabel);
+    function _deviceSubnode(
+        Deps memory deps,
+        string memory deviceLabel
+    )
+        internal
+        view
+        returns (bytes32 subnode)
+    {
+        subnode = SubnodeUtils.deviceSubnodeOf(_tldNodeOf(deps), deviceLabel);
     }
 
     /// @notice Validates a personhood name and derives `(labelhash, node)`.
@@ -912,6 +996,7 @@ contract DotnsPopController is
     /// is rejected here even though @custom:function StringUtils.isSingleLabel would admit it.
     /// `legacy` selects the label error, as in @custom:function _requirePersonhoodLabel.
     function _validatePersonhoodLabel(
+        Deps memory deps,
         string calldata label,
         bool legacy
     )
@@ -924,7 +1009,7 @@ contract DotnsPopController is
         // this on its own: a label carrying a digit or a hyphen is measured as written, so one of
         // six or more characters classifies as Personhood or NoStatus and would otherwise pass.
         _requirePersonhoodLabel(label.isPersonhoodLabel(), legacy);
-        (labelhash, node) = LabelUtils.deriveNode(protocolRegistry.tldNode(), label);
+        (labelhash, node) = LabelUtils.deriveNode(_tldNodeOf(deps), label);
     }
 
     /// @notice Validates a personhood name as reservable and returns its hashes.
@@ -938,7 +1023,7 @@ contract DotnsPopController is
     /// what makes the eventual claim's mint revert, so a label that passes here is one a claim can
     /// still register.
     function _validateReservablePersonhoodLabel(
-        IPopRules rules,
+        Deps memory deps,
         string calldata label,
         bool legacy
     )
@@ -946,13 +1031,15 @@ contract DotnsPopController is
         view
         returns (bytes32 labelhash, bytes32 node)
     {
-        (labelhash, node) = _validatePersonhoodLabel(label, legacy);
+        (labelhash, node) = _validatePersonhoodLabel(deps, label, legacy);
 
-        (IPopRules.PopStatus required,) = rules.classifyName(label);
+        (IPopRules.PopStatus required,,) = PopClassification.classify(label);
         _requirePersonhoodLabel(
-            required != IPopRules.PopStatus.Reserved && rules.isBaseName(label), legacy
+            required != IPopRules.PopStatus.Reserved
+                && PopClassification.countTrailingDigits(label) == 0,
+            legacy
         );
-        require(!_registrar().exists(uint256(node)), PersonhoodNameUnavailable());
+        require(!_registrarOf(deps).exists(uint256(node)), PersonhoodNameUnavailable());
     }
 
     /// @notice Reverts with the device-label error the caller decodes when `ok` is false.
@@ -1009,26 +1096,112 @@ contract DotnsPopController is
         return IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
     }
 
+    /// @notice Returns PopRules, reading it from the protocol registry on first use in `deps`.
+    function _rulesOf(Deps memory deps) internal view returns (IPopRules rules) {
+        rules = deps.rules;
+        if (address(rules) == address(0)) deps.rules = rules = _popRules();
+    }
+
+    /// @notice Returns the registrar, reading it from the protocol registry on first use in
+    /// `deps`.
+    function _registrarOf(Deps memory deps) internal view returns (IDotnsRegistrar registrar) {
+        registrar = deps.registrar;
+        if (address(registrar) == address(0)) deps.registrar = registrar = _registrar();
+    }
+
+    /// @notice Returns the registry, reading it from the protocol registry on first use in
+    /// `deps`.
+    function _registryOf(Deps memory deps) internal view returns (IDotnsRegistry registry) {
+        registry = deps.registry;
+        if (address(registry) == address(0)) deps.registry = registry = _registry();
+    }
+
+    /// @notice Returns the PoP resolver, reading it from the protocol registry on first use in
+    /// `deps`.
+    function _popResolverOf(Deps memory deps) internal view returns (IDotnsPopResolver resolver) {
+        resolver = deps.popResolver;
+        if (address(resolver) == address(0)) deps.popResolver = resolver = _popResolver();
+    }
+
+    /// @notice Returns the store factory, reading it from the protocol registry on first use in
+    /// `deps`.
+    function _storeFactoryOf(Deps memory deps) internal view returns (IStoreFactory factory) {
+        factory = deps.storeFactory;
+        if (address(factory) == address(0)) deps.storeFactory = factory = _storeFactory();
+    }
+
+    /// @notice Returns the TLD node, reading it from the protocol registry on first use in
+    /// `deps`.
+    /// @dev The TLD node is a namehash, so zero never names a real TLD and serves as "not read
+    /// yet".
+    function _tldNodeOf(Deps memory deps) internal view returns (bytes32 tldNode) {
+        tldNode = deps.tldNode;
+        if (tldNode == bytes32(0)) deps.tldNode = tldNode = protocolRegistry.tldNode();
+    }
+
+    /// @notice Registers the device name `stem.suffix` for `owner` beneath its numeric container.
+    /// @dev The container is checked, and minted on first use, only until this contract has seen
+    /// it once; after that the registry's own parent authorisation in
+    /// @custom:function IDotnsRegistry.setSubnodeOwner is the guard. A container this contract
+    /// minted is soulbound to it, so it never changes hands afterwards.
+    function _registerDeviceSubname(
+        Deps memory deps,
+        string memory suffix,
+        string memory stem,
+        address owner
+    )
+        internal
+        returns (bytes32 subnode)
+    {
+        bytes32 parentNode =
+            LabelUtils.namehashUnder(_tldNodeOf(deps), LabelUtils.labelhashMemory(suffix));
+        if (!_deviceContainers[parentNode]) _ensureDeviceContainer(deps, parentNode);
+
+        subnode = _registryOf(deps)
+            .setSubnodeOwner(
+                IDotnsRegistry.SubnodeRecord({
+                parentNode: parentNode,
+                subLabel: stem,
+                parentLabel: suffix,
+                owner: owner,
+                persist: false
+            })
+            );
+    }
+
+    /// @notice Mints the numeric container `parentNode` for this contract when it does not exist
+    /// yet, or checks that this contract owns it, and records that it is ready.
+    /// @dev Reverts with @custom:reverts IDotnsRegistry.NotAuthorised when someone else holds the
+    /// container, so a name registered elsewhere is never used as a device container.
+    function _ensureDeviceContainer(Deps memory deps, bytes32 parentNode) internal {
+        IDotnsRegistrar registrar = _registrarOf(deps);
+        IDotnsRegistry registry = _registryOf(deps);
+        if (!registrar.exists(uint256(parentNode))) {
+            registrar.register(uint256(parentNode), address(this), "");
+            registry.setOwner(parentNode, address(this));
+        } else {
+            require(registry.owner(parentNode) == address(this), IDotnsRegistry.NotAuthorised());
+        }
+        _deviceContainers[parentNode] = true;
+    }
+
     /// @notice Writes the new head of the queue into PopRules so the public commit-reveal flow
     /// rejects registrations of this base name for anyone other than `newHead`.
     /// @dev Callers guarantee `newHead` is non-zero (the queue holds a live entry) and that
     /// `_reservedBaseLabel[labelhash]` is non-empty (any non-empty queue had its first head
-    /// write the slot). The release-then-reserve pair satisfies PopRules' ownership gate on
-    /// `reserveBaseNameForPop`.
-    function _syncPopRulesToHead(bytes32 labelhash, address newHead) internal {
-        string memory reservedLabel = _reservedBaseLabel[labelhash];
-        IPopRules rules = _popRules();
-        rules.releaseBaseName(reservedLabel);
-        rules.reserveBaseNameForPop(reservedLabel, newHead);
+    /// write the slot). @custom:function IPopRules.reassignBaseNameForPop moves the slot in one
+    /// call; this contract stamped it, so PopRules' ownership gate admits the move.
+    function _syncPopRulesToHead(Deps memory deps, bytes32 labelhash, address newHead) internal {
+        _rulesOf(deps).reassignBaseNameForPop(_reservedBaseLabel[labelhash], newHead);
         emit ReservationHeadAdvanced(labelhash, newHead);
     }
 
     /// @notice Clears the PopRules slot and the local label bookkeeping when the queue empties
     /// (claim, last-relinquish, last-expire).
-    function _releasePopRulesSlot(bytes32 labelhash) internal {
+    function _releasePopRulesSlot(Deps memory deps, bytes32 labelhash) internal {
         string memory reservedLabel = _reservedBaseLabel[labelhash];
         if (bytes(reservedLabel).length == 0) return;
-        _popRules().releaseBaseName(reservedLabel);
+        _rulesOf(deps).releaseBaseName(reservedLabel);
         delete _reservedBaseLabel[labelhash];
     }
 

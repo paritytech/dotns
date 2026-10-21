@@ -180,6 +180,23 @@ node scripts/js/release-metadata.mjs verify --network <folder> --rpc "$RPC_URL" 
 
 Done. ✅
 
+## Before enabling the PoP gateway
+
+The gateway pallet calls `DotnsPopController` as Root under a fixed weight limit, and pallet-revive
+meters proof size pessimistically, so the first device name in a numeric container, which also
+mints the container, costs noticeably more than the ones after it. Mint all 100 containers before
+the gateway's dispatcher address is set. `prepareDeviceContainer` is permissionless, so any funded
+account can send it, and a container already minted is a no-op:
+
+```bash
+for n in $(seq -w 0 99); do
+  cast send "$POP_CONTROLLER" "prepareDeviceContainer(string)" "$n" \
+    --rpc-url "$RPC_URL" --private-key "$KEY"
+done
+```
+
+- [ ] Containers `00` to `99` exist and are owned by `DotnsPopController`.
+
 ## Upgrading a live network
 
 Upgrade tooling does not live in this repository; operations do. What lives

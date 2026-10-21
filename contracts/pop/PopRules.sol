@@ -13,6 +13,7 @@ import {
 import {StringUtils} from "../utils/StringUtils.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
 import {IPopRules} from "./IPopRules.sol";
+import {PopClassification} from "./PopClassification.sol";
 import {IDotnsCostModelRegistry} from "./IDotnsCostModelRegistry.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {IDotnsController} from "../registrars/IDotnsController.sol";
@@ -402,9 +403,7 @@ contract PopRules is
     ///      ordinary label, where they are part of the name: `web3` is a four-character word,
     ///      not `web` with a counter.
     function _baseNameEnd(string calldata name) private pure returns (uint256 end) {
-        end = bytes(name).length;
-        if (!name.isDeviceLabel()) return end;
-        return end - StringUtils.DEVICE_SUFFIX_DIGITS - 1;
+        end = PopClassification.baseNameEnd(name);
     }
 
     /// @notice The base length that pricing and classification both use to place a name in its
@@ -444,14 +443,7 @@ contract PopRules is
         pure
         returns (uint256 digitCount)
     {
-        bytes calldata bytesLabel = bytes(label);
-        for (uint256 i = bytesLabel.length; i > 0; i--) {
-            if (bytesLabel[i - 1] >= 0x30 && bytesLabel[i - 1] <= 0x39) {
-                digitCount++;
-            } else {
-                break;
-            }
-        }
+        digitCount = PopClassification.countTrailingDigits(label);
     }
 
     /// @notice Returns `name`'s base name: a device name without its allocated suffix, or any
@@ -479,24 +471,7 @@ contract PopRules is
         pure
         returns (PopStatus requirement, string memory message, uint256 baseLength)
     {
-        baseLength = _validatedBaseLength(name);
-
-        if (baseLength <= 5) {
-            return (PopStatus.Reserved, "Reserved for Governance", baseLength);
-        }
-
-        if (baseLength >= 6 && baseLength <= 8) {
-            // Devicehood is the gateway's separated form. Digits in an ordinary label say nothing
-            // about personhood, so such a label sits in the band its length earns.
-            if (name.isDeviceLabel()) {
-                return (PopStatus.Devicehood, "Requires devicehood", baseLength);
-            }
-            return (PopStatus.Personhood, "Requires personhood", baseLength);
-        }
-
-        // Base length >= 9 is open to any caller, and is reached by a device name whose stem is
-        // nine or more through the gateway.
-        return (PopStatus.NoStatus, "Available to all", baseLength);
+        (requirement, message, baseLength) = PopClassification.classify(name);
     }
 
     /// @notice Requires `baseName` to be a canonical DNS label, carrying no separator.
@@ -599,6 +574,38 @@ contract PopRules is
         }
         delete reservations[baseName];
         emit BaseNameReleased(baseName);
+    }
+
+    /// @inheritdoc IPopRules
+    function reassignBaseNameForPop(
+        string calldata baseName,
+        address userAddress
+    )
+        external
+        override
+        onlyRegistry
+    {
+        _requireBaseName(baseName);
+        require(
+            _countTrailingDigits(baseName) == 0,
+            PopError("Reservation base name must have no trailing digits")
+        );
+        Reservation memory reservation = reservations[baseName];
+        // The same gate as `releaseBaseName`: only the controller that wrote a live slot may
+        // move it, so this grants nothing a release followed by a reservation would not.
+        if (_isLive(reservation)) {
+            require(
+                msg.sender == reservation.controller,
+                PopError("Only reserving controller can release")
+            );
+        }
+        emit BaseNameReleased(baseName);
+
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint64 expiryTime = uint64(block.timestamp + MAX_RESERVATION_TIME);
+        reservations[baseName] =
+            Reservation({owner: userAddress, expires: expiryTime, controller: msg.sender});
+        emit BaseNameReserved(baseName, userAddress, expiryTime);
     }
 
     /// @inheritdoc IPopRules
