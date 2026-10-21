@@ -180,12 +180,14 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="popclassification"><a class="header" href="#popclassification">PopClassification</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/74f32bb255ddaa09b91be0f8b5361e2b816ec12c/contracts/pop/PopClassification.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/80c7efb8c5f119fd119e1b75f55be06f1379749a/contracts/pop/PopClassification.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 PopClassification</p>
 <p>The pure dotNS naming rules: a label's base length, its trailing digits, and the PoP
 tier its base length places it in.</p>
 <p>Shared by @custom:contract PopRules, which exposes them through</p>
+<p>Every contract that uses these rules compiles them in, so a change to them takes effect
+in each contract only when that contract is upgraded. Upgrade PopRules and</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
@@ -193,6 +195,9 @@ tier its base length places it in.</p>
 callers that apply the same rules inside their own call. Calling the library in place of
 PopRules saves a proxied external call for logic that reads no state. Inputs are the
 label bytes only; validating the label's shape is the caller's job.</p>
+</li>
+<li>
+<p>contract: DotnsPopController together whenever these rules change.</p>
 </li>
 <li>
 <p>security-contact: admin@parity.io</p>

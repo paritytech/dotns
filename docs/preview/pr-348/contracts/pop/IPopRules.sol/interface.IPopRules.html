@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/74f32bb255ddaa09b91be0f8b5361e2b816ec12c/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/80c7efb8c5f119fd119e1b75f55be06f1379749a/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for dotNS</p>
 <p>Proof of personhood interface defining dotNS price calculation, PoP-tier requirements,
@@ -270,7 +270,8 @@ controller. Its length window bounds the base name and does not name a tier:
 Devicehood is decided by the separated label shape. The caller passes the base name; a
 non-canonical label, a trailing digit, or a length outside <code>[6, 8]</code> triggers</p>
 <p><strong>Note:</strong>
-reverts: PopError. Cross-user collision on a live slot triggers @custom:reverts
+reverts: PopError, as does a zero <code>user</code>. Cross-user collision on a live slot
+triggers @custom:reverts
 PopError so the caller cannot silently overwrite another user's reservation; same-user
 refresh and writes into an empty or expired slot emit @custom:emits BaseNameReserved.</p>
 <pre><code class="language-solidity">function reserveBaseName(string calldata baseName, address user) external;
@@ -287,12 +288,19 @@ refresh and writes into an empty or expired slot emit @custom:emits BaseNameRese
 registrar's <code>controllers</code> set may call this, otherwise @custom:reverts NotRegistry.
 Does not apply the 6-8 base-length window that @custom:function reserveBaseName
 enforces, but does require the input to be canonical with no trailing digits; a
-non-canonical label or one with trailing digits triggers @custom:reverts PopError. If
+non-canonical label, one with trailing digits or a zero <code>user</code> triggers</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: PopError. If
 the slot is already live and held by a different user, @custom:reverts PopError so the
 caller's local bookkeeping and PopRules state stay in lockstep; if it is live for the
 same user, expiry is refreshed to <code>block.timestamp + MAX_RESERVATION_TIME</code>. Emits</p>
-<p><strong>Note:</strong>
-emits: BaseNameReserved on every successful write.</p>
+</li>
+<li>
+<p>emits: BaseNameReserved on every successful write.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function reserveBaseNameForPop(string calldata baseName, address user) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -329,10 +337,8 @@ followed by @custom:function reserveBaseNameForPop would, in one call.</p>
 <p>reverts: NotRegistry. A live slot may only be moved by the controller that
 wrote it, otherwise @custom:reverts PopError, which is the authority that controller
 already has to release it; an empty or expired slot may be written by any authorised
-controller. Non-canonical labels and labels with trailing digits trigger</p>
-</li>
-<li>
-<p>reverts: PopError. The new reservation expires at
+controller. Non-canonical labels, labels with trailing digits and a zero <code>user</code>
+trigger @custom:reverts PopError. The new reservation expires at
 <code>block.timestamp + MAX_RESERVATION_TIME</code> and is stamped by the caller. Emits</p>
 </li>
 <li>
