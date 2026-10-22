@@ -275,7 +275,7 @@ contract DotnsPopController is
         (bytes32 reservedHash,) = _validateReservablePersonhoodLabel(deps, params.label, false);
         bool slotKept =
             _advanceExpiredHead(deps, reservedHash, MAX_QUEUE_STEPS_PER_CALL, true, address(0));
-        _dropUserReservation(deps, params.user, MAX_QUEUE_STEPS_PER_CALL);
+        if (_keepOrDropReservation(deps, reservedHash, params.user)) return;
         _enqueueReservation(deps, reservedHash, params.label, params.user, slotKept);
     }
 
@@ -315,7 +315,7 @@ contract DotnsPopController is
         if (hasReservation) {
             bool slotKept =
                 _advanceExpiredHead(deps, reservedHash, MAX_QUEUE_STEPS_PER_CALL, true, address(0));
-            _dropUserReservation(deps, params.issuance.user, MAX_QUEUE_STEPS_PER_CALL);
+            if (_keepOrDropReservation(deps, reservedHash, params.issuance.user)) return;
             _enqueueReservation(
                 deps, reservedHash, params.reservedLabel, params.issuance.user, slotKept
             );
@@ -870,6 +870,32 @@ contract DotnsPopController is
             && reservation.index < _reservationMeta[reservation.labelhash].head;
     }
 
+    /// @notice Prepares a gateway reservation of `labelhash` for `user`: keeps the user's
+    /// reservation when it is an active one for the same name, and otherwise drops whatever
+    /// reservation they hold so a fresh one can be queued.
+    /// @dev A repeated reservation of the same name, such as one made again after the user recovers
+    /// their account onto a new device, keeps the user's place and expiry. The expiry is not
+    /// refreshed, so repeating a reservation never extends how long a user holds a name. Reads the
+    /// user's reservation once and hands it to @custom:function _dropReservation.
+    /// @return kept Whether the existing reservation was kept, so nothing is to be queued.
+    function _keepOrDropReservation(
+        Deps memory deps,
+        bytes32 labelhash,
+        address user
+    )
+        internal
+        returns (bool kept)
+    {
+        UserReservation memory reservation = _userReservations[user];
+        if (
+            reservation.labelhash == labelhash && !_isEvicted(reservation)
+                && !_isExpired(_reservationEntries[labelhash][reservation.index].joinedAt)
+        ) {
+            return true;
+        }
+        _dropReservation(deps, user, reservation, MAX_QUEUE_STEPS_PER_CALL);
+    }
+
     /// @notice Clears up to `maxSteps` expired or emptied entries from the front of the queue.
     /// @dev Every entry visited costs a storage read, and a gateway call runs under a fixed weight
     /// limit, so a call clears at most `maxSteps` entries and keeps that progress; a later call
@@ -934,7 +960,19 @@ contract DotnsPopController is
     /// bounds the clearing that follows when the user was at the front of their queue: a gateway
     /// call passes `MAX_QUEUE_STEPS_PER_CALL`, and a signed relinquish the whole queue.
     function _dropUserReservation(Deps memory deps, address user, uint256 maxSteps) internal {
-        UserReservation memory reservation = _userReservations[user];
+        _dropReservation(deps, user, _userReservations[user], maxSteps);
+    }
+
+    /// @notice Body of @custom:function _dropUserReservation for a caller that has already read
+    /// `user`'s reservation.
+    function _dropReservation(
+        Deps memory deps,
+        address user,
+        UserReservation memory reservation,
+        uint256 maxSteps
+    )
+        internal
+    {
         bytes32 labelhash = reservation.labelhash;
         if (labelhash == bytes32(0)) return;
         if (_isEvicted(reservation)) {
@@ -942,7 +980,7 @@ contract DotnsPopController is
             delete _userReservations[user];
             return;
         }
-        _removeUserFromQueue(deps, user, maxSteps);
+        _removeUserFromQueue(deps, user, reservation, maxSteps);
         emit ReservationRelinquished(labelhash, user);
     }
 
@@ -952,12 +990,17 @@ contract DotnsPopController is
     /// emptied entry among them, and moves PopRules to the next user with an active reservation
     /// or releases it when none is left. Removing any other entry leaves the front and PopRules
     /// unchanged. Emits nothing itself; callers go through @custom:function _dropUserReservation.
-    function _removeUserFromQueue(Deps memory deps, address user, uint256 maxSteps) internal {
-        UserReservation memory userRes = _userReservations[user];
-        bytes32 labelhash = userRes.labelhash;
-        if (labelhash == bytes32(0)) return;
-
-        uint64 entryIndex = userRes.index;
+    /// `reservation` is the user's live reservation, already read by the caller.
+    function _removeUserFromQueue(
+        Deps memory deps,
+        address user,
+        UserReservation memory reservation,
+        uint256 maxSteps
+    )
+        internal
+    {
+        bytes32 labelhash = reservation.labelhash;
+        uint64 entryIndex = reservation.index;
         ReservationQueueMeta memory queueMeta = _reservationMeta[labelhash];
 
         delete _userReservations[user];

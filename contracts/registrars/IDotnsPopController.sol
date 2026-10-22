@@ -279,11 +279,12 @@ interface IDotnsPopController is IDotnsController {
     /// mutation, so an already-registered `reservedLabel` aborts the whole call and the candidate
     /// receives no device name either; callers should validate the reserved label before
     /// attesting rather than relying on this revert. It then clears up to
-    /// `MAX_QUEUE_STEPS_PER_CALL` expired entries from the front of the queue (@custom:emits
-    /// ReservationExpired for each
-    /// one cleared), removes the user from
-    /// any prior queue position (@custom:emits ReservationRelinquished) so a single user holds at
-    /// most one live reservation across all labels, and enqueues a fresh entry
+    /// `MAX_QUEUE_STEPS_PER_CALL` expired entries from the front of the queue
+    /// (@custom:emits ReservationExpired for each one cleared). When the user already holds an
+    /// active reservation for `reservedLabel`, that reservation stays as it is, with the same
+    /// place in the queue and the same expiry, and nothing else changes. Otherwise it removes the
+    /// user from any prior queue position (@custom:emits ReservationRelinquished) so a single user
+    /// holds at most one live reservation across all labels, and enqueues a fresh entry
     /// (@custom:emits ReservationQueued). The enqueue rejects with @custom:reverts
     /// AlreadyReserved when the user already holds a reservation that was not cleared by the
     /// prior removal and with @custom:reverts QueueFull when the per-label queue has reached
@@ -301,9 +302,10 @@ interface IDotnsPopController is IDotnsController {
     /// proof-size stays below per-call limits. Reverts with @custom:reverts InvalidPersonhoodLabel
     /// when the label is empty, is not lowercase ASCII letters (so a hyphen or any digit rejects
     /// it), or is governance-reserved, and with @custom:reverts PersonhoodNameUnavailable when the
-    /// label already has an owner on the registrar and so could never be claimed. Moving the user
-    /// out of a prior queue @custom:emits ReservationRelinquished. The caller remains agnostic
-    /// about backend batching; it simply exposes a small retryable primitive.
+    /// label already has an owner on the registrar and so could never be claimed. When the user
+    /// already holds an active reservation for `label`, that reservation stays as it is, with
+    /// the same place in the queue and the same expiry, so the call is safe to retry. Otherwise
+    /// moving the user out of a prior queue @custom:emits ReservationRelinquished.
     /// @param params Reservation request; see @custom:struct PersonhoodNameReservation.
     function reservePersonhoodName(PersonhoodNameReservation calldata params) external;
 
