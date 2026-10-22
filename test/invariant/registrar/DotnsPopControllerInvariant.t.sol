@@ -212,12 +212,11 @@ contract DotnsPopControllerInvariant is BaseDotns {
                 continue;
             }
 
-            // A queue whose front has expired leaves the slot with the user at the front, until a
-            // call clears the queue. Never with a user the queue no longer holds.
-            if (popHolder != address(0)) {
-                (address headOwner,) = dotnsPopController.reservationEntry(labelhash, head);
-                assertEq(popHolder, headOwner, "PopRules names a user outside the queue head");
-            }
+            // A queue whose front is not active keeps its slot until clearing reaches an active
+            // reservation or empties the queue. The slot may name a user the queue has moved
+            // past, which gains them nothing: the public flow rejects a reserved name for
+            // everyone, and the gateway decides from the queue alone.
+            assertTrue(popHolder != address(0), "a non-empty queue lost its PopRules slot");
         }
     }
 

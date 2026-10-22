@@ -283,9 +283,10 @@ interface IDotnsPopController is IDotnsController {
     /// owner could never be claimed. This validation runs before both the issuance and any queue
     /// mutation, so an already-registered `reservedLabel` aborts the whole call and the candidate
     /// receives no device name either; callers should validate the reserved label before
-    /// attesting rather than relying on this revert. It then clears the expired entries at the
-    /// front of the queue when there are at most `MAX_QUEUE_STEPS_PER_CALL` of them, and none
-    /// otherwise (@custom:emits ReservationExpired for each one cleared), removes the user from
+    /// attesting rather than relying on this revert. It then clears up to
+    /// `MAX_QUEUE_STEPS_PER_CALL` expired entries from the front of the queue (@custom:emits
+    /// ReservationExpired for each
+    /// one cleared), removes the user from
     /// any prior queue position (@custom:emits ReservationRelinquished) so a single user holds at
     /// most one live reservation across all labels, and enqueues a fresh entry
     /// (@custom:emits ReservationQueued). The enqueue rejects with @custom:reverts
@@ -351,11 +352,12 @@ interface IDotnsPopController is IDotnsController {
     /// waiter at once, releases the PopRules slot, and @custom:emits ReservationClaimed; a
     /// non-claim drops any pending entry the user holds (@custom:emits ReservationRelinquished).
     /// Either way the issuance
-    /// @custom:emits PersonhoodNameIssued. Expired entries at the front of the queue are
-    /// cleared first when there are at most `MAX_QUEUE_STEPS_PER_CALL` of them
-    /// (@custom:emits ReservationExpired for each one); with more, none are cleared and a claim
-    /// @custom:reverts NotHolder. The chat-key axis selects whether a fresh key is persisted on
-    /// the resolver or the new entry inherits its key from a prior device name.
+    /// @custom:emits PersonhoodNameIssued. Up to `MAX_QUEUE_STEPS_PER_CALL` expired
+    /// entries are cleared from the front of the queue first (@custom:emits ReservationExpired
+    /// for each one); if the front is still expired after that, a claim
+    /// @custom:reverts NotHolder and the revert discards the clearing. The chat-key axis selects
+    /// whether a fresh key is persisted on the resolver or the new entry inherits its key from a
+    /// prior device name.
     /// The fresh-key branch rejects a chat key whose length is neither zero nor `CHAT_KEY_LENGTH`
     /// (otherwise @custom:reverts InvalidChatKey). The `DeviceName` branch validates the device
     /// name's `stem.NN` shape (otherwise @custom:reverts InvalidDeviceLabel), requires the

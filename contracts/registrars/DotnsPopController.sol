@@ -109,11 +109,11 @@ contract DotnsPopController is
     /// state has been committed.
     uint256 private constant CHAT_KEY_LENGTH = 65;
 
-    /// @notice Most expired entries one gateway call clears from the front of a reservation
-    /// queue.
+    /// @notice Most expired or emptied entries one gateway call clears from the front of a
+    /// reservation queue.
     /// @dev A gateway call runs under a fixed weight limit, and each entry visited costs a
-    /// storage read. A gateway call facing more expired entries clears none of them;
-    /// @custom:function expireReservation clears the whole queue.
+    /// storage read. A longer run is cleared over several calls, each keeping its progress, or at
+    /// once by @custom:function expireReservation.
     uint256 public constant MAX_QUEUE_STEPS_PER_CALL = 4;
 
     /// @notice Protocol-level address registry for all dotNS contracts.
@@ -165,7 +165,12 @@ contract DotnsPopController is
 
     /// @notice Numeric containers this contract has minted or verified as its own.
     /// @dev Lets device-name issuance skip the registrar and registry checks on every later
-    /// issuance in the same container. See @custom:function _registerDeviceSubname.
+    /// issuance in the same container. See @custom:function _registerDeviceSubname. An entry is
+    /// never cleared, because a recorded container cannot change hands: the registrar marks a
+    /// name minted by this contract soulbound and rejects every transfer of it, release to the
+    /// escrow included, and it has no burn. If a container ever did change hands, the registry's
+    /// own parent check in @custom:function IDotnsRegistry.setSubnodeOwner would still reject
+    /// issuance under it.
     mapping(bytes32 parentNode => bool ready) internal _deviceContainers;
 
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
@@ -270,7 +275,7 @@ contract DotnsPopController is
         (bytes32 reservedHash,) = _validateReservablePersonhoodLabel(deps, params.label, false);
         bool slotKept =
             _advanceExpiredHead(deps, reservedHash, MAX_QUEUE_STEPS_PER_CALL, true, address(0));
-        _dropUserReservation(deps, params.user);
+        _dropUserReservation(deps, params.user, MAX_QUEUE_STEPS_PER_CALL);
         _enqueueReservation(deps, reservedHash, params.label, params.user, slotKept);
     }
 
@@ -310,7 +315,7 @@ contract DotnsPopController is
         if (hasReservation) {
             bool slotKept =
                 _advanceExpiredHead(deps, reservedHash, MAX_QUEUE_STEPS_PER_CALL, true, address(0));
-            _dropUserReservation(deps, params.issuance.user);
+            _dropUserReservation(deps, params.issuance.user, MAX_QUEUE_STEPS_PER_CALL);
             _enqueueReservation(
                 deps, reservedHash, params.reservedLabel, params.issuance.user, slotKept
             );
@@ -374,8 +379,8 @@ contract DotnsPopController is
         bool isClaim;
         if (meta.head < meta.tail) {
             // The queue holds this label's PopRules slot, so the queue alone decides: only the
-            // user at the front with an active reservation may take the name. A front left
-            // expired, because clearing it would exceed this call's limit, lets nobody.
+            // user at the front with an active reservation may take the name. A front still
+            // expired after this call's clearing lets nobody.
             ReservationEntry memory headEntry = _reservationEntries[labelhash][meta.head];
             isClaim = headEntry.owner == user && !_isExpired(headEntry.joinedAt);
             require(isClaim, NotHolder(user, labelhash));
@@ -391,7 +396,7 @@ contract DotnsPopController is
         if (isClaim) {
             _clearQueue(deps, labelhash);
         } else {
-            _dropUserReservation(deps, user);
+            _dropUserReservation(deps, user, MAX_QUEUE_STEPS_PER_CALL);
         }
 
         bytes32 deviceLabelhash;
@@ -454,7 +459,8 @@ contract DotnsPopController is
             NoActiveReservation(msg.sender)
         );
         Deps memory deps;
-        _dropUserReservation(deps, msg.sender);
+        // A signed call outside the gateway's limit: it has room to clear the whole queue.
+        _dropUserReservation(deps, msg.sender, MAX_RESERVATION_QUEUE);
     }
 
     /// @inheritdoc IDotnsPopController
@@ -864,20 +870,21 @@ contract DotnsPopController is
             && reservation.index < _reservationMeta[reservation.labelhash].head;
     }
 
-    /// @notice Clears the expired entries at the front of the queue, if at most `maxSteps` of them
-    /// stand before an active reservation or the end of the queue; otherwise leaves the queue as
-    /// it is.
-    /// @dev All or nothing, so PopRules always names the user at the front of the queue: a call
-    /// that cannot finish within its limit changes nothing, and a later call with room to finish
-    /// (such as the permissionless @custom:function expireReservation) clears the queue. Every
-    /// entry visited costs a storage read, and a gateway call runs under a fixed weight limit.
-    /// Clearing writes nothing per entry: entries and pointers stay below the new front, where
-    /// they read as gone (@custom:function _isEvicted), and queue indices only ever grow.
+    /// @notice Clears up to `maxSteps` expired or emptied entries from the front of the queue.
+    /// @dev Every entry visited costs a storage read, and a gateway call runs under a fixed weight
+    /// limit, so a call clears at most `maxSteps` entries and keeps that progress; a later call
+    /// carries on. Clearing writes nothing per entry: entries and pointers stay below the new
+    /// front, where they read as gone (@custom:function _isEvicted), and queue indices only ever
+    /// grow.
     /// When clearing reaches an active reservation, PopRules moves to that user, unless it is
-    /// `claimant`, whose claim in the same call releases the slot. When it empties the queue,
-    /// the PopRules slot is released, unless the caller is `refilling` it in the same call: then
-    /// the slot and its label are kept and `slotKept` is returned, so the slot moves to the new
-    /// user in one PopRules call. @custom:emits ReservationExpired once per expired entry cleared.
+    /// `claimant`, whose claim in the same call releases the slot. When it empties the queue, the
+    /// PopRules slot is released, unless the caller is `refilling` it in the same call: then the
+    /// slot and its label are kept and `slotKept` is returned, so the slot moves to the new user
+    /// in one PopRules call. When it stops before either, PopRules is left as it is, naming a user
+    /// the queue may have moved past. That user gains nothing: the public flow rejects a reserved
+    /// name for everyone, and while a name has a queue, @custom:function issuePersonhoodName
+    /// decides from the queue alone. @custom:emits ReservationExpired once per expired entry
+    /// cleared.
     function _advanceExpiredHead(
         Deps memory deps,
         bytes32 labelhash,
@@ -896,31 +903,25 @@ contract DotnsPopController is
         address activeHead;
         // Read once: every entry visited compares against it.
         uint64 duration = reservationDuration;
-        address[] memory expired = new address[](maxSteps);
-        uint256 steps;
 
-        for (; head < tail; ++head) {
+        for (uint256 steps; head < tail; ++head) {
             ReservationEntry memory entry = _reservationEntries[labelhash][head];
             if (entry.owner != address(0) && entry.joinedAt + duration >= block.timestamp) {
                 activeHead = entry.owner;
                 break;
             }
-            // Clearing that cannot finish within the limit clears nothing.
-            if (steps == maxSteps) return false;
+            if (steps == maxSteps) break;
+            ++steps;
             // An empty entry is one its owner already left.
-            expired[steps++] = entry.owner;
+            if (entry.owner != address(0)) emit ReservationExpired(labelhash, entry.owner);
         }
-        if (steps == 0) return false;
+        if (head == meta.head) return false;
 
         _reservationMeta[labelhash] = ReservationQueueMeta({head: head, tail: tail});
-        for (uint256 k; k < steps; ++k) {
-            if (expired[k] != address(0)) emit ReservationExpired(labelhash, expired[k]);
-        }
-
         if (head == tail) {
             if (refilling) return true;
             _releasePopRulesSlot(deps, labelhash);
-        } else if (activeHead != claimant) {
+        } else if (activeHead != address(0) && activeHead != claimant) {
             _syncPopRulesToHead(deps, labelhash, activeHead);
         }
     }
@@ -929,8 +930,10 @@ contract DotnsPopController is
     /// @dev The single path by which a user's entry leaves a queue other than by expiry or by a
     /// claim: an explicit relinquish, a standalone personhood-name issuance, and a re-reservation
     /// that moves the user to another queue. @custom:emits ReservationRelinquished only when the
-    /// user held an entry, so an indexer can rebuild every queue from events alone.
-    function _dropUserReservation(Deps memory deps, address user) internal {
+    /// user held an entry, so an indexer can rebuild every queue from events alone. `maxSteps`
+    /// bounds the clearing that follows when the user was at the front of their queue: a gateway
+    /// call passes `MAX_QUEUE_STEPS_PER_CALL`, and a signed relinquish the whole queue.
+    function _dropUserReservation(Deps memory deps, address user, uint256 maxSteps) internal {
         UserReservation memory reservation = _userReservations[user];
         bytes32 labelhash = reservation.labelhash;
         if (labelhash == bytes32(0)) return;
@@ -939,18 +942,17 @@ contract DotnsPopController is
             delete _userReservations[user];
             return;
         }
-        _removeUserFromQueue(deps, user);
+        _removeUserFromQueue(deps, user, maxSteps);
         emit ReservationRelinquished(labelhash, user);
     }
 
     /// @notice Removes `user` from whichever reservation queue they currently occupy.
     /// @dev The user's entry is deleted in place. When it was the front of the queue,
-    /// @custom:function _advanceExpiredHead clears the queue from there with room for the whole
-    /// queue: the emptied entry counts as one cleared entry, and PopRules moves to the next
-    /// user with an active reservation, or is released when none is left. Removing any other
-    /// entry leaves the front and PopRules unchanged. Emits nothing itself; callers go through
-    /// @custom:function _dropUserReservation.
-    function _removeUserFromQueue(Deps memory deps, address user) internal {
+    /// @custom:function _advanceExpiredHead clears up to `maxSteps` entries from there, the
+    /// emptied entry among them, and moves PopRules to the next user with an active reservation
+    /// or releases it when none is left. Removing any other entry leaves the front and PopRules
+    /// unchanged. Emits nothing itself; callers go through @custom:function _dropUserReservation.
+    function _removeUserFromQueue(Deps memory deps, address user, uint256 maxSteps) internal {
         UserReservation memory userRes = _userReservations[user];
         bytes32 labelhash = userRes.labelhash;
         if (labelhash == bytes32(0)) return;
@@ -962,8 +964,7 @@ contract DotnsPopController is
         delete _reservationEntries[labelhash][entryIndex];
 
         if (entryIndex == queueMeta.head) {
-            // The user leaving held PopRules, so the queue is always cleared to the next user.
-            _advanceExpiredHead(deps, labelhash, MAX_RESERVATION_QUEUE, false, address(0));
+            _advanceExpiredHead(deps, labelhash, maxSteps, false, address(0));
         }
     }
 
@@ -1049,11 +1050,7 @@ contract DotnsPopController is
         (labelhash, node) = _validatePersonhoodLabel(deps, label, legacy);
 
         (IPopRules.PopStatus required,,) = PopClassification.classify(label);
-        _requirePersonhoodLabel(
-            required != IPopRules.PopStatus.Reserved
-                && PopClassification.countTrailingDigits(label) == 0,
-            legacy
-        );
+        _requirePersonhoodLabel(required != IPopRules.PopStatus.Reserved, legacy);
         require(!_registrarOf(deps).exists(uint256(node)), PersonhoodNameUnavailable());
     }
 
