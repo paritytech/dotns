@@ -169,11 +169,6 @@ interface IDotnsPopController is IDotnsController {
     /// at once, with no per-waiter event, so its cost does not grow with the queue.
     event ReservationClaimed(bytes32 indexed reservedLabelhash, address indexed user);
 
-    /// @notice Not emitted; a claim ends every reservation in its queue through
-    /// @custom:event ReservationClaimed.
-    /// @dev Kept in the ABI so logs that carry it still decode.
-    event ReservationEvicted(bytes32 indexed reservedLabelhash, address indexed user);
-
     /// @notice Emitted when a personhood name is linked to a device name.
     event DeviceNameLinked(bytes32 indexed personhoodLabelhash, bytes32 indexed deviceLabelhash);
 
