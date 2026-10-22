@@ -261,6 +261,11 @@ interface IDotnsPopController is IDotnsController {
     /// @param duration Caller-supplied duration, in seconds.
     error ReservationDurationTooLow(uint64 duration);
 
+    /// @notice Thrown when @custom:function setReservationDuration is called with a value above
+    /// the protocol maximum.
+    /// @param duration Caller-supplied duration, in seconds.
+    error ReservationDurationTooHigh(uint64 duration);
+
     /// @notice Issues a device name to the supplied user and optionally enqueues a reservation
     /// for a personhood name they intend to claim later.
     /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The issuance
@@ -411,7 +416,9 @@ interface IDotnsPopController is IDotnsController {
         returns (bool reserved, address holder);
 
     /// @notice Updates the reservation duration used to decide when queue entries expire.
-    /// @dev Owner-gated (otherwise @custom:reverts OwnableUnauthorizedAccount); emits
+    /// @dev Owner-gated (otherwise @custom:reverts OwnableUnauthorizedAccount). A duration below
+    /// `MIN_RESERVATION_DURATION` @custom:reverts ReservationDurationTooLow, and one above
+    /// `MAX_RESERVATION_DURATION` @custom:reverts ReservationDurationTooHigh. Emits
     /// @custom:emits ReservationDurationSet on success.
     function setReservationDuration(uint64 duration) external;
 

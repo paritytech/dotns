@@ -224,7 +224,7 @@ contract PopRules is
         returns (PriceWithMeta memory metadata)
     {
         _requireLabel(name);
-        _enforceReservationRules(name, userAddress);
+        _enforceReservationRules(name);
 
         (PopStatus requiredStatus, string memory classification, uint256 baseLength) =
             _classifyValidatedName(name);
@@ -275,7 +275,7 @@ contract PopRules is
         string memory baseName = _stripDigits(name);
         Reservation memory reservation = reservations[baseName];
 
-        if (_isLive(reservation) && reservation.owner != userAddress) {
+        if (_isLive(reservation)) {
             metadata.message = "Reserved for a device-name holder's personhood claim";
             metadata.status = IPopRules.PopStatus.Reserved;
         }
@@ -415,19 +415,17 @@ contract PopRules is
         return _baseNameEnd(name);
     }
 
-    /// @notice Enforces base-name reservation rules.
+    /// @notice Enforces base-name reservation rules: a live reservation keeps the name out of the
+    /// public flow for every account, its owner included. A reserved name is taken only through
+    /// the controller that holds the reservation.
     /// @param name Domain label.
-    /// @param userAddress Registering user.
-    function _enforceReservationRules(string calldata name, address userAddress) internal view {
+    function _enforceReservationRules(string calldata name) internal view {
         string memory baseName = _stripDigits(name);
         Reservation memory reservation = reservations[baseName];
 
-        if (_isLive(reservation)) {
-            require(
-                reservation.owner == userAddress,
-                PopError("Reserved for a device-name holder's personhood claim")
-            );
-        }
+        require(
+            !_isLive(reservation), PopError("Reserved for a device-name holder's personhood claim")
+        );
     }
 
     /// @notice Returns whether `reservation` is live at `block.timestamp`.

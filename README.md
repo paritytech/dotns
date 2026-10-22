@@ -176,7 +176,7 @@ The second, issuePersonhoodName, issues a personhood name. The label is lowercas
 
 Each personhood name has a reservation queue of up to `MAX_RESERVATION_QUEUE` users. Only the user at the front can claim the name. A reservation lasts `reservationDuration` (7 days by default); once it expires, the user behind takes the front only after a call clears the expired reservation from the front (see [Clearing expired reservations](#clearing-expired-reservations)).
 
-PopRules records the user at the front of the queue as the holder of the personhood name. The controller updates the record whenever the front changes: when the first user joins, when the front user leaves, when a call clears expired reservations, and when a claim ends the queue. The public commit-reveal flow checks PopRules when pricing a name, so a queued name is reserved there too, and only the user at the front can buy it.
+PopRules records the user at the front of the queue as the holder of the personhood name. The controller updates the record whenever the front changes: when the first user joins, when the front user leaves, when a call clears expired reservations, and when a claim ends the queue. The public commit-reveal flow checks PopRules when pricing a name, so nobody can buy a queued name there, the user at the front included: a queued name is taken only through a gateway claim.
 
 `issuePersonhoodName` lets only the user at the front claim a queued name, while their reservation is still running, and rejects anyone else with `NotHolder`. It also rejects device names and governance-reserved labels with `InvalidPersonhoodLabel`. Another controller authorised on the registrar could write its own PopRules reservation for a name with no queue here; none does today, and `issuePersonhoodName` would reject other users with `NotHolder` in that case too.
 
@@ -186,14 +186,16 @@ The gateway pallet binds three deprecated entrypoints, reserveLiteName, reserveB
 
 #### Clearing expired reservations
 
-An expired reservation keeps its place at the front of the queue until a call clears it. Until then, the next user cannot claim the name, and the expired user still holds it in PopRules and can register it through the public flow.
+An expired reservation keeps its place at the front of the queue until a call clears it. Until then, the next user cannot claim the name, and the name stays blocked on the public flow.
 
 Two calls clear a queue:
 
 - **A gateway call** clears the expired reservations at the front before doing its own work, but only when there are at most `MAX_QUEUE_STEPS_PER_CALL` (4), counting entries left empty by users who dropped out, because the gateway pallet calls the controller under a fixed weight limit. Facing more, it clears none: a reservation still joins the queue at the back, and a claim reverts with `NotHolder`.
 - **`expireReservation(label)`** clears the whole queue in one call. Anyone can call it; the gateway pallet never does.
 
-Apps should therefore call `expireReservation(label)` before a gateway reservation or claim whenever the name's queue is not empty (`reservationMeta(labelhash)` reports its entries). The call changes nothing when no reservation has expired.
+Apps should therefore call `expireReservation(label)` before a gateway reservation or claim whenever the name's queue is not empty (`reservationMeta(labelhash)` reports its entries), and before a public purchase when PopRules reports the name reserved but `isReservedForClaim` returns false. The call changes nothing when no reservation has expired.
+
+A queue holds at most `MAX_RESERVATION_QUEUE` entries, counting the slots of users who left it. Clearing frees those slots only once it reaches them, so a queue can turn new reservations away until its front user claims or leaves, or their reservation expires and a call clears the queue.
 
 #### Gateway call budget
 

@@ -93,6 +93,16 @@ contract DotnsPopController is
     /// pending-claim entry. The actual production duration is governance-tuned higher.
     uint64 public constant MIN_RESERVATION_DURATION = 1 hours;
 
+    /// @notice Maximum value accepted by @custom:function setReservationDuration.
+    /// @dev PopRules holds the name for the user at the front of a queue for
+    /// @custom:constant PopRules.MAX_RESERVATION_TIME (12 weeks) from each change of front, and a
+    /// PopRules reservation lapses at its last second while a queue entry is still active at
+    /// its own. One second less keeps the front user's entry from outlasting the PopRules
+    /// reservation written when they reached the front. Users behind them keep their own join
+    /// time, so their entries can outlast it; a call that clears the queue re-stamps or releases
+    /// the PopRules reservation, which is why apps clear a queue before using it.
+    uint64 public constant MAX_RESERVATION_DURATION = 12 weeks - 1;
+
     /// @notice Required byte length for a non-empty chat key.
     /// @dev Mirrors @custom:contract IDotnsPopResolver `InvalidChatKeyLength` so the controller
     /// can fail closed before the mint instead of bubbling the resolver's revert after partial
@@ -203,6 +213,10 @@ contract DotnsPopController is
         require(
             reservationDuration_ >= MIN_RESERVATION_DURATION,
             ReservationDurationTooLow(reservationDuration_)
+        );
+        require(
+            reservationDuration_ <= MAX_RESERVATION_DURATION,
+            ReservationDurationTooHigh(reservationDuration_)
         );
         __Ownable_init(initialOwner);
         __ERC165_init();
@@ -547,6 +561,7 @@ contract DotnsPopController is
     /// @inheritdoc IDotnsPopController
     function setReservationDuration(uint64 duration) external override onlyOwner {
         require(duration >= MIN_RESERVATION_DURATION, ReservationDurationTooLow(duration));
+        require(duration <= MAX_RESERVATION_DURATION, ReservationDurationTooHigh(duration));
         reservationDuration = duration;
         emit ReservationDurationSet(duration);
     }

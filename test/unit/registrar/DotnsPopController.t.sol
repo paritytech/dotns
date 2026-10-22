@@ -287,6 +287,47 @@ contract DotnsPopControllerTests is BaseDotns {
         assertFalse(liveAfter);
     }
 
+    function test_setReservationDuration_bounds() public {
+        uint64 max = dotnsPopController.MAX_RESERVATION_DURATION();
+        vm.startPrank(owner);
+        dotnsPopController.setReservationDuration(max);
+        assertEq(dotnsPopController.reservationDuration(), max);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsPopController.ReservationDurationTooHigh.selector, max + 1)
+        );
+        dotnsPopController.setReservationDuration(max + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopController.ReservationDurationTooHigh.selector, type(uint64).max
+            )
+        );
+        dotnsPopController.setReservationDuration(type(uint64).max);
+        vm.stopPrank();
+    }
+
+    /// @notice At the longest duration, the front user's entry ends no later than the PopRules
+    ///         reservation written when they joined, so the name never opens on the public flow
+    ///         while that entry is still active.
+    function test_front_entry_at_the_longest_duration_ends_within_the_popRules_reservation()
+        public
+    {
+        uint64 max = dotnsPopController.MAX_RESERVATION_DURATION();
+        vm.prank(owner);
+        dotnsPopController.setReservationDuration(max);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "longnamebob");
+        (, uint64 joinedAt) =
+            dotnsPopController.reservationEntry(keccak256(bytes("longnamebob")), 0);
+
+        // The entry's last active second: PopRules must still hold the name.
+        vm.warp(uint256(joinedAt) + max);
+        (bool reserved,) = dotnsPopController.isReservedForClaim("longnamebob");
+        assertTrue(reserved, "entry still active");
+        (bool slotLive,,) = popRules.isBaseNameReserved("longnamebob");
+        assertTrue(slotLive, "PopRules still holds the name");
+    }
+
     function test_setReservationDuration_reverts_for_non_owner() public {
         vm.prank(ed);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", ed));
@@ -485,11 +526,43 @@ contract DotnsPopControllerTests is BaseDotns {
         dotnsRegistrarController.register{value: 1 ether}(registration);
     }
 
-    function test_gateway_reserved_name_allows_holder_to_register_via_public() public {
+    /// @notice A reserved name is taken only through the gateway claim, so the public flow
+    ///         rejects the user at the front of the queue too.
+    function test_gateway_reserved_name_rejects_holder_on_the_public_flow() public {
         _grantPersonhood(tiago);
         _reservePop(tiago, DEVICE_LABEL_A, _validChatKey(0x11), "longnamebob");
 
-        _commitAndRegister("longnamebob", tiago, true);
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: "longnamebob",
+                owner: tiago,
+                secret: keccak256("secret"),
+                reserved: true,
+                maxPrice: type(uint256).max,
+                pricingVersion: popRules.pricingVersion()
+            });
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        vm.prank(tiago);
+        dotnsRegistrarController.commit(commitment);
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        bytes memory reserved = abi.encodeWithSelector(
+            IPopRules.PopError.selector, "Reserved for a device-name holder's personhood claim"
+        );
+        vm.expectRevert(reserved);
+        popRules.priceWithCheck("longnamebob", tiago);
+
+        vm.deal(tiago, 1000 ether);
+        vm.prank(tiago);
+        vm.expectRevert(reserved);
+        dotnsRegistrarController.register{value: 1000 ether}(registration);
+
+        // The gateway claim still works.
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: "longnamebob", user: tiago, link: _linkFresh(_validChatKey(0x11))
+            })
+        );
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("longnamebob"))), tiago);
     }
 

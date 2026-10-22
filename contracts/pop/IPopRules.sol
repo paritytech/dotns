@@ -58,8 +58,9 @@ interface IPopRules {
     /// @notice Thrown when a caller is not an authorised controller on the registrar.
     error NotRegistry();
 
-    /// @notice Thrown when registering a name whose base name is held as a live reservation by
-    /// another user.
+    /// @notice Thrown when registering a name whose base name is held as a live reservation. A
+    /// reserved name is taken only through the controller holding the reservation, so this applies
+    /// to the reservation's owner too.
     /// @param label Caller-supplied label whose base name is reserved.
     error NameReserved(string label);
 
@@ -255,7 +256,8 @@ interface IPopRules {
     /// @dev Reverting pricing path used by the commit-reveal controller. Price is the scarcity
     ///      curve for the label's base length and is charged to every caller, verified or not;
     ///      personhood only unlocks the premium band. Non-canonical
-    ///      labels, a base name held live by another user, a governance-reserved label, or a
+    ///      labels, a base name held as a live reservation (for every account, its owner
+    ///      included), a governance-reserved label, or a
     ///      `userAddress` whose personhood tier does not meet the label's required tier each
     ///      trigger @custom:reverts PopError.
     /// @param name Domain label.
@@ -294,8 +296,9 @@ interface IPopRules {
     /// reverting on conflicts.
     /// @dev Non-reverting counterpart to `priceWithCheck`: surfaces the same fields, but reports
     ///      a `Reserved` status through `metadata` instead of reverting when the base name is
-    ///      held by another user. Used by front-ends that need to present a price and eligibility
-    ///      preview without forcing a transaction attempt. Governance-reserved names are not
+    ///      held as a live reservation, whoever owns it. Used by front-ends that need to present a
+    /// price and eligibility preview without forcing a transaction attempt. Governance-reserved
+    /// names are not
     ///      rejected here either; the caller decides what to do. Non-canonical labels still
     ///      trigger @custom:reverts PopError because the input is malformed rather than just
     ///      contested.
