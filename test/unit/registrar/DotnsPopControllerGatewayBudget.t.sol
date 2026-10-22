@@ -10,9 +10,9 @@ import {Vm} from "forge-std/Vm.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /// @notice The gateway calls the controller under a fixed weight limit, so no call may grow
-///         excessively with what a reservation queue holds. These tests pin all-or-nothing queue
-///         clearing, the single-call slot move when a queue is emptied and refilled, and container
-///         preparation.
+///         excessively with what a reservation queue holds. These tests pin bounded queue
+///         clearing that keeps its progress, gateway calls that work on one queue, the single-call
+///         slot move when a queue is emptied and refilled, and container preparation.
 contract DotnsPopControllerGatewayBudgetTests is BaseDotns {
     string internal constant BASE = "longnamebob";
 
@@ -137,41 +137,23 @@ contract DotnsPopControllerGatewayBudgetTests is BaseDotns {
         assertEq(popHolder, users[count], "PopRules moved to the next user");
     }
 
-    /// @dev Indices never restart, so a pointer a claim left below the head can never match an
-    ///      entry queued under the same label later.
-    /// @dev A front user who leaves through a gateway call clears at most the gateway's limit,
-    ///      so a long run behind them cannot push the call past the weight limit. PopRules keeps
-    ///      naming them until a later call reaches an active user, which gains them nothing.
-    function test_front_user_leaving_through_the_gateway_clears_at_most_the_limit() public {
-        uint256 bound = dotnsPopController.MAX_QUEUE_STEPS_PER_CALL();
+    /// @dev A front user who leaves through a gateway call only empties their entry, so the call
+    ///      works on one queue: the old queue is not cleared and PopRules is not called for it.
+    ///      PopRules keeps naming them until the next call on the name, which gains them nothing.
+    function test_front_user_leaving_through_the_gateway_only_empties_their_entry() public {
         address front = makeAddr("front");
         _reservePop(front, "frontuser.11", _validChatKey(0x01), BASE);
-        address[] memory leavers = new address[](bound + 1);
-        for (uint256 i; i < leavers.length; ++i) {
-            leavers[i] = makeAddr(string.concat("leaver", vm.toString(i)));
-            string memory stem =
-                string.concat("leaver", string(abi.encodePacked(bytes1(uint8(0x61 + i)))));
-            _reservePop(
-                leavers[i], string.concat(stem, ".11"), _validChatKey(bytes1(uint8(i + 2))), BASE
-            );
-        }
         address waiter = makeAddr("waiter");
-        _reservePop(waiter, "waiteruser.11", _validChatKey(0x66), BASE);
-        for (uint256 i; i < leavers.length; ++i) {
-            vm.prank(leavers[i]);
-            dotnsPopController.relinquishReservation();
-        }
+        _reservePop(waiter, "waiteruser.11", _validChatKey(0x02), BASE);
 
         // `front` moves to another name through the gateway.
+        vm.recordLogs();
         _rootReservePersonhoodName(
             IDotnsPopController.PersonhoodNameReservation({user: front, label: "othername"})
         );
+        _assertNoRelease(vm.getRecordedLogs());
 
-        bytes32 labelhash = keccak256(bytes(BASE));
-        (uint64 head,) = dotnsPopController.reservationMeta(labelhash);
-        assertEq(head, bound, "front's entry and the limit's worth of empty entries cleared");
-        (address popHolder,) = popRules.getBaseNameReservation(BASE);
-        assertEq(popHolder, front, "PopRules left as it was");
+        _assertFrontEntryEmptied(front);
         assertEq(dotnsPopController.userReservation(front).labelhash, keccak256(bytes("othername")));
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -180,11 +162,61 @@ contract DotnsPopControllerGatewayBudgetTests is BaseDotns {
         );
         popRules.priceWithCheck(BASE, front);
 
+        // The user behind still claims: the claim clears the emptied entry first.
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: BASE, user: waiter, link: _linkWithDeviceName("waiteruser.11")
+            })
+        );
+        assertEq(dotnsRegistry.owner(_nodeOf(BASE)), waiter);
+    }
+
+    /// @dev A standalone claim of a name with no queue leaves the claimant's old queue the same
+    ///      way, and the next clearing moves PopRules to the user behind.
+    function test_standalone_claim_only_empties_the_users_old_entry() public {
+        address front = makeAddr("front");
+        _reservePop(front, "frontuser.11", _validChatKey(0x01), BASE);
+        address waiter = makeAddr("waiter");
+        _reservePop(waiter, "waiteruser.11", _validChatKey(0x02), BASE);
+
+        vm.recordLogs();
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: "othername", user: front, link: _linkWithDeviceName("frontuser.11")
+            })
+        );
+        _assertNoRelease(vm.getRecordedLogs());
+
+        _assertFrontEntryEmptied(front);
+        assertEq(dotnsPopController.userReservation(front).labelhash, bytes32(0));
+
         dotnsPopController.expireReservation(BASE);
-        (popHolder,) = popRules.getBaseNameReservation(BASE);
+        (address popHolder,) = popRules.getBaseNameReservation(BASE);
         assertEq(popHolder, waiter, "the next clearing reaches the waiter");
     }
 
+    function _assertFrontEntryEmptied(address front) internal view {
+        bytes32 labelhash = keccak256(bytes(BASE));
+        (uint64 head,) = dotnsPopController.reservationMeta(labelhash);
+        assertEq(head, 0, "the old queue was not cleared");
+        (address frontOwner,) = dotnsPopController.reservationEntry(labelhash, 0);
+        assertEq(frontOwner, address(0), "front's entry is empty");
+        (address popHolder,) = popRules.getBaseNameReservation(BASE);
+        assertEq(popHolder, front, "PopRules left as it was");
+    }
+
+    function _assertNoRelease(Vm.Log[] memory logs) internal view {
+        for (uint256 i; i < logs.length; ++i) {
+            assertTrue(
+                logs[i].emitter != address(popRules)
+                    || logs[i].topics[0] != IPopRules.BaseNameReleased.selector,
+                "PopRules moved for the old queue"
+            );
+        }
+    }
+
+    /// @dev Indices never restart, so a pointer a claim left below the head can never match an
+    ///      entry queued under the same label later.
     function test_drained_queue_keeps_its_indices() public {
         uint256 count = 2;
         _queueExpired(count);

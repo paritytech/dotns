@@ -176,7 +176,9 @@ The second, issuePersonhoodName, issues a personhood name. The label is lowercas
 
 Each personhood name has a reservation queue of up to `MAX_RESERVATION_QUEUE` users. Only the user at the front can claim the name. A user who reserves a name again while their reservation for it is active keeps their place and their expiry. A reservation lasts `reservationDuration` (7 days by default); once it expires, the user behind takes the front only after a call clears the expired reservation from the front (see [Clearing expired reservations](#clearing-expired-reservations)).
 
-PopRules records the user at the front of the queue as the holder of the personhood name. The controller updates the record whenever the front changes: when the first user joins, when the front user leaves, when clearing reaches a user with an active reservation, and when a claim ends the queue or clearing empties it. Clearing that stops before an active reservation leaves the record as it is. The public commit-reveal flow checks PopRules when pricing a name, so nobody can buy a queued name there, the user at the front included: a queued name is taken only through a gateway claim.
+PopRules records the user at the front of the queue as the holder of the personhood name. The controller updates the record whenever the front changes: when the first user joins, when the front user leaves with `relinquishReservation`, when clearing reaches a user with an active reservation, and when a claim ends the queue or clearing empties it. Clearing that stops before an active reservation leaves the record as it is.
+
+A user who leaves a queue through the gateway, by reserving or claiming another name, only empties their entry in it. The next call on that name clears the entry like an expired one. The public commit-reveal flow checks PopRules when pricing a name, so nobody can buy a queued name there, the user at the front included: a queued name is taken only through a gateway claim.
 
 `issuePersonhoodName` lets only the user at the front claim a queued name, while their reservation is still running, and rejects anyone else with `NotHolder`. It also rejects device names and governance-reserved labels with `InvalidPersonhoodLabel`. Another controller authorised on the registrar could write its own PopRules reservation for a name with no queue here; none does today, and `issuePersonhoodName` would reject other users with `NotHolder` in that case too.
 
@@ -203,6 +205,7 @@ Other measures keep gateway calls within the same weight limit:
 
 - **Expiry and claims write nothing per entry.** Clearing only moves the queue's front past expired entries, and a claim ends the whole queue at once. Users left behind read as having no reservation (`userReservation` and `reservationEntry` return empty) until they reserve again. A claim emits only `ReservationClaimed`, which ends the reservation of every user in that name's queue; indexers apply it to the open `ReservationQueued` events for the name. Expiry still emits `ReservationExpired` for each entry it clears.
 - **Containers can be prepared.** The first device name in a numeric container also mints the container. `prepareDeviceContainer` (permissionless) mints it ahead of time, so the gateway call does not pay for it.
+- **One queue per call.** A gateway call that moves a user to another name only empties their entry in the old queue, so it never clears two queues or updates PopRules for both.
 - **One call per reservation move.** When the front of a queue changes hands, the controller moves the PopRules reservation with `reassignBaseNameForPop`, which emits the same events as a release followed by a reservation.
 
 #### Early testnet quirk: LabelStore deployment

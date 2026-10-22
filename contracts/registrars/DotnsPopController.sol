@@ -396,7 +396,9 @@ contract DotnsPopController is
         if (isClaim) {
             _clearQueue(deps, labelhash);
         } else {
-            _dropUserReservation(deps, user, MAX_QUEUE_STEPS_PER_CALL);
+            // Leaving another queue only empties the user's entry there, as in
+            // @custom:function _keepOrDropReservation.
+            _dropUserReservation(deps, user, 0);
         }
 
         bytes32 deviceLabelhash;
@@ -877,6 +879,9 @@ contract DotnsPopController is
     /// their account onto a new device, keeps the user's place and expiry. The expiry is not
     /// refreshed, so repeating a reservation never extends how long a user holds a name. Reads the
     /// user's reservation once and hands it to @custom:function _dropReservation.
+    /// Dropping a reservation for another name only empties the user's entry in that queue: the
+    /// next call on that name clears it like an expired one. A gateway call then does queue work
+    /// in one queue only, the name being reserved, so its cost stays within the weight limit.
     /// @return kept Whether the existing reservation was kept, so nothing is to be queued.
     function _keepOrDropReservation(
         Deps memory deps,
@@ -893,7 +898,7 @@ contract DotnsPopController is
         ) {
             return true;
         }
-        _dropReservation(deps, user, reservation, MAX_QUEUE_STEPS_PER_CALL);
+        _dropReservation(deps, user, reservation, 0);
     }
 
     /// @notice Clears up to `maxSteps` expired or emptied entries from the front of the queue.
@@ -958,7 +963,8 @@ contract DotnsPopController is
     /// that moves the user to another queue. @custom:emits ReservationRelinquished only when the
     /// user held an entry, so an indexer can rebuild every queue from events alone. `maxSteps`
     /// bounds the clearing that follows when the user was at the front of their queue: a gateway
-    /// call passes `MAX_QUEUE_STEPS_PER_CALL`, and a signed relinquish the whole queue.
+    /// call passes 0, leaving the emptied entry for the next call on that name, and a signed
+    /// relinquish clears the whole queue.
     function _dropUserReservation(Deps memory deps, address user, uint256 maxSteps) internal {
         _dropReservation(deps, user, _userReservations[user], maxSteps);
     }
@@ -985,12 +991,13 @@ contract DotnsPopController is
     }
 
     /// @notice Removes `user` from whichever reservation queue they currently occupy.
-    /// @dev The user's entry is deleted in place. When it was the front of the queue,
-    /// @custom:function _advanceExpiredHead clears up to `maxSteps` entries from there, the
-    /// emptied entry among them, and moves PopRules to the next user with an active reservation
-    /// or releases it when none is left. Removing any other entry leaves the front and PopRules
-    /// unchanged. Emits nothing itself; callers go through @custom:function _dropUserReservation.
-    /// `reservation` is the user's live reservation, already read by the caller.
+    /// @dev The user's entry is deleted in place. When it was the front of the queue and
+    /// `maxSteps` is not zero, @custom:function _advanceExpiredHead clears up to `maxSteps`
+    /// entries from there, the emptied entry among them, and moves PopRules to the next user with
+    /// an active reservation or releases it when none is left. Otherwise the front and PopRules
+    /// stay unchanged. Emits nothing itself; callers go through
+    /// @custom:function _dropUserReservation. `reservation` is the user's live reservation,
+    /// already read by the caller.
     function _removeUserFromQueue(
         Deps memory deps,
         address user,
@@ -1001,12 +1008,11 @@ contract DotnsPopController is
     {
         bytes32 labelhash = reservation.labelhash;
         uint64 entryIndex = reservation.index;
-        ReservationQueueMeta memory queueMeta = _reservationMeta[labelhash];
 
         delete _userReservations[user];
         delete _reservationEntries[labelhash][entryIndex];
 
-        if (entryIndex == queueMeta.head) {
+        if (maxSteps != 0 && entryIndex == _reservationMeta[labelhash].head) {
             _advanceExpiredHead(deps, labelhash, maxSteps, false, address(0));
         }
     }

@@ -285,11 +285,12 @@ interface IDotnsPopController is IDotnsController {
     /// place in the queue and the same expiry, and nothing else changes. Otherwise it removes the
     /// user from any prior queue position (@custom:emits ReservationRelinquished) so a single user
     /// holds at most one live reservation across all labels, and enqueues a fresh entry
-    /// (@custom:emits ReservationQueued). The enqueue rejects with @custom:reverts
-    /// AlreadyReserved when the user already holds a reservation that was not cleared by the
-    /// prior removal and with @custom:reverts QueueFull when the per-label queue has reached
-    /// `MAX_RESERVATION_QUEUE`. Cross-chain callers pass the ABI-encoded tuple as the call's
-    /// payload, which Solidity decodes directly.
+    /// (@custom:emits ReservationQueued). The removal only empties the user's entry in the prior
+    /// queue: the next call on that name clears it like an expired one. The enqueue rejects with
+    /// @custom:reverts AlreadyReserved when the user already holds a reservation that was not
+    /// cleared by the prior removal and with @custom:reverts QueueFull when the per-label queue
+    /// has reached `MAX_RESERVATION_QUEUE`. Cross-chain callers pass the ABI-encoded tuple as the
+    /// call's payload, which Solidity decodes directly.
     /// @param params Issuance and reservation request; see
     /// @custom:struct DeviceNameIssuanceWithReservation.
     function issueDeviceNameWithReservation(DeviceNameIssuanceWithReservation calldata params)
@@ -305,7 +306,8 @@ interface IDotnsPopController is IDotnsController {
     /// label already has an owner on the registrar and so could never be claimed. When the user
     /// already holds an active reservation for `label`, that reservation stays as it is, with
     /// the same place in the queue and the same expiry, so the call is safe to retry. Otherwise
-    /// moving the user out of a prior queue @custom:emits ReservationRelinquished.
+    /// moving the user out of a prior queue @custom:emits ReservationRelinquished and only empties
+    /// their entry there, as in @custom:function issueDeviceNameWithReservation.
     /// @param params Reservation request; see @custom:struct PersonhoodNameReservation.
     function reservePersonhoodName(PersonhoodNameReservation calldata params) external;
 
@@ -347,7 +349,8 @@ interface IDotnsPopController is IDotnsController {
     /// machine. The reservation axis treats the user as claiming if and only if they hold the live
     /// head-of-queue reservation on the label: a claim ends the queue, evicting every other
     /// waiter at once, releases the PopRules slot, and @custom:emits ReservationClaimed; a
-    /// non-claim drops any pending entry the user holds (@custom:emits ReservationRelinquished).
+    /// non-claim drops any pending entry the user holds (@custom:emits ReservationRelinquished),
+    /// only emptying it in its queue for the next call on that name to clear.
     /// Either way the issuance
     /// @custom:emits PersonhoodNameIssued. Up to `MAX_QUEUE_STEPS_PER_CALL` expired
     /// entries are cleared from the front of the queue first (@custom:emits ReservationExpired

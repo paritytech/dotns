@@ -383,6 +383,37 @@ contract DotnsPopControllerTests is BaseDotns {
         assertEq(dotnsPopController.userReservation(ed).index, tail - 1, "ed is at the back");
     }
 
+    /// @notice A user behind an expired front who reserves the same name again keeps their place
+    ///         after the call clears the front, and PopRules moves to them.
+    function test_re_reserving_behind_an_expired_front_keeps_the_users_place() public {
+        string memory base = "longnamebob";
+        bytes32 labelhash = keccak256(bytes(base));
+        uint64 duration = dotnsPopController.reservationDuration();
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), base);
+        vm.warp(block.timestamp + uint256(duration) / 2);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0x02), base);
+        (, uint64 joinedAt) = dotnsPopController.reservationEntry(labelhash, 1);
+        vm.warp(block.timestamp + uint256(duration) / 2 + 1);
+
+        vm.recordLogs();
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: tiago, label: base})
+        );
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        _assertEventNotEmitted(logs, IDotnsPopController.ReservationQueued.selector);
+        _assertEventNotEmitted(logs, IDotnsPopController.ReservationRelinquished.selector);
+
+        (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(labelhash);
+        assertEq(head, 1, "ed's expired entry cleared");
+        assertEq(tail, 2, "nobody was added");
+        (address frontOwner, uint64 frontJoinedAt) =
+            dotnsPopController.reservationEntry(labelhash, 1);
+        assertEq(frontOwner, tiago, "tiago keeps the entry");
+        assertEq(frontJoinedAt, joinedAt, "and the expiry");
+        (address popHolder,) = popRules.getBaseNameReservation(base);
+        assertEq(popHolder, tiago, "PopRules moved to tiago");
+    }
+
     function _assertQueueUntouched(Vm.Log[] memory logs) internal pure {
         bytes32[3] memory queueEvents = [
             IDotnsPopController.ReservationQueued.selector,
