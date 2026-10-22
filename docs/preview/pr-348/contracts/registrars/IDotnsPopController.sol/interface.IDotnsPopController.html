@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/58e117fe350e0d832b9900771e2d93d818110732/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/e42f5cf2d74041eae25ccbe37bb8148f476b878d/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -246,9 +246,10 @@ when <code>reservedLabel</code> is non-empty: it requires a letters-only personh
 owner could never be claimed. This validation runs before both the issuance and any queue
 mutation, so an already-registered <code>reservedLabel</code> aborts the whole call and the candidate
 receives no device name either; callers should validate the reserved label before
-attesting rather than relying on this revert. It then clears the expired entries at the
-front of the queue when there are at most <code>MAX_QUEUE_STEPS_PER_CALL</code> of them, and none
-otherwise (@custom:emits ReservationExpired for each one cleared), removes the user from
+attesting rather than relying on this revert. It then clears up to
+<code>MAX_QUEUE_STEPS_PER_CALL</code> expired entries from the front of the queue (@custom:emits
+ReservationExpired for each
+one cleared), removes the user from
 any prior queue position (@custom:emits ReservationRelinquished) so a single user holds at
 most one live reservation across all labels, and enqueues a fresh entry
 (@custom:emits ReservationQueued). The enqueue rejects with @custom:reverts
@@ -358,13 +359,14 @@ non-claim drops any pending entry the user holds (@custom:emits ReservationRelin
 Either way the issuance</p>
 </li>
 <li>
-<p>emits: PersonhoodNameIssued. Expired entries at the front of the queue are
-cleared first when there are at most <code>MAX_QUEUE_STEPS_PER_CALL</code> of them
-(@custom:emits ReservationExpired for each one); with more, none are cleared and a claim</p>
+<p>emits: PersonhoodNameIssued. Up to <code>MAX_QUEUE_STEPS_PER_CALL</code> expired
+entries are cleared from the front of the queue first (@custom:emits ReservationExpired
+for each one); if the front is still expired after that, a claim</p>
 </li>
 <li>
-<p>reverts: NotHolder. The chat-key axis selects whether a fresh key is persisted on
-the resolver or the new entry inherits its key from a prior device name.
+<p>reverts: NotHolder and the revert discards the clearing. The chat-key axis selects
+whether a fresh key is persisted on the resolver or the new entry inherits its key from a
+prior device name.
 The fresh-key branch rejects a chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code>
 (otherwise @custom:reverts InvalidChatKey). The <code>DeviceName</code> branch validates the device
 name's <code>stem.NN</code> shape (otherwise @custom:reverts InvalidDeviceLabel), requires the

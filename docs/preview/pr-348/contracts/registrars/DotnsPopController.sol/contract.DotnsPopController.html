@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/58e117fe350e0d832b9900771e2d93d818110732/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/e42f5cf2d74041eae25ccbe37bb8148f476b878d/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a>, <a href="/contracts/registrars/IDotnsPopControllerLegacy.sol/interface.IDotnsPopControllerLegacy.html">IDotnsPopControllerLegacy</a></p>
 <p><strong>Title:</strong>
@@ -266,12 +266,11 @@ state has been committed.</p>
 <pre><code class="language-solidity">uint256 private constant CHAT_KEY_LENGTH = 65
 </code></pre>
 <h3 id="max_queue_steps_per_call"><a class="header" href="#max_queue_steps_per_call">MAX_QUEUE_STEPS_PER_CALL</a></h3>
-<p>Most expired entries one gateway call clears from the front of a reservation
-queue.</p>
+<p>Most expired or emptied entries one gateway call clears from the front of a
+reservation queue.</p>
 <p>A gateway call runs under a fixed weight limit, and each entry visited costs a
-storage read. A gateway call facing more expired entries clears none of them;</p>
-<p><strong>Note:</strong>
-function: expireReservation clears the whole queue.</p>
+storage read. A longer run is cleared over several calls, each keeping its progress, or at
+once by @custom:function expireReservation.</p>
 <pre><code class="language-solidity">uint256 public constant MAX_QUEUE_STEPS_PER_CALL = 4
 </code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
@@ -334,7 +333,12 @@ boundary, which is the question it is asking.</p>
 <h3 id="_devicecontainers"><a class="header" href="#_devicecontainers">_deviceContainers</a></h3>
 <p>Numeric containers this contract has minted or verified as its own.</p>
 <p>Lets device-name issuance skip the registrar and registry checks on every later
-issuance in the same container. See @custom:function _registerDeviceSubname.</p>
+issuance in the same container. See @custom:function _registerDeviceSubname. An entry is
+never cleared, because a recorded container cannot change hands: the registrar marks a
+name minted by this contract soulbound and rejects every transfer of it, release to the
+escrow included, and it has no burn. If a container ever did change hands, the registry's
+own parent check in @custom:function IDotnsRegistry.setSubnodeOwner would still reject
+issuance under it.</p>
 <pre><code class="language-solidity">mapping(bytes32 parentNode =&gt; bool ready) internal _deviceContainers
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
@@ -444,9 +448,10 @@ when <code>reservedLabel</code> is non-empty: it requires a letters-only personh
 owner could never be claimed. This validation runs before both the issuance and any queue
 mutation, so an already-registered <code>reservedLabel</code> aborts the whole call and the candidate
 receives no device name either; callers should validate the reserved label before
-attesting rather than relying on this revert. It then clears the expired entries at the
-front of the queue when there are at most <code>MAX_QUEUE_STEPS_PER_CALL</code> of them, and none
-otherwise (@custom:emits ReservationExpired for each one cleared), removes the user from
+attesting rather than relying on this revert. It then clears up to
+<code>MAX_QUEUE_STEPS_PER_CALL</code> expired entries from the front of the queue (@custom:emits
+ReservationExpired for each
+one cleared), removes the user from
 any prior queue position (@custom:emits ReservationRelinquished) so a single user holds at
 most one live reservation across all labels, and enqueues a fresh entry
 (@custom:emits ReservationQueued). The enqueue rejects with @custom:reverts
@@ -509,9 +514,9 @@ cross-flow authority: when PopRules carries a live base-name slot held by anothe
 controller's prior queue head, or a sibling controller's write), the call reverts</p>
 </li>
 <li>
-<p>emits: PersonhoodNameIssued. Expired entries at the front of the queue are
-cleared first when there are at most <code>MAX_QUEUE_STEPS_PER_CALL</code> of them
-(@custom:emits ReservationExpired for each one); with more, none are cleared and a claim</p>
+<p>emits: PersonhoodNameIssued. Up to <code>MAX_QUEUE_STEPS_PER_CALL</code> expired
+entries are cleared from the front of the queue first (@custom:emits ReservationExpired
+for each one); if the front is still expired after that, a claim</p>
 </li>
 <li>
 <p>function: settlePendingClaims. Cross-chain callers pass the ABI-encoded issuance
@@ -1016,20 +1021,21 @@ never matches an entry queued later under the same label.</p>
 <pre><code class="language-solidity">function _isEvicted(UserReservation memory reservation) internal view returns (bool);
 </code></pre>
 <h3 id="_advanceexpiredhead"><a class="header" href="#_advanceexpiredhead">_advanceExpiredHead</a></h3>
-<p>Clears the expired entries at the front of the queue, if at most <code>maxSteps</code> of them
-stand before an active reservation or the end of the queue; otherwise leaves the queue as
-it is.</p>
-<p>All or nothing, so PopRules always names the user at the front of the queue: a call
-that cannot finish within its limit changes nothing, and a later call with room to finish
-(such as the permissionless @custom:function expireReservation) clears the queue. Every
-entry visited costs a storage read, and a gateway call runs under a fixed weight limit.
-Clearing writes nothing per entry: entries and pointers stay below the new front, where
-they read as gone (@custom:function _isEvicted), and queue indices only ever grow.
+<p>Clears up to <code>maxSteps</code> expired or emptied entries from the front of the queue.</p>
+<p>Every entry visited costs a storage read, and a gateway call runs under a fixed weight
+limit, so a call clears at most <code>maxSteps</code> entries and keeps that progress; a later call
+carries on. Clearing writes nothing per entry: entries and pointers stay below the new
+front, where they read as gone (@custom:function _isEvicted), and queue indices only ever
+grow.
 When clearing reaches an active reservation, PopRules moves to that user, unless it is
-<code>claimant</code>, whose claim in the same call releases the slot. When it empties the queue,
-the PopRules slot is released, unless the caller is <code>refilling</code> it in the same call: then
-the slot and its label are kept and <code>slotKept</code> is returned, so the slot moves to the new
-user in one PopRules call. @custom:emits ReservationExpired once per expired entry cleared.</p>
+<code>claimant</code>, whose claim in the same call releases the slot. When it empties the queue, the
+PopRules slot is released, unless the caller is <code>refilling</code> it in the same call: then the
+slot and its label are kept and <code>slotKept</code> is returned, so the slot moves to the new user
+in one PopRules call. When it stops before either, PopRules is left as it is, naming a user
+the queue may have moved past. That user gains nothing: the public flow rejects a reserved
+name for everyone, and while a name has a queue, @custom:function issuePersonhoodName
+decides from the queue alone. @custom:emits ReservationExpired once per expired entry
+cleared.</p>
 <pre><code class="language-solidity">function _advanceExpiredHead(
     Deps memory deps,
     bytes32 labelhash,
@@ -1045,25 +1051,20 @@ user in one PopRules call. @custom:emits ReservationExpired once per expired ent
 <p>The single path by which a user's entry leaves a queue other than by expiry or by a
 claim: an explicit relinquish, a standalone personhood-name issuance, and a re-reservation
 that moves the user to another queue. @custom:emits ReservationRelinquished only when the
-user held an entry, so an indexer can rebuild every queue from events alone.</p>
-<pre><code class="language-solidity">function _dropUserReservation(Deps memory deps, address user) internal;
+user held an entry, so an indexer can rebuild every queue from events alone. <code>maxSteps</code>
+bounds the clearing that follows when the user was at the front of their queue: a gateway
+call passes <code>MAX_QUEUE_STEPS_PER_CALL</code>, and a signed relinquish the whole queue.</p>
+<pre><code class="language-solidity">function _dropUserReservation(Deps memory deps, address user, uint256 maxSteps) internal;
 </code></pre>
 <h3 id="_removeuserfromqueue"><a class="header" href="#_removeuserfromqueue">_removeUserFromQueue</a></h3>
 <p>Removes <code>user</code> from whichever reservation queue they currently occupy.</p>
 <p>The user's entry is deleted in place. When it was the front of the queue,</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>function: _advanceExpiredHead clears the queue from there with room for the whole
-queue: the emptied entry counts as one cleared entry, and PopRules moves to the next
-user with an active reservation, or is released when none is left. Removing any other
-entry leaves the front and PopRules unchanged. Emits nothing itself; callers go through</p>
-</li>
-<li>
-<p>function: _dropUserReservation.</p>
-</li>
-</ul>
-<pre><code class="language-solidity">function _removeUserFromQueue(Deps memory deps, address user) internal;
+<p><strong>Note:</strong>
+function: _advanceExpiredHead clears up to <code>maxSteps</code> entries from there, the
+emptied entry among them, and moves PopRules to the next user with an active reservation
+or releases it when none is left. Removing any other entry leaves the front and PopRules
+unchanged. Emits nothing itself; callers go through @custom:function _dropUserReservation.</p>
+<pre><code class="language-solidity">function _removeUserFromQueue(Deps memory deps, address user, uint256 maxSteps) internal;
 </code></pre>
 <h3 id="_validatedevicelabel"><a class="header" href="#_validatedevicelabel">_validateDeviceLabel</a></h3>
 <p>Validates a device name <code>stem.NN</code> and derives <code>(labelhash, node)</code>.</p>
