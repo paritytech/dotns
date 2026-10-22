@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/c024a5fba065521ff436696ee6b45b6a6542cab3/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/490c46d44ffb74ead250876a443d220dc4b44e98/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -247,11 +247,12 @@ owner could never be claimed. This validation runs before both the issuance and 
 mutation, so an already-registered <code>reservedLabel</code> aborts the whole call and the candidate
 receives no device name either; callers should validate the reserved label before
 attesting rather than relying on this revert. It then clears up to
-<code>MAX_QUEUE_STEPS_PER_CALL</code> expired entries from the front of the queue (@custom:emits
-ReservationExpired for each
-one cleared), removes the user from
-any prior queue position (@custom:emits ReservationRelinquished) so a single user holds at
-most one live reservation across all labels, and enqueues a fresh entry
+<code>MAX_QUEUE_STEPS_PER_CALL</code> expired entries from the front of the queue
+(@custom:emits ReservationExpired for each one cleared). When the user already holds an
+active reservation for <code>reservedLabel</code>, that reservation stays as it is, with the same
+place in the queue and the same expiry, and nothing else changes. Otherwise it removes the
+user from any prior queue position (@custom:emits ReservationRelinquished) so a single user
+holds at most one live reservation across all labels, and enqueues a fresh entry
 (@custom:emits ReservationQueued). The enqueue rejects with @custom:reverts
 AlreadyReserved when the user already holds a reservation that was not cleared by the
 prior removal and with @custom:reverts QueueFull when the per-label queue has reached
@@ -278,9 +279,10 @@ name first, then this function reserves the personhood name in a separate transa
 proof-size stays below per-call limits. Reverts with @custom:reverts InvalidPersonhoodLabel
 when the label is empty, is not lowercase ASCII letters (so a hyphen or any digit rejects
 it), or is governance-reserved, and with @custom:reverts PersonhoodNameUnavailable when the
-label already has an owner on the registrar and so could never be claimed. Moving the user
-out of a prior queue @custom:emits ReservationRelinquished. The caller remains agnostic
-about backend batching; it simply exposes a small retryable primitive.</p>
+label already has an owner on the registrar and so could never be claimed. When the user
+already holds an active reservation for <code>label</code>, that reservation stays as it is, with
+the same place in the queue and the same expiry, so the call is safe to retry. Otherwise
+moving the user out of a prior queue @custom:emits ReservationRelinquished.</p>
 <pre><code class="language-solidity">function reservePersonhoodName(PersonhoodNameReservation calldata params) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
