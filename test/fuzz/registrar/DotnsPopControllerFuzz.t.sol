@@ -119,7 +119,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
     {
         duration = uint64(
             bound(
-                uint256(duration), uint256(dotnsPopController.MIN_RESERVATION_DURATION()), 365 days
+                uint256(duration),
+                uint256(dotnsPopController.MIN_RESERVATION_DURATION()),
+                uint256(dotnsPopController.MAX_RESERVATION_DURATION())
             )
         );
         elapsed = uint64(bound(uint256(elapsed), 0, 365 days));
@@ -205,7 +207,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
     {
         duration = uint64(
             bound(
-                uint256(duration), uint256(dotnsPopController.MIN_RESERVATION_DURATION()), 365 days
+                uint256(duration),
+                uint256(dotnsPopController.MIN_RESERVATION_DURATION()),
+                uint256(dotnsPopController.MAX_RESERVATION_DURATION())
             )
         );
         elapsed = uint64(bound(uint256(elapsed), 0, 365 days));

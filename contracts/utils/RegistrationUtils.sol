@@ -74,10 +74,35 @@ library RegistrationUtils {
     {
         Siblings memory siblings = _resolveSiblings(context.protocolRegistry);
 
-        siblings.registrar.register(uint256(context.node), context.user, context.label);
-        siblings.registry.setOwner(context.node, context.user);
+        registerName(
+            siblings.registrar, siblings.registry, context.node, context.user, context.label
+        );
 
         labelStore = siblings.storeFactory.getLabelStore(context.user);
+    }
+
+    /// @notice Mints the name token for `node` to `user` and points the forward registry at
+    /// them: the first two steps of the triad.
+    /// @dev For a controller that already holds the registrar and registry addresses, so it
+    ///      runs the same steps as @custom:function registerAndStore without resolving them
+    ///      again. A non-empty `label` makes the registrar write the owner's `LabelStore` entry;
+    ///      an empty one leaves the store write to the caller.
+    /// @param registrar The base registrar.
+    /// @param registry The forward registry.
+    /// @param node `namehash(tldNode, labelhash)`.
+    /// @param user Address receiving the name.
+    /// @param label Label for the registrar's store write, or empty to skip it.
+    function registerName(
+        IDotnsRegistrar registrar,
+        IDotnsRegistry registry,
+        bytes32 node,
+        address user,
+        string memory label
+    )
+        internal
+    {
+        registrar.register(uint256(node), user, label);
+        registry.setOwner(node, user);
     }
 
     /// @notice Resolves sibling contracts via the protocol registry.
