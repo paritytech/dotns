@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/490c46d44ffb74ead250876a443d220dc4b44e98/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c779c2d5f3e17ef17f070d9fb0186a6843e6c352/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a>, <a href="/contracts/registrars/IDotnsPopControllerLegacy.sol/interface.IDotnsPopControllerLegacy.html">IDotnsPopControllerLegacy</a></p>
 <p><strong>Title:</strong>
@@ -455,11 +455,14 @@ active reservation for <code>reservedLabel</code>, that reservation stays as it 
 place in the queue and the same expiry, and nothing else changes. Otherwise it removes the
 user from any prior queue position (@custom:emits ReservationRelinquished) so a single user
 holds at most one live reservation across all labels, and enqueues a fresh entry
-(@custom:emits ReservationQueued). The enqueue rejects with @custom:reverts
-AlreadyReserved when the user already holds a reservation that was not cleared by the
-prior removal and with @custom:reverts QueueFull when the per-label queue has reached
-<code>MAX_RESERVATION_QUEUE</code>. Cross-chain callers pass the ABI-encoded tuple as the call's
-payload, which Solidity decodes directly.</p>
+(@custom:emits ReservationQueued). The removal only empties the user's entry in the prior
+queue: the next call on that name clears it like an expired one. The enqueue rejects with</p>
+</li>
+<li>
+<p>reverts: AlreadyReserved when the user already holds a reservation that was not
+cleared by the prior removal and with @custom:reverts QueueFull when the per-label queue
+has reached <code>MAX_RESERVATION_QUEUE</code>. Cross-chain callers pass the ABI-encoded tuple as the
+call's payload, which Solidity decodes directly.</p>
 </li>
 <li>
 <p>struct: DeviceNameIssuanceWithReservation.</p>
@@ -492,7 +495,8 @@ it), or is governance-reserved, and with @custom:reverts PersonhoodNameUnavailab
 label already has an owner on the registrar and so could never be claimed. When the user
 already holds an active reservation for <code>label</code>, that reservation stays as it is, with
 the same place in the queue and the same expiry, so the call is safe to retry. Otherwise
-moving the user out of a prior queue @custom:emits ReservationRelinquished.</p>
+moving the user out of a prior queue @custom:emits ReservationRelinquished and only empties
+their entry there, as in @custom:function issueDeviceNameWithReservation.</p>
 <pre><code class="language-solidity">function reservePersonhoodName(PersonhoodNameReservation calldata params)
     external
     override
@@ -1029,7 +1033,10 @@ reservation they hold so a fresh one can be queued.</p>
 <p>A repeated reservation of the same name, such as one made again after the user recovers
 their account onto a new device, keeps the user's place and expiry. The expiry is not
 refreshed, so repeating a reservation never extends how long a user holds a name. Reads the
-user's reservation once and hands it to @custom:function _dropReservation.</p>
+user's reservation once and hands it to @custom:function _dropReservation.
+Dropping a reservation for another name only empties the user's entry in that queue: the
+next call on that name clears it like an expired one. A gateway call then does queue work
+in one queue only, the name being reserved, so its cost stays within the weight limit.</p>
 <pre><code class="language-solidity">function _keepOrDropReservation(
     Deps memory deps,
     bytes32 labelhash,
@@ -1076,7 +1083,8 @@ claim: an explicit relinquish, a standalone personhood-name issuance, and a re-r
 that moves the user to another queue. @custom:emits ReservationRelinquished only when the
 user held an entry, so an indexer can rebuild every queue from events alone. <code>maxSteps</code>
 bounds the clearing that follows when the user was at the front of their queue: a gateway
-call passes <code>MAX_QUEUE_STEPS_PER_CALL</code>, and a signed relinquish the whole queue.</p>
+call passes 0, leaving the emptied entry for the next call on that name, and a signed
+relinquish clears the whole queue.</p>
 <pre><code class="language-solidity">function _dropUserReservation(Deps memory deps, address user, uint256 maxSteps) internal;
 </code></pre>
 <h3 id="_dropreservation"><a class="header" href="#_dropreservation">_dropReservation</a></h3>
@@ -1092,13 +1100,14 @@ call passes <code>MAX_QUEUE_STEPS_PER_CALL</code>, and a signed relinquish the w
 </code></pre>
 <h3 id="_removeuserfromqueue"><a class="header" href="#_removeuserfromqueue">_removeUserFromQueue</a></h3>
 <p>Removes <code>user</code> from whichever reservation queue they currently occupy.</p>
-<p>The user's entry is deleted in place. When it was the front of the queue,</p>
+<p>The user's entry is deleted in place. When it was the front of the queue and
+<code>maxSteps</code> is not zero, @custom:function _advanceExpiredHead clears up to <code>maxSteps</code>
+entries from there, the emptied entry among them, and moves PopRules to the next user with
+an active reservation or releases it when none is left. Otherwise the front and PopRules
+stay unchanged. Emits nothing itself; callers go through</p>
 <p><strong>Note:</strong>
-function: _advanceExpiredHead clears up to <code>maxSteps</code> entries from there, the
-emptied entry among them, and moves PopRules to the next user with an active reservation
-or releases it when none is left. Removing any other entry leaves the front and PopRules
-unchanged. Emits nothing itself; callers go through @custom:function _dropUserReservation.
-<code>reservation</code> is the user's live reservation, already read by the caller.</p>
+function: _dropUserReservation. <code>reservation</code> is the user's live reservation,
+already read by the caller.</p>
 <pre><code class="language-solidity">function _removeUserFromQueue(
     Deps memory deps,
     address user,
