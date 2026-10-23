@@ -8,7 +8,7 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">dotNS 4naly3er Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-10-20 12:25 UTC | 38 findings</p>
+<p class="text-sm text-gray-500">Generated 2026-10-23 10:27 UTC | 38 findings</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">Medium</p><p class="text-xl font-mono font-bold text-yellow-400">5</p></div>
@@ -74,7 +74,7 @@
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">L-4</td>
 <td class="py-2 px-3 text-gray-200">Signature use at deadlines should be allowed</td>
-<td class="py-2 px-3 font-mono text-right">5</td>
+<td class="py-2 px-3 font-mono text-right">6</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">L-5</td>
@@ -112,22 +112,22 @@
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-2</td>
 <td class="py-2 px-3 text-gray-200">Using bools for storage incurs overhead</td>
-<td class="py-2 px-3 font-mono text-right">5</td>
+<td class="py-2 px-3 font-mono text-right">6</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-3</td>
 <td class="py-2 px-3 text-gray-200">Cache array length outside of loop</td>
-<td class="py-2 px-3 font-mono text-right">7</td>
+<td class="py-2 px-3 font-mono text-right">8</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-4</td>
 <td class="py-2 px-3 text-gray-200">For Operations that will not overflow, you could use unchecked</td>
-<td class="py-2 px-3 font-mono text-right">379</td>
+<td class="py-2 px-3 font-mono text-right">385</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-5</td>
 <td class="py-2 px-3 text-gray-200">Use Custom Errors instead of Revert Strings to save Gas</td>
-<td class="py-2 px-3 font-mono text-right">12</td>
+<td class="py-2 px-3 font-mono text-right">14</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-6</td>
@@ -137,12 +137,12 @@
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-7</td>
 <td class="py-2 px-3 text-gray-200">`++i` costs less gas compared to `i++` or `i += 1` (same for `--i` vs `i--` or `i -= 1`)</td>
-<td class="py-2 px-3 font-mono text-right">12</td>
+<td class="py-2 px-3 font-mono text-right">9</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-8</td>
 <td class="py-2 px-3 text-gray-200">Using `private` rather than `public` for constants, saves gas</td>
-<td class="py-2 px-3 font-mono text-right">12</td>
+<td class="py-2 px-3 font-mono text-right">14</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-9</td>
@@ -152,7 +152,7 @@
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-10</td>
 <td class="py-2 px-3 text-gray-200">Splitting require() statements that use && saves gas</td>
-<td class="py-2 px-3 font-mono text-right">7</td>
+<td class="py-2 px-3 font-mono text-right">8</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-11</td>
@@ -162,7 +162,7 @@
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-12</td>
 <td class="py-2 px-3 text-gray-200">Increments/decrements can be unchecked in for-loops</td>
-<td class="py-2 px-3 font-mono text-right">38</td>
+<td class="py-2 px-3 font-mono text-right">39</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">GAS-13</td>
@@ -185,7 +185,7 @@
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-500">NC-2</td>
 <td class="py-2 px-3 text-gray-200">Control structures do not follow the Solidity Style Guide</td>
-<td class="py-2 px-3 font-mono text-right">132</td>
+<td class="py-2 px-3 font-mono text-right">153</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-500">NC-3</td>
@@ -205,7 +205,7 @@
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-500">NC-6</td>
 <td class="py-2 px-3 text-gray-200">Functions should not be longer than 50 lines</td>
-<td class="py-2 px-3 font-mono text-right">457</td>
+<td class="py-2 px-3 font-mono text-right">466</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-500">NC-7</td>
