@@ -75,7 +75,7 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         assertFalse(isReserved, "no base name reserved by either registration");
     }
 
-    function test_register_cross_payer_charges_max_not_sum_of_price_and_reach() public {
+    function test_register_cross_payer_charges_only_the_owner_price() public {
         string memory label = NOSTATUS_LABEL_A;
         address payer = leonardo;
         address nameOwner = ed;
@@ -84,11 +84,7 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         _grantNoStatus(nameOwner);
 
         uint256 ownerPrice = popRules.priceWithoutCheck(label, nameOwner).price;
-        uint256 friction = popRules.transferFloor(label, payer, nameOwner);
         assertGt(ownerPrice, 0, "scenario requires non-zero owner price");
-        assertGt(friction, 0, "scenario requires non-zero payer-to-owner friction");
-
-        uint256 expectedCharge = ownerPrice > friction ? ownerPrice : friction;
 
         IDotnsRegistrarController.Registration memory registration =
             IDotnsRegistrarController.Registration({
@@ -105,21 +101,20 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         dotnsRegistrarController.commit(commitment);
         vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
-        uint256 protocolFeesBefore = dotnsNameEscrow.protocolFees();
+        uint256 payerBalanceBefore = payer.balance;
 
+        // Overpay so any extra charge on top of the owner price would show up in the debit.
         vm.prank(payer);
-        dotnsRegistrarController.register{value: expectedCharge}(registration);
+        dotnsRegistrarController.register{value: ownerPrice * 2}(registration);
 
-        // Cross-payer charge is the name's own curve price. The whole charge routes to protocol
-        // fees; the refundable deposit branch is reserved for direct registrants.
         assertEq(
-            dotnsNameEscrow.protocolFees() - protocolFeesBefore,
-            expectedCharge,
-            "cross-payer must credit the name's own curve price to protocol fees"
+            payerBalanceBefore - payer.balance,
+            ownerPrice,
+            "a payer above the owner's tier is charged only the owner price"
         );
     }
 
-    function test_revert_register_cross_payer_when_msg_value_below_max_of_price_and_reach() public {
+    function test_revert_register_cross_payer_when_msg_value_below_price() public {
         string memory label = NOSTATUS_LABEL_A;
         address payer = leonardo;
         address nameOwner = ed;
@@ -128,11 +123,7 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         _grantNoStatus(nameOwner);
 
         uint256 ownerPrice = popRules.priceWithoutCheck(label, nameOwner).price;
-        uint256 friction = popRules.transferFloor(label, payer, nameOwner);
         assertGt(ownerPrice, 0);
-        assertGt(friction, 0);
-
-        uint256 expectedCharge = ownerPrice > friction ? ownerPrice : friction;
 
         IDotnsRegistrarController.Registration memory registration =
             IDotnsRegistrarController.Registration({
@@ -151,10 +142,10 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
 
         vm.prank(payer);
         vm.expectRevert(IDotnsRegistrarController.InsufficientValue.selector);
-        dotnsRegistrarController.register{value: expectedCharge - 1}(registration);
+        dotnsRegistrarController.register{value: ownerPrice - 1}(registration);
     }
 
-    function test_register_cross_payer_routes_owner_price_to_protocol_fees() public {
+    function test_register_cross_payer_locks_the_price_as_the_owner_deposit() public {
         string memory label = NOSTATUS_LABEL_A;
         address payer = leonardo;
         address nameOwner = ed;
@@ -180,7 +171,7 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         dotnsRegistrarController.commit(commitment);
         vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
-        uint256 protocolFeesBefore = dotnsNameEscrow.protocolFees();
+        uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
 
         vm.prank(payer);
         dotnsRegistrarController.register{value: ownerPrice}(registration);
@@ -189,11 +180,12 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         IDotnsNameEscrow.ReleasePosition memory position =
             dotnsNameEscrow.getReleasePosition(tokenId);
 
-        assertEq(position.amount, 0, "cross-payer must not seed a refundable position");
+        assertEq(position.recipient, nameOwner, "the owner holds the position");
+        assertEq(position.amount, ownerPrice, "the price is the owner's refundable deposit");
         assertEq(
-            dotnsNameEscrow.protocolFees() - protocolFeesBefore,
+            dotnsNameEscrow.reserves(address(0)) - reservesBefore,
             ownerPrice,
-            "cross-payer price must accrue to protocol fees"
+            "the deposit is reserved for the owner's refund"
         );
     }
 

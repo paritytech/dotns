@@ -164,9 +164,8 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         bytes32 node = _namehash(dotNode, labelhash);
         uint256 tokenId = uint256(node);
 
-        uint256 _xferFee = dotnsRegistrar.quoteTransferFee(tokenId, recipient);
         vm.prank(sender);
-        dotnsRegistrar.transferFrom{value: _xferFee}(sender, recipient, tokenId);
+        dotnsRegistrar.transferFrom(sender, recipient, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), recipient);
 
@@ -261,10 +260,8 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         uint256 depositorRefundsBefore = dotnsNameEscrow.pendingRefundCount(depositor);
         uint256 recipientRefundsBefore = dotnsNameEscrow.pendingRefundCount(recipientSeed);
 
-        uint256 transferFee = dotnsRegistrar.quoteTransferFee(tokenId, recipientSeed);
-
         vm.prank(depositor);
-        dotnsRegistrar.transferFrom{value: transferFee}(depositor, recipientSeed, tokenId);
+        dotnsRegistrar.transferFrom(depositor, recipientSeed, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), recipientSeed, "NFT must move to the recipient");
 
@@ -314,9 +311,8 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
 
         assertEq(dotnsReverseResolver.nameOf(sender), string.concat(nameLabel, ".dot"));
 
-        uint256 _xferFee = dotnsRegistrar.quoteTransferFee(tokenId, recipient);
         vm.prank(sender);
-        dotnsRegistrar.transferFrom{value: _xferFee}(sender, recipient, tokenId);
+        dotnsRegistrar.transferFrom(sender, recipient, tokenId);
 
         assertEq(dotnsReverseResolver.nameOf(sender), "");
     }

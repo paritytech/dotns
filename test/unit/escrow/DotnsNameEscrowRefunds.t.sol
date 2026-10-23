@@ -8,20 +8,31 @@ import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocol
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title DotnsNameEscrowRefundHarness
-/// @notice Test-only subclass exposing internal refund-ledger primitives so the unit suite can
-///         drive `_creditRefund` and `_removeRefundEntry` directly without standing up the full
-///         transfer-fee pipeline.
+/// @notice Test-only subclass that seeds refund entries straight into storage and exposes
+///         `_removeRefundEntry`. Nothing in the escrow credits entries any more, so seeding is the
+///         only way to exercise the claim and view functions that serve entries already on the
+///         ledger.
 contract DotnsNameEscrowRefundHarness is DotnsNameEscrow {
-    function exposeCreditRefund(
+    uint256 private _seededEntries;
+
+    function seedRefundEntry(
         address recipient,
         uint256 amount,
         uint256 tokenId
     )
         external
-        payable
         returns (uint256 entryId)
     {
-        entryId = _creditRefund(recipient, amount, tokenId);
+        entryId = ++_seededEntries;
+        _refundEntries[entryId] = RefundEntry({
+            recipient: recipient,
+            amount: amount,
+            availableAt: uint64(block.timestamp + cooldown),
+            tokenId: tokenId
+        });
+        uint256[] storage list = _entriesByRecipient[recipient];
+        list.push(entryId);
+        _entryIndexPlusOne[entryId] = list.length;
     }
 
     function exposeRemoveRefundEntry(uint256 entryId, address recipient) external {
@@ -48,7 +59,8 @@ contract RejectingReceiver {
 }
 
 /// @title DotnsNameEscrowRefundsTest
-/// @notice Unit tests for the time-locked refund ledger added to @custom:contract DotnsNameEscrow.
+/// @notice Unit tests for claiming entries on the time-locked refund ledger of
+///         @custom:contract DotnsNameEscrow.
 contract DotnsNameEscrowRefundsTest is BaseDotns {
     DotnsNameEscrowRefundHarness internal harness;
 
@@ -82,15 +94,8 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         otherRecipient = makeAddr("otherRefundRecipient");
     }
 
-    function _credit(
-        address to,
-        uint256 amount,
-        uint256 tokenId
-    )
-        internal
-        returns (uint256 entryId)
-    {
-        entryId = harness.exposeCreditRefund(to, amount, tokenId);
+    function _seed(address to, uint256 amount, uint256 tokenId) internal returns (uint256 entryId) {
+        entryId = harness.seedRefundEntry(to, amount, tokenId);
     }
 
     function _warpPast(uint64 availableAt) internal {
@@ -105,53 +110,8 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         assertEq(entry.tokenId, 0, "entry tokenId should be zero");
     }
 
-    function test_creditRefund_allocatesMonotonicEntryIds() public {
-        uint256 first = _credit(recipient, 1 ether, TOKEN_ID);
-        uint256 second = _credit(recipient, 2 ether, TOKEN_ID);
-        uint256 third = _credit(recipient, 3 ether, TOKEN_ID);
-
-        assertGt(second, first, "second entry id should exceed first");
-        assertGt(third, second, "third entry id should exceed second");
-    }
-
-    function test_creditRefund_independentCooldowns() public {
-        uint256 firstId = _credit(recipient, 1 ether, TOKEN_ID);
-        uint64 firstAvailableAt = harness.refundEntry(firstId).availableAt;
-
-        vm.warp(block.timestamp + 30 minutes);
-
-        uint256 secondId = _credit(recipient, 2 ether, TOKEN_ID);
-        uint64 secondAvailableAt = harness.refundEntry(secondId).availableAt;
-
-        assertEq(
-            harness.refundEntry(firstId).availableAt,
-            firstAvailableAt,
-            "first entry cooldown must not move when second is credited"
-        );
-        assertGt(
-            secondAvailableAt, firstAvailableAt, "later entry's clock starts at its credit time"
-        );
-    }
-
-    function test_creditRefund_revertsOnZeroRecipient() public {
-        vm.expectRevert(IDotnsNameEscrow.InvalidRecipient.selector);
-        harness.exposeCreditRefund(address(0), 1 ether, TOKEN_ID);
-    }
-
-    function test_creditRefund_revertsOnZeroAmount() public {
-        vm.expectRevert(IDotnsNameEscrow.InvalidAmount.selector);
-        harness.exposeCreditRefund(recipient, 0, TOKEN_ID);
-    }
-
-    function test_creditRefund_emitsRefundCredited() public {
-        uint64 expectedAvailableAt = uint64(block.timestamp + DEFAULT_COOLDOWN);
-        vm.expectEmit(true, true, true, true, address(harness));
-        emit IDotnsNameEscrow.RefundCredited(recipient, 1, 1 ether, expectedAvailableAt, TOKEN_ID);
-        _credit(recipient, 1 ether, TOKEN_ID);
-    }
-
     function test_claimRefund_transfersAndDeletes() public {
-        uint256 entryId = _credit(recipient, 1 ether, TOKEN_ID);
+        uint256 entryId = _seed(recipient, 1 ether, TOKEN_ID);
         _warpPast(harness.refundEntry(entryId).availableAt);
 
         uint256 before = recipient.balance;
@@ -165,7 +125,7 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     }
 
     function test_claimRefund_revertsWhenCallerIsNotRecipient() public {
-        uint256 entryId = _credit(recipient, 1 ether, TOKEN_ID);
+        uint256 entryId = _seed(recipient, 1 ether, TOKEN_ID);
         _warpPast(harness.refundEntry(entryId).availableAt);
 
         vm.prank(otherRecipient);
@@ -178,7 +138,7 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     }
 
     function test_claimRefund_revertsBeforeCooldown() public {
-        uint256 entryId = _credit(recipient, 1 ether, TOKEN_ID);
+        uint256 entryId = _seed(recipient, 1 ether, TOKEN_ID);
         uint64 availableAt = harness.refundEntry(entryId).availableAt;
 
         vm.prank(recipient);
@@ -189,7 +149,7 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     }
 
     function test_claimRefund_emitsRefundClaimed() public {
-        uint256 entryId = _credit(recipient, 1 ether, TOKEN_ID);
+        uint256 entryId = _seed(recipient, 1 ether, TOKEN_ID);
         _warpPast(harness.refundEntry(entryId).availableAt);
 
         vm.expectEmit(true, true, false, true, address(harness));
@@ -200,7 +160,7 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
 
     function test_claimRefund_revertsOnTransferFailure() public {
         RejectingReceiver rejecter = new RejectingReceiver();
-        uint256 entryId = _credit(address(rejecter), 1 ether, TOKEN_ID);
+        uint256 entryId = _seed(address(rejecter), 1 ether, TOKEN_ID);
         _warpPast(harness.refundEntry(entryId).availableAt);
 
         vm.prank(address(rejecter));
@@ -209,9 +169,9 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     }
 
     function test_claimRefundsBatch_aggregatesAndTransfers() public {
-        uint256 a = _credit(recipient, 1 ether, TOKEN_ID);
-        uint256 b = _credit(recipient, 2 ether, TOKEN_ID);
-        uint256 c = _credit(recipient, 3 ether, TOKEN_ID);
+        uint256 a = _seed(recipient, 1 ether, TOKEN_ID);
+        uint256 b = _seed(recipient, 2 ether, TOKEN_ID);
+        uint256 c = _seed(recipient, 3 ether, TOKEN_ID);
         _warpPast(harness.refundEntry(c).availableAt);
 
         uint256[] memory ids = new uint256[](3);
@@ -229,12 +189,12 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     }
 
     function test_claimRefundsBatch_atomicOnLockedEntry() public {
-        uint256 a = _credit(recipient, 1 ether, TOKEN_ID);
+        uint256 a = _seed(recipient, 1 ether, TOKEN_ID);
         // Warp between credits so entry B's cooldown clock starts late enough that the batch
         // claim straddles it: A and C are claimable, B is not.
         vm.warp(block.timestamp + DEFAULT_COOLDOWN);
-        uint256 b = _credit(recipient, 2 ether, TOKEN_ID);
-        uint256 c = _credit(recipient, 3 ether, TOKEN_ID);
+        uint256 b = _seed(recipient, 2 ether, TOKEN_ID);
+        uint256 c = _seed(recipient, 3 ether, TOKEN_ID);
         uint64 aAvailableAt = harness.refundEntry(a).availableAt;
         vm.warp(aAvailableAt + 1);
         uint64 bAvailableAt = harness.refundEntry(b).availableAt;
@@ -266,9 +226,9 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     }
 
     function test_pendingRefundIds_paginates() public {
-        uint256 a = _credit(recipient, 1 ether, TOKEN_ID);
-        uint256 b = _credit(recipient, 2 ether, TOKEN_ID);
-        uint256 c = _credit(recipient, 3 ether, TOKEN_ID);
+        uint256 a = _seed(recipient, 1 ether, TOKEN_ID);
+        uint256 b = _seed(recipient, 2 ether, TOKEN_ID);
+        uint256 c = _seed(recipient, 3 ether, TOKEN_ID);
 
         uint256[] memory firstPage = harness.pendingRefundIds(recipient, 0, 2);
         assertEq(firstPage.length, 2);
@@ -284,9 +244,9 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
     }
 
     function test_removeRefundEntry_swapPopMiddlePreservesIndices() public {
-        uint256 a = _credit(recipient, 1 ether, TOKEN_ID);
-        uint256 b = _credit(recipient, 2 ether, TOKEN_ID);
-        uint256 c = _credit(recipient, 3 ether, TOKEN_ID);
+        uint256 a = _seed(recipient, 1 ether, TOKEN_ID);
+        uint256 b = _seed(recipient, 2 ether, TOKEN_ID);
+        uint256 c = _seed(recipient, 3 ether, TOKEN_ID);
 
         _warpPast(harness.refundEntry(b).availableAt);
         vm.prank(recipient);
