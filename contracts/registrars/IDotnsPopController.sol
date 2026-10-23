@@ -72,8 +72,7 @@ interface IDotnsPopController is IDotnsController {
 
     /// @notice Metadata describing the occupied range of a reservation queue.
     /// @dev Uses monotonically increasing indices. Active entries occupy `[head, tail)`;
-    /// `length = tail - head`. Slots past `head` are deleted as the head advances so
-    /// garbage never accumulates.
+    /// `length = tail - head`. Entries below `head` stay in storage and read as gone.
     struct ReservationQueueMeta {
         uint64 head;
         uint64 tail;
@@ -166,10 +165,9 @@ interface IDotnsPopController is IDotnsController {
     event ReservationRelinquished(bytes32 indexed reservedLabelhash, address indexed user);
 
     /// @notice Emitted when the holder of a queue's live head claims the reserved name.
+    /// @dev Ends the reservation of every waiter in the queue as well: a claim evicts them all
+    /// at once, with no per-waiter event, so its cost does not grow with the queue.
     event ReservationClaimed(bytes32 indexed reservedLabelhash, address indexed user);
-
-    /// @notice Emitted for each waiter removed from a queue when its head is claimed.
-    event ReservationEvicted(bytes32 indexed reservedLabelhash, address indexed user);
 
     /// @notice Emitted when a personhood name is linked to a device name.
     event DeviceNameLinked(bytes32 indexed personhoodLabelhash, bytes32 indexed deviceLabelhash);
@@ -258,6 +256,11 @@ interface IDotnsPopController is IDotnsController {
     /// @param duration Caller-supplied duration, in seconds.
     error ReservationDurationTooLow(uint64 duration);
 
+    /// @notice Thrown when @custom:function setReservationDuration is called with a value above
+    /// the protocol maximum.
+    /// @param duration Caller-supplied duration, in seconds.
+    error ReservationDurationTooHigh(uint64 duration);
+
     /// @notice Issues a device name to the supplied user and optionally enqueues a reservation
     /// for a personhood name they intend to claim later.
     /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The issuance
@@ -275,15 +278,19 @@ interface IDotnsPopController is IDotnsController {
     /// owner could never be claimed. This validation runs before both the issuance and any queue
     /// mutation, so an already-registered `reservedLabel` aborts the whole call and the candidate
     /// receives no device name either; callers should validate the reserved label before
-    /// attesting rather than relying on this revert. It then advances the head past expired
-    /// entries (@custom:emits ReservationExpired for each one), removes the user from any prior
-    /// queue position (@custom:emits ReservationRelinquished) so a single user holds at most one
-    /// live reservation across all labels, and enqueues a fresh entry
-    /// (@custom:emits ReservationQueued). The enqueue rejects with @custom:reverts
-    /// AlreadyReserved when the user already holds a reservation that was not cleared by the
-    /// prior removal and with @custom:reverts QueueFull when the per-label queue has reached
-    /// `MAX_RESERVATION_QUEUE`. Cross-chain callers pass the ABI-encoded tuple as the call's
-    /// payload, which Solidity decodes directly.
+    /// attesting rather than relying on this revert. It then clears up to
+    /// `MAX_QUEUE_STEPS_PER_CALL` expired entries from the front of the queue
+    /// (@custom:emits ReservationExpired for each one cleared). When the user already holds an
+    /// active reservation for `reservedLabel`, that reservation stays as it is, with the same
+    /// place in the queue and the same expiry, and nothing else changes. Otherwise it removes the
+    /// user from any prior queue position (@custom:emits ReservationRelinquished) so a single user
+    /// holds at most one live reservation across all labels, and enqueues a fresh entry
+    /// (@custom:emits ReservationQueued). The removal only empties the user's entry in the prior
+    /// queue: the next call on that name clears it like an expired one. The enqueue rejects with
+    /// @custom:reverts AlreadyReserved when the user already holds a reservation that was not
+    /// cleared by the prior removal and with @custom:reverts QueueFull when the per-label queue
+    /// has reached `MAX_RESERVATION_QUEUE`. Cross-chain callers pass the ABI-encoded tuple as the
+    /// call's payload, which Solidity decodes directly.
     /// @param params Issuance and reservation request; see
     /// @custom:struct DeviceNameIssuanceWithReservation.
     function issueDeviceNameWithReservation(DeviceNameIssuanceWithReservation calldata params)
@@ -296,9 +303,11 @@ interface IDotnsPopController is IDotnsController {
     /// proof-size stays below per-call limits. Reverts with @custom:reverts InvalidPersonhoodLabel
     /// when the label is empty, is not lowercase ASCII letters (so a hyphen or any digit rejects
     /// it), or is governance-reserved, and with @custom:reverts PersonhoodNameUnavailable when the
-    /// label already has an owner on the registrar and so could never be claimed. Moving the user
-    /// out of a prior queue @custom:emits ReservationRelinquished. The caller remains agnostic
-    /// about backend batching; it simply exposes a small retryable primitive.
+    /// label already has an owner on the registrar and so could never be claimed. When the user
+    /// already holds an active reservation for `label`, that reservation stays as it is, with
+    /// the same place in the queue and the same expiry, so the call is safe to retry. Otherwise
+    /// moving the user out of a prior queue @custom:emits ReservationRelinquished and only empties
+    /// their entry there, as in @custom:function issueDeviceNameWithReservation.
     /// @param params Reservation request; see @custom:struct PersonhoodNameReservation.
     function reservePersonhoodName(PersonhoodNameReservation calldata params) external;
 
@@ -338,13 +347,17 @@ interface IDotnsPopController is IDotnsController {
     /// controller's prior queue head, or a sibling controller's write), the call reverts
     /// @custom:reverts NotHolder before any queue mutation. Two orthogonal axes drive the state
     /// machine. The reservation axis treats the user as claiming if and only if they hold the live
-    /// head-of-queue reservation on the label: a claim wipes the entire queue
-    /// (@custom:emits ReservationEvicted for every other waiter), releases the PopRules slot, and
-    /// @custom:emits ReservationClaimed; a non-claim drops any pending entry the user holds
-    /// (@custom:emits ReservationRelinquished). Either way the issuance
-    /// @custom:emits PersonhoodNameIssued. Advancing the queue head past expired entries
-    /// @custom:emits ReservationExpired for each one. The chat-key axis selects whether a fresh key
-    /// is persisted on the resolver or the new entry inherits its key from a prior device name.
+    /// head-of-queue reservation on the label: a claim ends the queue, evicting every other
+    /// waiter at once, releases the PopRules slot, and @custom:emits ReservationClaimed; a
+    /// non-claim drops any pending entry the user holds (@custom:emits ReservationRelinquished),
+    /// only emptying it in its queue for the next call on that name to clear.
+    /// Either way the issuance
+    /// @custom:emits PersonhoodNameIssued. Up to `MAX_QUEUE_STEPS_PER_CALL` expired
+    /// entries are cleared from the front of the queue first (@custom:emits ReservationExpired
+    /// for each one); if the front is still expired after that, a claim
+    /// @custom:reverts NotHolder and the revert discards the clearing. The chat-key axis selects
+    /// whether a fresh key is persisted on the resolver or the new entry inherits its key from a
+    /// prior device name.
     /// The fresh-key branch rejects a chat key whose length is neither zero nor `CHAT_KEY_LENGTH`
     /// (otherwise @custom:reverts InvalidChatKey). The `DeviceName` branch validates the device
     /// name's `stem.NN` shape (otherwise @custom:reverts InvalidDeviceLabel), requires the
@@ -370,9 +383,22 @@ interface IDotnsPopController is IDotnsController {
     /// from the head. A label carrying a digit or a hyphen is not a personhood label and
     /// @custom:reverts InvalidPersonhoodLabel, as does a device name, since a separator is not one
     /// either. Only a letters-only label reaches the queue, and one that was never reserved
-    /// resolves to an empty queue so the call is a no-op.
+    /// resolves to an empty queue so the call is a no-op. Clears every expired entry at the
+    /// front of the queue in one call, including a run longer than a gateway call clears, then
+    /// moves PopRules to the next active reservation or releases it when the queue is empty.
     /// @param label Personhood name whose queue is reaped.
     function expireReservation(string calldata label) external;
+
+    /// @notice Permissionlessly mints the numeric container `suffix` that device names
+    ///         `stem.suffix` live beneath, owned by this contract, or records an existing one.
+    /// @dev The first device name issued in a container otherwise mints it inside the gateway's
+    /// call, which runs under a fixed weight limit. Preparing containers ahead of time, from any
+    /// signed account, takes that cost out of the issuance. A container already recorded is a
+    /// no-op. `suffix` must be exactly two ASCII digits (otherwise
+    /// @custom:reverts InvalidDeviceLabel), and a container held by anyone else
+    /// @custom:reverts IDotnsRegistry.NotAuthorised.
+    /// @param suffix Two-digit container label, e.g. `01`.
+    function prepareDeviceContainer(string calldata suffix) external;
 
     /// @notice Lets the caller voluntarily drop their own active reservation.
     /// @dev Reverts with @custom:reverts NoActiveReservation when the caller holds no live
@@ -392,7 +418,9 @@ interface IDotnsPopController is IDotnsController {
         returns (bool reserved, address holder);
 
     /// @notice Updates the reservation duration used to decide when queue entries expire.
-    /// @dev Owner-gated (otherwise @custom:reverts OwnableUnauthorizedAccount); emits
+    /// @dev Owner-gated (otherwise @custom:reverts OwnableUnauthorizedAccount). A duration below
+    /// `MIN_RESERVATION_DURATION` @custom:reverts ReservationDurationTooLow, and one above
+    /// `MAX_RESERVATION_DURATION` @custom:reverts ReservationDurationTooHigh. Emits
     /// @custom:emits ReservationDurationSet on success.
     function setReservationDuration(uint64 duration) external;
 
@@ -407,9 +435,9 @@ interface IDotnsPopController is IDotnsController {
     function reservationMeta(bytes32 labelhash) external view returns (uint64 head, uint64 tail);
 
     /// @notice Returns the queue entry at `index` for `labelhash`.
-    /// @dev Sparse storage: a zero `entryOwner` means the slot was relinquished, expired and
-    /// reaped, or never written. Callers pair this with @custom:function reservationMeta to walk
-    /// the live window `[head, tail)`.
+    /// @dev Reads only the live window `[head, tail)` of @custom:function reservationMeta: an
+    /// index outside it, whose entry expired, was claimed or was never written, returns zero, and
+    /// so does an entry its owner relinquished.
     /// @param labelhash Keccak-256 of the personhood name whose queue is being read.
     /// @param index Queue index to look up.
     /// @return entryOwner Owner of the slot (zero if empty/relinquished).

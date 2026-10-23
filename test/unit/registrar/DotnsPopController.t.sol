@@ -287,6 +287,146 @@ contract DotnsPopControllerTests is BaseDotns {
         assertFalse(liveAfter);
     }
 
+    function test_setReservationDuration_bounds() public {
+        uint64 max = dotnsPopController.MAX_RESERVATION_DURATION();
+        vm.startPrank(owner);
+        dotnsPopController.setReservationDuration(max);
+        assertEq(dotnsPopController.reservationDuration(), max);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsPopController.ReservationDurationTooHigh.selector, max + 1)
+        );
+        dotnsPopController.setReservationDuration(max + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsPopController.ReservationDurationTooHigh.selector, type(uint64).max
+            )
+        );
+        dotnsPopController.setReservationDuration(type(uint64).max);
+        vm.stopPrank();
+    }
+
+    /// @notice At the longest duration, the front user's entry ends no later than the PopRules
+    ///         reservation written when they joined, so the name never opens on the public flow
+    ///         while that entry is still active.
+    function test_front_entry_at_the_longest_duration_ends_within_the_popRules_reservation()
+        public
+    {
+        uint64 max = dotnsPopController.MAX_RESERVATION_DURATION();
+        vm.prank(owner);
+        dotnsPopController.setReservationDuration(max);
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "longnamebob");
+        (, uint64 joinedAt) =
+            dotnsPopController.reservationEntry(keccak256(bytes("longnamebob")), 0);
+
+        // The entry's last active second: PopRules must still hold the name.
+        vm.warp(uint256(joinedAt) + max);
+        (bool reserved,) = dotnsPopController.isReservedForClaim("longnamebob");
+        assertTrue(reserved, "entry still active");
+        (bool slotLive,,) = popRules.isBaseNameReserved("longnamebob");
+        assertTrue(slotLive, "PopRules still holds the name");
+    }
+
+    /// @notice Reserving the same name again while the reservation is active keeps the user's
+    ///         place and expiry, on both reservation paths, and emits nothing about the queue.
+    function test_re_reserving_the_same_name_keeps_the_users_place() public {
+        string memory base = "longnamebob";
+        bytes32 labelhash = keccak256(bytes(base));
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), base);
+        vm.warp(block.timestamp + 1 hours);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0x02), base);
+        (, uint64 joinedAt) = dotnsPopController.reservationEntry(labelhash, 0);
+        vm.warp(block.timestamp + 1 hours);
+
+        // Reserve-only path.
+        vm.recordLogs();
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: ed, label: base})
+        );
+        _assertQueueUntouched(vm.getRecordedLogs());
+
+        // Device-name path, as after recovering the account onto a new device.
+        vm.recordLogs();
+        _reservePop(ed, "edrecovered.14", _validChatKey(0x03), base);
+        _assertQueueUntouched(vm.getRecordedLogs());
+
+        (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(labelhash);
+        assertEq(head, 0);
+        assertEq(tail, 2, "nobody was added");
+        (address frontOwner, uint64 frontJoinedAt) =
+            dotnsPopController.reservationEntry(labelhash, 0);
+        assertEq(frontOwner, ed, "ed keeps the front");
+        assertEq(frontJoinedAt, joinedAt, "and the expiry");
+        (address popHolder,) = popRules.getBaseNameReservation(base);
+        assertEq(popHolder, ed);
+    }
+
+    /// @notice A user whose reservation for a name has expired rejoins its queue at the back.
+    function test_re_reserving_after_expiry_rejoins_at_the_back() public {
+        string memory base = "longnamebob";
+        bytes32 labelhash = keccak256(bytes(base));
+        uint64 duration = dotnsPopController.reservationDuration();
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), base);
+        vm.warp(block.timestamp + uint256(duration) / 2);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0x02), base);
+        vm.warp(block.timestamp + uint256(duration) / 2 + 1);
+
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: ed, label: base})
+        );
+
+        (bool reserved, address holder) = dotnsPopController.isReservedForClaim(base);
+        assertTrue(reserved);
+        assertEq(holder, tiago, "the next user reached the front");
+        (, uint64 tail) = dotnsPopController.reservationMeta(labelhash);
+        assertEq(dotnsPopController.userReservation(ed).index, tail - 1, "ed is at the back");
+    }
+
+    /// @notice A user behind an expired front who reserves the same name again keeps their place
+    ///         after the call clears the front, and PopRules moves to them.
+    function test_re_reserving_behind_an_expired_front_keeps_the_users_place() public {
+        string memory base = "longnamebob";
+        bytes32 labelhash = keccak256(bytes(base));
+        uint64 duration = dotnsPopController.reservationDuration();
+        _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), base);
+        vm.warp(block.timestamp + uint256(duration) / 2);
+        _reservePop(tiago, DEVICE_LABEL_B, _validChatKey(0x02), base);
+        (, uint64 joinedAt) = dotnsPopController.reservationEntry(labelhash, 1);
+        vm.warp(block.timestamp + uint256(duration) / 2 + 1);
+
+        vm.recordLogs();
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: tiago, label: base})
+        );
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        _assertEventNotEmitted(logs, IDotnsPopController.ReservationQueued.selector);
+        _assertEventNotEmitted(logs, IDotnsPopController.ReservationRelinquished.selector);
+
+        (uint64 head, uint64 tail) = dotnsPopController.reservationMeta(labelhash);
+        assertEq(head, 1, "ed's expired entry cleared");
+        assertEq(tail, 2, "nobody was added");
+        (address frontOwner, uint64 frontJoinedAt) =
+            dotnsPopController.reservationEntry(labelhash, 1);
+        assertEq(frontOwner, tiago, "tiago keeps the entry");
+        assertEq(frontJoinedAt, joinedAt, "and the expiry");
+        (address popHolder,) = popRules.getBaseNameReservation(base);
+        assertEq(popHolder, tiago, "PopRules moved to tiago");
+    }
+
+    function _assertQueueUntouched(Vm.Log[] memory logs) internal pure {
+        bytes32[3] memory queueEvents = [
+            IDotnsPopController.ReservationQueued.selector,
+            IDotnsPopController.ReservationRelinquished.selector,
+            IDotnsPopController.ReservationHeadAdvanced.selector
+        ];
+        for (uint256 i; i < logs.length; ++i) {
+            for (uint256 k; k < queueEvents.length; ++k) {
+                assertTrue(logs[i].topics[0] != queueEvents[k], "the queue changed");
+            }
+        }
+    }
+
     function test_setReservationDuration_reverts_for_non_owner() public {
         vm.prank(ed);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", ed));
@@ -485,11 +625,43 @@ contract DotnsPopControllerTests is BaseDotns {
         dotnsRegistrarController.register{value: 1 ether}(registration);
     }
 
-    function test_gateway_reserved_name_allows_holder_to_register_via_public() public {
+    /// @notice A reserved name is taken only through the gateway claim, so the public flow
+    ///         rejects the user at the front of the queue too.
+    function test_gateway_reserved_name_rejects_holder_on_the_public_flow() public {
         _grantPersonhood(tiago);
         _reservePop(tiago, DEVICE_LABEL_A, _validChatKey(0x11), "longnamebob");
 
-        _commitAndRegister("longnamebob", tiago, true);
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: "longnamebob",
+                owner: tiago,
+                secret: keccak256("secret"),
+                reserved: true,
+                maxPrice: type(uint256).max,
+                pricingVersion: popRules.pricingVersion()
+            });
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        vm.prank(tiago);
+        dotnsRegistrarController.commit(commitment);
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        bytes memory reserved = abi.encodeWithSelector(
+            IPopRules.PopError.selector, "Reserved for a device-name holder's personhood claim"
+        );
+        vm.expectRevert(reserved);
+        popRules.priceWithCheck("longnamebob", tiago);
+
+        vm.deal(tiago, 1000 ether);
+        vm.prank(tiago);
+        vm.expectRevert(reserved);
+        dotnsRegistrarController.register{value: 1000 ether}(registration);
+
+        // The gateway claim still works.
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: "longnamebob", user: tiago, link: _linkFresh(_validChatKey(0x11))
+            })
+        );
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(_nodeOf("longnamebob"))), tiago);
     }
 

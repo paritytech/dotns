@@ -209,7 +209,14 @@ contract DotnsPopControllerInvariant is BaseDotns {
             if (head >= tail) {
                 (bool slotLive,,) = popRules.isBaseNameReserved(baseLabel);
                 assertFalse(slotLive, "PopRules slot outlived an empty queue");
+                continue;
             }
+
+            // A queue whose front is not active keeps its slot until clearing reaches an active
+            // reservation or empties the queue. The slot may name a user the queue has moved
+            // past, which gains them nothing: the public flow rejects a reserved name for
+            // everyone, and the gateway decides from the queue alone.
+            assertTrue(popHolder != address(0), "a non-empty queue lost its PopRules slot");
         }
     }
 

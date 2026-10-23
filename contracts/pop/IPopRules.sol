@@ -58,8 +58,9 @@ interface IPopRules {
     /// @notice Thrown when a caller is not an authorised controller on the registrar.
     error NotRegistry();
 
-    /// @notice Thrown when registering a name whose base name is held as a live reservation by
-    /// another user.
+    /// @notice Thrown when registering a name whose base name is held as a live reservation. A
+    /// reserved name is taken only through the controller holding the reservation, so this applies
+    /// to the reservation's owner too.
     /// @param label Caller-supplied label whose base name is reserved.
     error NameReserved(string label);
 
@@ -144,7 +145,8 @@ interface IPopRules {
     ///      controller. Its length window bounds the base name and does not name a tier:
     ///      Devicehood is decided by the separated label shape. The caller passes the base name; a
     ///      non-canonical label, a trailing digit, or a length outside `[6, 8]` triggers
-    ///      @custom:reverts PopError. Cross-user collision on a live slot triggers @custom:reverts
+    ///      @custom:reverts PopError, as does a zero `user`. Cross-user collision on a live slot
+    ///      triggers @custom:reverts
     ///      PopError so the caller cannot silently overwrite another user's reservation; same-user
     ///      refresh and writes into an empty or expired slot emit @custom:emits BaseNameReserved.
     /// @param baseName The base name, with no trailing digits.
@@ -160,7 +162,8 @@ interface IPopRules {
     ///      registrar's `controllers` set may call this, otherwise @custom:reverts NotRegistry.
     ///      Does not apply the 6-8 base-length window that @custom:function reserveBaseName
     ///      enforces, but does require the input to be canonical with no trailing digits; a
-    ///      non-canonical label or one with trailing digits triggers @custom:reverts PopError. If
+    ///      non-canonical label, one with trailing digits or a zero `user` triggers
+    ///      @custom:reverts PopError. If
     ///      the slot is already live and held by a different user, @custom:reverts PopError so the
     ///      caller's local bookkeeping and PopRules state stay in lockstep; if it is live for the
     ///      same user, expiry is refreshed to `block.timestamp + MAX_RESERVATION_TIME`. Emits
@@ -180,6 +183,22 @@ interface IPopRules {
     ///      Emits @custom:emits BaseNameReleased once the slot is cleared.
     /// @param baseName The base name whose reservation should be cleared (no trailing digits).
     function releaseBaseName(string calldata baseName) external;
+
+    /// @notice Moves a base-name reservation to `user`, as @custom:function releaseBaseName
+    ///         followed by @custom:function reserveBaseNameForPop would, in one call.
+    /// @dev Only a controller in the registrar's `controllers` set may call this, otherwise
+    ///      @custom:reverts NotRegistry. A live slot may only be moved by the controller that
+    ///      wrote it, otherwise @custom:reverts PopError, which is the authority that controller
+    ///      already has to release it; an empty or expired slot may be written by any authorised
+    ///      controller. Non-canonical labels, labels with trailing digits and a zero `user`
+    ///      trigger @custom:reverts PopError. The new reservation expires at
+    ///      `block.timestamp + MAX_RESERVATION_TIME` and is stamped by the caller. Emits
+    ///      @custom:emits BaseNameReleased and then @custom:emits BaseNameReserved, the same
+    ///      events as the two calls it replaces. Used by the PoP controller when a queue head
+    ///      changes hands, so the move costs one cross-contract call.
+    /// @param baseName The base name, with no trailing digits.
+    /// @param user The address receiving reservation rights.
+    function reassignBaseNameForPop(string calldata baseName, address user) external;
 
     /// @notice Clears a reservation when the slot owner matches `expectedOwner`, allowing any
     ///         registrar-authorised controller (not only the stamping one) to release the slot.
@@ -237,7 +256,8 @@ interface IPopRules {
     /// @dev Reverting pricing path used by the commit-reveal controller. Price is the scarcity
     ///      curve for the label's base length and is charged to every caller, verified or not;
     ///      personhood only unlocks the premium band. Non-canonical
-    ///      labels, a base name held live by another user, a governance-reserved label, or a
+    ///      labels, a base name held as a live reservation (for every account, its owner
+    ///      included), a governance-reserved label, or a
     ///      `userAddress` whose personhood tier does not meet the label's required tier each
     ///      trigger @custom:reverts PopError.
     /// @param name Domain label.
@@ -276,8 +296,9 @@ interface IPopRules {
     /// reverting on conflicts.
     /// @dev Non-reverting counterpart to `priceWithCheck`: surfaces the same fields, but reports
     ///      a `Reserved` status through `metadata` instead of reverting when the base name is
-    ///      held by another user. Used by front-ends that need to present a price and eligibility
-    ///      preview without forcing a transaction attempt. Governance-reserved names are not
+    ///      held as a live reservation, whoever owns it. Used by front-ends that need to present a
+    /// price and eligibility preview without forcing a transaction attempt. Governance-reserved
+    /// names are not
     ///      rejected here either; the caller decides what to do. Non-canonical labels still
     ///      trigger @custom:reverts PopError because the input is malformed rather than just
     ///      contested.
