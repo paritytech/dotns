@@ -113,6 +113,19 @@ interface IDotnsRegistry {
     ///      path.
     error ParentLabelMismatch();
 
+    /// @notice Thrown when @custom:function revokeSubname is called outside a Root origin.
+    error NotRoot();
+
+    /// @notice Thrown when @custom:function revokeName is called by anything other than the
+    ///         registrar.
+    error NotRegistrar(address caller);
+
+    /// @notice Thrown when @custom:function revokeSubname targets a device name.
+    /// @dev Device names are subnames of containers the PoP controller holds, and the gateway
+    ///      keeps state about them that only @custom:function IDotnsPopGovernance.revokeName
+    ///      clears.
+    error IssuedByGateway(bytes32 node);
+
     /// @notice Record describing a subnode resolver update request.
     /// @param subLabel Human-readable subnode label e.g "alice".
     /// @param parentLabel Canonical parent name without the TLD suffix e.g bob or child.bob.
@@ -299,6 +312,28 @@ interface IDotnsRegistry {
     /// @param parentNode Parent of the subname.
     /// @param labelhash Labelhash of the subname under `parentNode`.
     function linkSubname(bytes32 parentNode, bytes32 labelhash) external;
+
+    /// @notice Clears a tokenised name that is being revoked and deletes its record.
+    /// @dev Callable only by the registrar, otherwise @custom:reverts NotRegistrar, which calls it
+    ///      from @custom:function IDotnsRegistrar.revoke and @custom:function
+    ///      IDotnsRegistrar.revokeIssued before burning the token. Bumps both
+    ///      versions of `node`, so its records read as unset and every subname beneath it stops
+    ///      resolving, including after the name is registered again. Deletes the record, so the
+    ///      node reads as unregistered (@custom:function owner returns zero) rather than
+    ///      deferring to a token that no longer exists. Emits @custom:emits RecordsCleared,
+    ///      @custom:emits SubnamesCleared and @custom:emits NodeTransferred with a zero owner.
+    /// @param node Node of the name being revoked.
+    function revokeName(bytes32 node) external;
+
+    /// @notice Deletes one subname of `parentNode`, together with its records and every subname
+    ///         beneath it, on governance's authority rather than the parent's.
+    /// @dev Callable only under a Root origin, otherwise @custom:reverts NotRoot. Does what
+    ///      @custom:function deleteSubname does, with the same events and the same
+    ///      @custom:reverts SubnameNotFound, whoever holds the parent. A device name, a subname of
+    ///      a container the PoP controller holds, reverts @custom:reverts IssuedByGateway.
+    /// @param parentNode Parent of the subname.
+    /// @param labelhash Labelhash of the subname under `parentNode`.
+    function revokeSubname(bytes32 parentNode, bytes32 labelhash) external;
 
     /// @notice Returns whether `node` resolves and the record version its records are written
     ///         under.

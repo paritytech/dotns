@@ -331,8 +331,9 @@ interface IDotnsPopController is IDotnsController {
     /// issued as a subname (`joseph` beneath its numeric container `42`) and a personhood name as
     /// a second-level name, so a caller holding a node must check that the node is the one `label`
     /// resolves to under those rules before reading this answer as being about what it holds; node
-    /// identity is what names the object. Set at mint and never cleared, so it is unaffected by a
-    /// name later becoming transferable; the soulbound flag is a transfer rule and cannot stand in
+    /// identity is what names the object. Set at mint and cleared only when governance revokes the
+    /// name (@custom:function IDotnsPopGovernance.revokeName), so it is unaffected by a name later
+    /// becoming transferable; the soulbound flag is a transfer rule and cannot stand in
     /// for it.
     /// @param label Bare label without the TLD, for example `joseph.42`.
     /// @return issued True when this controller issued `label`.

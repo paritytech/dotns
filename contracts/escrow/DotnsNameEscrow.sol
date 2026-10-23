@@ -13,6 +13,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
+import {IDotnsNameEscrowRevocation} from "./IDotnsNameEscrowRevocation.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IDotnsResolver} from "../resolvers/IDotnsResolver.sol";
@@ -30,7 +31,8 @@ contract DotnsNameEscrow is
     ReentrancyGuardTransient,
     ERC165Upgradeable,
     IERC721Receiver,
-    IDotnsNameEscrow
+    IDotnsNameEscrow,
+    IDotnsNameEscrowRevocation
 {
     /// @notice Maximum page size for releasedTokens pagination.
     uint256 public constant MAX_RELEASED_PAGE_SIZE = 200;
@@ -739,6 +741,29 @@ contract DotnsNameEscrow is
         emit NameReclaimed(tokenId, previousRecipient, newOwner);
     }
 
+    /// @inheritdoc IDotnsNameEscrowRevocation
+    /// @dev Settles before deleting, as @custom:function reclaim does: the holder loses the name
+    ///      but keeps their claim on the deposit. `_settleDeposit` is a no-op for a zero-amount
+    ///      position and for one already withdrawn.
+    function revoke(uint256 tokenId)
+        external
+        override
+        onlyRegistrar
+        nonReentrant
+        returns (address recipient)
+    {
+        ReleasePosition storage position = _positions[tokenId];
+        recipient = position.recipient;
+        if (recipient == address(0)) return recipient;
+
+        _settleDeposit(position, tokenId, recipient);
+
+        delete _positions[tokenId];
+        _removeReleasedToken(tokenId);
+
+        emit PositionRevoked(tokenId, recipient);
+    }
+
     /// @inheritdoc IDotnsNameEscrow
     /// @dev `public` rather than `external` so `reclaim` can gate on it without a self-call, which
     ///      is what keeps the condition in one place instead of two.
@@ -814,6 +839,7 @@ contract DotnsNameEscrow is
     /// @inheritdoc ERC165Upgradeable
     function supportsInterface(bytes4 interfaceId) public view override returns (bool supported) {
         supported = interfaceId == type(IDotnsNameEscrow).interfaceId
+            || interfaceId == type(IDotnsNameEscrowRevocation).interfaceId
             || interfaceId == type(IERC721Receiver).interfaceId
             || super.supportsInterface(interfaceId);
     }
