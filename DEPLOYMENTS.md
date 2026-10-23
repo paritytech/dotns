@@ -297,6 +297,29 @@ The upgrade is additive. Every existing function, event and error keeps its sele
 - Resolver reads make two calls they did not make before (the protocol registry lookup and `recordVersion`), and reads of a subname walk the levels above it, so a contract that resolves names on chain pays a little more gas. `release` makes three more writes, deleting the address and content hash and clearing the name, each with its own lookups.
 - Creating a subname writes its parent, one more storage slot, and its parent's subname version too once that parent has been cleared. That includes every device name the gateway issues, which costs about 28k more gas (around 5%) in the test suite. Confirm the gateway pallet's gas limit for issuance leaves that headroom before upgrading.
 
+## Upgrading to governance revocation
+
+Governance can revoke any name and evict a personhood name's reservation queue (see [README → Revoking a name](./README.md#revoking-a-name)). Five proxies take part and none gains storage or a configuration value. The new calls live on the registrar, the registry and the PoP controller, and each calls the others, so the callees go first:
+
+1. **Registry, escrow and PoP resolver**, in any order. They gain the calls the revocation paths make into them: `revokeName` and `revokeSubname` on the registry, `revoke` on the escrow, `clearRecords` on the PoP resolver. Each is gated to the registrar, to Root, or to the PoP controller, so only the registry's Root-gated `revokeSubname` is usable before step 2.
+2. **Registrar.** `revoke` and `revokeIssued` call the escrow and the registry from step 1, and revert against either one without it.
+3. **PoP controller.** `revokeName` calls the registrar's `revokeIssued` and the PoP resolver's `clearRecords`.
+
+Each step leaves the system working. Subnames can be revoked after step 1, names on the public and reserved paths after step 2, and names the gateway issued only after step 3, since the registrar refuses a soulbound name and the registry refuses a device name on the direct Root calls.
+
+Registry revocation builds on the record and subname clearing above, so it needs that upgrade first, including the subname linking: a subname that was never linked keeps resolving after the name above it is revoked, the same as after a clear.
+
+### What existing integrations keep
+
+Every existing function, event and error keeps its selector and arguments, and storage is unchanged in all five contracts. The escrow, the PoP resolver and the PoP controller report the same ERC-165 interface ids as before. Their new calls are on separate interfaces (`IDotnsNameEscrowRevocation`, `IDotnsPopResolverClearing`, `IDotnsPopGovernance`), which they report as well.
+
+### What existing integrations see change
+
+- A name can now stop existing. `DotnsRegistrar.revoke` and `revokeIssued` burn the token, emitting the ERC-721 `Transfer` to the zero address and `NameRevoked`. `ownerOf` then reverts and `available` returns true, and the registry's `owner` returns zero for the name rather than deferring to the registrar. The registry emits `NodeTransferred` with a zero owner, alongside `RecordsCleared` and `SubnamesCleared`.
+- `isSoulbound` and `isPopIssued` can turn false for a name that was issued through the gateway, once governance revokes it.
+- The PoP resolver emits `ChatKeyUpdated` with empty bytes and `DeviceLinkUpdated` with a zero labelhash when a revocation removes those records.
+- The gateway pallet's record of an account's names is not updated by the contracts. Dispatch the pallet's own update in the same governance batch as `revokeName`.
+
 ## Deployment pipeline
 
 The fresh-deploy pipeline is split across five stages:
