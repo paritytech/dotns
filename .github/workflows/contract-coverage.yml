@@ -30,6 +30,9 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
+    # Invariant suites are left out of this job (see "Run coverage"), so this is plenty of
+    # headroom. It stops a stuck run long before GitHub's 6 hour default.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -119,7 +122,13 @@ jobs:
           # it was fixed. Clear it before running coverage.
           rm -rf cache/fuzz cache/invariant cache/test-failures
 
+          # Invariant suites are left out, using the same split as the test workflow.
+          # Each one runs hundreds of random call sequences and coverage slows every
+          # call, so together they kept this job running for hours. The test workflow
+          # still runs them on every pull request; this report covers unit and fuzz
+          # tests only.
           forge coverage --ir-minimum --report summary \
+            --no-match-contract Invariant \
             --no-match-coverage "test/|lib/" \
             2>&1 | tee coverage.log
           CODE=${PIPESTATUS[0]}
