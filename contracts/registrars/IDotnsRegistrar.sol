@@ -57,6 +57,13 @@ interface IDotnsRegistrar is IERC721 {
     /// on a plain `transferFrom`, which is why the gate is enforced here too.
     error UnsolicitedEscrowDeposit(uint256 tokenId);
 
+    /// @notice Thrown when @custom:function revoke is called outside a Root origin.
+    error NotRoot();
+
+    /// @notice Thrown when @custom:function revokeIssued is called by anything other than the
+    /// PoP controller.
+    error NotPopController(address caller);
+
     /// @notice Emitted when a name is registered.
     /// @param id The token id (namehash node) that was minted.
     /// @param owner The address that received the name.
@@ -71,8 +78,42 @@ interface IDotnsRegistrar is IERC721 {
     /// the registrar depending on any specific controller interface.
     event ControllerAdded(IDotnsController indexed controller);
 
+    /// @notice Emitted when a name is revoked.
+    /// @param id The token id (namehash node) that was burned.
+    /// @param holder The account the name was taken from: the token holder, or the previous
+    /// holder when the name was in escrow custody after a release.
+    event NameRevoked(uint256 indexed id, address indexed holder);
+
     /// @notice Emitted when a controller is removed.
     event ControllerRemoved(IDotnsController indexed controller);
+
+    /// @notice Revokes a name: clears it, settles its escrow position, and burns the token so the
+    /// name can be registered again.
+    /// @dev Callable only under a Root origin, otherwise @custom:reverts NotRoot. Takes back a name
+    /// registered on the public or reserved path, whoever holds it, including a name in escrow
+    /// custody after a release. A name the gateway issued goes through
+    /// @custom:function IDotnsPopGovernance.revokeName instead. The name's records and subnames are
+    /// cleared before the token is burned (@custom:function IDotnsRegistry.revokeName), and its
+    /// escrow position
+    /// is settled with any deposit credited to the holder's pull-payment balance
+    /// (@custom:function IDotnsNameEscrowRevocation.revoke). Revocation is final: the holder has
+    /// no redeem window, and the name is available to anyone at once. A soulbound name reverts
+    /// @custom:reverts NameSoulbound, because the gateway keeps state about it that only the PoP
+    /// controller clears. A name that does not exist reverts
+    /// @custom:reverts ERC721NonexistentToken. Emits @custom:emits NameRevoked and the ERC-721
+    /// `Transfer` to the zero address.
+    /// @param tokenId The token id (namehash node) of the name.
+    function revoke(uint256 tokenId) external;
+
+    /// @notice Revokes a name issued through the PoP controller, once the controller has cleared
+    /// the state it keeps about it.
+    /// @dev Callable only by the address registered as `POP_CONTROLLER`, otherwise
+    /// @custom:reverts NotPopController. Does what @custom:function revoke does, for a soulbound
+    /// name as well, and leaves the soulbound flag cleared so a later public registration of the
+    /// same name is transferable. Reached through
+    /// @custom:function IDotnsPopGovernance.revokeName, which is Root-gated.
+    /// @param tokenId The token id (namehash node) of the name.
+    function revokeIssued(uint256 tokenId) external;
 
     /// @notice Returns whether a registration call may proceed for `id`.
     /// @dev Signals two distinct paths to the controller. Returns `true` when the owner slot is
@@ -89,15 +130,16 @@ interface IDotnsRegistrar is IERC721 {
     /// @custom:function IDotnsNameEscrow.getReleasePosition.
     function available(uint256 id) external view returns (bool isAvailable);
 
-    /// @notice Registers a name permanently.
-    /// @dev Permanence is by construction: there is no `expire`, `renew`, or `release` path on
-    /// the registrar. Custody only moves via ERC721 transfers (which the registrar polices via
-    /// the fee-on-transfer hook) or via escrow reclaim. Restricted to authorised controllers
-    /// (otherwise @custom:reverts NotController) and rejects ids that are not available
+    /// @notice Registers a name with no expiry.
+    /// @dev There is no `expire` or `renew` path on the registrar. Custody only moves via ERC721
+    /// transfers (which the registrar polices via the fee-on-transfer hook), via the escrow's
+    /// release, redeem and reclaim, or ends when governance revokes the name
+    /// (@custom:function revoke, @custom:function revokeIssued). Restricted to authorised
+    /// controllers (otherwise @custom:reverts NotController) and rejects ids that are not available
     /// (otherwise @custom:reverts NameNotAvailable). Emits @custom:emits NameRegistered on
     /// success.
     /// @dev When the caller is the address registered under `DotnsConstants.POP_CONTROLLER`, the
-    /// name is marked soulbound and becomes permanently non-transferable (see
+    /// name is marked soulbound and stays non-transferable for as long as it exists (see
     /// @custom:function isSoulbound). Provenance is read from the protocol registry at mint time,
     /// so no other authorised controller can mint a soulbound name and the PoP controller cannot
     /// mint an unlocked one. Public registrations from any other controller stay transferable.
@@ -105,8 +147,8 @@ interface IDotnsRegistrar is IERC721 {
     function register(uint256 id, address owner, string calldata label) external;
 
     /// @notice Returns whether a token is soulbound (PoP-gateway minted and non-transferable).
-    /// @dev Durable on-chain marker set once at mint by @custom:function register and never
-    /// cleared. A `true` result means every transfer overload reverts with
+    /// @dev Durable on-chain marker set once at mint by @custom:function register and cleared
+    /// only when the name is revoked. A `true` result means every transfer overload reverts with
     /// @custom:reverts NameSoulbound and @custom:function quoteTransferFee reverts likewise.
     /// @param tokenId The name's token id.
     /// @return soulbound True when the name was minted through the gateway pallet.

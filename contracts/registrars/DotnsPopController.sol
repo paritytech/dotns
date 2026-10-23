@@ -159,10 +159,11 @@ contract DotnsPopController is
     mapping(address user => PendingClaim[] queue) internal _pendingClaimQueue;
 
     /// @notice Labels this controller minted, keyed by the bare label without the TLD.
-    /// @dev Provenance, not a transfer rule: written once at mint and never cleared, so it
-    ///      stays true if a name later becomes transferable. Keyed by the label text rather
-    ///      than the node because a reader holding only `joseph.42` cannot derive the node
-    ///      without first deciding whether the separator is part of the label or a subname
+    /// @dev Provenance, not a transfer rule: written at mint and cleared only when the name is
+    ///      revoked (@custom:function revokeName), so it stays true if a name later becomes
+    ///      transferable and turns false once governance takes the name back. Keyed by the label
+    ///      text rather than the node because a reader holding only `joseph.42` cannot derive the
+    ///      node without first deciding whether the separator is part of the label or a subname
     ///      boundary, which is the question it is asking.
     mapping(string label => bool issued) internal _popIssued;
 
@@ -171,7 +172,9 @@ contract DotnsPopController is
     /// issuance in the same container. See @custom:function _registerDeviceSubname. An entry is
     /// never cleared, because a recorded container cannot change hands: the registrar marks a
     /// name minted by this contract soulbound and rejects every transfer of it, release to the
-    /// escrow included, and it has no burn. If a container ever did change hands, the registry's
+    /// escrow included. Nor can it be revoked: the registrar's Root revocation refuses a soulbound
+    /// name, and @custom:function revokeName takes only labels this contract issued, which a
+    /// container is not. If a container ever did change hands, the registry's
     /// own parent check in @custom:function IDotnsRegistry.setSubnodeOwner would still reject
     /// issuance under it.
     mapping(bytes32 parentNode => bool ready) internal _deviceContainers;
@@ -891,15 +894,17 @@ contract DotnsPopController is
         emit ReservationQueued(labelhash, user, index - meta.head);
     }
 
-    /// @notice Ends the reservation queue for `labelhash` when its head claims the name, and
-    /// releases the corresponding PopRules reservation.
-    /// @dev The claim mints the name, so nothing is left to reserve and PopRules is told the slot
-    /// is free. Every entry, the claimant's and each waiter's, is evicted lazily, so the claim
-    /// costs the same whatever the queue holds: the head moves to the tail, which ends the queue,
-    /// and entries and pointers stay where they are, below the new head.
+    /// @notice Ends the reservation queue for `labelhash` when its head claims the name or
+    /// governance evicts the queue, and releases the corresponding PopRules reservation.
+    /// @dev After a claim the name is minted, and after an eviction nobody is waiting for it, so
+    /// either way nothing is left to reserve and PopRules is told the slot is free. Every entry,
+    /// the claimant's and each waiter's, is evicted lazily, so the call costs the same whatever
+    /// the queue holds: the head moves to the tail, which ends the queue, and entries and pointers
+    /// stay where they are, below the new head.
     /// @custom:function _isEvicted reads such a pointer as no reservation, and the user's next
-    /// reservation clears it. @custom:emits ReservationClaimed, emitted by the caller, therefore
-    /// ends the reservation of every waiter in the queue.
+    /// reservation clears it. The event the caller emits, @custom:emits ReservationClaimed or
+    /// @custom:emits ReservationsEvicted, therefore ends the reservation of every waiter in the
+    /// queue.
     function _clearQueue(Deps memory deps, bytes32 labelhash) internal {
         uint64 tail = _reservationMeta[labelhash].tail;
         _reservationMeta[labelhash] = ReservationQueueMeta({head: tail, tail: tail});

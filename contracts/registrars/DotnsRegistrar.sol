@@ -28,7 +28,7 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title dotNS Registrar
-/// @notice ERC721-backed registrar implementing permanent name ownership.
+/// @notice ERC721-backed registrar implementing name ownership with no expiry.
 /// @dev Deliberately policy-free on pricing, reservations, and PoP gating; those live in the
 /// controllers and @custom:contract IPopRules. The registrar owns transferability itself: publicly
 /// registered names transfer freely, while names minted through the dotNS gateway pallet are
@@ -60,9 +60,10 @@ contract DotnsRegistrar is
 
     /// @notice Marks a token as soulbound: minted through the gateway pallet and non-transferable.
     /// @dev Set at mint by @custom:function register when the caller is the address registered
-    /// under `DotnsConstants.POP_CONTROLLER`. Write-once and never cleared: a name's soulbound
-    /// state is fixed at registration. Read by the `_update` transfer gate and by
-    /// @custom:function quoteTransferFee.
+    /// under `DotnsConstants.POP_CONTROLLER`. Fixed for as long as the token exists: cleared only
+    /// when the token is burned by @custom:function revokeIssued, so a later registration of the
+    /// same name through another controller is not soulbound. Read by the `_update` transfer gate
+    /// and by @custom:function quoteTransferFee.
     mapping(uint256 tokenId => bool soulbound) private _soulbound;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
