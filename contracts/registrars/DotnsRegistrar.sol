@@ -21,8 +21,11 @@ import {StoreUtils} from "../utils/StoreUtils.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {IDotnsNameEscrow} from "../escrow/IDotnsNameEscrow.sol";
+import {IDotnsNameEscrowRevocation} from "../escrow/IDotnsNameEscrowRevocation.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
+import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title dotNS Registrar
 /// @notice ERC721-backed registrar implementing permanent name ownership.
@@ -158,6 +161,50 @@ contract DotnsRegistrar is
     }
 
     /// @inheritdoc IDotnsRegistrar
+    /// @dev `msg.sender` is not read on this path: a Root origin has no account behind it, so
+    /// reading it traps. The burn branch of `_update` returns before the transfer gate, which does
+    /// read it.
+    function revoke(uint256 tokenId) external override {
+        require(SystemUtils.originIsRoot(), NotRoot());
+        require(!_soulbound[tokenId], NameSoulbound(tokenId));
+        _revoke(tokenId);
+    }
+
+    /// @inheritdoc IDotnsRegistrar
+    function revokeIssued(uint256 tokenId) external override {
+        address popController = protocolRegistry.get(DotnsConstants.POP_CONTROLLER);
+        require(msg.sender == popController, NotPopController(msg.sender));
+        _revoke(tokenId);
+    }
+
+    /// @notice Body of @custom:function revoke and @custom:function revokeIssued.
+    /// @dev The order follows the rule that a name is cleared before it is revoked: the escrow
+    /// position and the registry record go first, while the token still exists, and the burn is
+    /// last. Every call out goes to a protocol contract resolved through the registry, never to a
+    /// holder-controlled address, so nothing reachable from here can re-enter a Root-gated
+    /// function.
+    /// @param tokenId The token id (namehash node) of the name.
+    function _revoke(uint256 tokenId) private {
+        address holder = _requireOwned(tokenId);
+
+        IDotnsProtocolRegistry registry = protocolRegistry;
+        address escrow = registry.get(DotnsConstants.NAME_ESCROW);
+        require(escrow != address(0), EscrowNotConfigured());
+
+        // A name in escrow custody was taken from the holder who released it, who is also the
+        // position recipient the escrow reports.
+        address recipient = IDotnsNameEscrowRevocation(escrow).revoke(tokenId);
+        if (holder == escrow) holder = recipient;
+
+        IDotnsRegistry(registry.get(DotnsConstants.REGISTRY)).revokeName(bytes32(tokenId));
+
+        delete _soulbound[tokenId];
+        _burn(tokenId);
+
+        emit NameRevoked(tokenId, holder);
+    }
+
+    /// @inheritdoc IDotnsRegistrar
     function labelOf(uint256 tokenId) external view override returns (string memory) {
         address holder = _ownerOf(tokenId);
         if (holder == address(0)) return "";
@@ -274,6 +321,11 @@ contract DotnsRegistrar is
             require(msg.value == 0, UnexpectedValue());
             return from;
         }
+
+        // A burn is reachable only from `_revoke`, which has already settled the escrow position
+        // and the registry record. Nothing is priced or mirrored for a name that stops existing,
+        // and nothing below may run, because a burn under a Root origin cannot read `msg.sender`.
+        if (to == address(0)) return from;
 
         // Soulbound names are non-transferable, including a move to the sender's own address, which
         // keeps this in step with @custom:function quoteTransferFee and the interface contract. It

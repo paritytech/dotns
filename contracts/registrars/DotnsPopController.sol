@@ -16,9 +16,11 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IDotnsPopController} from "./IDotnsPopController.sol";
 import {IDotnsPopControllerLegacy} from "./IDotnsPopControllerLegacy.sol";
+import {IDotnsPopGovernance} from "./IDotnsPopGovernance.sol";
 import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {IDotnsPopResolver} from "../resolvers/IDotnsPopResolver.sol";
+import {IDotnsPopResolverClearing} from "../resolvers/IDotnsPopResolverClearing.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
 import {PopClassification} from "../pop/PopClassification.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
@@ -79,7 +81,8 @@ contract DotnsPopController is
     OwnableUpgradeable,
     ERC165Upgradeable,
     IDotnsPopController,
-    IDotnsPopControllerLegacy
+    IDotnsPopControllerLegacy,
+    IDotnsPopGovernance
 {
     using StringUtils for *;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -432,6 +435,46 @@ contract DotnsPopController is
         }
     }
 
+    /// @inheritdoc IDotnsPopGovernance
+    function revokeName(string calldata label) external override onlyRoot {
+        bytes32 labelhash = LabelUtils.labelhash(label);
+        require(_popIssued[label], NotPopIssued(labelhash));
+        delete _popIssued[label];
+
+        Deps memory deps;
+        IDotnsPopResolverClearing resolver =
+            IDotnsPopResolverClearing(address(_popResolverOf(deps)));
+
+        if (label.isDeviceLabel()) {
+            // A device name is the subname `stem` of the container `suffix`, which this contract
+            // holds, so it deletes the subname as the parent's owner.
+            (string memory stem, string memory suffix) = StringUtils.splitDeviceLabel(label);
+            bytes32 parentNode =
+                LabelUtils.namehashUnder(_tldNodeOf(deps), LabelUtils.labelhashMemory(suffix));
+            bytes32 stemhash = LabelUtils.labelhashMemory(stem);
+            resolver.clearRecords(LabelUtils.namehashUnder(parentNode, stemhash), labelhash);
+            _registryOf(deps).deleteSubname(parentNode, stemhash);
+        } else {
+            bytes32 node = LabelUtils.namehashUnder(_tldNodeOf(deps), labelhash);
+            resolver.clearRecords(node, bytes32(0));
+            _registrarOf(deps).revokeIssued(uint256(node));
+        }
+
+        emit NameRevoked(labelhash, label);
+    }
+
+    /// @inheritdoc IDotnsPopGovernance
+    function evictReservations(string calldata label) external override onlyRoot {
+        Deps memory deps;
+        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label, false);
+
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        if (meta.head == meta.tail) return;
+
+        _clearQueue(deps, labelhash);
+        emit ReservationsEvicted(labelhash);
+    }
+
     /// @inheritdoc IDotnsPopController
     function expireReservation(string calldata label) external override {
         Deps memory deps;
@@ -689,6 +732,7 @@ contract DotnsPopController is
     {
         return interfaceId == type(IDotnsPopController).interfaceId
             || interfaceId == type(IDotnsPopControllerLegacy).interfaceId
+            || interfaceId == type(IDotnsPopGovernance).interfaceId
             || super.supportsInterface(interfaceId);
     }
 
