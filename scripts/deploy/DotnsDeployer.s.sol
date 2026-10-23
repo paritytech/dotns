@@ -37,9 +37,10 @@ import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 /// @custom:security-contact admin@parity.io
 contract DotnsDeployer is BaseDeployer {
     /// @notice Default reservation duration for the freshly-deployed PoP controller.
-    /// @dev Mirrors `pallet_resources::UsernameReservationDuration`; the protocol owner
-    ///      rotates this post-deploy via `DotnsPopController.setReservationDuration`.
-    uint64 public constant DEFAULT_RESERVATION_DURATION = 7 days;
+    /// @dev Gives a device-name holder a month to reach personhood and claim the personhood
+    ///      name they reserved. The protocol owner rotates this post-deploy via
+    ///      `DotnsPopController.setReservationDuration`.
+    uint64 public constant DEFAULT_RESERVATION_DURATION = 30 days;
 
     /// @notice Default refund cooldown for the freshly-deployed name escrow.
     /// @dev Sized to the release-and-withdraw safety window, well below the escrow's
