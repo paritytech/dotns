@@ -16,7 +16,6 @@ import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
-import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title dotNS Name Escrow
 /// @notice Holds refundable deposits for registered names and manages the release/reclaim
@@ -81,9 +80,8 @@ contract DotnsNameEscrow is
     mapping(uint256 tokenId => uint256 indexPlusOne) private _releasedIndexPlusOne;
 
     /// @notice Protocol fee balance held by the escrow.
-    /// @dev Holds the transfer fees collected by earlier implementations. Nothing credits it, only
-    ///      @custom:function withdrawProtocolFees debits it, and refunds draw solely on the
-    ///      per-asset reserve.
+    /// @dev Holds the transfer fees collected by earlier implementations. Nothing credits or
+    ///      debits it, and refunds draw solely on the per-asset reserve.
     uint256 public protocolFees;
 
     /// @notice Pull-payment ledger storing each recipient's claimable refund balance.
@@ -314,24 +312,6 @@ contract DotnsNameEscrow is
         if (priorRecipient != address(0) && to != priorRecipient) {
             position.recipient = to;
         }
-    }
-
-    /// @inheritdoc IDotnsNameEscrow
-    function withdrawProtocolFees(address to, uint256 amount) external override nonReentrant {
-        // `msg.sender` is not consulted: a Root dispatch has no account.
-        require(SystemUtils.originIsRoot(), NotRoot());
-        require(to != address(0), InvalidRecipient());
-        require(amount != 0, InvalidAmount());
-        uint256 available = protocolFees;
-        require(amount <= available, ProtocolFeesExceeded(amount, available));
-
-        // Effects before interaction.
-        protocolFees = available - amount;
-
-        (bool ok,) = payable(to).call{value: amount}("");
-        require(ok, ProtocolFeeTransferFailed(to, amount));
-
-        emit ProtocolFeesWithdrawn(to, amount);
     }
 
     /// @inheritdoc IDotnsNameEscrow

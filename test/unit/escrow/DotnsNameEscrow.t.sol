@@ -7,7 +7,6 @@ import {BaseDotns, IDotnsRegistrarController} from "../../base/BaseDotns.t.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {IDotnsRegistrar} from "../../../contracts/registrars/IDotnsRegistrar.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
-import {stdStorage, StdStorage} from "forge-std/Test.sol";
 
 /// @title ForceSender
 /// @notice Self-destructing helper that force-credits its constructor balance to `target`,
@@ -30,16 +29,10 @@ contract GhostNft is ERC721 {
     }
 }
 
-/// @title ValueRejecter
-/// @notice Recipient with no `receive` or `fallback`, so any value sent to it reverts.
-contract ValueRejecter {}
-
 /// @title DotnsNameEscrowTest
 /// @notice Unit tests covering the deposit, release, withdrawal and reclaim lifecycle on
 ///         @custom:contract DotnsNameEscrow, plus the pull-payment and solvency guarantees.
 contract DotnsNameEscrowTest is BaseDotns {
-    using stdStorage for StdStorage;
-
     /// @notice Default label used across most tests.
     /// @dev Eleven characters measured as written, which classifies as NoStatus; the flat deposit
     ///      equals BASE_DEPOSIT.
@@ -827,84 +820,5 @@ contract DotnsNameEscrowTest is BaseDotns {
             balanceBefore + BASE_DEPOSIT,
             "withdraw should still transfer correct amount"
         );
-    }
-
-    // withdrawProtocolFees: governance spends the protocol fee balance, and nothing else
-
-    /// @notice Credits `amount` to the protocol fee balance and backs it with native value, as
-    ///         the transfer fees of earlier implementations left it.
-    function _seedProtocolFees(uint256 amount) internal {
-        stdstore.target(address(dotnsNameEscrow)).sig("protocolFees()").checked_write(amount);
-        vm.deal(address(dotnsNameEscrow), address(dotnsNameEscrow).balance + amount);
-    }
-
-    function test_withdrawProtocolFees_moves_fees_to_recipient() public {
-        _seedProtocolFees(5 ether);
-        address treasury = makeAddr("treasury");
-
-        _mockOriginIsRoot(true);
-        vm.expectEmit(true, false, false, true, address(dotnsNameEscrow));
-        emit IDotnsNameEscrow.ProtocolFeesWithdrawn(treasury, 3 ether);
-        dotnsNameEscrow.withdrawProtocolFees(treasury, 3 ether);
-        _mockOriginIsRoot(false);
-
-        assertEq(treasury.balance, 3 ether, "recipient receives the amount");
-        assertEq(dotnsNameEscrow.protocolFees(), 2 ether, "balance is debited by the amount");
-    }
-
-    function test_withdrawProtocolFees_reverts_without_root() public {
-        _seedProtocolFees(1 ether);
-
-        vm.expectRevert(IDotnsNameEscrow.NotRoot.selector);
-        vm.prank(owner);
-        dotnsNameEscrow.withdrawProtocolFees(owner, 1 ether);
-    }
-
-    function test_withdrawProtocolFees_cannot_reach_deposits() public {
-        // A live deposit backs the escrow balance, but only the protocol fee balance is spendable.
-        uint256 tokenId = _registerNoStatus(LABEL, ed);
-        _seedProtocolFees(1 ether);
-        uint256 reservesBefore = dotnsNameEscrow.reserves(address(0));
-
-        _mockOriginIsRoot(true);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.ProtocolFeesExceeded.selector, 1 ether + 1, 1 ether
-            )
-        );
-        dotnsNameEscrow.withdrawProtocolFees(owner, 1 ether + 1);
-        _mockOriginIsRoot(false);
-
-        assertEq(dotnsNameEscrow.reserves(address(0)), reservesBefore);
-        assertEq(dotnsNameEscrow.getReleasePosition(tokenId).amount, BASE_DEPOSIT);
-    }
-
-    function test_withdrawProtocolFees_rejects_zero_recipient_and_amount() public {
-        _seedProtocolFees(1 ether);
-        _mockOriginIsRoot(true);
-
-        vm.expectRevert(IDotnsNameEscrow.InvalidRecipient.selector);
-        dotnsNameEscrow.withdrawProtocolFees(address(0), 1 ether);
-
-        vm.expectRevert(IDotnsNameEscrow.InvalidAmount.selector);
-        dotnsNameEscrow.withdrawProtocolFees(owner, 0);
-
-        _mockOriginIsRoot(false);
-    }
-
-    function test_withdrawProtocolFees_reverts_when_recipient_rejects_value() public {
-        _seedProtocolFees(1 ether);
-        address rejecter = address(new ValueRejecter());
-
-        _mockOriginIsRoot(true);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsNameEscrow.ProtocolFeeTransferFailed.selector, rejecter, 1 ether
-            )
-        );
-        dotnsNameEscrow.withdrawProtocolFees(rejecter, 1 ether);
-        _mockOriginIsRoot(false);
-
-        assertEq(dotnsNameEscrow.protocolFees(), 1 ether, "a failed payout debits nothing");
     }
 }

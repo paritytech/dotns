@@ -105,11 +105,6 @@ interface IDotnsNameEscrow {
     /// @param recipient Address the NFT was returned to, which is also the position recipient.
     event NameRedeemed(uint256 indexed tokenId, address indexed recipient);
 
-    /// @notice Emitted when governance moves protocol fees out of the escrow.
-    /// @param to Address that received the value.
-    /// @param amount Native value moved, debited from the protocol fee balance.
-    event ProtocolFeesWithdrawn(address indexed to, uint256 amount);
-
     /// @notice Emitted when overpayment is refunded to the payer.
     event OverpaymentRefunded(address indexed payer, uint256 amount);
 
@@ -118,15 +113,6 @@ interface IDotnsNameEscrow {
 
     /// @notice Thrown when the caller is not the configured registrar.
     error NotRegistrar(address caller);
-
-    /// @notice Thrown when a governance call does not run under a Root origin.
-    error NotRoot();
-
-    /// @notice Thrown when a protocol fee withdrawal asks for more than the balance holds.
-    error ProtocolFeesExceeded(uint256 amount, uint256 available);
-
-    /// @notice Thrown when the recipient of a protocol fee withdrawal rejects the value.
-    error ProtocolFeeTransferFailed(address to, uint256 amount);
 
     /// @notice Thrown when the supplied refund recipient is invalid (e.g. zero address).
     error InvalidRecipient();
@@ -299,20 +285,9 @@ interface IDotnsNameEscrow {
 
     /// @notice Returns the protocol fee balance the escrow holds.
     /// @dev Nothing credits it: it holds the transfer fees collected by earlier implementations.
-    ///      Only @custom:function withdrawProtocolFees spends it.
+    ///      Nothing spends it either.
     /// @return balance Current protocol fee balance, in wei.
     function protocolFees() external view returns (uint256 balance);
-
-    /// @notice Moves `amount` of the protocol fee balance to `to`.
-    /// @dev Callable only under a Root origin, otherwise @custom:reverts NotRoot. Spends the
-    ///      protocol fee balance alone: deposits, pending withdrawals and refund entries belong to
-    ///      their holders and stay out of reach. A zero `to` @custom:reverts InvalidRecipient, a
-    ///      zero `amount` @custom:reverts InvalidAmount, an `amount` above the balance
-    ///      @custom:reverts ProtocolFeesExceeded, and a recipient that rejects the value
-    ///      @custom:reverts ProtocolFeeTransferFailed. Emits @custom:emits ProtocolFeesWithdrawn.
-    /// @param to Address that receives the value.
-    /// @param amount Native value to move, in wei.
-    function withdrawProtocolFees(address to, uint256 amount) external;
 
     /// @notice Releases a token into escrow and starts the withdrawal cooldown.
     /// @dev First step of the phased lifecycle. The caller must be the current NFT holder and the
