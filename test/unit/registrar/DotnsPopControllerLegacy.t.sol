@@ -431,7 +431,7 @@ contract DotnsPopControllerLegacyTests is BaseDotns {
 
     // Every reservation-queue exit emits an event
 
-    function test_claim_emits_claimed_and_evicts_every_other_waiter() public {
+    function test_claim_emits_claimed_and_ends_every_other_waiters_reservation() public {
         _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
         _rootReservePersonhoodName(
             IDotnsPopController.PersonhoodNameReservation({user: tiago, label: PERSONHOOD_LABEL_A})
@@ -450,14 +450,28 @@ contract DotnsPopControllerLegacyTests is BaseDotns {
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
+        // The claim evicts every waiter at once: `ReservationClaimed` is the only event, so its
+        // cost does not grow with the queue.
         bytes32 claimed = keccak256("ReservationClaimed(bytes32,address)");
         bytes32 evicted = keccak256("ReservationEvicted(bytes32,address)");
         assertEq(_countEventsFor(logs, claimed, ed), 1, "the claimant's claim");
-        assertEq(_countEventsFor(logs, evicted, tiago), 1, "first waiter evicted");
-        assertEq(_countEventsFor(logs, evicted, leonardo), 1, "second waiter evicted");
-        assertEq(_countEventsFor(logs, evicted, ed), 0, "the claimant is not evicted");
+        assertEq(_countEvents(logs, evicted), 0, "no per-waiter event");
         assertEq(dotnsPopController.userReservation(tiago).labelhash, bytes32(0));
         assertEq(dotnsPopController.userReservation(leonardo).labelhash, bytes32(0));
+
+        // An evicted waiter holds no reservation, and can reserve again.
+        vm.prank(tiago);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsPopController.NoActiveReservation.selector, tiago)
+        );
+        dotnsPopController.relinquishReservation();
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({user: tiago, label: PERSONHOOD_LABEL_B})
+        );
+        assertEq(
+            dotnsPopController.userReservation(tiago).labelhash,
+            keccak256(bytes(PERSONHOOD_LABEL_B))
+        );
     }
 
     function test_standalone_issuance_relinquishes_the_users_other_reservation() public {

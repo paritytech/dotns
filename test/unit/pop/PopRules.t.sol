@@ -10,6 +10,7 @@ import {
     IDotnsProtocolRegistry
 } from "../../../contracts/registry/DotnsProtocolRegistry.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 /// @title PopRulesTests
 /// @notice Unit tests for PopRules name classification, pricing checks, and base-name reservation
@@ -370,6 +371,85 @@ contract PopRulesTests is BaseDotns {
 
         (address holder,) = popRules.getBaseNameReservation("longnamebob");
         assertEq(holder, address(0));
+    }
+
+    function test_reassignBaseNameForPop_moves_live_slot_for_reserving_controller() public {
+        _authoriseTestAsController();
+        popRules.reserveBaseNameForPop("longnamebob", leonardo);
+
+        vm.recordLogs();
+        popRules.reassignBaseNameForPop("longnamebob", tiago);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        (address holder, uint64 expires) = popRules.getBaseNameReservation("longnamebob");
+        assertEq(holder, tiago);
+        assertEq(expires, block.timestamp + popRules.MAX_RESERVATION_TIME());
+        assertEq(logs.length, 2, "release and reserve events");
+        assertEq(logs[0].topics[0], IPopRules.BaseNameReleased.selector);
+        assertEq(logs[1].topics[0], IPopRules.BaseNameReserved.selector);
+    }
+
+    function test_reassignBaseNameForPop_reverts_for_non_reserving_controller() public {
+        _authoriseTestAsController();
+        popRules.reserveBaseNameForPop("longnamebob", leonardo);
+
+        address otherController = makeAddr("otherController");
+        vm.prank(owner);
+        dotnsRegistrar.addController(IDotnsController(otherController));
+
+        vm.prank(otherController);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPopRules.PopError.selector, "Only reserving controller can release"
+            )
+        );
+        popRules.reassignBaseNameForPop("longnamebob", tiago);
+
+        (address holder,) = popRules.getBaseNameReservation("longnamebob");
+        assertEq(holder, leonardo);
+    }
+
+    function test_reassignBaseNameForPop_expired_slot_moved_by_any_controller() public {
+        _authoriseTestAsController();
+        popRules.reserveBaseNameForPop("longnamebob", leonardo);
+        vm.warp(block.timestamp + popRules.MAX_RESERVATION_TIME() + 1);
+
+        address otherController = makeAddr("otherController");
+        vm.prank(owner);
+        dotnsRegistrar.addController(IDotnsController(otherController));
+
+        vm.prank(otherController);
+        popRules.reassignBaseNameForPop("longnamebob", tiago);
+
+        (address holder,) = popRules.getBaseNameReservation("longnamebob");
+        assertEq(holder, tiago);
+    }
+
+    function test_reservations_reject_a_zero_user() public {
+        _authoriseTestAsController();
+        bytes memory zeroOwner =
+            abi.encodeWithSelector(IPopRules.PopError.selector, "Reservation owner cannot be zero");
+
+        vm.expectRevert(zeroOwner);
+        popRules.reserveBaseNameForPop("longnamebob", address(0));
+        vm.expectRevert(zeroOwner);
+        popRules.reserveBaseName("bobbyy", address(0));
+    }
+
+    function test_reassignBaseNameForPop_rejects_a_zero_user() public {
+        _authoriseTestAsController();
+        popRules.reserveBaseNameForPop("longnamebob", leonardo);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPopRules.PopError.selector, "Reservation owner cannot be zero")
+        );
+        popRules.reassignBaseNameForPop("longnamebob", address(0));
+    }
+
+    function test_reassignBaseNameForPop_reverts_for_non_controller() public {
+        vm.prank(ed);
+        vm.expectRevert(IPopRules.NotRegistry.selector);
+        popRules.reassignBaseNameForPop("longnamebob", ed);
     }
 
     function test_writeReservation_preserves_original_controller_on_same_owner_refresh() public {
