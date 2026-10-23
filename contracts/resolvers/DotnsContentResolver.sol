@@ -23,7 +23,10 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 ///      approval) or on a resolver-local operator the owner has approved, rather than on a
 ///      privileged writer address. Content records are user-managed metadata, so write authority
 ///      follows the node owner across transfers and honours the same delegates the registry
-///      recognises.
+///      recognises. Each record is stamped with the node's record version from the registry
+///      (@custom:function IDotnsRegistry.recordVersion), and a read returns empty unless the node
+///      still resolves and the stamp is current, so clearing a name never has to list its text
+///      keys.
 /// @custom:security-contact admin@parity.io
 contract DotnsContentResolver is
     Initializable,
@@ -47,6 +50,14 @@ contract DotnsContentResolver is
     /// @dev Reserved storage space to allow for layout changes in the future.
     // forge-lint: disable-next-line(mixed-case-variable)
     uint256[50] private __gap;
+
+    /// @notice Node => registry record version its content hash was written under.
+    /// @dev Zero matches the record version every node starts at, so a content hash stamped zero
+    ///      reads as set until its node is first cleared. The same holds for `textVersions`.
+    mapping(bytes32 node => uint64 version) private contenthashVersions;
+
+    /// @notice Node => text key => registry record version the value was written under.
+    mapping(bytes32 node => mapping(string key => uint64 version)) private textVersions;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -74,21 +85,44 @@ contract DotnsContentResolver is
 
     /// @inheritdoc IDotnsContentResolver
     function setContenthash(bytes32 node, bytes calldata hash) external override {
-        _requireNodeOwnerOrOperator(node);
-        contenthashes[node] = hash;
+        uint64 currentVersion = _requireNodeOwnerOrOperator(node);
+        if (hash.length == 0) {
+            // An empty hash is a delete; see `setText`.
+            delete contenthashes[node];
+            delete contenthashVersions[node];
+        } else {
+            contenthashes[node] = hash;
+            if (contenthashVersions[node] != currentVersion) {
+                contenthashVersions[node] = currentVersion;
+            }
+        }
         emit ContentHashUpdated(node, hash);
     }
 
     /// @inheritdoc IDotnsContentResolver
     function contenthash(bytes32 node) external view override returns (bytes memory hash) {
+        if (!_isCurrent(node, contenthashVersions[node])) return "";
         return contenthashes[node];
     }
 
     /// @inheritdoc IDotnsContentResolver
     function setText(bytes32 node, string calldata key, string calldata value) external override {
-        _requireNodeOwnerOrOperator(node);
-        textRecords[node][key] = value;
+        uint64 currentVersion = _requireNodeOwnerOrOperator(node);
+        if (bytes(value).length == 0) {
+            // An empty value is a delete: the value and its stamp are both zeroed, so their
+            // storage deposit is released to the signer of the transaction. This also frees a key
+            // left behind by a clear, which no read can reach any more but which still holds
+            // storage.
+            delete textRecords[node][key];
+            delete textVersions[node][key];
+        } else {
+            textRecords[node][key] = value;
+            if (textVersions[node][key] != currentVersion) {
+                textVersions[node][key] = currentVersion;
+            }
+        }
         emit TextUpdated(node, key, value);
+        emit TextChanged(node, key, key, value);
     }
 
     /// @inheritdoc IDotnsContentResolver
@@ -101,6 +135,7 @@ contract DotnsContentResolver is
         override
         returns (string memory value)
     {
+        if (!_isCurrent(node, textVersions[node][key])) return "";
         return textRecords[node][key];
     }
 
@@ -132,14 +167,37 @@ contract DotnsContentResolver is
     ///      delegation that grants no power over ownership or transfers. The cheap owner and
     ///      local-operator checks run before the cross-contract registry call.
     /// @param node Node identifier.
-    function _requireNodeOwnerOrOperator(bytes32 node) internal view {
-        IDotnsRegistry _registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
+    /// @return currentVersion Record version of `node`, which the caller stamps the write with.
+    function _requireNodeOwnerOrOperator(bytes32 node)
+        internal
+        view
+        returns (uint64 currentVersion)
+    {
+        IDotnsRegistry _registry = _forwardRegistry();
         address nodeOwner = _registry.owner(node);
         require(
             msg.sender == nodeOwner || operators[nodeOwner][msg.sender]
                 || _registry.isAuthorised(node, msg.sender),
             NotAuthorised(node, msg.sender)
         );
+        (, currentVersion) = _registry.recordVersion(node);
+    }
+
+    /// @notice Returns whether a record stamped `stamp` is readable for `node`.
+    /// @dev Every getter goes through here. A getter that skipped it would serve records the node
+    ///      has cleared, so a new record type must read through it too.
+    /// @param node Node identifier.
+    /// @param stamp Record version the record was written under.
+    /// @return current True when `node` resolves and `stamp` is its current record version.
+    function _isCurrent(bytes32 node, uint64 stamp) internal view returns (bool current) {
+        (bool live, uint64 currentVersion) = _forwardRegistry().recordVersion(node);
+        current = live && stamp == currentVersion;
+    }
+
+    /// @notice Returns the forward registry, resolved lazily so a rewire needs no upgrade here.
+    /// @return registry The forward registry.
+    function _forwardRegistry() internal view returns (IDotnsRegistry registry) {
+        registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
     }
 
     /// @notice Returns the release this network declares it runs, read live from the protocol

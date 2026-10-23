@@ -374,6 +374,15 @@ interface IDotnsNameEscrow {
     ///      holder's exclusive redeem phase and opens permissionless reclaim. Both are snapshots
     ///      so later policy changes never move an in-flight position. A release attempted while
     ///      `redeemWindow` is unseeded triggers @custom:reverts RedeemWindowNotConfigured.
+    ///      Releasing gives up the name's records and subnames along with the name: once the token
+    ///      is in custody the escrow, as its owner, deletes the address and content hash, which
+    ///      releases their storage deposit to the signer of this transaction, and calls
+    ///      @custom:function IDotnsRegistry.clear, so every text record reads as unset and every
+    ///      linked subname stops resolving from this call on (a subname with no recorded parent
+    ///      is reached once @custom:function IDotnsRegistry.linkSubname links it). Whoever gets
+    ///      the name next, through @custom:function redeem or @custom:function reclaim, starts
+    ///      clean. Text records and subnames keep their storage and its deposit; a holder who wants
+    ///      that deposit back deletes them before releasing.
     function release(uint256 tokenId) external;
 
     /// @notice Credits the refundable deposit for a released token to the recipient's pending
@@ -416,7 +425,8 @@ interface IDotnsNameEscrow {
     ///      previous recipient's pull-payment balance, claimable through @custom:function
     ///      claimWithdrawal with no deadline. That is what keeps a name recyclable when its
     ///      previous holder never returns: the value follows them, the name does not wait for them.
-    ///      Emits @custom:emits RefundWithdrawn on settlement.
+    ///      Emits @custom:emits RefundWithdrawn on settlement. The name arrives as release left it:
+    ///      cleared, so the new owner starts clean.
     /// @param newOwner Address of the new registrant taking over the name.
     function reclaim(uint256 tokenId, address newOwner) external;
 
@@ -438,8 +448,9 @@ interface IDotnsNameEscrow {
     ///      below `redeemableUntil`; a position failing any of those is not redeemable and
     ///      @custom:reverts NotRedeemable.
     ///      No value moves. The position keeps its recipient, asset and amount, so the deposit
-    ///      stays locked exactly as it was before the release and the name returns to its
-    ///      pre-release state, releasable again later on a fresh pair of clocks. Excluding
+    ///      stays locked exactly as it was before the release, and the name is releasable again
+    ///      later on a fresh pair of clocks. The records and subnames the release cleared do not
+    ///      come back: the holder gets the name back clean. Excluding
     ///      withdrawn positions is deliberate: a holder who has already pulled the deposit would
     ///      otherwise recover the name without it being deposit-backed, breaking the one-deposit-
     ///      per-live-name bound. The choice is therefore exclusive — take the value back, or take

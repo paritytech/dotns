@@ -14,6 +14,9 @@ import {
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
+import {IDotnsResolver} from "../resolvers/IDotnsResolver.sol";
+import {IDotnsContentResolver} from "../resolvers/IDotnsContentResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
@@ -419,7 +422,36 @@ contract DotnsNameEscrow is
 
         _addReleasedToken(tokenId);
 
+        // Cleared once custody has moved, because the registry and the resolvers admit the escrow
+        // as the name's owner and need no escrow-specific authority to let it clear. Redeem and
+        // reclaim do not clear again: they hand back the name as release left it.
+        _clearName(tokenId, true);
+
         emit NameReleased(tokenId, msg.sender, asset, amount, availableAt, redeemUntil);
+    }
+
+    /// @notice Clears, once, every name the escrow holds in custody that entered custody without
+    ///         being cleared.
+    /// @dev Release clears a name as it takes custody, and redeem and reclaim hand it back as it
+    ///      is, so a name that entered custody uncleared would otherwise leave it with its records.
+    ///      Meant to run as the post-upgrade call of `upgradeToAndCall`, so nothing can be
+    ///      redeemed or reclaimed between the upgrade and the clear. A deployment that never held
+    ///      such names never needs it. Owner-only (@custom:reverts OwnableUnauthorizedAccount) and
+    ///      callable once per proxy (@custom:reverts InvalidInitialization on a second call); it
+    ///      takes initializer version 2, so a later upgrade that needs a reinitializer starts at 3.
+    ///      It clears lazily only and deletes no record outright: deleting would release the
+    ///      storage deposit the holders paid to the signer of this call instead. Walks every name
+    ///      in custody in one call, so check @custom:function releasedTokenCount before relying on
+    ///      it. Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
+    ///      through ERC-165 stays the same.
+    ///      The one-time `clearCustodyOnUpgrade` upgrade call is declared on `DotnsNameEscrow`
+    /// only: adding it in the interface would change the interface id the escrow reports through
+    /// ERC-165.
+    function clearCustodyOnUpgrade() external onlyOwner reinitializer(2) {
+        uint256 count = _releasedTokens.length;
+        for (uint256 i; i < count; ++i) {
+            _clearName(_releasedTokens[i], false);
+        }
     }
 
     /// @inheritdoc IDotnsNameEscrow
@@ -744,7 +776,8 @@ contract DotnsNameEscrow is
             NotRedeemable(tokenId)
         );
 
-        // Restore the pre-release state and nothing more. Recipient, asset and amount are left
+        // Restore the position's pre-release state and nothing more; the records and subnames
+        // release cleared stay cleared. Recipient, asset and amount are left
         // untouched so the deposit stays locked against the name; clearing the clocks means a later
         // release starts a fresh pair rather than inheriting stale deadlines.
         position.released = false;
@@ -794,6 +827,33 @@ contract DotnsNameEscrow is
     /// @return versionString Declared release as bare semver, empty when never declared.
     function version() external view virtual returns (string memory versionString) {
         versionString = protocolRegistry.protocolVersion();
+    }
+
+    /// @notice Clears every record and subname of a name the escrow holds.
+    /// @dev The address and the content hash are each one record per name, at a fixed place, so
+    ///      they are deleted outright when `deleteRecords` is set, and their storage deposit is
+    ///      released to the signer of the transaction. Text records and subnames cannot be listed,
+    ///      so the registry clear hides them at constant cost and their storage stays.
+    ///      A name with no registry record has nothing to clear, because records and subnames can
+    ///      only be written for a node the registry knows, and the registry admits no clear for a
+    ///      node it holds no record of. Such a name is skipped, so release, redeem and reclaim
+    ///      still work for it.
+    /// @param tokenId Token in custody; its node is `bytes32(tokenId)`.
+    /// @param deleteRecords Whether to delete the address and content hash outright.
+    function _clearName(uint256 tokenId, bool deleteRecords) internal {
+        IDotnsRegistry registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
+        bytes32 node = bytes32(tokenId);
+        if (!registry.recordExists(node)) return;
+
+        if (deleteRecords) {
+            address resolver = protocolRegistry.get(DotnsConstants.RESOLVER);
+            if (resolver != address(0)) IDotnsResolver(resolver).setAddress(node, address(0));
+            address contentResolver = protocolRegistry.get(DotnsConstants.CONTENT_RESOLVER);
+            if (contentResolver != address(0)) {
+                IDotnsContentResolver(contentResolver).setContenthash(node, "");
+            }
+        }
+        registry.clear(node);
     }
 
     /// @notice Returns the configured registrar from the protocol registry.

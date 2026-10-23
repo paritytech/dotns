@@ -341,7 +341,7 @@ contract EscrowHandler is Test {
     /// @notice Redeems a released token back to its previous holder inside the redeem window.
     /// @dev Picks from `_releasedTokenIds` and only acts while the position is still redeemable
     ///      (released, unwithdrawn, inside the window). Moves the token back to
-    ///      `_depositedTokenIds` because a redeem restores the pre-release state exactly: the
+    ///      `_depositedTokenIds` because a redeem restores the position exactly: the
     ///      deposit is still locked and the name is releasable again. No value moves, so no ghost
     ///      accounting changes.
     /// @param tokenSeed Seed for selecting which released token to redeem.
