@@ -24,7 +24,7 @@ dotNS is a naming system for Polkadot. An account can register a .dot name, rece
 | --- | --- |
 | **Anyone with an account** | Register an available name on the public paid path, within the bands in [Who can register a name](#who-can-register-a-name). Own it, transfer it, attach records, issue subnames beneath it. |
 | **An account with devicehood or personhood** | Receive a device name or a personhood name issued through the dotNS gateway pallet, at no cost. See [DotnsPopController](#dotnspopcontroller). |
-| **Root (governance)** | Gates every name that skips pricing or personhood: issues per-name grants, mints a reserved name directly, drives the gateway, and opens the short-name band. It cannot seize, reassign, or destroy a name anyone already holds — see [What governance controls](#what-governance-controls). |
+| **Root (governance)** | Gates every name that skips pricing or personhood: issues per-name grants, mints a reserved name directly, drives the gateway, and opens the short-name band. It can also revoke any name, whoever holds it and however it was issued, and evict a personhood name's reservation queue. A revoked name goes back into circulation rather than to anyone in particular, though governance can then issue it again through the reserved path or the gateway like any other available name. See [Revoking a name](#revoking-a-name). |
 | **The contract owner** | Deploys, upgrades, and wires the protocol registry. Not an allocator by design, but `DotnsProtocolRegistry.set` and `DotnsRegistrar.addController` both reach the same outcome, so treat the owner as trusted infrastructure rather than a constrained role. |
 | **Anyone, as upkeep** | Permissionless maintenance: expire a stale reservation, settle another user's deferred label write, submit a granted registration on the beneficiary's behalf. None of these confer any claim on a name. |
 
@@ -131,7 +131,7 @@ Releasing a name gives up its records and subnames along with it. The moment the
 
 Storage on Asset Hub carries a deposit, locked when a slot is first written and released to whoever signs the transaction that zeroes it. Release deletes the address and content hash outright, so their deposit returns to the holder releasing the name. Text records and subnames cannot be listed, so release only hides them and their deposit stays locked. A holder who wants it back deletes them before releasing (see [Clearing records and subnames](#clearing-records-and-subnames)); after release that path moves with the name.
 
-Gateway-issued (soulbound) names never enter this lifecycle. Releasing a name transfers it into escrow custody, and a soulbound name reverts on any transfer, so it holds no position and has no release, redeem, or reclaim path. It stays with the person who earned it.
+Gateway-issued (soulbound) names never enter this lifecycle. Releasing a name transfers it into escrow custody, and a soulbound name reverts on any transfer, so it holds no position and has no release, redeem, or reclaim path. It stays with the person who earned it unless governance revokes it (see [Revoking a name](#revoking-a-name)).
 
 ### Cost-model versioning
 
@@ -139,7 +139,27 @@ A pricing model's values are fixed for its life: the flat model's deposit, or th
 
 ### What governance controls
 
-Governance chooses a model's values when it deploys one, and the contracts hold them coherent and nothing more: a flat deposit above zero; for the scarcity candidate, D and F above zero, F no greater than D, and D within a ceiling that keeps the multiplication below nine characters from overflowing. Beyond these checks there is no cap on how high or low the amounts go and no limit on how fast they move, so any rate limit or advance notice comes from the governance process rather than from these contracts. Governance also opens or closes the short-name market with the switch, tunes the release cooldown within its one-hour bound, sets the redeem window between 1 and 30 days, and sets the gateway's reservation duration. None of these controls lets governance seize, reassign, or destroy a name anyone already holds.
+Governance chooses a model's values when it deploys one, and the contracts hold them coherent and nothing more: a flat deposit above zero; for the scarcity candidate, D and F above zero, F no greater than D, and D within a ceiling that keeps the multiplication below nine characters from overflowing. Beyond these checks there is no cap on how high or low the amounts go and no limit on how fast they move, so any rate limit or advance notice comes from the governance process rather than from these contracts. Governance also opens or closes the short-name market with the switch, tunes the release cooldown within its one-hour bound, sets the redeem window between 1 and 30 days, and sets the gateway's reservation duration. None of these settings touches a name anyone already holds. Taking a name back is a separate, explicit call, described next.
+
+### Revoking a name
+
+Governance holds Root and can take back any name: a public name at any price, a reserved name, a subname at any depth, a device name or a personhood name. Revoking clears the name first and then frees it, so it behaves like a released name that nobody may redeem.
+
+| Call | Takes back | What happens |
+|---|---|---|
+| `DotnsRegistrar.revoke(tokenId)` | A second-level name registered on the public or reserved path, including one in escrow custody after a release | The escrow position is settled and removed, the name's records and subnames are cleared, its registry record is deleted, and the token is burned. |
+| `DotnsRegistry.revokeSubname(parentNode, labelhash)` | A subname, whoever holds its parent | The subname is deleted as its parent's owner would delete it, with its records and every subname beneath it. |
+| `DotnsPopController.revokeName(label)` | A device name or personhood name the gateway issued | The gateway's state about the name is cleared (its issued flag, chat key and device link), then the name goes as above: a personhood name is revoked on the registrar, a device name is deleted from its container. |
+
+All three are Root-gated and revert with `NotRoot` for a signed caller. The registrar refuses a soulbound name and the registry refuses a device name, so a name the gateway issued always goes through the PoP controller, which is the only contract that knows what the gateway stored about it. A numeric device container is never an issued name, so it cannot be revoked and the device names inside it are unaffected.
+
+- **Deposit.** Any deposit the name's escrow position still holds is credited to the holder's pull-payment balance, claimable at once through `claimWithdrawal`. A deposit already withdrawn is not credited again. The credit is written under Root, which carries the storage-deposit caveat in [KNOWN_ISSUES.md](./KNOWN_ISSUES.md#4-root-written-storage-refunds-deposits-nobody-paid).
+- **No redeem.** Revocation is final. The position is removed, so a released name loses its redeem window, and the name is available to anyone straight away.
+- **Starts clean.** Whoever gets the name next, the previous holder included, finds no records, no subnames and no gateway records, and a public registration of a former personhood name is transferable. A subname that was never linked is the exception: nothing above it can reach it, so it keeps resolving. Link the name's subnames first (`linkSubname`, see [DEPLOYMENTS.md](./DEPLOYMENTS.md#upgrading-to-record-and-subname-clearing)) when that matters.
+- **Usual rules still apply.** The name is registrable again under the same rules as any available name. In particular a PoP reservation on its base name, such as `alice` for `alice42`, still blocks the public path for everyone but the user at the front of that queue. Revoking a name never touches reservations; batch `evictReservations` with it when the base name should be freed too.
+- **Left in place.** The holder's `LabelStore` row stays, as after a transfer, and so does a gateway pending claim for the label: settling it only writes a row readers already check against the registry. A whitelist grant record stays `Claimed`; pair the revocation with `DotnsNameWhitelist.revokeName` when the name should be grantable again. The gateway pallet's own record of an account's names lives outside the contracts, so governance updates it in the same dispatch.
+
+`DotnsPopController.evictReservations(label)` clears a personhood name's whole reservation queue in one call, however full, and releases the PopRules slot the queue held, so the name is reservable and registrable at once. It is the remedy for a queue filled with candidates an attester controls: clearing the attester's allowance stops new reservations, and eviction removes the ones already queued. It emits `ReservationsEvicted`, which ends every reservation in that queue. An empty queue is left as it is.
 
 ### Refund ledgers
 
@@ -186,7 +206,7 @@ A user who leaves a queue through the gateway, by reserving or claiming another 
 
 `issuePersonhoodName` lets only the user at the front claim a queued name, while their reservation is still running, and rejects anyone else with `NotHolder`. It also rejects device names and governance-reserved labels with `InvalidPersonhoodLabel`. Another controller authorised on the registrar could write its own PopRules reservation for a name with no queue here; none does today, and `issuePersonhoodName` would reject other users with `NotHolder` in that case too.
 
-Every way of leaving a queue emits an event: `ReservationClaimed`, `ReservationRelinquished` or `ReservationExpired`. Together with `ReservationQueued`, these let an indexer rebuild every queue. A claim ends the reservation of everyone in the queue, so `ReservationClaimed` covers the users behind the claimant too.
+Every way of leaving a queue emits an event: `ReservationClaimed`, `ReservationRelinquished`, `ReservationExpired` or, when governance evicts the queue, `ReservationsEvicted`. Together with `ReservationQueued`, these let an indexer rebuild every queue. A claim or an eviction ends the reservation of everyone in the queue, so `ReservationClaimed` and `ReservationsEvicted` cover every user in it.
 
 The gateway pallet binds three deprecated entrypoints, reserveLiteName, reserveBaseName and registerBaseName, through `IDotnsPopControllerLegacy`. Each forwards to issueDeviceName, issueDeviceNameWithReservation and issuePersonhoodName respectively with the same selector it always had, and its label errors are `InvalidLiteLabel` and `InvalidBaseLabel`, the ones the pallet decodes. New integrations use the current entrypoints.
 
@@ -222,7 +242,7 @@ Deferred settlement has no transfer-pricing consequence, because gateway-issued 
 
 ERC721-backed registrar that tokenises second-level names: a name's tokenId is `uint256(node)` (see [Identifiers](#identifiers)). Minting is restricted to every address in the controllers mapping; the mapping is owner-gated through addController and removeController. Every other contract in the system that needs to check "is this address authorised to drive name state?" consults this mapping rather than keeping a parallel list, which is what lets multiple controllers coexist on the same registrar without per-contract configuration changes.
 
-The registrar owns transferability. A name is marked soulbound at mint when the caller is the address registered under POP_CONTROLLER, so only the gateway path can issue a soulbound name and no other controller can lock a public one. The marker is set once and never cleared, and isSoulbound reports it. The transfer hook rejects every transfer of a soulbound name, including a move to the holder's own address and a release into escrow, so a gateway-issued name can never leave its holder's wallet. Only the mint is exempt, because the marker is set just after it.
+The registrar owns transferability. A name is marked soulbound at mint when the caller is the address registered under POP_CONTROLLER, so only the gateway path can issue a soulbound name and no other controller can lock a public one. The marker is set once and cleared only when governance revokes the name, and isSoulbound reports it. The transfer hook rejects every transfer of a soulbound name, including a move to the holder's own address and a release into escrow, so a gateway-issued name can never leave its holder's wallet. Only the mint is exempt, because the marker is set just after it.
 
 ### DotnsRegistry
 
