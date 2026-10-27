@@ -1,0 +1,1471 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>DotnsPopController</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../../favicon.svg">
+        <link rel="shortcut icon" href="../../../favicon.png">
+        <link rel="stylesheet" href="../../../css/variables.css">
+        <link rel="stylesheet" href="../../../css/general.css">
+        <link rel="stylesheet" href="../../../css/chrome.css">
+        <link rel="stylesheet" href="../../../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../../../highlight.css">
+        <link rel="stylesheet" href="../../../tomorrow-night.css">
+        <link rel="stylesheet" href="../../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../../../book.css">
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../../../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item "><a href="../../../index.html">Home</a></li><li class="chapter-item affix "><li class="part-title">contracts</li><li class="chapter-item "><a href="../../../contracts/deploy/index.html">❱ deploy</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/deploy/Create3Factory.sol/contract.Create3Factory.html">Create3Factory</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/escrow/index.html">❱ escrow</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/escrow/DotnsNameEscrow.sol/contract.DotnsNameEscrow.html">DotnsNameEscrow</a></li><li class="chapter-item "><a href="../../../contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></li><li class="chapter-item "><a href="../../../contracts/escrow/IDotnsNameEscrowRevocation.sol/interface.IDotnsNameEscrowRevocation.html">IDotnsNameEscrowRevocation</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/external/index.html">❱ external</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/external/personhood/index.html">❱ personhood</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/external/personhood/IPersonhood.sol/interface.IPersonhood.html">IPersonhood</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/external/revive/index.html">❱ revive</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/external/revive/ISystem.sol/interface.ISystem.html">ISystem</a></li></ol></li></ol></li><li class="chapter-item "><a href="../../../contracts/pop/index.html">❱ pop</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/pop/DotnsCostModelRegistry.sol/contract.DotnsCostModelRegistry.html">DotnsCostModelRegistry</a></li><li class="chapter-item "><a href="../../../contracts/pop/DotnsFlatPricing.sol/contract.DotnsFlatPricing.html">DotnsFlatPricing</a></li><li class="chapter-item "><a href="../../../contracts/pop/DotnsScarcityPricing.sol/contract.DotnsScarcityPricing.html">DotnsScarcityPricing</a></li><li class="chapter-item "><a href="../../../contracts/pop/IDotnsCostModelRegistry.sol/interface.IDotnsCostModelRegistry.html">IDotnsCostModelRegistry</a></li><li class="chapter-item "><a href="../../../contracts/pop/IDotnsPricing.sol/interface.IDotnsPricing.html">IDotnsPricing</a></li><li class="chapter-item "><a href="../../../contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></li><li class="chapter-item "><a href="../../../contracts/pop/PopClassification.sol/library.PopClassification.html">PopClassification</a></li><li class="chapter-item "><a href="../../../contracts/pop/PopRules.sol/contract.PopRules.html">PopRules</a></li></ol></li><li class="chapter-item expanded "><a href="../../../contracts/registrars/index.html">❱ registrars</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../../../contracts/registrars/DotnsPopController.sol/contract.DotnsPopController.html" class="active">DotnsPopController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/DotnsPopLens.sol/contract.DotnsPopLens.html">DotnsPopLens</a></li><li class="chapter-item "><a href="../../../contracts/registrars/DotnsRegistrar.sol/contract.DotnsRegistrar.html">DotnsRegistrar</a></li><li class="chapter-item "><a href="../../../contracts/registrars/DotnsRegistrarController.sol/contract.DotnsRegistrarController.html">DotnsRegistrarController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsPopControllerLegacy.sol/interface.IDotnsPopControllerLegacy.html">IDotnsPopControllerLegacy</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsPopGovernance.sol/interface.IDotnsPopGovernance.html">IDotnsPopGovernance</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsPopLens.sol/interface.IDotnsPopLens.html">IDotnsPopLens</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></li><li class="chapter-item "><a href="../../../contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/registry/index.html">❱ registry</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/registry/DotnsProtocolRegistry.sol/contract.DotnsProtocolRegistry.html">DotnsProtocolRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/DotnsRegistry.sol/contract.DotnsRegistry.html">DotnsRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></li><li class="chapter-item "><a href="../../../contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/resolvers/index.html">❱ resolvers</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsContentResolver.sol/contract.DotnsContentResolver.html">DotnsContentResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsPopResolver.sol/contract.DotnsPopResolver.html">DotnsPopResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsResolver.sol/contract.DotnsResolver.html">DotnsResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/DotnsReverseResolver.sol/contract.DotnsReverseResolver.html">DotnsReverseResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html">IDotnsPopResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsPopResolverClearing.sol/interface.IDotnsPopResolverClearing.html">IDotnsPopResolverClearing</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></li><li class="chapter-item "><a href="../../../contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/store/index.html">❱ store</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></li><li class="chapter-item "><a href="../../../contracts/store/ILabelStore.sol/interface.ILabelStore.html">ILabelStore</a></li><li class="chapter-item "><a href="../../../contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></li><li class="chapter-item "><a href="../../../contracts/store/IUserStore.sol/interface.IUserStore.html">IUserStore</a></li><li class="chapter-item "><a href="../../../contracts/store/LabelStore.sol/contract.LabelStore.html">LabelStore</a></li><li class="chapter-item "><a href="../../../contracts/store/StoreFactory.sol/contract.StoreFactory.html">StoreFactory</a></li><li class="chapter-item "><a href="../../../contracts/store/UserStore.sol/contract.UserStore.html">UserStore</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/utils/index.html">❱ utils</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/utils/DotnsConstants.sol/library.DotnsConstants.html">DotnsConstants</a></li><li class="chapter-item "><a href="../../../contracts/utils/LabelUtils.sol/library.LabelUtils.html">LabelUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/Multicall3.sol/contract.Multicall3.html">Multicall3</a></li><li class="chapter-item "><a href="../../../contracts/utils/RegistrationUtils.sol/library.RegistrationUtils.html">RegistrationUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/StoreAuth.sol/library.StoreAuth.html">StoreAuth</a></li><li class="chapter-item "><a href="../../../contracts/utils/StoreUtils.sol/library.StoreUtils.html">StoreUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/StringUtils.sol/library.StringUtils.html">StringUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/SubnodeUtils.sol/library.SubnodeUtils.html">SubnodeUtils</a></li><li class="chapter-item "><a href="../../../contracts/utils/SystemUtils.sol/library.SystemUtils.html">SystemUtils</a></li></ol></li><li class="chapter-item "><a href="../../../contracts/whitelist/index.html">❱ whitelist</a><a class="toggle"><div>❱</div></a></li><li><ol class="section"><li class="chapter-item "><a href="../../../contracts/whitelist/DotnsNameWhitelist.sol/contract.DotnsNameWhitelist.html">DotnsNameWhitelist</a></li><li class="chapter-item "><a href="../../../contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title"></h1>
+
+                    <div class="right-buttons">
+                        <a href="../../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/paritytech/dotns" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
+<p><a href="https://github.com/paritytech/dotns/blob/94df1c4e822d726e278b70abd563f1410d06dfd0/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><strong>Inherits:</strong>
+Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a>, <a href="/contracts/registrars/IDotnsPopControllerLegacy.sol/interface.IDotnsPopControllerLegacy.html">IDotnsPopControllerLegacy</a>, <a href="/contracts/registrars/IDotnsPopGovernance.sol/interface.IDotnsPopGovernance.html">IDotnsPopGovernance</a></p>
+<p><strong>Title:</strong>
+DotnsPopController</p>
+<p>Dedicated PoP controller that issues device names and personhood names on behalf of
+the dotNS gateway pallet.</p>
+<p>Lives behind its own UUPS proxy with its own storage. Registered on <code>DotnsRegistrar</code>
+via <code>addController</code>, which is how multiple controllers coexist on the same registrar
+without interfering with each other.
+Enforcement:
+Devicehood and personhood are attested off-chain by the gateway before the call reaches this
+contract, so the on-chain personhood precompile is not re-queried on the gateway path.
+Every issuance path applies PopRules' naming rules (@custom:contract PopClassification) to
+reject governance-reserved labels (@custom:reverts InvalidPersonhoodLabel for personhood names,</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: InvalidDeviceLabel for device names). A device name is accepted with any
+two-digit suffix whose stem is not governance-reserved, regardless of stem length. Native-token
+pricing is bypassed entirely; the gateway pays no rent.
+Decoupling:
+This contract does not import or call <code>IDotnsRegistrarController</code>. The public
+commit-reveal controller is equally unaware of this one. Cross-flow collision handling
+relies on two distinct properties, neither of which requires the two controllers to know
+about each other:
+(1) Device names (<code>stem.NN</code>) occupy a namespace the public path cannot reach: the
+separator is legal only on a device name, and the public path rejects it, so no public
+registration can spell one. A digit suffix is not exclusive, but an ordinary label carrying
+one is measured as written and so is simply a different name. The two flows therefore cannot
+contend for the same label. This holds of labels the contracts minted, not of an arbitrary
+string: a subname stored under a digit-only parent reads the same way, which is why
+provenance is published through @custom:function isPopIssued rather than inferred.
+(2) Personhood-name reservations are synchronised into <code>IPopRules</code> by base name. The head of
+this controller's reservation queue is written through <code>IPopRules.reserveBaseNameForPop</code> on
+every head transition; the slot is cleared through <code>IPopRules.releaseBaseName</code> when the
+queue empties (claim, final relinquish, final expiry). The public commit-reveal
+controller routes through <code>IPopRules.priceWithCheck</code>, which rejects any registration
+targeting a base name reserved for another user, so the public flow respects
+gateway reservations without ever importing this contract. PopRules is the single
+cross-flow authority; the queue here is the intra-PoP ordering layer on top of it.
+Shared primitives: labelhash / namehash via @custom:contract LabelUtils; classification via</p>
+</li>
+<li>
+<p>contract: PopClassification; chat-key and device-link persistence via</p>
+</li>
+<li>
+<p>contract: IDotnsPopResolver. Keeping per-name records on the resolver preserves the
+"Store = labels only" invariant.</p>
+</li>
+<li>
+<p>security-contact: admin@parity.io</p>
+</li>
+</ul>
+<h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
+<h3 id="max_reservation_queue"><a class="header" href="#max_reservation_queue">MAX_RESERVATION_QUEUE</a></h3>
+<p>Upper bound for the number of simultaneously queued reservations per label.</p>
+<p>Keeps <code>expireReservation</code> gas bounded.</p>
+<pre><code class="language-solidity">uint16 public constant MAX_RESERVATION_QUEUE = 64
+</code></pre>
+<h3 id="min_reservation_duration"><a class="header" href="#min_reservation_duration">MIN_RESERVATION_DURATION</a></h3>
+<p>Minimum value accepted by @custom:function setReservationDuration.</p>
+<p>Prevents owner misconfiguration from instantly expiring every live queue and
+pending-claim entry. The actual production duration is governance-tuned higher.</p>
+<pre><code class="language-solidity">uint64 public constant MIN_RESERVATION_DURATION = 1 hours
+</code></pre>
+<h3 id="max_reservation_duration"><a class="header" href="#max_reservation_duration">MAX_RESERVATION_DURATION</a></h3>
+<p>Maximum value accepted by @custom:function setReservationDuration.</p>
+<p>PopRules holds the name for the user at the front of a queue for</p>
+<p><strong>Note:</strong>
+constant: PopRules.MAX_RESERVATION_TIME (12 weeks) from each change of front, and a
+PopRules reservation lapses at its last second while a queue entry is still active at
+its own. One second less keeps the front user's entry from outlasting the PopRules
+reservation written when they reached the front. Users behind them keep their own join
+time, so their entries can outlast it; a call that clears the queue re-stamps or releases
+the PopRules reservation, which is why apps clear a queue before using it.</p>
+<pre><code class="language-solidity">uint64 public constant MAX_RESERVATION_DURATION = 12 weeks - 1
+</code></pre>
+<h3 id="chat_key_length"><a class="header" href="#chat_key_length">CHAT_KEY_LENGTH</a></h3>
+<p>Required byte length for a non-empty chat key.</p>
+<p>Mirrors @custom:contract IDotnsPopResolver <code>InvalidChatKeyLength</code> so the controller
+can fail closed before the mint instead of bubbling the resolver's revert after partial
+state has been committed.</p>
+<pre><code class="language-solidity">uint256 private constant CHAT_KEY_LENGTH = 65
+</code></pre>
+<h3 id="max_queue_steps_per_call"><a class="header" href="#max_queue_steps_per_call">MAX_QUEUE_STEPS_PER_CALL</a></h3>
+<p>Most expired or emptied entries one gateway call clears from the front of a
+reservation queue.</p>
+<p>A gateway call runs under a fixed weight limit, and each entry visited costs a
+storage read. A longer run is cleared over several calls, each keeping its progress, or at
+once by @custom:function expireReservation.</p>
+<pre><code class="language-solidity">uint256 public constant MAX_QUEUE_STEPS_PER_CALL = 4
+</code></pre>
+<h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
+<h3 id="protocolregistry"><a class="header" href="#protocolregistry">protocolRegistry</a></h3>
+<p>Protocol-level address registry for all dotNS contracts.</p>
+<pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
+</code></pre>
+<h3 id="_reservationmeta"><a class="header" href="#_reservationmeta">_reservationMeta</a></h3>
+<p>Per-label queue metadata (head/tail pointers).</p>
+<pre><code class="language-solidity">mapping(bytes32 labelhash =&gt; ReservationQueueMeta meta) internal _reservationMeta
+</code></pre>
+<h3 id="_reservationentries"><a class="header" href="#_reservationentries">_reservationEntries</a></h3>
+<p>Per-label sparse entries keyed by monotonically-increasing index.</p>
+<pre><code class="language-solidity">mapping(bytes32 labelhash =&gt; mapping(uint64 index =&gt; ReservationEntry entry)) internal
+    _reservationEntries
+</code></pre>
+<h3 id="_userreservations"><a class="header" href="#_userreservations">_userReservations</a></h3>
+<p>Single per-user pointer into the reservation queues.</p>
+<p>Keeps per-user reservation data behind one key and one struct value so callers
+read both fields in one call instead of two.</p>
+<pre><code class="language-solidity">mapping(address user =&gt; UserReservation reservation) internal _userReservations
+</code></pre>
+<h3 id="_reservedbaselabel"><a class="header" href="#_reservedbaselabel">_reservedBaseLabel</a></h3>
+<p>Remembers the personhood name for each reserved labelhash so the PopRules
+sync path can address the reservation by its original string form (PopRules keys its
+<code>reservations</code> mapping by string).</p>
+<p>Populated on first enqueue for a label, cleared when the queue empties. Exists
+only to bridge the queue's <code>bytes32</code> key space to PopRules' <code>string</code> key space;
+nothing else reads it.</p>
+<pre><code class="language-solidity">mapping(bytes32 labelhash =&gt; string reservedLabel) internal _reservedBaseLabel
+</code></pre>
+<h3 id="reservationduration"><a class="header" href="#reservationduration">reservationDuration</a></h3>
+<p>Duration (in seconds) after which a reservation entry is considered expired.</p>
+<p>Sets the reservation duration, configurable by
+governance via <code>setReservationDuration</code>.</p>
+<pre><code class="language-solidity">uint64 public override reservationDuration
+</code></pre>
+<h3 id="_pendingclaimusers"><a class="header" href="#_pendingclaimusers">_pendingClaimUsers</a></h3>
+<p>Enumeration set of users holding at least one pending claim.</p>
+<p>Membership equals the set of users with a non-empty queue. Used by
+<code>pendingClaimUserCount</code> and <code>pendingClaimUsers</code> for paginated enumeration.</p>
+<pre><code class="language-solidity">EnumerableSet.AddressSet private _pendingClaimUsers
+</code></pre>
+<h3 id="_pendingclaimqueue"><a class="header" href="#_pendingclaimqueue">_pendingClaimQueue</a></h3>
+<p>Per-user pile of deferred names awaiting a <code>LabelStore</code>.</p>
+<p>The mint origin cannot deploy a <code>LabelStore</code>, so deferred names accumulate here until a
+signed-origin @custom:function settlePendingClaims deploys the store and writes the stashed
+labels. Entries never lapse and can be settled at any time.</p>
+<pre><code class="language-solidity">mapping(address user =&gt; PendingClaim[] queue) internal _pendingClaimQueue
+</code></pre>
+<h3 id="_popissued"><a class="header" href="#_popissued">_popIssued</a></h3>
+<p>Labels this controller minted, keyed by the bare label without the TLD.</p>
+<p>Provenance, not a transfer rule: written at mint and cleared only when the name is
+revoked (@custom:function revokeName), so it stays true if a name later becomes
+transferable and turns false once governance takes the name back. Keyed by the label
+text rather than the node because a reader holding only <code>joseph.42</code> cannot derive the
+node without first deciding whether the separator is part of the label or a subname
+boundary, which is the question it is asking.</p>
+<pre><code class="language-solidity">mapping(string label =&gt; bool issued) internal _popIssued
+</code></pre>
+<h3 id="_devicecontainers"><a class="header" href="#_devicecontainers">_deviceContainers</a></h3>
+<p>Numeric containers this contract has minted or verified as its own.</p>
+<p>Lets device-name issuance skip the registrar and registry checks on every later
+issuance in the same container. See @custom:function _registerDeviceSubname. An entry is
+never cleared, because a recorded container cannot change hands: the registrar marks a
+name minted by this contract soulbound and rejects every transfer of it, release to the
+escrow included. Nor can it be revoked: the registrar's Root revocation refuses a soulbound
+name, and @custom:function revokeName takes only labels this contract issued, which a
+container is not. If a container ever did change hands, the registry's
+own parent check in @custom:function IDotnsRegistry.setSubnodeOwner would still reject
+issuance under it.</p>
+<pre><code class="language-solidity">mapping(bytes32 parentNode =&gt; bool ready) internal _deviceContainers
+</code></pre>
+<h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
+<p>Reserved storage space to allow for layout changes in future upgrades.</p>
+<pre><code class="language-solidity">uint256[49] private __gap
+</code></pre>
+<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
+<h3 id="onlyroot"><a class="header" href="#onlyroot">onlyRoot</a></h3>
+<p>Restricts calls to a Root origin.</p>
+<pre><code class="language-solidity">modifier onlyRoot() ;
+</code></pre>
+<h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
+<p><strong>Note:</strong>
+oz-upgrades-unsafe-allow: constructor</p>
+<pre><code class="language-solidity">constructor() ;
+</code></pre>
+<h3 id="initialize"><a class="header" href="#initialize">initialize</a></h3>
+<p>Initialises the PoP controller.</p>
+<p>Called once through the UUPS proxy; <code>_disableInitializers</code> on the implementation
+makes direct calls revert with @custom:reverts InvalidInitialization, and any nested
+call outside an active initialiser scope reverts with @custom:reverts NotInitializing.
+Emits @custom:emits ReservationDurationSet so indexers observe the initial value
+through the same event the setter uses later.</p>
+<pre><code class="language-solidity">function initialize(
+    address initialOwner,
+    IDotnsProtocolRegistry registry,
+    uint64 reservationDuration_
+)
+    external
+    initializer;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>initialOwner</code></td><td><code>address</code></td><td>Address that owns the contract once initialised.</td></tr>
+<tr><td><code>registry</code></td><td><code>IDotnsProtocolRegistry</code></td><td></td></tr>
+<tr><td><code>reservationDuration_</code></td><td><code>uint64</code></td><td></td></tr>
+</tbody></table>
+</div>
+<h3 id="ispopissued"><a class="header" href="#ispopissued">isPopIssued</a></h3>
+<p>Whether this controller issued <code>label</code> as a PoP identity.</p>
+<p>Keyed by text, so it answers about a name rather than about a node. A device name is
+issued as a subname (<code>joseph</code> beneath its numeric container <code>42</code>) and a personhood name as
+a second-level name, so a caller holding a node must check that the node is the one <code>label</code>
+resolves to under those rules before reading this answer as being about what it holds; node
+identity is what names the object. Set at mint and cleared only when governance revokes the
+name (@custom:function IDotnsPopGovernance.revokeName), so it is unaffected by a name later
+becoming transferable; the soulbound flag is a transfer rule and cannot stand in
+for it.</p>
+<pre><code class="language-solidity">function isPopIssued(string calldata label) external view override returns (bool issued);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Bare label without the TLD, for example <code>joseph.42</code>.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>issued</code></td><td><code>bool</code></td><td>True when this controller issued <code>label</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="issuedevicename"><a class="header" href="#issuedevicename">issueDeviceName</a></h3>
+<p>Issues a device name to the supplied user without touching the reservation queue.</p>
+<p>Callable only under a Root origin (otherwise @custom:reverts NotRoot). The
+supplied label must satisfy the <code>stem.NN</code> shape and must classify outside the
+governance-reserved tier (otherwise @custom:reverts InvalidDeviceLabel); a supplied chat
+key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code> reverts</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: InvalidChatKey before mint and resolver writes run. A device name that has
+already been issued reverts @custom:reverts DeviceNameAlreadyIssued. On a warm-path mint</p>
+</li>
+<li>
+<p>emits: DeviceNameIssued and @custom:emits NameRegistered. On a cold-path
+mint @custom:emits DeviceNameIssued and @custom:emits PendingClaimStashed, with</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function issueDeviceName(DeviceNameIssuance calldata params) external override onlyRoot;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>params</code></td><td><code>DeviceNameIssuance</code></td><td>Issuance request; see @custom:struct DeviceNameIssuance.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservelitename"><a class="header" href="#reservelitename">reserveLiteName</a></h3>
+<pre><code class="language-solidity">function reserveLiteName(DeviceNameIssuance calldata params) external override onlyRoot;
+</code></pre>
+<h3 id="issuedevicenamewithreservation"><a class="header" href="#issuedevicenamewithreservation">issueDeviceNameWithReservation</a></h3>
+<p>Issues a device name to the supplied user and optionally enqueues a reservation
+for a personhood name they intend to claim later.</p>
+<p>Callable only under a Root origin (otherwise @custom:reverts NotRoot). The issuance
+validates the <code>stem.NN</code> shape and requires the label to classify outside the
+governance-reserved tier (otherwise @custom:reverts InvalidDeviceLabel), and rejects a
+supplied chat key whose length is neither zero nor <code>CHAT_KEY_LENGTH</code>
+(otherwise @custom:reverts InvalidChatKey). On a warm-path mint (user already has a
+<code>LabelStore</code>) it @custom:emits DeviceNameIssued and @custom:emits NameRegistered;
+on a cold-path mint it @custom:emits DeviceNameIssued and</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>emits: PendingClaimStashed, with @custom:emits NameRegistered deferred to</p>
+</li>
+<li>
+<p>function: settlePendingClaims when the claim settles. The reservation only runs
+when <code>reservedLabel</code> is non-empty: it requires a letters-only personhood label
+(otherwise @custom:reverts InvalidPersonhoodLabel) with no owner on the registrar
+(otherwise @custom:reverts PersonhoodNameUnavailable), since a name that already has an
+owner could never be claimed. This validation runs before both the issuance and any queue
+mutation, so an already-registered <code>reservedLabel</code> aborts the whole call and the candidate
+receives no device name either; callers should validate the reserved label before
+attesting rather than relying on this revert. It then clears up to
+<code>MAX_QUEUE_STEPS_PER_CALL</code> expired entries from the front of the queue
+(@custom:emits ReservationExpired for each one cleared). When the user already holds an
+active reservation for <code>reservedLabel</code>, that reservation stays as it is, with the same
+place in the queue and the same expiry, and nothing else changes. Otherwise it removes the
+user from any prior queue position (@custom:emits ReservationRelinquished) so a single user
+holds at most one live reservation across all labels, and enqueues a fresh entry
+(@custom:emits ReservationQueued). The removal only empties the user's entry in the prior
+queue: the next call on that name clears it like an expired one. The enqueue rejects with</p>
+</li>
+<li>
+<p>reverts: AlreadyReserved when the user already holds a reservation that was not
+cleared by the prior removal and with @custom:reverts QueueFull when the per-label queue
+has reached <code>MAX_RESERVATION_QUEUE</code>. Cross-chain callers pass the ABI-encoded tuple as the
+call's payload, which Solidity decodes directly.</p>
+</li>
+<li>
+<p>struct: DeviceNameIssuanceWithReservation.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function issueDeviceNameWithReservation(DeviceNameIssuanceWithReservation calldata params)
+    external
+    override
+    onlyRoot;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>params</code></td><td><code>DeviceNameIssuanceWithReservation</code></td><td>Issuance and reservation request; see</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservebasename"><a class="header" href="#reservebasename">reserveBaseName</a></h3>
+<pre><code class="language-solidity">function reserveBaseName(DeviceNameIssuanceWithReservation calldata params)
+    external
+    override
+    onlyRoot;
+</code></pre>
+<h3 id="reservepersonhoodname"><a class="header" href="#reservepersonhoodname">reservePersonhoodName</a></h3>
+<p>Enqueues only a personhood-name reservation for a user.</p>
+<p>Callable only under a Root origin (otherwise @custom:reverts NotRoot). This is the
+second step of the split gateway flow: @custom:function issueDeviceName issues the device
+name first, then this function reserves the personhood name in a separate transaction so
+proof-size stays below per-call limits. Reverts with @custom:reverts InvalidPersonhoodLabel
+when the label is empty, is not lowercase ASCII letters (so a hyphen or any digit rejects
+it), or is governance-reserved, and with @custom:reverts PersonhoodNameUnavailable when the
+label already has an owner on the registrar and so could never be claimed. When the user
+already holds an active reservation for <code>label</code>, that reservation stays as it is, with
+the same place in the queue and the same expiry, so the call is safe to retry. Otherwise
+moving the user out of a prior queue @custom:emits ReservationRelinquished and only empties
+their entry there, as in @custom:function issueDeviceNameWithReservation.</p>
+<pre><code class="language-solidity">function reservePersonhoodName(PersonhoodNameReservation calldata params)
+    external
+    override
+    onlyRoot;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>params</code></td><td><code>PersonhoodNameReservation</code></td><td>Reservation request; see @custom:struct PersonhoodNameReservation.</td></tr>
+</tbody></table>
+</div>
+<h3 id="issuepersonhoodname"><a class="header" href="#issuepersonhoodname">issuePersonhoodName</a></h3>
+<p>Issues a personhood name to the supplied user.</p>
+<p>Callable only under a Root origin (otherwise @custom:reverts NotRoot). The label must
+be a letters-only personhood label (otherwise @custom:reverts InvalidPersonhoodLabel), and
+must not classify as governance-reserved or as a device-name shape (otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: InvalidPersonhoodLabel). The gateway also defers to PopRules as the single
+cross-flow authority: when PopRules carries a live base-name slot held by another user (this
+controller's prior queue head, or a sibling controller's write), the call reverts</p>
+</li>
+<li>
+<p>emits: PersonhoodNameIssued. Up to <code>MAX_QUEUE_STEPS_PER_CALL</code> expired
+entries are cleared from the front of the queue first (@custom:emits ReservationExpired
+for each one); if the front is still expired after that, a claim</p>
+</li>
+<li>
+<p>function: settlePendingClaims. Cross-chain callers pass the ABI-encoded issuance
+tuple as the call's payload, which Solidity decodes directly.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function issuePersonhoodName(PersonhoodNameIssuance calldata params)
+    external
+    override
+    onlyRoot;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>params</code></td><td><code>PersonhoodNameIssuance</code></td><td>Issuance request; see @custom:struct PersonhoodNameIssuance.</td></tr>
+</tbody></table>
+</div>
+<h3 id="registerbasename"><a class="header" href="#registerbasename">registerBaseName</a></h3>
+<pre><code class="language-solidity">function registerBaseName(PersonhoodNameIssuance calldata params) external override onlyRoot;
+</code></pre>
+<h3 id="_issuedevicenamewithreservation"><a class="header" href="#_issuedevicenamewithreservation">_issueDeviceNameWithReservation</a></h3>
+<p>Body shared by @custom:function issueDeviceNameWithReservation and its legacy
+entrypoint.</p>
+<p>The reservation is validated before the issuance so an unreservable label aborts the
+whole call. <code>legacy</code> selects the label errors, as in @custom:function _issueDeviceName.</p>
+<pre><code class="language-solidity">function _issueDeviceNameWithReservation(
+    DeviceNameIssuanceWithReservation calldata params,
+    bool legacy
+)
+    internal;
+</code></pre>
+<h3 id="_issuedevicename"><a class="header" href="#_issuedevicename">_issueDeviceName</a></h3>
+<p>Device-name issuance shared by @custom:function issueDeviceName, the issuance of</p>
+<p>Gateway attestation is the authority for devicehood on this path; the on-chain
+precompile is not consulted. The label is stored in the <code>stem.NN</code> form the gateway sends,
+which is the canonical form of the name, so no normalisation happens here. The shape check
+runs before classification so a malformed label reverts with a controller error, which the
+gateway decodes by selector; letting <code>classifyName</code> catch it instead would surface an
+undecodable PopRules string. <code>legacy</code> selects @custom:reverts InvalidLiteLabel over</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: issueDeviceNameWithReservation, and their legacy entrypoints.</p>
+</li>
+<li>
+<p>reverts: InvalidDeviceLabel for the callers that decode the legacy error.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function _issueDeviceName(
+    Deps memory deps,
+    DeviceNameIssuance calldata params,
+    bool legacy
+)
+    internal;
+</code></pre>
+<h3 id="_issuepersonhoodname"><a class="header" href="#_issuepersonhoodname">_issuePersonhoodName</a></h3>
+<p>Personhood-name issuance shared by @custom:function issuePersonhoodName and its
+legacy entrypoint.</p>
+<p><code>legacy</code> selects @custom:reverts InvalidLiteLabel / @custom:reverts InvalidBaseLabel
+over the new label errors for the callers that decode the legacy ones.</p>
+<pre><code class="language-solidity">function _issuePersonhoodName(PersonhoodNameIssuance calldata params, bool legacy) internal;
+</code></pre>
+<h3 id="revokename"><a class="header" href="#revokename">revokeName</a></h3>
+<p>Revokes a device name or a personhood name this controller issued.</p>
+<p>Root-gated. <code>label</code> must be one @custom:function IDotnsPopController.isPopIssued
+reports, otherwise @custom:reverts NotPopIssued; a numeric container is never one, so
+containers cannot be revoked. The gateway's state about the name goes first: the issued
+flag, then the chat key and the device link on the PoP resolver
+(@custom:function IDotnsPopResolverClearing.clearRecords). The name follows: a device name
+is deleted from the registry under the container this controller holds
+(@custom:function IDotnsRegistry.deleteSubname), and a personhood name is revoked on the
+registrar (@custom:function IDotnsRegistrar.revokeIssued). Either way its records and
+linked subnames are cleared and it can be issued again; a personhood name can also be
+registered on the public path, under the usual rules. A pending claim for the label stays
+in the holder's queue and is dropped without a write when it is settled
+(@custom:function IDotnsPopController.settlePendingClaims). The gateway pallet's own record
+of the account's names is not on this chain, so governance updates it in the same
+dispatch. Revoking a device name leaves its holder's personhood reservation in place,
+because the reservation does not depend on it; @custom:function evictReservation removes
+it when governance wants that too. Emits @custom:emits IssuedNameRevoked.</p>
+<pre><code class="language-solidity">function revokeName(string calldata label) external override onlyRoot;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The bare label without the TLD, for example <code>joseph.42</code> or <code>josephine</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="evictreservations"><a class="header" href="#evictreservations">evictReservations</a></h3>
+<p>Clears a personhood name's whole reservation queue and frees the name.</p>
+<p>Root-gated. <code>label</code> must be a personhood label, otherwise</p>
+<p><strong>Note:</strong>
+reverts: IDotnsPopController.InvalidPersonhoodLabel. Every entry is evicted in one
+step, whatever the queue holds: the front moves to the end, as on a claim, and the
+PopRules slot the queue held is released, so the name is reservable and registrable at
+once. Each evicted user's pointer reads as no reservation, and their next reservation
+clears it. An empty queue is left as it is and emits nothing, so a governance dispatch that
+races a claim or an expiry does not fail. Emits @custom:emits ReservationsEvicted.</p>
+<pre><code class="language-solidity">function evictReservations(string calldata label) external override onlyRoot;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The personhood name, bare, without the TLD.</td></tr>
+</tbody></table>
+</div>
+<h3 id="evictreservation"><a class="header" href="#evictreservation">evictReservation</a></h3>
+<p>Ends one user's personhood-name reservation, wherever it sits in its queue.</p>
+<p>Root-gated. The precise remedy when only some entries in a queue should go, such as
+candidates an attester controls, without evicting the users waiting behind them. The entry
+is removed as @custom:function IDotnsPopController.relinquishReservation removes it: in
+place when it is behind the front, and when it is the front, the reservation and the
+PopRules slot move to the next user with an active reservation, or the slot is released
+when none is left. A user with no active reservation is left as they are and nothing is
+emitted, so a dispatch that races a claim or an expiry does not fail. Emits</p>
+<p><strong>Note:</strong>
+emits: IDotnsPopController.ReservationRelinquished.</p>
+<pre><code class="language-solidity">function evictReservation(address user) external override onlyRoot;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Account whose reservation is ended.</td></tr>
+</tbody></table>
+</div>
+<h3 id="expirereservation"><a class="header" href="#expirereservation">expireReservation</a></h3>
+<p>Permissionlessly removes expired entries from the head of a reservation queue.</p>
+<p>Permissionless on purpose: anyone (typically a UI or a bot) can poke a stale queue
+so the next live head takes over without waiting for the next gateway call. Validates
+<code>label</code> as a letters-only personhood label (otherwise @custom:reverts
+InvalidPersonhoodLabel) and @custom:emits ReservationExpired for every expired entry reaped
+from the head. A label carrying a digit or a hyphen is not a personhood label and</p>
+<p><strong>Note:</strong>
+reverts: InvalidPersonhoodLabel, as does a device name, since a separator is not one
+either. Only a letters-only label reaches the queue, and one that was never reserved
+resolves to an empty queue so the call is a no-op. Clears every expired entry at the
+front of the queue in one call, including a run longer than a gateway call clears, then
+moves PopRules to the next active reservation or releases it when the queue is empty.</p>
+<pre><code class="language-solidity">function expireReservation(string calldata label) external override;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Personhood name whose queue is reaped.</td></tr>
+</tbody></table>
+</div>
+<h3 id="preparedevicecontainer"><a class="header" href="#preparedevicecontainer">prepareDeviceContainer</a></h3>
+<p>Permissionlessly mints the numeric container <code>suffix</code> that device names
+<code>stem.suffix</code> live beneath, owned by this contract, or records an existing one.</p>
+<p>The first device name issued in a container otherwise mints it inside the gateway's
+call, which runs under a fixed weight limit. Preparing containers ahead of time, from any
+signed account, takes that cost out of the issuance. A container already recorded is a
+no-op. <code>suffix</code> must be exactly two ASCII digits (otherwise</p>
+<p><strong>Note:</strong>
+reverts: InvalidDeviceLabel), and a container held by anyone else</p>
+<pre><code class="language-solidity">function prepareDeviceContainer(string calldata suffix) external override;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>suffix</code></td><td><code>string</code></td><td>Two-digit container label, e.g. <code>01</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="relinquishreservation"><a class="header" href="#relinquishreservation">relinquishReservation</a></h3>
+<p>Lets the caller voluntarily drop their own active reservation.</p>
+<p>Reverts with @custom:reverts NoActiveReservation when the caller holds no live
+reservation. On success the caller's entry is removed from its queue and</p>
+<p><strong>Note:</strong>
+emits: ReservationRelinquished is emitted; if the removed entry was the queue
+head, head advancement may additionally @custom:emits ReservationExpired for any
+stale entries reaped behind it.</p>
+<pre><code class="language-solidity">function relinquishReservation() external override;
+</code></pre>
+<h3 id="claimlabelstore"><a class="header" href="#claimlabelstore">claimLabelStore</a></h3>
+<p>Settles the caller's own pending claims into their <code>LabelStore</code>.</p>
+<p>Convenience for a user settling their own store: equivalent to</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: settlePendingClaims with <code>msg.sender</code> and a bounded batch. The caller
+deploys and pays for their store on the first write. Settles at most one bounded batch so
+the call cannot exceed the block gas limit; <code>moreRemaining</code> reports whether the caller
+still holds unsettled entries, in which case they call again. Emits the same</p>
+</li>
+<li>
+<p>emits: PendingClaimSettled and @custom:emits NameRegistered as</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function claimLabelStore() external override returns (bool moreRemaining);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>moreRemaining</code></td><td><code>bool</code></td><td>Whether the caller still holds unsettled entries.</td></tr>
+</tbody></table>
+</div>
+<h3 id="settlependingclaims"><a class="header" href="#settlependingclaims">settlePendingClaims</a></h3>
+<p>Settles up to <code>limit</code> of a user's pending claims, writing each stashed label into
+the user's <code>LabelStore</code> and deploying that store when the user has none yet.</p>
+<p>Permissionless: any caller may settle any user's claims and bears the full cost,
+including the <code>LabelStore</code> storage deposit, which is charged to the
+transaction signer. Settlement is never destructive: the name is already minted, so this
+only completes the deferred label write. Each settled entry is removed from the queue and
+the user leaves the pending-claim enumeration set once their queue empties. At most
+<code>limit</code> entries are processed so a large queue cannot exceed the block gas limit;
+<code>moreRemaining</code> reports whether entries are left for a follow-up call, and a <code>limit</code> of
+zero settles nothing. An entry whose store row is already written, for example
+independently or by an earlier entry for the same name, is removed without a write or an
+event. So is an entry for a name the user no longer holds, because governance revoked it.
+Emits</p>
+<p><strong>Note:</strong>
+emits: PendingClaimSettled and @custom:emits NameRegistered per settled entry, with
+<code>settledBy</code> set to the caller so a third-party settlement is distinguishable from a
+self-settlement.</p>
+<pre><code class="language-solidity">function settlePendingClaims(
+    address user,
+    uint256 limit
+)
+    external
+    override
+    returns (uint256 settledCount, bool moreRemaining);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Account whose pending claims are settled.</td></tr>
+<tr><td><code>limit</code></td><td><code>uint256</code></td><td>Maximum number of entries to settle in this call.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>settledCount</code></td><td><code>uint256</code></td><td>Number of entries settled.</td></tr>
+<tr><td><code>moreRemaining</code></td><td><code>bool</code></td><td>Whether the user still holds unsettled entries.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_settlepending"><a class="header" href="#_settlepending">_settlePending</a></h3>
+<p>Shared settlement loop behind @custom:function claimLabelStore and</p>
+<p>Settles up to <code>limit</code> of the user's pending claims, deploying the store on the first
+write, and removes the user from the enumeration set once their queue empties.</p>
+<p><strong>Note:</strong>
+function: settlePendingClaims.</p>
+<pre><code class="language-solidity">function _settlePending(
+    address user,
+    uint256 limit
+)
+    internal
+    returns (uint256 settledCount, bool moreRemaining);
+</code></pre>
+<h3 id="_settlependinglabel"><a class="header" href="#_settlependinglabel">_settlePendingLabel</a></h3>
+<p>Writes a single pending label into the user's store, deploying the store lazily.</p>
+<p>The store is created only when there is a label to write, so a caller who settles an
+empty queue never leaves a fresh store behind with nothing in it. Returns the (possibly
+newly deployed) store so the caller threads it through the remaining entries.</p>
+<pre><code class="language-solidity">function _settlePendingLabel(
+    Deps memory deps,
+    IStoreFactory factory,
+    address store,
+    address user,
+    string memory label
+)
+    internal
+    returns (address);
+</code></pre>
+<h3 id="isreservedforclaim"><a class="header" href="#isreservedforclaim">isReservedForClaim</a></h3>
+<p>Returns whether a label currently has a live reservation at the queue head.</p>
+<p>Validates <code>label</code> as a letters-only personhood label (otherwise</p>
+<p><strong>Note:</strong>
+reverts: InvalidPersonhoodLabel) before inspecting the queue.</p>
+<pre><code class="language-solidity">function isReservedForClaim(string calldata label)
+    external
+    view
+    override
+    returns (bool reserved, address holder);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Personhood name whose queue is inspected.</td></tr>
+</tbody></table>
+</div>
+<h3 id="setreservationduration"><a class="header" href="#setreservationduration">setReservationDuration</a></h3>
+<p>Updates the reservation duration used to decide when queue entries expire.</p>
+<p>Owner-gated (otherwise @custom:reverts OwnableUnauthorizedAccount). A duration below
+<code>MIN_RESERVATION_DURATION</code> @custom:reverts ReservationDurationTooLow, and one above
+<code>MAX_RESERVATION_DURATION</code> @custom:reverts ReservationDurationTooHigh. Emits</p>
+<p><strong>Note:</strong>
+emits: ReservationDurationSet on success.</p>
+<pre><code class="language-solidity">function setReservationDuration(uint64 duration) external override onlyOwner;
+</code></pre>
+<h3 id="reservationmeta"><a class="header" href="#reservationmeta">reservationMeta</a></h3>
+<p>Returns the queue metadata (<code>head</code>, <code>tail</code>) for <code>labelhash</code>.</p>
+<p>Read-only accessor over the per-label reservation queue. <code>head == tail</code> means
+the queue is empty; active entries occupy <code>[head, tail)</code>. Exposed on the interface
+because invariant tests and off-chain consumers use it to enumerate
+live queue state without scanning storage.</p>
+<pre><code class="language-solidity">function reservationMeta(bytes32 labelhash)
+    external
+    view
+    override
+    returns (uint64 head, uint64 tail);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Keccak-256 of the personhood name whose queue is being read.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>head</code></td><td><code>uint64</code></td><td>Index of the live queue head.</td></tr>
+<tr><td><code>tail</code></td><td><code>uint64</code></td><td>Index one past the last queued entry.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservationentry"><a class="header" href="#reservationentry">reservationEntry</a></h3>
+<p>Returns the queue entry at <code>index</code> for <code>labelhash</code>.</p>
+<p>Reads only the live window <code>[head, tail)</code> of @custom:function reservationMeta: an
+index outside it, whose entry expired, was claimed or was never written, returns zero, and
+so does an entry its owner relinquished.</p>
+<pre><code class="language-solidity">function reservationEntry(
+    bytes32 labelhash,
+    uint64 index
+)
+    external
+    view
+    override
+    returns (address entryOwner, uint64 joinedAt);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Keccak-256 of the personhood name whose queue is being read.</td></tr>
+<tr><td><code>index</code></td><td><code>uint64</code></td><td>Queue index to look up.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>entryOwner</code></td><td><code>address</code></td><td>Owner of the slot (zero if empty/relinquished).</td></tr>
+<tr><td><code>joinedAt</code></td><td><code>uint64</code></td><td>Timestamp the entry was enqueued (only meaningful when <code>entryOwner != address(0)</code>).</td></tr>
+</tbody></table>
+</div>
+<h3 id="userreservation"><a class="header" href="#userreservation">userReservation</a></h3>
+<p>Returns <code>user</code>'s current reservation pointer.</p>
+<p>A zero <code>labelhash</code> on the returned struct means the user holds no reservation;
+<code>index</code> is meaningful only when <code>labelhash</code> is non-zero.</p>
+<pre><code class="language-solidity">function userReservation(address user)
+    external
+    view
+    override
+    returns (UserReservation memory reservation);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Account whose reservation pointer is being read.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>reservation</code></td><td><code>UserReservation</code></td><td>Per-user reservation pointer; see @custom:struct UserReservation.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingclaims"><a class="header" href="#pendingclaims">pendingClaims</a></h3>
+<p>Returns a paginated slice of a user's pending claims in queue order.</p>
+<p>An empty array means the user has no pending claims at <code>offset</code>. Each entry carries
+its <code>mintedAt</code>, and every entry stays settleable whatever its age. An <code>offset</code> past the end
+returns an empty array rather than reverting, and a page holds at most
+<code>DotnsConstants.MAX_PAGE_SIZE</code> entries.</p>
+<pre><code class="language-solidity">function pendingClaims(
+    address user,
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    override
+    returns (PendingClaim[] memory claims);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Account whose pending claims are read.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint256</code></td><td>Start index into the queue.</td></tr>
+<tr><td><code>limit</code></td><td><code>uint256</code></td><td>Maximum entries to return.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>claims</code></td><td><code>PendingClaim[]</code></td><td>Page of the user's pending claims; see @custom:struct PendingClaim.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingclaimcountof"><a class="header" href="#pendingclaimcountof">pendingClaimCountOf</a></h3>
+<p>Returns the number of pending claims currently staged for <code>user</code>.</p>
+<pre><code class="language-solidity">function pendingClaimCountOf(address user) external view override returns (uint256 count);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>user</code></td><td><code>address</code></td><td>Account whose pending claims are counted.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>count</code></td><td><code>uint256</code></td><td>Number of staged pending claims.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingclaimusercount"><a class="header" href="#pendingclaimusercount">pendingClaimUserCount</a></h3>
+<p>Returns the number of users with at least one live pending claim.</p>
+<p>Exact live count, not an all-time tally: fully settled users are removed from the
+enumeration set so off-chain consumers can page through every stalled user without
+filtering.</p>
+<pre><code class="language-solidity">function pendingClaimUserCount() external view override returns (uint256 count);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>count</code></td><td><code>uint256</code></td><td>Number of users currently holding a pending claim.</td></tr>
+</tbody></table>
+</div>
+<h3 id="pendingclaimusers"><a class="header" href="#pendingclaimusers">pendingClaimUsers</a></h3>
+<p>Returns a paginated slice of users with at least one live pending claim.</p>
+<p>Pair with @custom:function pendingClaims to read each user's stashed entries.
+Ordering is not chronological; callers MUST NOT assume <code>mintedAt</code> is monotonic
+across the slice. Returns an empty array when <code>offset</code> is past the live count, and a page
+holds at most <code>DotnsConstants.MAX_PAGE_SIZE</code> entries.</p>
+<pre><code class="language-solidity">function pendingClaimUsers(
+    uint256 offset,
+    uint256 limit
+)
+    external
+    view
+    override
+    returns (address[] memory users);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>offset</code></td><td><code>uint256</code></td><td>Start index.</td></tr>
+<tr><td><code>limit</code></td><td><code>uint256</code></td><td>Maximum entries to return.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>users</code></td><td><code>address[]</code></td><td>Slice of users currently holding a pending claim.</td></tr>
+</tbody></table>
+</div>
+<h3 id="reservedlabelof"><a class="header" href="#reservedlabelof">reservedLabelOf</a></h3>
+<p>Returns the personhood name a reservation queue is keyed under.</p>
+<p>Reverse lookup from the <code>bytes32</code> queue key to its label string, so a consumer that
+observed a queue by labelhash (for example from a reservation event) can recover the
+human-readable label without holding its preimage. Returns an empty string when no
+reservation was ever enqueued under <code>labelhash</code>.</p>
+<pre><code class="language-solidity">function reservedLabelOf(bytes32 labelhash)
+    external
+    view
+    override
+    returns (string memory label);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Keccak-256 of the personhood name.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>The personhood name, or empty when unknown.</td></tr>
+</tbody></table>
+</div>
+<h3 id="supportsinterface"><a class="header" href="#supportsinterface">supportsInterface</a></h3>
+<pre><code class="language-solidity">function supportsInterface(bytes4 interfaceId)
+    public
+    view
+    override(ERC165Upgradeable, IERC165)
+    returns (bool);
+</code></pre>
+<h3 id="version"><a class="header" href="#version">version</a></h3>
+<p>Returns the release this network declares it runs, read live from the protocol
+registry so every dotNS contract reports one synchronised value.</p>
+<p>Mirror of <code>IDotnsProtocolRegistry.protocolVersion</code>, kept under the historical
+<code>version()</code> selector for ABI compatibility. It reports the network's declaration,
+not this contract's build; per-contract identity is the codehash declared on the
+registry.</p>
+<pre><code class="language-solidity">function version() external view virtual returns (string memory versionString);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>versionString</code></td><td><code>string</code></td><td>Declared release as bare semver, empty when never declared.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_completegatewayregistration"><a class="header" href="#_completegatewayregistration">_completeGatewayRegistration</a></h3>
+<p>Mints a name, wires forward registry, persists PoP-flow records (chat key,
+device link) on the PoP resolver, and either writes the label into the owner's
+existing <code>LabelStore</code> or stashes a pending claim when the owner has none yet.</p>
+<p>The mint + forward-registry pair runs against the registrar and registry this call
+already resolved, so the gateway's call reads each address once. The label is passed
+empty so the registrar does not deploy a <code>LabelStore</code>; the mint origin cannot run the
+<code>LabelStore</code> constructor. PoP-flow per-name records
+(chat key, device link) are persisted eagerly on @custom:contract IDotnsPopResolver
+here, before the label is written, so the resolver carries the full identity record
+from mint time regardless of whether the owner already has a <code>LabelStore</code>. The Store
+stays labels-only. Warm path emits @custom:emits NameRegistered immediately; the
+cold path emits @custom:emits PendingClaimStashed at mint and defers</p>
+<p><strong>Note:</strong>
+emits: NameRegistered to @custom:function settlePendingClaims when the claim
+settles.</p>
+<pre><code class="language-solidity">function _completeGatewayRegistration(
+    Deps memory deps,
+    address user,
+    string memory label,
+    bytes32 labelhash,
+    bytes32 node,
+    bytes memory chatKeyBytes,
+    bytes32 deviceLabelhash
+)
+    internal;
+</code></pre>
+<h3 id="_writerecord"><a class="header" href="#_writerecord">_writeRecord</a></h3>
+<p>Writes a name's label into <code>store</code>.</p>
+<p>Single canonical persistence step shared by the warm gateway path and</p>
+<p><strong>Note:</strong>
+function: settlePendingClaims. The store key is <code>node</code>, matching
+the registrar's <code>_writeOwnerLabel</code> convention. Idempotent on already-locked slots so a
+user whose store was pre-populated under the same <code>node</code> (e.g. by a sibling protocol
+flow) can still settle their pending claim without bricking on <code>LabelAlreadyExists</code>.</p>
+<pre><code class="language-solidity">function _writeRecord(address store, bytes32 node, string memory label) internal;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>store</code></td><td><code>address</code></td><td>Owner's <code>LabelStore</code> proxy.</td></tr>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The name's node. A device name resolves to its stem beneath its numeric container, so this is not always <code>namehash(tldNode, keccak(label))</code> for the whole label.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Bare label without the TLD, which is appended on write. A device name carries its separator, so this is not always a single DNS label.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_stashpendingclaim"><a class="header" href="#_stashpendingclaim">_stashPendingClaim</a></h3>
+<p>Appends a deferred binding for <code>user</code> and adds them to the enumeration set.</p>
+<p>The mint origin cannot deploy the user's <code>LabelStore</code>, so deferred names pile
+up in <code>_pendingClaimQueue</code> until a signed-origin @custom:function settlePendingClaims
+writes them. Adding the user to the set is idempotent, so repeat stashes keep a single
+enumeration entry. Emits @custom:emits PendingClaimStashed.</p>
+<pre><code class="language-solidity">function _stashPendingClaim(address user, string memory label, bytes32 labelhash) internal;
+</code></pre>
+<h3 id="_isexpired"><a class="header" href="#_isexpired">_isExpired</a></h3>
+<p>Returns whether a queue entry is expired relative to <code>block.timestamp</code>.</p>
+<pre><code class="language-solidity">function _isExpired(uint64 joinedAt) internal view returns (bool);
+</code></pre>
+<h3 id="_enqueuereservation"><a class="header" href="#_enqueuereservation">_enqueueReservation</a></h3>
+<p>Appends a new reservation entry to the tail of the queue for <code>labelhash</code>.</p>
+<p>Reverts if the queue is full or the user already holds a reservation. When the
+enqueued entry is the new head of an empty queue, the controller also reserves the
+base name on PopRules so the public commit-reveal flow sees the reservation through
+its existing <code>priceWithCheck</code> guard. Subsequent waiters only live in the local queue
+until they are promoted.</p>
+<pre><code class="language-solidity">function _enqueueReservation(
+    Deps memory deps,
+    bytes32 labelhash,
+    string memory reservedLabel,
+    address user,
+    bool slotKept
+)
+    internal;
+</code></pre>
+<h3 id="_clearqueue"><a class="header" href="#_clearqueue">_clearQueue</a></h3>
+<p>Ends the reservation queue for <code>labelhash</code> when its head claims the name or
+governance evicts the queue, and releases the corresponding PopRules reservation.</p>
+<p>After a claim the name is minted, and after an eviction nobody is waiting for it, so
+either way nothing is left to reserve and PopRules is told the slot is free. Every entry,
+the claimant's and each waiter's, is evicted lazily, so the call costs the same whatever
+the queue holds: the head moves to the tail, which ends the queue, and entries and pointers
+stay where they are, below the new head.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>function: _isEvicted reads such a pointer as no reservation, and the user's next
+reservation clears it. The event the caller emits, @custom:emits ReservationClaimed or</p>
+</li>
+<li>
+<p>emits: ReservationsEvicted, therefore ends the reservation of every waiter in the
+queue.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function _clearQueue(Deps memory deps, bytes32 labelhash) internal;
+</code></pre>
+<h3 id="_isevicted"><a class="header" href="#_isevicted">_isEvicted</a></h3>
+<p>Returns whether <code>reservation</code> points at an entry the queue's head has moved past.</p>
+<p>Expiry and claims leave entries and pointers in place and move the head past them
+(see @custom:function _advanceExpiredHead and @custom:function _clearQueue), so a pointer
+below its queue's head is no reservation. Queue indices only ever grow, so such a pointer
+never matches an entry queued later under the same label.</p>
+<pre><code class="language-solidity">function _isEvicted(UserReservation memory reservation) internal view returns (bool);
+</code></pre>
+<h3 id="_keepordropreservation"><a class="header" href="#_keepordropreservation">_keepOrDropReservation</a></h3>
+<p>Prepares a gateway reservation of <code>labelhash</code> for <code>user</code>: keeps the user's
+reservation when it is an active one for the same name, and otherwise drops whatever
+reservation they hold so a fresh one can be queued.</p>
+<p>A repeated reservation of the same name, such as one made again after the user recovers
+their account onto a new device, keeps the user's place and expiry. The expiry is not
+refreshed, so repeating a reservation never extends how long a user holds a name. Reads the
+user's reservation once and hands it to @custom:function _dropReservation.
+Dropping a reservation for another name only empties the user's entry in that queue: the
+next call on that name clears it like an expired one. A gateway call then does queue work
+in one queue only, the name being reserved, so its cost stays within the weight limit.</p>
+<pre><code class="language-solidity">function _keepOrDropReservation(
+    Deps memory deps,
+    bytes32 labelhash,
+    address user
+)
+    internal
+    returns (bool kept);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>kept</code></td><td><code>bool</code></td><td>Whether the existing reservation was kept, so nothing is to be queued.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_advanceexpiredhead"><a class="header" href="#_advanceexpiredhead">_advanceExpiredHead</a></h3>
+<p>Clears up to <code>maxSteps</code> expired or emptied entries from the front of the queue.</p>
+<p>Every entry visited costs a storage read, and a gateway call runs under a fixed weight
+limit, so a call clears at most <code>maxSteps</code> entries and keeps that progress; a later call
+carries on. Clearing writes nothing per entry: entries and pointers stay below the new
+front, where they read as gone (@custom:function _isEvicted), and queue indices only ever
+grow.
+When clearing reaches an active reservation, PopRules moves to that user, unless it is
+<code>claimant</code>, whose claim in the same call releases the slot. When it empties the queue, the
+PopRules slot is released, unless the caller is <code>refilling</code> it in the same call: then the
+slot and its label are kept and <code>slotKept</code> is returned, so the slot moves to the new user
+in one PopRules call. When it stops before either, PopRules is left as it is, naming a user
+the queue may have moved past. That user gains nothing: the public flow rejects a reserved
+name for everyone, and while a name has a queue, @custom:function issuePersonhoodName
+decides from the queue alone. @custom:emits ReservationExpired once per expired entry
+cleared.</p>
+<pre><code class="language-solidity">function _advanceExpiredHead(
+    Deps memory deps,
+    bytes32 labelhash,
+    uint256 maxSteps,
+    bool refilling,
+    address claimant
+)
+    internal
+    returns (bool slotKept);
+</code></pre>
+<h3 id="_dropuserreservation"><a class="header" href="#_dropuserreservation">_dropUserReservation</a></h3>
+<p>Drops <code>user</code>'s own reservation entry, if any, and records that it happened.</p>
+<p>The single path by which a user's entry leaves a queue other than by expiry or by a
+claim: an explicit relinquish, a standalone personhood-name issuance, and a re-reservation
+that moves the user to another queue. @custom:emits ReservationRelinquished only when the
+user held an entry, so an indexer can rebuild every queue from events alone. <code>maxSteps</code>
+bounds the clearing that follows when the user was at the front of their queue: a gateway
+call passes 0, leaving the emptied entry for the next call on that name, and a signed
+relinquish clears the whole queue.</p>
+<pre><code class="language-solidity">function _dropUserReservation(Deps memory deps, address user, uint256 maxSteps) internal;
+</code></pre>
+<h3 id="_dropreservation"><a class="header" href="#_dropreservation">_dropReservation</a></h3>
+<p>Body of @custom:function _dropUserReservation for a caller that has already read
+<code>user</code>'s reservation.</p>
+<pre><code class="language-solidity">function _dropReservation(
+    Deps memory deps,
+    address user,
+    UserReservation memory reservation,
+    uint256 maxSteps
+)
+    internal;
+</code></pre>
+<h3 id="_removeuserfromqueue"><a class="header" href="#_removeuserfromqueue">_removeUserFromQueue</a></h3>
+<p>Removes <code>user</code> from whichever reservation queue they currently occupy.</p>
+<p>The user's entry is deleted in place. When it was the front of the queue and
+<code>maxSteps</code> is not zero, @custom:function _advanceExpiredHead clears up to <code>maxSteps</code>
+entries from there, the emptied entry among them, and moves PopRules to the next user with
+an active reservation or releases it when none is left. Otherwise the front and PopRules
+stay unchanged. Emits nothing itself; callers go through</p>
+<p><strong>Note:</strong>
+function: _dropUserReservation. <code>reservation</code> is the user's live reservation,
+already read by the caller.</p>
+<pre><code class="language-solidity">function _removeUserFromQueue(
+    Deps memory deps,
+    address user,
+    UserReservation memory reservation,
+    uint256 maxSteps
+)
+    internal;
+</code></pre>
+<h3 id="_validatedevicelabel"><a class="header" href="#_validatedevicelabel">_validateDeviceLabel</a></h3>
+<p>Validates a device name <code>stem.NN</code> and derives <code>(labelhash, node)</code>.</p>
+<p>The stem is lowercase letters only, so this rejects a stem carrying a digit or a
+hyphen before any node is derived. <code>node</code> is the hierarchical subnode <code>stem</code> under the
+numeric container <code>NN</code>, the node a resolver reaches by walking the dotted name, and
+<code>labelhash</code> stays the keccak of the whole label so it is a stable text identifier for events
+and the reservation queue. <code>legacy</code> selects the label error, as in</p>
+<p><strong>Note:</strong>
+function: _requireDeviceLabel.</p>
+<pre><code class="language-solidity">function _validateDeviceLabel(
+    Deps memory deps,
+    string memory deviceLabel,
+    bool legacy
+)
+    internal
+    view
+    returns (bytes32 labelhash, bytes32 node);
+</code></pre>
+<h3 id="_devicesubnode"><a class="header" href="#_devicesubnode">_deviceSubnode</a></h3>
+<p>Derives the hierarchical subnode for a device name <code>&lt;stem&gt;.&lt;suffix&gt;</code>.</p>
+<p>Splits at the separator and walks <code>suffix.tld</code> then <code>stem</code> under it, so a device name
+resolves as <code>stem</code> beneath its numeric container rather than as a hash of the whole label.
+Shared by @custom:function _validateDeviceLabel and pending-claim settlement so every
+consumer agrees on one node.</p>
+<pre><code class="language-solidity">function _deviceSubnode(
+    Deps memory deps,
+    string memory deviceLabel
+)
+    internal
+    view
+    returns (bytes32 subnode);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>deps</code></td><td><code>Deps</code></td><td></td></tr>
+<tr><td><code>deviceLabel</code></td><td><code>string</code></td><td>Device name held in memory, e.g. <code>alice.01</code>.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>subnode</code></td><td><code>bytes32</code></td><td>Namehash of <code>stem</code> under <code>suffix.tld</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_validatepersonhoodlabel"><a class="header" href="#_validatepersonhoodlabel">_validatePersonhoodLabel</a></h3>
+<p>Validates a personhood name and derives <code>(labelhash, node)</code>.</p>
+<p>Letters only, so this is stricter than a DNS label: a hyphen or an interior digit
+is rejected here even though @custom:function StringUtils.isSingleLabel would admit it.
+<code>legacy</code> selects the label error, as in @custom:function _requirePersonhoodLabel.</p>
+<pre><code class="language-solidity">function _validatePersonhoodLabel(
+    Deps memory deps,
+    string calldata label,
+    bool legacy
+)
+    internal
+    view
+    returns (bytes32 labelhash, bytes32 node);
+</code></pre>
+<h3 id="_validatereservablepersonhoodlabel"><a class="header" href="#_validatereservablepersonhoodlabel">_validateReservablePersonhoodLabel</a></h3>
+<p>Validates a personhood name as reservable and returns its hashes.</p>
+<p>Shared by both reservation paths so the guard cannot drift between them. Runs three
+checks and reverts on the first failure, before any reservation state is mutated: the label
+must be a letters-only personhood label, which makes it its own base name, classify outside
+the governance-reserved tier, and have no owner on the registrar. The last check is the fix
+for a reservation queued over an already-registered name: the queue keys by base name, so
+such a reservation could never be redeemed yet would hold the base name, and so every device
+name with that stem, for the full reservation window. <code>exists</code> (owner set) mirrors exactly
+what makes the eventual claim's mint revert, so a label that passes here is one a claim can
+still register.</p>
+<pre><code class="language-solidity">function _validateReservablePersonhoodLabel(
+    Deps memory deps,
+    string calldata label,
+    bool legacy
+)
+    internal
+    view
+    returns (bytes32 labelhash, bytes32 node);
+</code></pre>
+<h3 id="_requiredevicelabel"><a class="header" href="#_requiredevicelabel">_requireDeviceLabel</a></h3>
+<p>Reverts with the device-label error the caller decodes when <code>ok</code> is false.</p>
+<p><code>legacy</code> is set only on the @custom:contract IDotnsPopControllerLegacy entrypoints,
+whose callers decode @custom:reverts InvalidLiteLabel; every other path reverts</p>
+<p><strong>Note:</strong>
+reverts: InvalidDeviceLabel.</p>
+<pre><code class="language-solidity">function _requireDeviceLabel(bool ok, bool legacy) internal pure;
+</code></pre>
+<h3 id="_requirepersonhoodlabel"><a class="header" href="#_requirepersonhoodlabel">_requirePersonhoodLabel</a></h3>
+<p>Reverts with the personhood-label error the caller decodes when <code>ok</code> is false.</p>
+<p><code>legacy</code> is set only on the @custom:contract IDotnsPopControllerLegacy entrypoints,
+whose callers decode @custom:reverts InvalidBaseLabel; every other path reverts</p>
+<p><strong>Note:</strong>
+reverts: InvalidPersonhoodLabel.</p>
+<pre><code class="language-solidity">function _requirePersonhoodLabel(bool ok, bool legacy) internal pure;
+</code></pre>
+<h3 id="_requirevalidchatkey"><a class="header" href="#_requirevalidchatkey">_requireValidChatKey</a></h3>
+<p>Reverts when a non-empty chat key is not exactly <code>CHAT_KEY_LENGTH</code> bytes.</p>
+<p>Mirrors the resolver's own length gate so the gateway sees a controller-local
+<code>InvalidChatKey</code> revert before any mint state is written.</p>
+<pre><code class="language-solidity">function _requireValidChatKey(bytes memory chatKey) internal pure;
+</code></pre>
+<h3 id="_popresolver"><a class="header" href="#_popresolver">_popResolver</a></h3>
+<p>Resolves the PoP resolver via the protocol registry.</p>
+<pre><code class="language-solidity">function _popResolver() internal view returns (IDotnsPopResolver);
+</code></pre>
+<h3 id="_poprules"><a class="header" href="#_poprules">_popRules</a></h3>
+<p>Resolves the PopRules contract via the protocol registry.</p>
+<pre><code class="language-solidity">function _popRules() internal view returns (IPopRules);
+</code></pre>
+<h3 id="_storefactory"><a class="header" href="#_storefactory">_storeFactory</a></h3>
+<p>Resolves the Store factory via the protocol registry.</p>
+<pre><code class="language-solidity">function _storeFactory() internal view returns (IStoreFactory);
+</code></pre>
+<h3 id="_registrar"><a class="header" href="#_registrar">_registrar</a></h3>
+<p>Resolves the registrar via the protocol registry.</p>
+<pre><code class="language-solidity">function _registrar() internal view returns (IDotnsRegistrar);
+</code></pre>
+<h3 id="_registry"><a class="header" href="#_registry">_registry</a></h3>
+<p>Resolves the registry via the protocol registry.</p>
+<pre><code class="language-solidity">function _registry() internal view returns (IDotnsRegistry);
+</code></pre>
+<h3 id="_rulesof"><a class="header" href="#_rulesof">_rulesOf</a></h3>
+<p>Returns PopRules, reading it from the protocol registry on first use in <code>deps</code>.</p>
+<pre><code class="language-solidity">function _rulesOf(Deps memory deps) internal view returns (IPopRules rules);
+</code></pre>
+<h3 id="_registrarof"><a class="header" href="#_registrarof">_registrarOf</a></h3>
+<p>Returns the registrar, reading it from the protocol registry on first use in
+<code>deps</code>.</p>
+<pre><code class="language-solidity">function _registrarOf(Deps memory deps) internal view returns (IDotnsRegistrar registrar);
+</code></pre>
+<h3 id="_registryof"><a class="header" href="#_registryof">_registryOf</a></h3>
+<p>Returns the registry, reading it from the protocol registry on first use in
+<code>deps</code>.</p>
+<pre><code class="language-solidity">function _registryOf(Deps memory deps) internal view returns (IDotnsRegistry registry);
+</code></pre>
+<h3 id="_popresolverof"><a class="header" href="#_popresolverof">_popResolverOf</a></h3>
+<p>Returns the PoP resolver, reading it from the protocol registry on first use in
+<code>deps</code>.</p>
+<pre><code class="language-solidity">function _popResolverOf(Deps memory deps) internal view returns (IDotnsPopResolver resolver);
+</code></pre>
+<h3 id="_storefactoryof"><a class="header" href="#_storefactoryof">_storeFactoryOf</a></h3>
+<p>Returns the store factory, reading it from the protocol registry on first use in
+<code>deps</code>.</p>
+<pre><code class="language-solidity">function _storeFactoryOf(Deps memory deps) internal view returns (IStoreFactory factory);
+</code></pre>
+<h3 id="_tldnodeof"><a class="header" href="#_tldnodeof">_tldNodeOf</a></h3>
+<p>Returns the TLD node, reading it from the protocol registry on first use in
+<code>deps</code>.</p>
+<p>The TLD node is a namehash, so zero never names a real TLD and serves as "not read
+yet".</p>
+<pre><code class="language-solidity">function _tldNodeOf(Deps memory deps) internal view returns (bytes32 tldNode);
+</code></pre>
+<h3 id="_registerdevicesubname"><a class="header" href="#_registerdevicesubname">_registerDeviceSubname</a></h3>
+<p>Registers the device name <code>stem.suffix</code> for <code>owner</code> beneath its numeric container.</p>
+<p>The container is checked, and minted on first use, only until this contract has seen
+it once; after that the registry's own parent authorisation in</p>
+<p><strong>Note:</strong>
+function: IDotnsRegistry.setSubnodeOwner is the guard. A container this contract
+minted is soulbound to it, so it never changes hands afterwards.</p>
+<pre><code class="language-solidity">function _registerDeviceSubname(
+    Deps memory deps,
+    string memory suffix,
+    string memory stem,
+    address owner
+)
+    internal
+    returns (bytes32 subnode);
+</code></pre>
+<h3 id="_ensuredevicecontainer"><a class="header" href="#_ensuredevicecontainer">_ensureDeviceContainer</a></h3>
+<p>Mints the numeric container <code>parentNode</code> for this contract when it does not exist
+yet, or checks that this contract owns it, and records that it is ready.</p>
+<p>Reverts with @custom:reverts IDotnsRegistry.NotAuthorised when someone else holds the
+container, so a name registered elsewhere is never used as a device container.</p>
+<pre><code class="language-solidity">function _ensureDeviceContainer(Deps memory deps, bytes32 parentNode) internal;
+</code></pre>
+<h3 id="_syncpoprulestohead"><a class="header" href="#_syncpoprulestohead">_syncPopRulesToHead</a></h3>
+<p>Writes the new head of the queue into PopRules so the public commit-reveal flow
+rejects registrations of this base name for anyone other than <code>newHead</code>.</p>
+<p>Callers guarantee <code>newHead</code> is non-zero (the queue holds a live entry) and that
+<code>_reservedBaseLabel[labelhash]</code> is non-empty (any non-empty queue had its first head
+write the slot). @custom:function IPopRules.reassignBaseNameForPop moves the slot in one
+call; this contract stamped it, so PopRules' ownership gate admits the move.</p>
+<pre><code class="language-solidity">function _syncPopRulesToHead(Deps memory deps, bytes32 labelhash, address newHead) internal;
+</code></pre>
+<h3 id="_releasepoprulesslot"><a class="header" href="#_releasepoprulesslot">_releasePopRulesSlot</a></h3>
+<p>Clears the PopRules slot and the local label bookkeeping when the queue empties
+(claim, last-relinquish, last-expire).</p>
+<pre><code class="language-solidity">function _releasePopRulesSlot(Deps memory deps, bytes32 labelhash) internal;
+</code></pre>
+<h3 id="_onlyroot"><a class="header" href="#_onlyroot">_onlyRoot</a></h3>
+<p>Internal check enforcing a Root origin.</p>
+<p>Authorises a call when @custom:function SystemUtils.originIsRoot is true, and
+reverts with NotRoot otherwise. <code>msg.sender</code> is deliberately not consulted: a
+Root origin has no account behind it, so reading <code>msg.sender</code> traps. That holds
+for this frame and any delegatecall sharing it; a nested call sees the calling
+contract as its sender and reads normally.
+The check also holds for the whole Root transaction rather than the entry frame
+alone, so nothing reachable from an onlyRoot entrypoint may call a
+user-controlled address: such a callee could re-enter a gated function and still
+pass. Every call out of this contract goes to a protocol contract resolved
+through the registry.</p>
+<pre><code class="language-solidity">function _onlyRoot() internal view;
+</code></pre>
+<h3 id="_authorizeupgrade"><a class="header" href="#_authorizeupgrade">_authorizeUpgrade</a></h3>
+<p>Function that should revert when <code>msg.sender</code> is not authorized to upgrade the contract.
+Called by
+{upgradeToAndCall}.
+Normally, this function will use an xref:access.adoc[access control] modifier such as
+{Ownable-onlyOwner}.</p>
+<pre><code class="language-solidity">function _authorizeUpgrade(address) internal onlyOwner {}
+</code></pre>
+<pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
+</code></pre>
+<h2 id="structs"><a class="header" href="#structs">Structs</a></h2>
+<h3 id="deps"><a class="header" href="#deps">Deps</a></h3>
+<p>Contract addresses one call reads from the protocol registry, each at most once.</p>
+<p>Filled on first use by the <code>_...Of</code> getters and passed by reference through the call.
+A gateway call runs under a fixed weight limit and every registry lookup is a proxied
+external call, so each address is read once per call and reused.</p>
+<pre><code class="language-solidity">struct Deps {
+    IPopRules rules;
+    IDotnsRegistrar registrar;
+    IDotnsRegistry registry;
+    IDotnsPopResolver popResolver;
+    IStoreFactory storeFactory;
+    bytes32 tldNode;
+}
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../../contracts/registrars/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../../../contracts/registrars/DotnsPopLens.sol/contract.DotnsPopLens.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../../contracts/registrars/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../../../contracts/registrars/DotnsPopLens.sol/contract.DotnsPopLens.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../../elasticlunr.min.js"></script>
+        <script src="../../../mark.min.js"></script>
+        <script src="../../../searcher.js"></script>
+
+        <script src="../../../clipboard.min.js"></script>
+        <script src="../../../highlight.js"></script>
+        <script src="../../../book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../../../solidity.min.js"></script>
+
+
+    </div>
+    </body>
+</html>
