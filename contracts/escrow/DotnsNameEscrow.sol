@@ -392,9 +392,6 @@ contract DotnsNameEscrow is
     ///      in custody in one call, so check @custom:function releasedTokenCount before relying on
     ///      it. Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
     ///      through ERC-165 stays the same.
-    ///      The one-time `clearCustodyOnUpgrade` upgrade call is declared on `DotnsNameEscrow`
-    /// only: adding it in the interface would change the interface id the escrow reports through
-    /// ERC-165.
     function clearCustodyOnUpgrade() external onlyOwner reinitializer(2) {
         uint256 count = _releasedTokens.length;
         for (uint256 i; i < count; ++i) {
