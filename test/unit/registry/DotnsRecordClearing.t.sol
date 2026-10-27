@@ -264,13 +264,64 @@ contract DotnsRecordClearingTest is BaseDotns {
         dotnsRegistry.deleteSubname(node, keccak256(bytes(CHILD)));
     }
 
-    function test_revert_delete_of_a_subname_that_does_not_resolve() public {
+    function test_parent_deletes_a_subname_a_clear_cut_off_and_frees_its_storage() public {
         vm.prank(ed);
         dotnsRegistry.clearSubnames(node);
 
         vm.prank(ed);
-        vm.expectRevert(abi.encodeWithSelector(IDotnsRegistry.SubnameNotFound.selector, childNode));
         dotnsRegistry.deleteSubname(node, keccak256(bytes(CHILD)));
+
+        bytes32 base = keccak256(abi.encode(childNode, RECORDS_SLOT));
+        _assertZero(address(dotnsRegistry), base, "record owner slot");
+        _assertZero(address(dotnsRegistry), bytes32(uint256(base) + 1), "record resolver slot");
+        _assertZero(
+            address(dotnsRegistry), keccak256(abi.encode(childNode, PARENT_OF_SLOT)), "parent link"
+        );
+    }
+
+    function test_revert_delete_below_a_subname_a_clear_cut_off() public {
+        vm.prank(ed);
+        dotnsRegistry.clearSubnames(node);
+
+        // The grandchild's parent no longer resolves, so nobody holds authority to delete it.
+        vm.prank(tiago);
+        vm.expectRevert(IDotnsRegistry.NotAuthorised.selector);
+        dotnsRegistry.deleteSubname(childNode, keccak256(bytes(GRANDCHILD)));
+    }
+
+    function test_new_owner_deletes_subnames_the_previous_owner_cleared() public {
+        vm.prank(ed);
+        dotnsRegistry.clearSubnames(node);
+        vm.prank(ed);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
+
+        vm.prank(ed);
+        vm.expectRevert(IDotnsRegistry.NotAuthorised.selector);
+        dotnsRegistry.deleteSubname(node, keccak256(bytes(CHILD)));
+
+        vm.prank(leonardo);
+        dotnsRegistry.deleteSubname(node, keccak256(bytes(CHILD)));
+        assertFalse(dotnsRegistry.recordExists(childNode));
+    }
+
+    function test_revert_delete_of_a_subname_that_does_not_exist() public {
+        bytes32 labelhash = keccak256("nobody");
+        vm.prank(ed);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsRegistry.SubnameNotFound.selector, _namehash(node, labelhash)
+            )
+        );
+        dotnsRegistry.deleteSubname(node, labelhash);
+    }
+
+    function test_new_subname_under_a_parent_never_cleared_writes_no_version_slot() public view {
+        // Its parent's subname version is zero, which is what the slot already holds, so the
+        // registry skips that write.
+        assertEq(
+            vm.load(address(dotnsRegistry), keccak256(abi.encode(childNode, VERSIONS_SLOT))),
+            bytes32(0)
+        );
     }
 
     function test_deleted_subname_can_be_created_again_clean() public {

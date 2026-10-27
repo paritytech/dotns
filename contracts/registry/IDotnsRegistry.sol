@@ -147,10 +147,10 @@ interface IDotnsRegistry {
     ///      resolver record is written either way. A `record.persist` of false defers the store
     ///      write and is restricted to registered controllers
     ///      (@custom:function IDotnsRegistrar.controllers), otherwise @custom:reverts
-    /// NotAuthorised. Creating a subname, as opposed to reassigning one that resolves, requires it
-    ///      to sit at most `MAX_SUBNAME_DEPTH` levels below its second-level name, otherwise
-    ///      @custom:reverts SubnameTooDeep. A subname still on record but cut off by a clear above
-    ///      it is created again from nothing: its versions are bumped, emitting
+    ///      NotAuthorised. Creating a subname, as opposed to reassigning one that resolves,
+    ///      requires it to sit at most `MAX_SUBNAME_DEPTH` levels below its second-level name,
+    ///      otherwise @custom:reverts SubnameTooDeep. A subname still on record but cut off by a
+    ///      clear above it is created again from nothing: its versions are bumped, emitting
     ///      @custom:emits RecordsCleared and @custom:emits SubnamesCleared, so none of its old
     ///      records or subnames come back. Emits @custom:emits NewOwner on each successful
     ///      assignment.
@@ -186,10 +186,11 @@ interface IDotnsRegistry {
     ///      it: a subname stores its own owner, and @custom:function isAuthorised returns on that
     ///      owner before consulting the registrar, so after the sale the seller keeps write
     ///      authority over every subname whose stored owner is still the seller, until the buyer
-    ///      reassigns each one through @custom:function setSubnodeOwner, deletes it through
-    ///      @custom:function deleteSubname, or clears them all at once through
-    ///      @custom:function clearSubnames. A subname created for someone else stays with that
-    ///      owner and leaves the seller no write path. The set is derivable from
+    ///      deletes each one through @custom:function deleteSubname or clears them all at once
+    ///      through @custom:function clearSubnames. Reassigning one through
+    ///      @custom:function setSubnodeOwner keeps its records and the subnames beneath it. A
+    ///      subname created for someone else stays with that owner and leaves the seller no write
+    ///      path. The set is derivable from
     ///      @custom:emits NewOwner, which indexes the parent node. Stores
     ///      `owner = address(0)` as a sentinel so reads delegate to `IDotnsRegistrar.ownerOf` and
     ///      ERC-721 transfers remain authoritative. Emits
@@ -241,8 +242,9 @@ interface IDotnsRegistry {
     /// @return authorisedFlag True when `account` may manage `node`.
     function isAuthorised(bytes32 node, address account) external view returns (bool authorisedFlag);
 
-    /// @notice Clears every record of `node`: each resolver record reads as unset and the resolver
-    ///         pointer returns to the protocol default.
+    /// @notice Clears the records of `node` on the resolvers that check `recordVersion`
+    ///         (`DotnsResolver` and `DotnsContentResolver`), and points it back at the default
+    ///         resolver.
     /// @dev Callable by anyone @custom:function isAuthorised admits for `node`, otherwise
     ///      @custom:reverts NotAuthorised. Constant cost whatever the number of records: the node's
     ///      record version is bumped rather than any record being visited. Subnames are untouched;
@@ -275,9 +277,12 @@ interface IDotnsRegistry {
     ///      @custom:reverts NotAuthorised: subnames are parent-sovereign, so the parent decides,
     ///      not the subname's holder. The subname's record and parent link are zeroed, releasing
     ///      their storage deposit to the signer of the transaction; one version slot stays so the
-    ///      subname, created again, starts empty. Subnames beneath it are cleared but keep their
-    ///      storage, so freeing every deposit means deleting from the deepest subname up, each by
-    ///      whoever holds that subname's parent. The subname must currently resolve, otherwise
+    ///      subname, created again, starts empty. The subname need not resolve: one a clear has
+    ///      already cut off can still be deleted by whoever controls `parentNode` now, after a
+    ///      transfer included. Subnames beneath it are cleared but keep their storage, and once
+    ///      their own parent stops resolving nobody can delete them, so freeing every deposit means
+    ///      deleting from the deepest subname up, each by whoever holds that subname's parent,
+    ///      before clearing anything above them. A subname must exist there, otherwise
     ///      @custom:reverts SubnameNotFound. Emits @custom:emits NewOwner with a zero owner, the
     ///      deletion convention indexers already follow, and @custom:emits RecordsCleared and
     ///      @custom:emits SubnamesCleared for the subname.
@@ -292,10 +297,11 @@ interface IDotnsRegistry {
     ///      The subname is linked as created under its parent's first subname version, so a subname
     ///      whose ancestor was cleared before it was linked reads as cleared once it and every
     ///      level between it and that ancestor are linked; an unlinked level still ends the walk
-    ///      as resolving. Every
-    ///      write path that names a parent links it as a side effect; this entry point covers the
-    ///      rest. @custom:reverts SubnameNotFound when no subname exists there. A subname already
-    ///      linked is left as it is. Emits @custom:emits SubnameLinked when it links.
+    ///      as resolving. Every successful write path that keeps the subname and names its parent
+    ///      (@custom:function setSubnodeOwner, @custom:function setSubnodeResolver) links it as a
+    ///      side effect; this entry point covers the rest. @custom:reverts SubnameNotFound when
+    ///      no subname exists there. A subname already linked is left as it is. Emits
+    ///      @custom:emits SubnameLinked when it links.
     /// @param parentNode Parent of the subname.
     /// @param labelhash Labelhash of the subname under `parentNode`.
     function linkSubname(bytes32 parentNode, bytes32 labelhash) external;

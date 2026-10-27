@@ -164,7 +164,12 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
             }
             records[subnode] = Record({owner: newOwner, resolver: reverseResolver, exists: true});
             _parentOf[subnode] = parentNode;
-            _versions[subnode].parentSubnames = _versions[parentNode].subnames;
+            // Usually both are zero, because the parent's subnames were never cleared, so the
+            // write is skipped rather than storing the value the slot already holds.
+            uint64 parentSubnames = _versions[parentNode].subnames;
+            if (_versions[subnode].parentSubnames != parentSubnames) {
+                _versions[subnode].parentSubnames = parentSubnames;
+            }
             if (record.persist) {
                 string memory fullName =
                     string.concat(subLabel, ".", parentLabel, protocolRegistry.tld());
@@ -189,9 +194,10 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         // Nor does it cover the nodes beneath: a subname carries its own owner in `records`,
         // and `_isAuthorised` returns on that owner before it ever consults the registrar, so a
         // seller keeps write authority over every subname whose stored owner is still the
-        // seller, until the buyer reassigns or deletes each one, or clears them all through
-        // `clearSubnames`. A subname created for someone else stays with that owner and leaves
-        // the seller no write path.
+        // seller, until the buyer deletes each one, or clears them all through `clearSubnames`;
+        // reassigning one through `setSubnodeOwner` keeps its records and the subnames beneath it.
+        // A subname created for someone else stays with that owner and leaves the seller no write
+        // path.
         // The set is derivable from this contract's `NewOwner` events, which index the parent.
         // Owner remains the zero sentinel so reads delegate to the registrar's ERC-721 holder.
         records[node] = Record({
@@ -257,12 +263,11 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         authorised(parentNode)
     {
         bytes32 subnode = LabelUtils.namehashUnder(parentNode, labelhash);
-        _linkIfUnlinked(subnode, parentNode);
         Record storage existing = records[subnode];
-        require(
-            existing.owner != address(0) && existing.exists && _isLive(subnode),
-            SubnameNotFound(subnode)
-        );
+        // A subname a clear has already cut off can still be deleted, so the parent's holder can
+        // free its storage after a clear, a release or a transfer. `authorised(parentNode)` is
+        // what limits this to whoever controls the parent now.
+        require(existing.owner != address(0) && existing.exists, SubnameNotFound(subnode));
 
         // The record and the parent link are zeroed, which releases their storage deposit to the
         // signer of the transaction. A node with no record is what a node that was never created
