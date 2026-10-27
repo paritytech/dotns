@@ -224,11 +224,6 @@ consumer that reads them is lied to:
   it must land together with a factory implementation upgrade (the factory is
   a UUPS proxy owning its beacons): new store code with the old factory's
   one-argument claim calldata breaks every claim that follows.
-- Upgrade in dependency order when a release adds a call from one contract
-  into another: the callee first, so the caller never runs against code that
-  lacks what it calls. The release's section in `DEPLOYMENTS.md` gives the
-  order and any backfill it needs, for example
-  [Upgrading to record and subname clearing](./DEPLOYMENTS.md#upgrading-to-record-and-subname-clearing).
 - Declare the release last: `setProtocolVersion("X.Y.Z")` only once every
   upgraded contract verifies. An aborted upgrade then leaves the previous
   declaration standing (under-claiming, which clients handle) rather than a
