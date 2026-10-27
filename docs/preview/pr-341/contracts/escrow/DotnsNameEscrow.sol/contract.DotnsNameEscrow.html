@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/3165700fad335c86556d9c1761cba1aa16cc79b0/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/e4f18b6f7a06f424bc0900dc4d8453ced5382dfb/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
@@ -556,10 +556,7 @@ It clears lazily only and deletes no record outright: deleting would release the
 storage deposit the holders paid to the signer of this call instead. Walks every name
 in custody in one call, so check @custom:function releasedTokenCount before relying on
 it. Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
-through ERC-165 stays the same.
-The one-time <code>clearCustodyOnUpgrade</code> upgrade call is declared on <code>DotnsNameEscrow</code>
-only: adding it in the interface would change the interface id the escrow reports through
-ERC-165.</p>
+through ERC-165 stays the same.</p>
 <pre><code class="language-solidity">function clearCustodyOnUpgrade() external onlyOwner reinitializer(2);
 </code></pre>
 <h3 id="withdraw"><a class="header" href="#withdraw">withdraw</a></h3>
