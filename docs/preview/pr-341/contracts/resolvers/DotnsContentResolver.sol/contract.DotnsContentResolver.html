@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnscontentresolver"><a class="header" href="#dotnscontentresolver">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/48ec5d4dd68ee19d08025548906bc9881012dd4d/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/22674946445adc65ee0d10f518aaf7ead5bdf752/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
@@ -215,7 +215,8 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
-<p>Reserved storage space to allow for layout changes in the future.</p>
+<p>Reserved storage space. It sits before <code>contenthashVersions</code> and <code>textVersions</code>, so it
+must never shrink: add new state after the last variable instead.</p>
 <pre><code class="language-solidity">uint256[50] private __gap
 </code></pre>
 <h3 id="contenthashversions"><a class="header" href="#contenthashversions">contenthashVersions</a></h3>
