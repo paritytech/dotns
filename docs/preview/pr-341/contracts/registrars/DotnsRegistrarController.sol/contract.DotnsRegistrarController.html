@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrarcontroller"><a class="header" href="#dotnsregistrarcontroller">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/e4f18b6f7a06f424bc0900dc4d8453ced5382dfb/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/48ec5d4dd68ee19d08025548906bc9881012dd4d/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, ReentrancyGuardTransient, <a href="/contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -328,23 +328,6 @@ reverts: CommitmentTooOld past <code>maxCommitmentAge</code>, and finally resolv
 configured escrow address from the protocol registry (otherwise</p>
 <pre><code class="language-solidity">function register(Registration calldata registration) external payable override nonReentrant;
 </code></pre>
-<h3 id="_settleescrow"><a class="header" href="#_settleescrow">_settleEscrow</a></h3>
-<p>Settles every escrow side-effect of a successful registration.</p>
-<p>Extracted to keep <code>register</code> under the stack-depth ceiling. On a direct
-registration the full <code>chargeAmount</code> lands in the refundable deposit position
-keyed to <code>nameOwner</code>. On a cross-payer registration the deposit position is
-seeded with a zero amount so the release lifecycle stays reachable, and the same
-<code>chargeAmount</code> routes to the protocol fee pot via <code>depositProtocolFee</code> keyed to
-<code>msg.sender</code> as the payer.</p>
-<pre><code class="language-solidity">function _settleEscrow(
-    address escrow,
-    uint256 tokenId,
-    address nameOwner,
-    bool isDirect,
-    uint256 chargeAmount
-)
-    internal;
-</code></pre>
 <h3 id="registerreserved"><a class="header" href="#registerreserved">registerReserved</a></h3>
 <p>Registers a granted name after the commitment delay, at zero base cost.</p>
 <p>Grant-backed issuance path: skips the PoP price check and charges no deposit, but
@@ -478,10 +461,10 @@ owner's resolver pointer follows the name to its new holder.</p>
 <p>The single construction site for a position, so "every minted name is releasable" is
 one rule rather than one per path. <code>amount</code> is the refundable deposit and may be zero:
 <code>DotnsNameEscrow</code> treats <code>recipient</code> as the presence sentinel, so a zero-amount
-position is still a position. Cross-payer registrations seed zero because the charge
-goes to the protocol fee pot instead, and grant-backed reserved registrations seed
-zero because they charge nothing at all. In both cases the position carries no value
-and exists only so <code>release</code>, <code>redeem</code> and <code>reclaim</code> stay reachable.</p>
+position is still a position. Public registrations lock the price as the owner's
+deposit, whoever paid it. Grant-backed reserved registrations seed zero because they
+charge nothing at all; their position carries no value and exists only so <code>release</code>,
+<code>redeem</code> and <code>reclaim</code> stay reachable.</p>
 <pre><code class="language-solidity">function _seedReleasePosition(
     address escrow,
     uint256 tokenId,
