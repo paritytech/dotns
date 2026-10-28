@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/e30dbbe283fd0bdd30f8a308eab1793a4b1c1576/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/088a2b15c7116b15f6c15e8f0b5f8fdaf45dd4fb/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -188,7 +188,8 @@ dotNS Registrar</p>
 <p>ERC721-backed ownership for dotNS names with controller-gated registration.</p>
 <p>Intentionally minimal and policy-free. Provides ERC721 ownership for registered name
 token IDs and controller-gated registration; pricing, PoP enforcement, and flow-specific
-policy live in the controllers.</p>
+policy live in the controllers. The ERC721 transfer functions carry no fee and are not
+payable; a soulbound name reverts on every one of them with @custom:reverts NameSoulbound.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
@@ -243,7 +244,7 @@ mint an unlocked one. Public registrations from any other controller stay transf
 <p>Durable on-chain marker set once at mint by @custom:function register and never
 cleared. A <code>true</code> result means every transfer overload reverts with</p>
 <p><strong>Note:</strong>
-reverts: NameSoulbound and @custom:function quoteTransferFee reverts likewise.</p>
+reverts: NameSoulbound.</p>
 <pre><code class="language-solidity">function isSoulbound(uint256 tokenId) external view returns (bool soulbound);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -303,74 +304,6 @@ tokenId can resolve the original label in one view call without scanning registr
 events. Returns the empty string when the token does not exist.</p>
 <pre><code class="language-solidity">function labelOf(uint256 tokenId) external view returns (string memory label);
 </code></pre>
-<h3 id="quotetransferfee"><a class="header" href="#quotetransferfee">quoteTransferFee</a></h3>
-<p>Quotes the additional native fee required to transfer a token to <code>to</code>.</p>
-<p>Returns the fee from @custom:function PopRules.transferFloor: the name's own price
-as the maximum of (i) the reach component charged when the recipient does not meet
-the label's required tier and (ii) the downgrade component charged when the
-recipient tier is strictly below the sender tier. Self-transfers and
-escrow-touching transfers (release into escrow, reclaim out of escrow) return
-zero. A token whose sender has no stored label also returns zero because there
-is no label-derived price to charge against. Soulbound names are non-transferable
-and have no transfer price, so a soulbound <code>tokenId</code> reverts with</p>
-<p><strong>Notes:</strong></p>
-<ul>
-<li>
-<p>reverts: NameSoulbound rather than returning zero. Rejects a zero <code>to</code> with</p>
-</li>
-<li>
-<p>reverts: ERC721InvalidReceiver, an unminted <code>tokenId</code> with</p>
-</li>
-<li>
-<p>reverts: ERC721NonexistentToken via the underlying <code>ownerOf</code>, and requires
-the protocol registry to have an escrow configured (otherwise</p>
-</li>
-<li>
-<p>reverts: EscrowNotConfigured). Returns zero when the protocol registry
-has no <code>STORE_FACTORY</code> configured because no label-derived price is reachable.</p>
-</li>
-</ul>
-<pre><code class="language-solidity">function quoteTransferFee(
-    uint256 tokenId,
-    address to
-)
-    external
-    view
-    returns (uint256 requiredFee);
-</code></pre>
-<h3 id="safetransferfrom"><a class="header" href="#safetransferfrom">safeTransferFrom</a></h3>
-<p>The registrar's <code>_update</code> hook consults @custom:function PopRules.transferFloor
-to compute the required transfer fee; if the caller does not forward at least that
-amount as <code>msg.value</code>, the transfer reverts with @custom:reverts TransferFeeRequired.
-A soulbound name is non-transferable and reverts with @custom:reverts NameSoulbound.
-The <code>payable</code> modifier on every transfer overload exists so the fee can be forwarded
-in the same call.</p>
-<pre><code class="language-solidity">function safeTransferFrom(
-    address from,
-    address to,
-    uint256 tokenId,
-    bytes calldata data
-)
-    external
-    payable
-    override;
-</code></pre>
-<h3 id="safetransferfrom-1"><a class="header" href="#safetransferfrom-1">safeTransferFrom</a></h3>
-<p>Subject to the same fee-on-transfer gate as the four-argument overload; reverts with</p>
-<p><strong>Note:</strong>
-reverts: TransferFeeRequired when the recipient owes a non-zero transfer fee and
-the caller has not forwarded it as <code>msg.value</code>, and with @custom:reverts NameSoulbound when
-the token is soulbound.</p>
-<pre><code class="language-solidity">function safeTransferFrom(address from, address to, uint256 tokenId) external payable override;
-</code></pre>
-<h3 id="transferfrom"><a class="header" href="#transferfrom">transferFrom</a></h3>
-<p>Subject to the same fee-on-transfer gate as the safe overloads; reverts with</p>
-<p><strong>Note:</strong>
-reverts: TransferFeeRequired when the recipient owes a non-zero transfer fee and
-the caller has not forwarded it as <code>msg.value</code>, and with @custom:reverts NameSoulbound when
-the token is soulbound.</p>
-<pre><code class="language-solidity">function transferFrom(address from, address to, uint256 tokenId) external payable override;
-</code></pre>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
 <h3 id="nameregistered"><a class="header" href="#nameregistered">NameRegistered</a></h3>
 <p>Emitted when a name is registered.</p>
@@ -408,19 +341,14 @@ the registrar depending on any specific controller interface.</p>
 <p>Thrown when the protocol registry has no escrow address configured.</p>
 <pre><code class="language-solidity">error EscrowNotConfigured();
 </code></pre>
-<h3 id="transferfeerequired"><a class="header" href="#transferfeerequired">TransferFeeRequired</a></h3>
-<p>Thrown when a standard ERC721 transfer is attempted but the recipient
-tier requires a non-zero transfer fee and the caller forwarded no <code>msg.value</code>.</p>
-<pre><code class="language-solidity">error TransferFeeRequired(uint256 tokenId, address to, uint256 requiredFee);
-</code></pre>
 <h3 id="protocolregistryrequired"><a class="header" href="#protocolregistryrequired">ProtocolRegistryRequired</a></h3>
 <p>Thrown when @custom:function initialize is called with the zero address as
 the protocol registry.</p>
 <pre><code class="language-solidity">error ProtocolRegistryRequired();
 </code></pre>
 <h3 id="unexpectedvalue"><a class="header" href="#unexpectedvalue">UnexpectedValue</a></h3>
-<p>Thrown when a mint, burn, or self-transfer carries <code>msg.value</code>. None of those
-paths forward value onward, so attached value would be permanently trapped.</p>
+<p>Thrown when a mint carries <code>msg.value</code>. Nothing forwards value onward, so attached
+value would be permanently trapped.</p>
 <pre><code class="language-solidity">error UnexpectedValue();
 </code></pre>
 <h3 id="invalidowner"><a class="header" href="#invalidowner">InvalidOwner</a></h3>
@@ -435,11 +363,9 @@ label.</p>
 <pre><code class="language-solidity">error InvalidLabel();
 </code></pre>
 <h3 id="namesoulbound"><a class="header" href="#namesoulbound">NameSoulbound</a></h3>
-<p>Thrown when a transfer or a transfer-fee quote targets a soulbound name.</p>
+<p>Thrown when a transfer targets a soulbound name.</p>
 <p>Soulbound names are minted through the dotNS gateway pallet and are permanently
-non-transferable. Raised by the <code>_update</code> transfer gate and by</p>
-<p><strong>Note:</strong>
-function: quoteTransferFee.</p>
+non-transferable. Raised by the <code>_update</code> transfer gate.</p>
 <pre><code class="language-solidity">error NameSoulbound(uint256 tokenId);
 </code></pre>
 <h3 id="unsolicitedescrowdeposit"><a class="header" href="#unsolicitedescrowdeposit">UnsolicitedEscrowDeposit</a></h3>
