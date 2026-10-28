@@ -97,7 +97,7 @@ The path decides whether the amount is a refundable deposit or nothing at all. E
 
 Registering a name under your own key locks a refundable deposit equal to the name's price. The deposit is bound to the name rather than to you, so it travels with the token on every transfer and unlocks only when the current holder releases the name back to escrow.
 
-A name someone else pays for locks the same deposit, owned by the name's owner: a third party who pays for another wallet's registration gives that owner the deposit, which the owner collects on release. A gateway grant carries no deposit. Refunds draw solely on the per-asset reserve that deposits fund, and a holder's deposit is their money held in trust. The escrow also holds a protocol fee balance from the transfer fees earlier releases charged. Nothing credits it, and only a Root call, `withdrawProtocolFees`, moves it out, to an address governance chooses; deposits, pending withdrawals and refund entries stay out of its reach.
+A name someone else pays for locks the same deposit, owned by the name's owner: a third party who pays for another wallet's registration gives that owner the deposit, which the owner collects on release. A gateway grant carries no deposit. Refunds draw solely on the per-asset reserve that deposits fund, and a holder's deposit is their money held in trust. The escrow also holds a protocol fee balance from the transfer fees earlier releases charged. Nothing credits or debits it.
 
 ### Transfers are free
 
@@ -212,7 +212,7 @@ Other measures keep gateway calls within the same weight limit:
 
 Pop-gateway issuances mint the name and persist its label, but LabelStore deployment is deferred for users who have not yet interacted with the protocol from their own address. The current pallet-revive runtime does not let substrate Root deploy contracts on behalf of an account it does not control, so the per-user LabelStore cannot be created at the moment the gateway writes. The controller stamps a pending-claim entry instead, and settlement writes the label into the owner's store, deploying the store on the first write. Settlement is permissionless via settlePendingClaims: the owner settles their own store, or anyone settles a given owner's entries at any time and pays the cost. Settlement always writes the label rather than dropping the entry, so a pending name is never stranded. When the runtime supports root-origin contract deployment, the deferred path collapses to a no-op and the issuance flow becomes one transaction end-to-end. This is a runtime limitation, not a protocol design choice.
 
-Deferred settlement has no transfer-pricing consequence, because gateway-issued names are soulbound and cannot be transferred at all. The transfer-floor price is derived by reading the label from the sender's LabelStore, so a name held before its label is settled would have no readable label to price against; making gateway names non-transferable removes that path entirely rather than relying on settlement to close it.
+Deferred settlement does not affect transfers, because gateway-issued names are soulbound and cannot be transferred at all.
 
 ### DotnsRegistrar
 
@@ -327,7 +327,7 @@ Stores are the per-user storage layer. They exist because two query paths the re
 
 LabelStore is the protocol-managed half. The registrar and the controller set write a label entry once and the slot is permanently locked. The invariant is labels only: every per-name record category (reverse, content, forward address, chat key, device link) goes to a dedicated resolver, and the Store stays the durable per-owner registration ledger. Because entries are append-only, transferring a name writes a fresh entry on the recipient and leaves the sender's locked entry in place, so LabelStore doubles as the address's lifetime-of-ownership ledger while the registry continues to answer for live ownership.
 
-The reason a label needs storing at all is that the chain never sees it. A name is hashed into a node before it reaches any contract, and hashing is one-way: from `joseph.dot` you can always compute the node, but from the node you can never recover the text. Since pricing, classification, and the transfer floor all read the label's length and shape, the string has to be kept deliberately. `LabelStore` is that record, and the only route back from a node to the name it came from.
+The reason a label needs storing at all is that the chain never sees it. A name is hashed into a node before it reaches any contract, and hashing is one-way: from `joseph.dot` you can always compute the node, but from the node you can never recover the text. Since pricing and classification both read the label's length and shape, the string has to be kept deliberately. `LabelStore` is that record, and the only route back from a node to the name it came from.
 
 UserStore is the user-claimed half. The bound owner is the only writer and prior values are snapshotted into a per-key history. It exists so that user-controlled records that do not belong to a name have a home that bills the user's own contract rather than polluting a shared resolver. The labels-only invariant is preserved by the split: nothing user-written ever lands on the protocol-managed side.
 
