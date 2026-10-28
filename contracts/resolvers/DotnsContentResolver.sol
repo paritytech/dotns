@@ -47,7 +47,8 @@ contract DotnsContentResolver is
     /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
-    /// @dev Reserved storage space to allow for layout changes in the future.
+    /// @dev Reserved storage space. It sits before `contenthashVersions` and `textVersions`, so it
+    ///      must never shrink: add new state after the last variable instead.
     // forge-lint: disable-next-line(mixed-case-variable)
     uint256[50] private __gap;
 
