@@ -72,13 +72,7 @@ contract PopLifecycleFlow is BaseDotns {
         bytes32 subnode = _setSubnode(ed, personhoodNode, SUB_LABEL, PERSONHOOD_LABEL_A, leonardo);
         assertEq(dotnsRegistry.owner(subnode), leonardo);
 
-        // It is soulbound: quoting a transfer and attempting one both revert, and ownership
-        // does not move.
-        vm.expectRevert(
-            abi.encodeWithSelector(IDotnsRegistrar.NameSoulbound.selector, personhoodTokenId)
-        );
-        dotnsRegistrar.quoteTransferFee(personhoodTokenId, tiago);
-
+        // It is soulbound: a transfer reverts, and ownership does not move.
         vm.expectRevert(
             abi.encodeWithSelector(IDotnsRegistrar.NameSoulbound.selector, personhoodTokenId)
         );

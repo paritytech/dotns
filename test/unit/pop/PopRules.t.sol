@@ -119,13 +119,6 @@ contract PopRulesTests is BaseDotns {
         assertEq(popRules.priceWithCheck("lights", ed).price, BASE_DEPOSIT);
     }
 
-    function test_transfer_reprices_at_own_length() public {
-        _grantPersonhood(leonardo);
-
-        assertEq(popRules.transferFloor("lights", leonardo, tiago), BASE_DEPOSIT);
-        assertEq(popRules.transferFloor("lights", leonardo, leonardo), 0);
-    }
-
     function test_price_with_check_revert_governance() public {
         vm.expectRevert(
             abi.encodeWithSelector(IPopRules.PopError.selector, "Reserved for Governance")
@@ -266,15 +259,6 @@ contract PopRulesTests is BaseDotns {
         string memory label = "longnamehere";
         IPopRules.PriceWithMeta memory metadata = popRules.priceWithCheck(label, ed);
         assertEq(metadata.price, costModelRegistry.priceForBaseLength(bytes(label).length));
-    }
-
-    function test_transferFloor_matches_model() public {
-        // A Personhood sender handing a NoStatus name to a NoStatus recipient pays the name's own
-        // price, which is the registered model's amount for its base length.
-        string memory label = "longnamehere";
-        _grantPersonhood(ed);
-        uint256 floor = popRules.transferFloor(label, ed, leonardo);
-        assertEq(floor, costModelRegistry.priceForBaseLength(bytes(label).length));
     }
 
     function test_pricingVersion_matches_registry() public view {

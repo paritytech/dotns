@@ -9,7 +9,8 @@ import {IDotnsController} from "./IDotnsController.sol";
 /// @notice ERC721-backed ownership for dotNS names with controller-gated registration.
 /// @dev Intentionally minimal and policy-free. Provides ERC721 ownership for registered name
 /// token IDs and controller-gated registration; pricing, PoP enforcement, and flow-specific
-/// policy live in the controllers.
+/// policy live in the controllers. The ERC721 transfer functions carry no fee and are not
+/// payable; a soulbound name reverts on every one of them with @custom:reverts NameSoulbound.
 /// @custom:security-contact admin@parity.io
 interface IDotnsRegistrar is IERC721 {
     /// @notice Thrown when a name is already registered.
@@ -21,16 +22,12 @@ interface IDotnsRegistrar is IERC721 {
     /// @notice Thrown when the protocol registry has no escrow address configured.
     error EscrowNotConfigured();
 
-    /// @notice Thrown when a standard ERC721 transfer is attempted but the recipient
-    /// tier requires a non-zero transfer fee and the caller forwarded no `msg.value`.
-    error TransferFeeRequired(uint256 tokenId, address to, uint256 requiredFee);
-
     /// @notice Thrown when @custom:function initialize is called with the zero address as
     /// the protocol registry.
     error ProtocolRegistryRequired();
 
-    /// @notice Thrown when a mint, burn, or self-transfer carries `msg.value`. None of those
-    /// paths forward value onward, so attached value would be permanently trapped.
+    /// @notice Thrown when a mint carries `msg.value`. Nothing forwards value onward, so attached
+    /// value would be permanently trapped.
     error UnexpectedValue();
 
     /// @notice Thrown when @custom:function register is called with the escrow address as
@@ -42,10 +39,9 @@ interface IDotnsRegistrar is IERC721 {
     /// label.
     error InvalidLabel();
 
-    /// @notice Thrown when a transfer or a transfer-fee quote targets a soulbound name.
+    /// @notice Thrown when a transfer targets a soulbound name.
     /// @dev Soulbound names are minted through the dotNS gateway pallet and are permanently
-    /// non-transferable. Raised by the `_update` transfer gate and by
-    /// @custom:function quoteTransferFee.
+    /// non-transferable. Raised by the `_update` transfer gate.
     error NameSoulbound(uint256 tokenId);
 
     /// @notice Thrown when a name is transferred into escrow custody by anything other than the
@@ -107,7 +103,7 @@ interface IDotnsRegistrar is IERC721 {
     /// @notice Returns whether a token is soulbound (PoP-gateway minted and non-transferable).
     /// @dev Durable on-chain marker set once at mint by @custom:function register and never
     /// cleared. A `true` result means every transfer overload reverts with
-    /// @custom:reverts NameSoulbound and @custom:function quoteTransferFee reverts likewise.
+    /// @custom:reverts NameSoulbound.
     /// @param tokenId The name's token id.
     /// @return soulbound True when the name was minted through the gateway pallet.
     function isSoulbound(uint256 tokenId) external view returns (bool soulbound);
@@ -143,58 +139,4 @@ interface IDotnsRegistrar is IERC721 {
     /// tokenId can resolve the original label in one view call without scanning registration
     /// events. Returns the empty string when the token does not exist.
     function labelOf(uint256 tokenId) external view returns (string memory label);
-
-    /// @notice Quotes the additional native fee required to transfer a token to `to`.
-    /// @dev Returns the fee from @custom:function PopRules.transferFloor: the name's own price
-    /// as the maximum of (i) the reach component charged when the recipient does not meet
-    /// the label's required tier and (ii) the downgrade component charged when the
-    /// recipient tier is strictly below the sender tier. Self-transfers and
-    /// escrow-touching transfers (release into escrow, reclaim out of escrow) return
-    /// zero. A token whose sender has no stored label also returns zero because there
-    /// is no label-derived price to charge against. Soulbound names are non-transferable
-    /// and have no transfer price, so a soulbound `tokenId` reverts with
-    /// @custom:reverts NameSoulbound rather than returning zero. Rejects a zero `to` with
-    /// @custom:reverts ERC721InvalidReceiver, an unminted `tokenId` with
-    /// @custom:reverts ERC721NonexistentToken via the underlying `ownerOf`, and requires
-    /// the protocol registry to have an escrow configured (otherwise
-    /// @custom:reverts EscrowNotConfigured). Returns zero when the protocol registry
-    /// has no `STORE_FACTORY` configured because no label-derived price is reachable.
-    function quoteTransferFee(
-        uint256 tokenId,
-        address to
-    )
-        external
-        view
-        returns (uint256 requiredFee);
-
-    /// @inheritdoc IERC721
-    /// @dev The registrar's `_update` hook consults @custom:function PopRules.transferFloor
-    /// to compute the required transfer fee; if the caller does not forward at least that
-    /// amount as `msg.value`, the transfer reverts with @custom:reverts TransferFeeRequired.
-    /// A soulbound name is non-transferable and reverts with @custom:reverts NameSoulbound.
-    /// The `payable` modifier on every transfer overload exists so the fee can be forwarded
-    /// in the same call.
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId,
-        bytes calldata data
-    )
-        external
-        payable
-        override;
-
-    /// @inheritdoc IERC721
-    /// @dev Subject to the same fee-on-transfer gate as the four-argument overload; reverts with
-    /// @custom:reverts TransferFeeRequired when the recipient owes a non-zero transfer fee and
-    /// the caller has not forwarded it as `msg.value`, and with @custom:reverts NameSoulbound when
-    /// the token is soulbound.
-    function safeTransferFrom(address from, address to, uint256 tokenId) external payable override;
-
-    /// @inheritdoc IERC721
-    /// @dev Subject to the same fee-on-transfer gate as the safe overloads; reverts with
-    /// @custom:reverts TransferFeeRequired when the recipient owes a non-zero transfer fee and
-    /// the caller has not forwarded it as `msg.value`, and with @custom:reverts NameSoulbound when
-    /// the token is soulbound.
-    function transferFrom(address from, address to, uint256 tokenId) external payable override;
 }

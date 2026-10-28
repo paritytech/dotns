@@ -468,17 +468,8 @@ contract PopControllerHandler is Test {
         if (to == from) return;
 
         ++transferAttemptCount;
-        uint256 fee;
-        try REGISTRAR.quoteTransferFee(tokenId, to) returns (uint256 quoted) {
-            fee = quoted;
-        } catch {
-            // Soulbound names have no transfer price. Send nothing and let the transfer revert.
-            fee = 0;
-        }
-
-        vm.deal(from, fee);
         vm.prank(from);
-        try REGISTRAR.transferFrom{value: fee}(from, to, tokenId) {
+        try REGISTRAR.transferFrom(from, to, tokenId) {
             ++transferSuccessCount;
         } catch {}
     }

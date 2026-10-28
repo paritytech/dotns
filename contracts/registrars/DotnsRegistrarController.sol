@@ -231,7 +231,8 @@ contract DotnsRegistrarController is
             _reclaimFromEscrow(escrow, tokenId, node, registration.owner);
         }
 
-        _settleEscrow(escrow, tokenId, registration.owner, isDirect, totalCharged);
+        // The price is the owner's refundable deposit, whoever paid it.
+        _seedReleasePosition(escrow, tokenId, registration.owner, totalCharged);
 
         if (msg.value > totalCharged) {
             uint256 refund = msg.value - totalCharged;
@@ -241,34 +242,6 @@ contract DotnsRegistrarController is
             } else {
                 IDotnsNameEscrow(payable(escrow)).creditOverpayment{value: refund}(msg.sender);
             }
-        }
-    }
-
-    /// @notice Settles every escrow side-effect of a successful registration.
-    /// @dev Extracted to keep `register` under the stack-depth ceiling. On a direct
-    ///      registration the full `chargeAmount` lands in the refundable deposit position
-    ///      keyed to `nameOwner`. On a cross-payer registration the deposit position is
-    ///      seeded with a zero amount so the release lifecycle stays reachable, and the same
-    ///      `chargeAmount` routes to the protocol fee pot via `depositProtocolFee` keyed to
-    ///      `msg.sender` as the payer.
-    function _settleEscrow(
-        address escrow,
-        uint256 tokenId,
-        address nameOwner,
-        bool isDirect,
-        uint256 chargeAmount
-    )
-        internal
-    {
-        uint256 depositAmount = isDirect ? chargeAmount : 0;
-        _seedReleasePosition(escrow, tokenId, nameOwner, depositAmount);
-
-        if (!isDirect && chargeAmount > 0) {
-            IDotnsNameEscrow(payable(escrow)).depositProtocolFee{value: chargeAmount}(
-                IDotnsNameEscrow.ProtocolFeeDepositParams({
-                    tokenId: tokenId, payer: msg.sender, recipient: nameOwner
-                })
-            );
         }
     }
 
@@ -513,10 +486,10 @@ contract DotnsRegistrarController is
     /// @dev The single construction site for a position, so "every minted name is releasable" is
     ///      one rule rather than one per path. `amount` is the refundable deposit and may be zero:
     ///      `DotnsNameEscrow` treats `recipient` as the presence sentinel, so a zero-amount
-    ///      position is still a position. Cross-payer registrations seed zero because the charge
-    ///      goes to the protocol fee pot instead, and grant-backed reserved registrations seed
-    ///      zero because they charge nothing at all. In both cases the position carries no value
-    ///      and exists only so `release`, `redeem` and `reclaim` stay reachable.
+    ///      position is still a position. Public registrations lock the price as the owner's
+    ///      deposit, whoever paid it. Grant-backed reserved registrations seed zero because they
+    ///      charge nothing at all; their position carries no value and exists only so `release`,
+    ///      `redeem` and `reclaim` stay reachable.
     /// @param escrow Configured name escrow.
     /// @param tokenId Token the position is keyed to.
     /// @param recipient Address the deposit (when non-zero) and the lifecycle are keyed to.
