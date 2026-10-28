@@ -105,7 +105,7 @@ Every transferable name moves for free, whatever its length and the holders' tie
 
 Names minted through the gateway pallet are soulbound: they stay bound to the person who earned them and cannot be transferred at all. Any transfer of a gateway-issued name reverts. Everything else about the name works normally, so its owner still sets records, issues subnames, and manages the name.
 
-A bare transfer does not reset the name's records. Registration and reclaim from escrow both point the registry record back at the default reverse resolver, but a direct ERC-721 `transferFrom` never calls the registry, so a name sold privately arrives still pointing at the seller's resolver. A buyer should overwrite the records they care about rather than assume they start clean.
+A transfer clears nothing. The name arrives with its records, its subnames and its resolver pointer, exactly as the seller left them, and the deposit moves with it. A seller who wants to hand over a clean name clears it first (see [Clearing records and subnames](#clearing-records-and-subnames)); a buyer should check what a name carries rather than assume it starts clean.
 
 ### Versioned pricing
 
@@ -122,10 +122,14 @@ Releasing a name starts two independent clocks, and the distinction between them
 
 Both are stamped at release time, so a governance change never moves the clocks on a name already released. Inside the redeem window the name belongs to its previous holder, and `DotnsRegistrar.available` reports false so no client advertises it as free. The holder has two mutually exclusive options:
 
-- `redeem` returns the token and moves no value. The position keeps its recipient, asset and amount, so the deposit stays locked and the name lands back in its exact pre-release state, releasable again later on a fresh pair of clocks. This is the undo for an accidental release.
+- `redeem` returns the token and moves no value. The position keeps its recipient, asset and amount, so the deposit stays locked and the name is releasable again later on a fresh pair of clocks. This is the undo for an accidental release of the name, but not of its records: those were cleared at release and do not come back.
 - `withdraw` credits the deposit and forfeits the right to redeem. A holder paid for the name cannot also take it back, otherwise they would hold a name no deposit backs.
 
 Once `redeemableUntil` passes, `reclaim` is permissionless through the ordinary commit-reveal path, whether or not the previous holder ever withdrew. If the position still holds value, reclaim settles it: the amount is credited to the previous holder's pull-payment balance and stays claimable with no deadline. The value follows the departing holder; the name does not wait for them. Grant-backed reserved registrations seed zero-amount positions, so those names have nothing to withdraw and nothing to settle, but they move through release, redeem and reclaim like any other name.
+
+Releasing a name gives up its records and subnames along with it. The moment the escrow takes custody it clears the name, so every address, content hash and text record reads as unset and every subname beneath it, at any depth, stops resolving. Whoever gets the name next, the same holder through `redeem` or a new owner through `reclaim`, starts clean.
+
+Storage on Asset Hub carries a deposit, locked when a slot is first written and released to whoever signs the transaction that zeroes it. Release deletes the address and content hash outright, so their deposit returns to the holder releasing the name. Text records and subnames cannot be listed, so release only hides them and their deposit stays locked. A holder who wants it back deletes them before releasing (see [Clearing records and subnames](#clearing-records-and-subnames)); after release that path moves with the name.
 
 Gateway-issued (soulbound) names never enter this lifecycle. Releasing a name transfers it into escrow custody, and a soulbound name reverts on any transfer, so it holds no position and has no release, redeem, or reclaim path. It stays with the person who earned it.
 
@@ -224,7 +228,25 @@ The registrar owns transferability. A name is marked soulbound at mint when the 
 
 Forward registry mapping node to (owner, resolver) and supporting subnode creation. When a second-level name is minted on the registrar, the matching controller wires the node to the new owner through this registry. Privileged node wiring defers to the same controllers mapping on the registrar, so both controllers can write without the registry tracking controllers of its own.
 
-Subnames are created by the parent name's owner. A subname carries its own (owner, resolver) and can in turn carry subnames, so the registry is the place the name hierarchy actually lives. Nesting is bounded by the whole path rather than by a depth counter: the dotted parent path a caller submits is capped at 255 octets. That is a protocol limit rather than the RFC 1035 figure it resembles, since the RFC bound counts a wire-format name including its length bytes and its TLD. Each level of a subname is stored as its full dotted name in the owner's LabelStore, and that row cannot be deleted, so an uncapped path would let a parent owner write an arbitrarily long permanent row into an address they chose.
+Subnames are created by the parent name's owner. A subname carries its own (owner, resolver) and can in turn carry subnames, so the registry is the place the name hierarchy actually lives. Nesting is bounded twice. A new subname sits at most `MAX_SUBNAME_DEPTH` (8) levels below its second-level name, because every read of a subname checks each level above it (see [Clearing records and subnames](#clearing-records-and-subnames)). And the dotted parent path a caller submits is capped at 255 octets. That is a protocol limit rather than the RFC 1035 figure it resembles, since the RFC bound counts a wire-format name including its length bytes and its TLD. Each level of a subname is stored as its full dotted name in the owner's LabelStore, and that row cannot be deleted, so an uncapped path would let a parent owner write an arbitrarily long permanent row into an address they chose.
+
+#### Clearing records and subnames
+
+Neither a name's text records nor its subnames can be listed on chain, so clearing never visits them. The registry keeps versions per node instead, and bumping one is a single write whatever the name holds:
+
+- `clearRecords(node)` bumps the node's record version. Resolvers stamp every record with the version it was written under and read anything stamped with an older one as unset. It also points the node back at the default resolver.
+- `clearSubnames(node)` bumps the node's subname version. A subname resolves only while the version it was created under is still its parent's, all the way up, so every subname beneath the node stops resolving: its owner reads as zero, it has no authority, and its records read as unset.
+- `clear(node)` does both. The escrow calls it on release.
+- `deleteSubname(parent, labelhash)` removes one subname and everything beneath it. Subnames are parent-sovereign, so this is the parent's call, not the subname holder's.
+
+All four take the same authority as any other write to the node, or for `deleteSubname` to its parent. A cleared or deleted subname can be created again and starts empty, even for the same holder. A clear leaves the bytes written before in storage, where nothing reads them, and their storage deposit stays locked.
+
+Deleting is how an owner gets that deposit back, and only what the owner knows about can be deleted:
+
+- Writing an empty value deletes a record: `setAddress(node, address(0))`, `setContenthash(node, "")`, `setText(node, key, "")`. The value and its version stamp are both zeroed. This also frees a text key a clear has already hidden.
+- `deleteSubname` zeroes the subname's record and its parent link. One version slot stays, so the subname, created again, cannot pick up its old records or children. Subnames beneath it are cleared but keep their storage, so to free everything, delete from the deepest subname up. Consumers that index records or subnames learn of a clear from the registry's `RecordsCleared` and `SubnamesCleared` events, one per clear, since descendants emit nothing of their own.
+
+A record stamped zero matches the version every node starts at, so it stays readable until its node is first cleared. A subname with no recorded parent needs linking (`linkSubname`, permissionless) before a clear above it reaches it, and so does every level between it and that clear. The upgrade links every existing subname before anything is cleared.
 
 The registry exposes isAuthorised(node, account) as the canonical check for whether an address may manage a node: the stored owner for a subname, or the ERC-721 holder, a single-token approvee, or an operator-for-all on the registrar for a tokenised name. Sibling contracts consult this view so a single registrar-level approval delegates management across the protocol rather than each contract maintaining its own approval list.
 
@@ -285,7 +307,7 @@ Reads are open but fail-closed: nameOf(address) re-validates current ownership a
 
 ### DotnsContentResolver
 
-Stores contenthash and text records per node. This is where external content links (for example IPFS hashes) and arbitrary key-value text records (for example social handles, verification metadata) live. Writes accept the node owner, any address the registry recognises as authorised for the node through isAuthorised (the ERC-721 holder, a single-token approvee, or an operator-for-all on the registrar), or an operator approved directly on this resolver; reads are open. The registry-recognised path lets a registrar-level name admin manage records without a separate grant, while the resolver-local operator is a narrower record-only delegation that confers no power over ownership or transfer. Authority is evaluated against the current owner on every write, so transferring a name reassigns write access to it automatically. That covers the node transferred and not the nodes beneath it: a subname carries its own owner in the registry, and transferring the parent does not change it. A seller therefore keeps write access to every subname they minted until the buyer reassigns each one with `setSubnodeOwner`. The set is derivable from the registry's `NewOwner` events, and reclaiming is one call per subname.
+Stores contenthash and text records per node. This is where external content links (for example IPFS hashes) and arbitrary key-value text records (for example social handles, verification metadata) live. Every text write emits two events. `TextUpdated` logs the key only as its hash, which lets a consumer filter by key but not read it. `TextChanged`, emitted alongside it in the shape of the ENS public resolver's event, also carries the key in its data, so an indexer can list the keys a node has set. Writes accept the node owner, any address the registry recognises as authorised for the node through isAuthorised (the ERC-721 holder, a single-token approvee, or an operator-for-all on the registrar), or an operator approved directly on this resolver; reads are open. The registry-recognised path lets a registrar-level name admin manage records without a separate grant, while the resolver-local operator is a narrower record-only delegation that confers no power over ownership or transfer. Authority is evaluated against the current owner on every write, so transferring a name reassigns write access to it automatically. That covers the node transferred and not the nodes beneath it: a subname carries its own owner in the registry, and transferring the parent does not change it. A seller therefore keeps write access to every subname they minted until the buyer takes them back: one at a time with `deleteSubname`, or all at once with `clearSubnames`; reassigning one with `setSubnodeOwner` keeps its records and the subnames beneath it (see [Clearing records and subnames](#clearing-records-and-subnames)). The set is derivable from the registry's `NewOwner` events.
 
 Choosing a delegation mechanism:
 
@@ -356,6 +378,8 @@ The protocol carries a handful of constraints worth knowing before deploying or 
 
 - **Deferred LabelStore deployment** (runtime). See [DotnsPopController](#early-testnet-quirk-labelstore-deployment).
 - **No standalone user-status mapping** (current implementation). See [DotnsPopController](#dotnspopcontroller).
+- **Clearing hides records rather than erasing them** (current implementation). See [Clearing records and subnames](#clearing-records-and-subnames).
+- **Root-written storage refunds deposits nobody paid** (runtime). Releasing or reclaiming a name governance minted zeroes storage Root wrote, refunding a deposit that was never charged. See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md#4-root-written-storage-refunds-deposits-nobody-paid).
 
 ## License
 

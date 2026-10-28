@@ -4,6 +4,7 @@ pragma solidity ^0.8.34;
 import {Test} from "forge-std/Test.sol";
 import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
 import {DotnsRegistry} from "../../../contracts/registry/DotnsRegistry.sol";
+import {DotnsResolver} from "../../../contracts/resolvers/DotnsResolver.sol";
 import {LabelUtils} from "../../../contracts/utils/LabelUtils.sol";
 import {DotnsRegistrar} from "../../../contracts/registrars/DotnsRegistrar.sol";
 import {
@@ -16,7 +17,13 @@ import {IPersonhood} from "../../../contracts/external/personhood/IPersonhood.so
 
 /// @title Registry Handler for Invariant Testing
 /// @notice Executes bounded random actions on the registry: register base domains,
-///         create subnodes, reassign subnodes, set resolvers, and transfer base domains.
+///         create subnodes and nested subnodes, reassign subnodes, write address records,
+///         clear records and subnames, delete subnodes, and transfer base domains.
+/// @dev Clearing never visits the nodes it clears, so the suite keeps an independent model of
+///      which subnodes should still resolve: every node has an epoch that a subname clear, a delete
+///      or a re-creation moves on, and a subnode resolves while the epoch of its parent is still
+/// the one it was created under, all the way up. The invariants compare the registry and the
+///      resolver against that model.
 contract RegistryHandler is Test {
     /// @notice Node hash of the suite's TLD, injected from the deployed protocol registry.
     /// @dev Keeps the handler rooted at the same TLD the protocol under test uses, without a
@@ -64,6 +71,34 @@ contract RegistryHandler is Test {
     /// @notice Parent label text for each subnode (same index).
     string[] internal _subnodeParentLabels;
 
+    /// @notice Marks a subnode created directly under a base domain.
+    uint256 internal constant NO_PARENT_INDEX = type(uint256).max;
+
+    /// @notice Address resolver whose records the clears must reach.
+    DotnsResolver public resolver;
+
+    /// @notice Index of each subnode's parent subnode, or `NO_PARENT_INDEX` under a base domain.
+    uint256[] internal _subnodeParentIndex;
+
+    /// @notice Epoch of the parent at the moment each subnode was last created.
+    uint256[] internal _subnodeCreatedUnder;
+
+    /// @notice Epoch of each subnode, moved on when its subnames are cleared, when it is deleted,
+    ///         and when it is created again.
+    uint256[] internal _subnodeEpoch;
+
+    /// @notice Whether each subnode was deleted and not created again since.
+    bool[] internal _subnodeDeleted;
+
+    /// @notice Address record each subnode should resolve to while its records are current.
+    address[] internal _subnodeAddress;
+
+    /// @notice Epoch of each base domain, moved on when its subnames are cleared.
+    mapping(bytes32 node => uint256 epoch) internal _baseEpoch;
+
+    /// @notice Subnode => its index plus one, so a node is tracked once.
+    mapping(bytes32 node => uint256 indexPlusOne) internal _indexOf;
+
     /// @notice Sub-labels the registry rejected.
     uint256 public rejectedSubLabelCount;
 
@@ -91,14 +126,17 @@ contract RegistryHandler is Test {
     /// @param _registrar The base registrar.
     /// @param _popRules The PoP rules contract.
     /// @param _tldNode Node hash of the suite's TLD, from the deployed protocol registry.
+    /// @param _resolver Address resolver whose records the clears must reach.
     constructor(
         DotnsRegistrarController _controller,
         DotnsRegistry _registry,
         DotnsRegistrar _registrar,
         IPopRules _popRules,
-        bytes32 _tldNode
+        bytes32 _tldNode,
+        DotnsResolver _resolver
     ) {
         TLD_NODE = _tldNode;
+        resolver = _resolver;
         controller = _controller;
         registry = _registry;
         registrar = _registrar;
@@ -159,7 +197,139 @@ contract RegistryHandler is Test {
         _registerBaseDomain(label, domainOwner);
         bytes32 parentNode = _computeNode(label);
 
-        _createSubnode(parentNode, _buildSubLabel(subLabelSeed), label, domainOwner, subnodeOwner);
+        _createSubnode(
+            parentNode,
+            _buildSubLabel(subLabelSeed),
+            label,
+            domainOwner,
+            subnodeOwner,
+            NO_PARENT_INDEX,
+            _baseEpoch[parentNode]
+        );
+    }
+
+    /// @notice Create a subnode beneath an existing subnode that still resolves.
+    /// @dev Depth past `MAX_SUBNAME_DEPTH` is rejected by the registry and counted like any other
+    ///      rejected sub-label. A node already tracked is skipped, so each index stays one node.
+    /// @param subnodeSeed Seed selecting the parent subnode.
+    /// @param subnodeOwnerSeed Seed selecting the new subnode's owner.
+    /// @param subLabelSeed Seed generating the sub-label.
+    function createNestedSubnode(
+        uint256 subnodeSeed,
+        uint256 subnodeOwnerSeed,
+        uint256 subLabelSeed
+    )
+        external
+    {
+        if (_subnodeHashes.length == 0 || actors.length < 2) return;
+        uint256 parentIndex = subnodeSeed % _subnodeHashes.length;
+        if (!isLive(parentIndex)) return;
+
+        string memory subLabel = _buildSubLabel(subLabelSeed);
+        bytes32 parentNode = _subnodeHashes[parentIndex];
+        if (_indexOf[LabelUtils.namehashUnder(parentNode, keccak256(bytes(subLabel)))] != 0) {
+            return;
+        }
+
+        _createSubnode(
+            parentNode,
+            subLabel,
+            _pathOf(parentIndex),
+            _subnodeOwners[parentIndex],
+            actors[subnodeOwnerSeed % actors.length],
+            parentIndex,
+            _subnodeEpoch[parentIndex]
+        );
+    }
+
+    /// @notice The owner of a subnode that still resolves writes its address record.
+    /// @param subnodeSeed Seed selecting the subnode.
+    /// @param valueSeed Seed generating the address written.
+    function writeAddress(uint256 subnodeSeed, uint256 valueSeed) external {
+        if (_subnodeHashes.length == 0) return;
+        uint256 index = subnodeSeed % _subnodeHashes.length;
+        if (!isLive(index)) return;
+
+        address value = address(uint160(valueSeed | 1));
+        vm.prank(_subnodeOwners[index]);
+        resolver.setAddress(_subnodeHashes[index], value);
+        _subnodeAddress[index] = value;
+    }
+
+    /// @notice The owner of a subnode that still resolves clears its records.
+    /// @param subnodeSeed Seed selecting the subnode.
+    function clearSubnodeRecords(uint256 subnodeSeed) external {
+        if (_subnodeHashes.length == 0) return;
+        uint256 index = subnodeSeed % _subnodeHashes.length;
+        if (!isLive(index)) return;
+
+        vm.prank(_subnodeOwners[index]);
+        registry.clearRecords(_subnodeHashes[index]);
+        _subnodeAddress[index] = address(0);
+    }
+
+    /// @notice The owner of a subnode that still resolves clears every subname beneath it.
+    /// @param subnodeSeed Seed selecting the subnode.
+    function clearSubnodeSubnames(uint256 subnodeSeed) external {
+        if (_subnodeHashes.length == 0) return;
+        uint256 index = subnodeSeed % _subnodeHashes.length;
+        if (!isLive(index)) return;
+
+        vm.prank(_subnodeOwners[index]);
+        registry.clearSubnames(_subnodeHashes[index]);
+        ++_subnodeEpoch[index];
+    }
+
+    /// @notice The holder of a base domain clears every subname beneath it.
+    /// @param labelSeed Seed selecting the base domain.
+    function clearBaseSubnames(uint256 labelSeed) external {
+        if (_registeredLabels.length == 0) return;
+        bytes32 node = _computeNode(_registeredLabels[labelSeed % _registeredLabels.length]);
+
+        vm.prank(registrar.ownerOf(uint256(node)));
+        registry.clearSubnames(node);
+        ++_baseEpoch[node];
+    }
+
+    /// @notice The parent of a subnode that still resolves deletes it.
+    /// @param subnodeSeed Seed selecting the subnode.
+    function deleteSubnode(uint256 subnodeSeed) external {
+        if (_subnodeHashes.length == 0) return;
+        uint256 index = subnodeSeed % _subnodeHashes.length;
+        if (!isLive(index)) return;
+
+        uint256 parentIndex = _subnodeParentIndex[index];
+        bytes32 parentNode = _subnodeParents[index];
+        address parentOwner = parentIndex == NO_PARENT_INDEX
+            ? registrar.ownerOf(uint256(parentNode))
+            : _subnodeOwners[parentIndex];
+
+        vm.prank(parentOwner);
+        registry.deleteSubname(parentNode, keccak256(bytes(_subnodeLabels[index])));
+        _subnodeDeleted[index] = true;
+        ++_subnodeEpoch[index];
+        _subnodeAddress[index] = address(0);
+    }
+
+    /// @notice Whether the model says the subnode at `index` still resolves.
+    /// @param index Subnode index.
+    /// @return live True when nothing above the subnode was cleared or deleted since it was
+    ///         created.
+    function isLive(uint256 index) public view returns (bool live) {
+        while (true) {
+            if (_subnodeDeleted[index]) return false;
+            uint256 parentIndex = _subnodeParentIndex[index];
+            if (parentIndex == NO_PARENT_INDEX) {
+                return _subnodeCreatedUnder[index] == _baseEpoch[_subnodeParents[index]];
+            }
+            if (_subnodeCreatedUnder[index] != _subnodeEpoch[parentIndex]) return false;
+            index = parentIndex;
+        }
+    }
+
+    /// @notice Address record the subnode at `index` should resolve to.
+    function expectedAddressAt(uint256 index) external view returns (address) {
+        return isLive(index) ? _subnodeAddress[index] : address(0);
     }
 
     /// @notice Reassign an existing subnode to a different owner.
@@ -169,6 +339,7 @@ contract RegistryHandler is Test {
         if (_subnodeHashes.length == 0 || actors.length < 2) return;
 
         uint256 index = subnodeSeed % _subnodeHashes.length;
+        if (_subnodeParentIndex[index] != NO_PARENT_INDEX) return;
         bytes32 parentNode = _subnodeParents[index];
 
         // Find the parent label from registered labels
@@ -200,10 +371,19 @@ contract RegistryHandler is Test {
             persist: true
         });
 
+        bool wasLive = isLive(index);
+
         vm.prank(parentOwner);
         registry.setSubnodeOwner(record);
 
         _subnodeOwners[index] = newOwner;
+        if (!wasLive) {
+            // Created again from nothing: no records, and nothing it held before comes back.
+            _subnodeDeleted[index] = false;
+            ++_subnodeEpoch[index];
+            _subnodeCreatedUnder[index] = _baseEpoch[parentNode];
+            _subnodeAddress[index] = address(0);
+        }
     }
 
     /// @notice Transfer a base domain ERC721 token.
@@ -303,12 +483,16 @@ contract RegistryHandler is Test {
     /// @param parentLabel Label of the parent (required by `setSubnodeOwner`).
     /// @param parentOwner Address authorised to create the subnode.
     /// @param subnodeOwner Address receiving ownership of the new subnode.
+    /// @param parentIndex Index of the parent subnode, or `NO_PARENT_INDEX`.
+    /// @param createdUnder Epoch of the parent at creation.
     function _createSubnode(
         bytes32 parentNode,
         string memory subLabel,
         string memory parentLabel,
         address parentOwner,
-        address subnodeOwner
+        address subnodeOwner,
+        uint256 parentIndex,
+        uint256 createdUnder
     )
         internal
     {
@@ -345,6 +529,17 @@ contract RegistryHandler is Test {
         _subnodeOwners.push(subnodeOwner);
         _subnodeLabels.push(subLabel);
         _subnodeParentLabels.push(parentLabel);
+        _subnodeParentIndex.push(parentIndex);
+        _subnodeCreatedUnder.push(createdUnder);
+        _subnodeEpoch.push(0);
+        _subnodeDeleted.push(false);
+        _subnodeAddress.push(address(0));
+        _indexOf[subnode] = _subnodeHashes.length;
+    }
+
+    /// @notice Dotted path of the subnode at `index`, without the TLD.
+    function _pathOf(uint256 index) internal view returns (string memory path) {
+        path = string.concat(_subnodeLabels[index], ".", _subnodeParentLabels[index]);
     }
 
     /// @notice Builds a sub-label from an alphabet that includes the separator and digits.
