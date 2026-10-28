@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/230f49974fe5eabeac9a91ff1159bda517bf8b79/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/5f4b404a1220266249e8b05bd81452d0145328fe/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -301,10 +301,13 @@ until the buyer overwrites it. That covers the node itself and not the nodes ben
 it: a subname stores its own owner, and @custom:function isAuthorised returns on that
 owner before consulting the registrar, so after the sale the seller keeps write
 authority over every subname whose stored owner is still the seller, until the buyer
-reassigns each one through @custom:function setSubnodeOwner, deletes it through</p>
+deletes each one through @custom:function deleteSubname or clears them all at once
+through @custom:function clearSubnames. Reassigning one through</p>
 </li>
 <li>
-<p>function: deleteSubname, or clears them all at once through</p>
+<p>function: setSubnodeOwner keeps its records and the subnames beneath it. A
+subname created for someone else stays with that owner and leaves the seller no write
+path. The set is derivable from</p>
 </li>
 <li>
 <p>emits: NewOwner, which indexes the parent node. Stores
@@ -348,8 +351,9 @@ path of at most <code>StringUtils.MAX_NAME_PATH_OCTETS</code> octets whose nameh
     authorised(record.parentNode);
 </code></pre>
 <h3 id="clearrecords"><a class="header" href="#clearrecords">clearRecords</a></h3>
-<p>Clears every record of <code>node</code>: each resolver record reads as unset and the resolver
-pointer returns to the protocol default.</p>
+<p>Clears the records of <code>node</code> on the resolvers that check <code>recordVersion</code>
+(<code>DotnsResolver</code> and <code>DotnsContentResolver</code>), and points it back at the default
+resolver.</p>
 <p>Callable by anyone @custom:function isAuthorised admits for <code>node</code>, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
@@ -408,9 +412,12 @@ beneath it.</p>
 <p>reverts: NotAuthorised: subnames are parent-sovereign, so the parent decides,
 not the subname's holder. The subname's record and parent link are zeroed, releasing
 their storage deposit to the signer of the transaction; one version slot stays so the
-subname, created again, starts empty. Subnames beneath it are cleared but keep their
-storage, so freeing every deposit means deleting from the deepest subname up, each by
-whoever holds that subname's parent. The subname must currently resolve, otherwise</p>
+subname, created again, starts empty. The subname need not resolve: one a clear has
+already cut off can still be deleted by whoever controls <code>parentNode</code> now, after a
+transfer included. Subnames beneath it are cleared but keep their storage, and once
+their own parent stops resolving nobody can delete them, so freeing every deposit means
+deleting from the deepest subname up, each by whoever holds that subname's parent,
+before clearing anything above them. A subname must exist there, otherwise</p>
 </li>
 <li>
 <p>emits: SubnamesCleared for the subname.</p>
@@ -486,10 +493,12 @@ an ancestor reaches it.</p>
 The subname is linked as created under its parent's first subname version, so a subname
 whose ancestor was cleared before it was linked reads as cleared once it and every
 level between it and that ancestor are linked; an unlinked level still ends the walk
-as resolving. Every
-write path that names a parent links it as a side effect; this entry point covers the
-rest. @custom:reverts SubnameNotFound when no subname exists there. A subname already
-linked is left as it is. Emits @custom:emits SubnameLinked when it links.</p>
+as resolving. Every successful write path that keeps the subname and names its parent
+(@custom:function setSubnodeOwner, @custom:function setSubnodeResolver) links it as a
+side effect; this entry point covers the rest. @custom:reverts SubnameNotFound when
+no subname exists there. A subname already linked is left as it is. Emits</p>
+<p><strong>Note:</strong>
+emits: SubnameLinked when it links.</p>
 <pre><code class="language-solidity">function linkSubname(bytes32 parentNode, bytes32 labelhash) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
