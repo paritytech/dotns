@@ -97,7 +97,7 @@ The path decides whether the amount is a refundable deposit or nothing at all. E
 
 Registering a name under your own key locks a refundable deposit equal to the name's price. The deposit is bound to the name rather than to you, so it travels with the token on every transfer and unlocks only when the current holder releases the name back to escrow.
 
-A name someone else pays for locks the same deposit, owned by the name's owner: a third party who pays for another wallet's registration gives that owner the deposit, which the owner collects on release. A gateway grant carries no deposit. Refunds draw solely on the per-asset reserve that deposits fund, and a holder's deposit is their money held in trust. The escrow also holds a protocol fee balance that earlier releases collected from transfer fees and cross-payer registration charges. Nothing credits it, and nothing can spend it until [#354](https://github.com/paritytech/dotns/issues/354) adds a Root withdrawal.
+A name someone else pays for locks the same deposit, owned by the name's owner: a third party who pays for another wallet's registration gives that owner the deposit, which the owner collects on release. A gateway grant carries no deposit. Refunds draw solely on the per-asset reserve that deposits fund, and a holder's deposit is their money held in trust. The escrow also holds a protocol fee balance that earlier releases collected from transfer fees and cross-payer registration charges. Nothing credits it, and no function can spend it yet.
 
 ### Transfers are free
 
