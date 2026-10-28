@@ -269,14 +269,14 @@ contract DotnsPopControllerTests is BaseDotns {
 
     function test_setReservationDuration_shortening_retroactively_expires_live_entries() public {
         _grantPersonhood(ed);
-        // Enqueue alice under the default duration (7 days).
+        // Enqueue alice under the default duration (30 days).
         _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), PERSONHOOD_LABEL_A);
 
         (bool liveBefore, address holderBefore) =
             dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertTrue(liveBefore);
         assertEq(holderBefore, ed);
-        // Warp 2 days forward (still well within the original 7-day window).
+        // Warp 2 days forward (still well within the original 30-day window).
         vm.warp(block.timestamp + 2 days);
         // Governance shrinks the window to 1 day. The entry's `joinedAt` plus
         // the new duration is now in the past, so the slot is expired.

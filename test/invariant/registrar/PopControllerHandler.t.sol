@@ -362,9 +362,10 @@ contract PopControllerHandler is Test {
     }
 
     /// @notice Advances `block.timestamp` to exercise expiry paths.
-    /// @dev Bounded to 30 days so state does not drift off a cliff.
+    /// @dev Bounded to 60 days, twice the default reservation duration, so one step can
+    ///      expire an entry without state drifting off a cliff.
     function warp(uint256 secondsForward) external {
-        vm.warp(block.timestamp + (secondsForward % (30 days)));
+        vm.warp(block.timestamp + (secondsForward % (60 days)));
     }
 
     /// @notice Settles the picked actor's own pending claims.
