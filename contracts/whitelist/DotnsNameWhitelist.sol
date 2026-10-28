@@ -22,7 +22,8 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 /// @title DotnsNameWhitelist
 /// @notice Pre-launch name whitelist. A name is Open until governance reserves it or a claim is
 ///         accepted for it. Several beneficiaries may claim the same Open name, each with a
-///         reason, and governance accepts one as the winner.
+///         reason, and governance accepts one as the winner. A grant binds its name for
+///         `grantDuration`; once that passes, the name reads Open again.
 /// @dev Lives behind its own UUPS proxy with its own storage. Callers pass bare labels only; the
 ///      contract derives the node from the label and the TLD in the protocol registry, so a
 ///      caller cannot supply a mismatched hash. Claims are keyed by the beneficiary `user`, not
@@ -82,6 +83,16 @@ contract DotnsNameWhitelist is
     /// @notice Timestamp requests stop being accepted.
     uint64 private _requestClose;
 
+    /// @notice Period a grant binds its name, tunable by governance within
+    ///         `DotnsConstants.WHITELIST_MIN_GRANT_DURATION` and
+    ///         `DotnsConstants.WHITELIST_MAX_GRANT_DURATION`.
+    uint64 public grantDuration;
+
+    /// @notice Earliest timestamp a grant period runs from.
+    /// @dev Set when grant expiry is initialised. A grant recorded before then has no `grantedAt`,
+    ///      so its period runs from here.
+    uint64 private _grantClockStart;
+
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
 
@@ -134,6 +145,24 @@ contract DotnsNameWhitelist is
         maxClaimants = DotnsConstants.WHITELIST_DEFAULT_MAX_CLAIMANTS;
         maxGrantBatch = DotnsConstants.WHITELIST_DEFAULT_MAX_GRANT_BATCH;
         maxReasonBytes = DotnsConstants.WHITELIST_DEFAULT_MAX_REASON_BYTES;
+        _initializeGrantExpiry();
+    }
+
+    /// @notice Starts grant expiry on a whitelist initialised without it.
+    /// @dev Called once by the owner through `upgradeToAndCall`, so the upgrade and the clock
+    ///      start land in one call. Sets the default grant period and starts the clock for grants
+    ///      made before it, which have no `grantedAt`. A whitelist that `initialize` already set
+    ///      up @custom:reverts InvalidInitialization.
+    function initializeGrantExpiry() external reinitializer(2) onlyOwner {
+        require(grantDuration == 0, InvalidInitialization());
+        _initializeGrantExpiry();
+    }
+
+    /// @notice Sets the default grant period and starts the grant clock.
+    function _initializeGrantExpiry() internal {
+        grantDuration = DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION;
+        _grantClockStart = uint64(block.timestamp);
+        emit GrantDurationSet(DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION);
     }
 
     /// @inheritdoc IDotnsNameWhitelist
@@ -167,6 +196,17 @@ contract DotnsNameWhitelist is
     }
 
     /// @inheritdoc IDotnsNameWhitelist
+    function setGrantDuration(uint64 newDuration) external override onlyGovernance {
+        require(
+            newDuration >= DotnsConstants.WHITELIST_MIN_GRANT_DURATION
+                && newDuration <= DotnsConstants.WHITELIST_MAX_GRANT_DURATION,
+            GrantDurationOutOfRange()
+        );
+        grantDuration = newDuration;
+        emit GrantDurationSet(newDuration);
+    }
+
+    /// @inheritdoc IDotnsNameWhitelist
     function requestName(
         string calldata label,
         string calldata reason,
@@ -181,7 +221,7 @@ contract DotnsNameWhitelist is
         require(label.isSingleLabel(), InvalidLabel());
 
         bytes32 node = _nodeOf(label);
-        require(_names[node].status == NameStatus.Open, NameNotOpen(node));
+        require(_clearExpiredGrant(_names[node]) == NameStatus.Open, NameNotOpen(node));
         require(_claims[node][user].status == ClaimStatus.None, AlreadyClaimed(node, user));
         require(_claimants[node].length() < maxClaimants, TooManyClaimants(node));
 
@@ -248,6 +288,7 @@ contract DotnsNameWhitelist is
         _clearClaimants(node, address(0), label);
         record.status = NameStatus.Open;
         record.winner = address(0);
+        record.grantedAt = 0;
         emit NameRevoked(node, winner, label);
         _deactivate(node);
     }
@@ -258,7 +299,7 @@ contract DotnsNameWhitelist is
         bytes32 node = _nodeOf(label);
         NameRecord storage record = _names[node];
         if (reserved) {
-            require(record.status == NameStatus.Open, NameNotOpen(node));
+            require(_clearExpiredGrant(record) == NameStatus.Open, NameNotOpen(node));
             // Clear any pending claims the way a grant does, so a permissionless requestName
             // cannot force governance to revokeName before it can reserve.
             _clearClaimants(node, address(0), label);
@@ -278,11 +319,12 @@ contract DotnsNameWhitelist is
         bytes32 node = _nodeOf(label);
         NameRecord storage record = _names[node];
         require(
-            record.status == NameStatus.Claimed && record.winner == registrant,
+            _statusOf(record) == NameStatus.Claimed && record.winner == registrant,
             NotWinner(registrant, node)
         );
         record.status = NameStatus.Open;
         record.winner = address(0);
+        record.grantedAt = 0;
         emit NameConsumed(node, registrant, label);
         _deactivate(node);
     }
@@ -299,7 +341,7 @@ contract DotnsNameWhitelist is
 
     /// @inheritdoc IDotnsNameWhitelist
     function statusOf(string calldata label) external view override returns (NameStatus status) {
-        return _names[_nodeOf(label)].status;
+        return _statusOf(_names[_nodeOf(label)]);
     }
 
     /// @inheritdoc IDotnsNameWhitelist
@@ -310,7 +352,18 @@ contract DotnsNameWhitelist is
     /// @inheritdoc IDotnsNameWhitelist
     function granteeOf(string calldata label) external view override returns (address winner) {
         NameRecord storage record = _names[_nodeOf(label)];
-        return record.status == NameStatus.Claimed ? record.winner : address(0);
+        return _statusOf(record) == NameStatus.Claimed ? record.winner : address(0);
+    }
+
+    /// @inheritdoc IDotnsNameWhitelist
+    function grantExpiresAt(string calldata label)
+        external
+        view
+        override
+        returns (uint64 expiresAt)
+    {
+        NameRecord storage record = _names[_nodeOf(label)];
+        return _statusOf(record) == NameStatus.Claimed ? _expiryOf(record) : 0;
     }
 
     /// @inheritdoc IDotnsNameWhitelist
@@ -324,8 +377,8 @@ contract DotnsNameWhitelist is
         returns (bool granted)
     {
         NameRecord storage record = _names[_nodeOf(label)];
-        return
-            account != address(0) && record.status == NameStatus.Claimed && record.winner == account;
+        return account != address(0) && _statusOf(record) == NameStatus.Claimed
+            && record.winner == account;
     }
 
     /// @inheritdoc IDotnsNameWhitelist
@@ -396,8 +449,12 @@ contract DotnsNameWhitelist is
         for (uint256 i; i < count; ++i) {
             bytes32 node = _activeNodes.at(offset + i);
             NameRecord storage record = _names[node];
+            NameStatus status = _statusOf(record);
             page[i] = NameView({
-                node: node, label: record.label, status: record.status, winner: record.winner
+                node: node,
+                label: record.label,
+                status: status,
+                winner: status == NameStatus.Claimed ? record.winner : address(0)
             });
         }
     }
@@ -430,7 +487,7 @@ contract DotnsNameWhitelist is
         require(user != address(0), ZeroUser());
         require(label.isSingleLabel(), InvalidLabel());
         bytes32 node = _nodeOf(label);
-        require(_names[node].status == NameStatus.Open, NameNotOpen(node));
+        require(_clearExpiredGrant(_names[node]) == NameStatus.Open, NameNotOpen(node));
         emit NameAccepted(node, user, label);
         _settle(node, user, label);
     }
@@ -443,8 +500,48 @@ contract DotnsNameWhitelist is
         NameRecord storage record = _names[node];
         record.status = NameStatus.Claimed;
         record.winner = winner;
+        record.grantedAt = uint64(block.timestamp);
         _activate(node, label);
         _clearClaimants(node, winner, label);
+    }
+
+    /// @notice Returns the status of `record`, reading an expired grant as Open.
+    /// @param record Stored record of the name.
+    /// @return status Effective name status.
+    function _statusOf(NameRecord storage record) internal view returns (NameStatus status) {
+        status = record.status;
+        if (status == NameStatus.Claimed && block.timestamp >= _expiryOf(record)) {
+            status = NameStatus.Open;
+        }
+    }
+
+    /// @notice Returns when the grant held in `record` expires.
+    /// @dev The period runs from `grantedAt`, or from the grant clock start for a grant made
+    ///      before expiry was initialised. A zero `grantDuration` exists only on a whitelist
+    ///      upgraded without `initializeGrantExpiry`, since `setGrantDuration` refuses it; every
+    ///      grant then keeps binding, so a separate upgrade call cannot open granted names.
+    /// @param record Stored record of a `Claimed` name.
+    /// @return expiresAt Timestamp the grant expires at; `type(uint64).max` while the period is
+    ///         unset.
+    function _expiryOf(NameRecord storage record) internal view returns (uint64 expiresAt) {
+        if (grantDuration == 0) return type(uint64).max;
+        uint64 start = record.grantedAt;
+        if (start < _grantClockStart) start = _grantClockStart;
+        return start + grantDuration;
+    }
+
+    /// @notice Resets an expired grant in `record` to Open and returns the resulting status.
+    /// @dev Run by the writes that need an Open name, so a lapsed grant is never carried into a
+    ///      new state.
+    /// @param record Stored record of the name.
+    /// @return status Status of the name after the reset.
+    function _clearExpiredGrant(NameRecord storage record) internal returns (NameStatus status) {
+        status = _statusOf(record);
+        if (status != record.status) {
+            record.status = NameStatus.Open;
+            record.winner = address(0);
+            record.grantedAt = 0;
+        }
     }
 
     /// @notice Deletes every claim on a name, rejecting each claimant that is not `winner`.

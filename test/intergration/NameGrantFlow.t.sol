@@ -3,6 +3,7 @@ pragma solidity ^0.8.34;
 
 import {BaseDotns, IDotnsRegistrarController} from "../base/BaseDotns.t.sol";
 import {IDotnsNameWhitelist} from "../../contracts/whitelist/IDotnsNameWhitelist.sol";
+import {IDotnsPopController} from "../../contracts/registrars/IDotnsPopController.sol";
 import {IDotnsNameEscrow} from "../../contracts/escrow/IDotnsNameEscrow.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -71,6 +72,157 @@ contract NameGrantFlow is BaseDotns {
 
         bytes32 node = _nodeOf(nameLabel);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(uint256(node)), beneficiary);
+    }
+
+    // a live grant binds its name on every registration path
+
+    /// @dev The paid path refuses a granted name for everyone. The grantee is refused too: their
+    ///      path is `registerReserved`, which spends the grant, so no path leaves a grant
+    ///      unspent on a registered name.
+    function test_register_refuses_a_granted_name_for_every_caller() public {
+        string memory nameLabel = "grantedname";
+        _grantName(nameLabel, ed);
+
+        address[2] memory callers = [tiago, ed];
+        for (uint256 i; i < callers.length; ++i) {
+            (IDotnsRegistrarController.Registration memory registration, uint256 price) =
+                _commitPaidRegistration(nameLabel, callers[i]);
+            vm.expectRevert(
+                abi.encodeWithSelector(IDotnsRegistrarController.NameGranted.selector, nameLabel)
+            );
+            vm.prank(callers[i]);
+            dotnsRegistrarController.register{value: price}(registration);
+        }
+
+        _registerReserved(nameLabel, ed, ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(nameLabel)), ed);
+    }
+
+    /// @dev The gateway neither issues nor reserves a granted name, for any user.
+    function test_the_gateway_refuses_a_granted_name_for_every_user() public {
+        string memory nameLabel = "grantedname";
+        _grantName(nameLabel, ed);
+
+        address[2] memory users = [tiago, ed];
+        for (uint256 i; i < users.length; ++i) {
+            vm.expectRevert(IDotnsPopController.PersonhoodNameUnavailable.selector);
+            _rootIssuePersonhoodName(
+                IDotnsPopController.PersonhoodNameIssuance({
+                    label: nameLabel, user: users[i], link: _linkFresh(_validChatKey(0x55))
+                })
+            );
+
+            vm.expectRevert(IDotnsPopController.PersonhoodNameUnavailable.selector);
+            _rootReservePersonhoodName(
+                IDotnsPopController.PersonhoodNameReservation({label: nameLabel, user: users[i]})
+            );
+        }
+
+        // The reservation is validated before the issuance, so the device name is not issued
+        // either.
+        vm.expectRevert(IDotnsPopController.PersonhoodNameUnavailable.selector);
+        _rootIssueDeviceNameWithReservation(
+            IDotnsPopController.DeviceNameIssuanceWithReservation({
+                issuance: IDotnsPopController.DeviceNameIssuance({
+                    label: "candidate.07", user: tiago, chatKey: _validChatKey(0x56)
+                }),
+                reservedLabel: nameLabel
+            })
+        );
+    }
+
+    /// @dev `Reserved` is a whitelist-only status: it closes a name to requests and grants and
+    ///      leaves every registration path as it was.
+    function test_a_whitelist_reservation_leaves_the_other_paths_open() public {
+        string memory nameLabel = "withheldname";
+        _mockOriginIsRoot(true);
+        dotnsNameWhitelist.setReserved(nameLabel, true);
+        _mockOriginIsRoot(false);
+
+        _commitAndRegister(nameLabel, tiago, false);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(nameLabel)), tiago);
+    }
+
+    /// @dev Once the grant expires, the grantee loses the free path and everyone else regains the
+    ///      paid one.
+    function test_an_expired_grant_frees_the_name() public {
+        string memory nameLabel = "lapsedgrant";
+        _grantName(nameLabel, ed);
+
+        IDotnsRegistrarController.Registration memory reserved =
+            IDotnsRegistrarController.Registration({
+                label: nameLabel,
+                owner: ed,
+                secret: keccak256(abi.encodePacked(nameLabel, "lapsed")),
+                reserved: true,
+                maxPrice: type(uint256).max,
+                pricingVersion: popRules.pricingVersion()
+            });
+        vm.prank(ed);
+        dotnsRegistrarController.commit(dotnsRegistrarController.makeCommitment(reserved));
+
+        vm.warp(block.timestamp + dotnsNameWhitelist.grantDuration());
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsRegistrarController.NameNotGranted.selector, nameLabel, ed)
+        );
+        vm.prank(ed);
+        dotnsRegistrarController.registerReserved(reserved);
+
+        _commitAndRegister(nameLabel, tiago, false);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(nameLabel)), tiago);
+    }
+
+    /// @dev The gateway takes a lapsed grant's name back too, both as a reservation and as an
+    ///      issuance.
+    function test_the_gateway_accepts_a_name_once_its_grant_expires() public {
+        string memory reservedName = "lapsedreserve";
+        string memory issuedName = "lapsedissue";
+        _grantName(reservedName, ed);
+        _grantName(issuedName, ed);
+        vm.warp(block.timestamp + dotnsNameWhitelist.grantDuration());
+
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({label: reservedName, user: tiago})
+        );
+        assertEq(
+            dotnsPopController.userReservation(tiago).labelhash,
+            keccak256(bytes(reservedName)),
+            "the lapsed name is reservable"
+        );
+
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: issuedName, user: leonardo, link: _linkFresh(_validChatKey(0x57))
+            })
+        );
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(issuedName)), leonardo);
+    }
+
+    /// @dev A whitelist reservation leaves the gateway as it was, like the paid path.
+    function test_a_whitelist_reservation_leaves_the_gateway_open() public {
+        string memory nameLabel = "withheldgate";
+        _mockOriginIsRoot(true);
+        dotnsNameWhitelist.setReserved(nameLabel, true);
+        _mockOriginIsRoot(false);
+
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: nameLabel, user: tiago, link: _linkFresh(_validChatKey(0x58))
+            })
+        );
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(nameLabel)), tiago);
+    }
+
+    /// @dev Governance grants a lapsed name afresh without revoking the old grant first.
+    function test_an_expired_grant_can_be_granted_again() public {
+        string memory nameLabel = "regrantname";
+        _grantName(nameLabel, ed);
+        vm.warp(block.timestamp + dotnsNameWhitelist.grantDuration());
+
+        _grantName(nameLabel, tiago);
+        _registerReserved(nameLabel, tiago, tiago);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(nameLabel)), tiago);
     }
 
     // release lifecycle: a granted name must not be a one-way exit from circulation
@@ -334,6 +486,30 @@ contract NameGrantFlow is BaseDotns {
         vm.stopPrank();
 
         vm.warp(dotnsNameEscrow.getReleasePosition(tokenId).redeemableUntil);
+    }
+
+    /// @notice Commits a paid registration of `nameLabel` for `nameOwner` and waits out the
+    ///         commitment delay, leaving the reveal to the caller.
+    function _commitPaidRegistration(
+        string memory nameLabel,
+        address nameOwner
+    )
+        private
+        returns (IDotnsRegistrarController.Registration memory registration, uint256 price)
+    {
+        registration = IDotnsRegistrarController.Registration({
+            label: nameLabel,
+            owner: nameOwner,
+            secret: keccak256(abi.encodePacked(nameLabel, nameOwner, "paid")),
+            reserved: false,
+            maxPrice: type(uint256).max,
+            pricingVersion: popRules.pricingVersion()
+        });
+        vm.prank(nameOwner);
+        dotnsRegistrarController.commit(dotnsRegistrarController.makeCommitment(registration));
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+        price = popRules.priceWithCheck(nameLabel, nameOwner).price;
+        vm.deal(nameOwner, nameOwner.balance + price);
     }
 
     /// @notice Commit-reveal a reserved registration for `nameOwner`, submitted by `submitter`.

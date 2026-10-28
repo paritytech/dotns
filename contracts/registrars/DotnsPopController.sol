@@ -27,6 +27,7 @@ import {LabelUtils} from "../utils/LabelUtils.sol";
 import {SubnodeUtils} from "../utils/SubnodeUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
+import {IDotnsNameWhitelist} from "../whitelist/IDotnsNameWhitelist.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
@@ -372,6 +373,7 @@ contract DotnsPopController is
             required != IPopRules.PopStatus.Reserved && required != IPopRules.PopStatus.Devicehood,
             legacy
         );
+        _requireNotGranted(label);
 
         _advanceExpiredHead(deps, labelhash, MAX_QUEUE_STEPS_PER_CALL, false, user);
 
@@ -1078,10 +1080,11 @@ contract DotnsPopController is
     }
 
     /// @notice Validates a personhood name as reservable and returns its hashes.
-    /// @dev Shared by both reservation paths so the guard cannot drift between them. Runs three
+    /// @dev Shared by both reservation paths so the guard cannot drift between them. Runs four
     /// checks and reverts on the first failure, before any reservation state is mutated: the label
     /// must be a letters-only personhood label, which makes it its own base name, classify outside
-    /// the governance-reserved tier, and have no owner on the registrar. The last check is the fix
+    /// the governance-reserved tier, have no owner on the registrar, and hold no live grant on the
+    /// name whitelist, which only its grantee may register. The owner check is the fix
     /// for a reservation queued over an already-registered name: the queue keys by base name, so
     /// such a reservation could never be redeemed yet would hold the base name, and so every device
     /// name with that stem, for the full reservation window. `exists` (owner set) mirrors exactly
@@ -1101,6 +1104,21 @@ contract DotnsPopController is
         (IPopRules.PopStatus required,,) = PopClassification.classify(label);
         _requirePersonhoodLabel(required != IPopRules.PopStatus.Reserved, legacy);
         require(!_registrarOf(deps).exists(uint256(node)), PersonhoodNameUnavailable());
+        _requireNotGranted(label);
+    }
+
+    /// @notice Reverts when `label` holds a live grant on the name whitelist.
+    /// @dev A granted name is registered only through the public controller's
+    /// `registerReserved`, which spends the grant, so the gateway neither issues nor reserves it,
+    /// for any user. Reverts @custom:reverts PersonhoodNameUnavailable, an error the gateway
+    /// already decodes. A network with no whitelist configured has no grants to honour.
+    function _requireNotGranted(string calldata label) internal view {
+        address whitelist = protocolRegistry.get(DotnsConstants.NAME_WHITELIST);
+        if (whitelist == address(0)) return;
+        require(
+            IDotnsNameWhitelist(whitelist).granteeOf(label) == address(0),
+            PersonhoodNameUnavailable()
+        );
     }
 
     /// @notice Reverts with the device-label error the caller decodes when `ok` is false.

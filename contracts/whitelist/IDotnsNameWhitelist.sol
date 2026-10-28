@@ -19,7 +19,9 @@ pragma solidity ^0.8.34;
 interface IDotnsNameWhitelist {
     /// @notice Status of a name.
     /// @dev `Open` is the zero-value default: claimable, not reserved, not won. `Reserved` is
-    ///      withheld by governance. `Claimed` has a single winner.
+    ///      withheld by governance. `Claimed` has a single winner until the grant expires
+    ///      `grantDuration` after it was made; every view and gate reads an expired grant as
+    ///      `Open`.
     enum NameStatus {
         Open,
         Reserved,
@@ -65,14 +67,18 @@ interface IDotnsNameWhitelist {
     }
 
     /// @notice Stored resolved state of a name.
-    /// @dev `status` and `winner` are ordered first so the 1-byte enum and 20-byte address share
-    ///      one storage slot; the dynamic `label` is stored separately.
+    /// @dev `status`, `winner` and `grantedAt` are ordered first so the 1-byte enum, the 20-byte
+    ///      address and the 8-byte timestamp share one storage slot; the dynamic `label` is stored
+    ///      separately. The stored `status` stays `Claimed` after a grant expires, until a write
+    ///      on the name clears it.
     /// @param status Name status; see NameStatus.
     /// @param winner Winning beneficiary when `Claimed`, otherwise the zero address.
+    /// @param grantedAt Timestamp the name became `Claimed`, zero otherwise.
     /// @param label Bare label, kept so reserved and claimed names are reviewable.
     struct NameRecord {
         NameStatus status;
         address winner;
+        uint64 grantedAt;
         string label;
     }
 
@@ -114,6 +120,10 @@ interface IDotnsNameWhitelist {
     /// @param maxGrantBatch New `grantNames` batch cap.
     event MaxGrantBatchSet(uint16 maxGrantBatch);
 
+    /// @notice Emitted when the grant period is set.
+    /// @param grantDuration New grant period, in seconds.
+    event GrantDurationSet(uint64 grantDuration);
+
     /// @notice Thrown when a claim names the zero-address beneficiary.
     error ZeroUser();
 
@@ -147,6 +157,11 @@ interface IDotnsNameWhitelist {
     /// @notice Thrown when the grant-batch cap is set to zero or above
     /// `DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT`.
     error MaxGrantBatchOutOfRange();
+
+    /// @notice Thrown when the grant period is set below
+    /// `DotnsConstants.WHITELIST_MIN_GRANT_DURATION` or above
+    /// `DotnsConstants.WHITELIST_MAX_GRANT_DURATION`.
+    error GrantDurationOutOfRange();
 
     /// @notice Thrown when a claim is not in the `Requested` status.
     /// @param node Namehash of the label under the active TLD.
@@ -214,8 +229,9 @@ interface IDotnsNameWhitelist {
     function reject(string calldata label, address user) external;
 
     /// @notice Grants `label` to `user` directly, without a prior claim.
-    /// @dev Restricted to a substrate Root dispatch. Requires the name Open, `user` non-zero
-    /// and a canonical label. Sets the name `Claimed` with `user` the winner and clears any pending
+    /// @dev Restricted to a substrate Root dispatch. Requires the name Open, which an expired
+    /// grant is, `user` non-zero and a canonical label. Sets the name `Claimed` with `user` the
+    /// winner, starts the grant period, and clears any pending
     ///      claims. @custom:reverts NameNotOpen, @custom:reverts ZeroUser or
     ///      @custom:reverts InvalidLabel. @custom:emits NameAccepted, and
     ///      @custom:emits NameRejected for each cleared claim.
@@ -233,7 +249,8 @@ interface IDotnsNameWhitelist {
 
     /// @notice Resets `label` to Open, clearing any winner and claims.
     /// @dev Restricted to a substrate Root dispatch. Resolves a Claimed or claim-holding
-    /// name; a Reserved name is released through @custom:function setReserved, not here.
+    /// name, an expired grant included, so governance can tidy a lapsed entry from the active
+    /// set; a Reserved name is released through @custom:function setReserved, not here.
     ///      @custom:reverts NothingToRevoke when the name is not Claimed and holds no claims.
     ///      @custom:emits NameRevoked, and @custom:emits NameRejected for each cleared claim.
     /// @param label Bare label to reset.
@@ -250,7 +267,8 @@ interface IDotnsNameWhitelist {
     /// @notice Removes the win on `label` as `registrant` registers it.
     /// @dev Restricted to the registrar controllers resolved through the protocol registry. Resets
     ///      the name to Open. @custom:reverts NotController for any other caller and
-    ///      @custom:reverts NotWinner when `label` is not won by `registrant`.
+    ///      @custom:reverts NotWinner when `label` is not won by `registrant` or the grant has
+    ///      expired.
     ///      @custom:emits NameConsumed.
     /// @param label Bare label being registered.
     /// @param registrant Address registering the name.
@@ -285,6 +303,16 @@ interface IDotnsNameWhitelist {
     /// @param newMax New batch cap.
     function setMaxGrantBatch(uint16 newMax) external;
 
+    /// @notice Sets the period a grant binds its name.
+    /// @dev Restricted to a substrate Root dispatch, bounded by
+    /// `DotnsConstants.WHITELIST_MIN_GRANT_DURATION` and
+    /// `DotnsConstants.WHITELIST_MAX_GRANT_DURATION`. Expiry is computed on read, so the new
+    /// period applies to every live grant: lengthening it extends them and shortening it can
+    /// expire them at once. @custom:reverts GrantDurationOutOfRange when `newDuration` is out of
+    /// range. @custom:emits GrantDurationSet.
+    /// @param newDuration New grant period, in seconds.
+    function setGrantDuration(uint64 newDuration) external;
+
     /// @notice Returns the live-claim cap per name.
     /// @return cap Current per-name claim cap.
     function maxClaimants() external view returns (uint16 cap);
@@ -297,7 +325,12 @@ interface IDotnsNameWhitelist {
     /// @return cap Current batch cap.
     function maxGrantBatch() external view returns (uint16 cap);
 
+    /// @notice Returns the period a grant binds its name.
+    /// @return duration Current grant period, in seconds.
+    function grantDuration() external view returns (uint64 duration);
+
     /// @notice Returns the status of `label`.
+    /// @dev An expired grant reads `Open`.
     /// @param label Bare label to look up.
     /// @return status Name status; see NameStatus.
     function statusOf(string calldata label) external view returns (NameStatus status);
@@ -308,12 +341,23 @@ interface IDotnsNameWhitelist {
     function isReserved(string calldata label) external view returns (bool reserved);
 
     /// @notice Returns the winner of `label`, or the zero address when not `Claimed`.
+    /// @dev The check the controllers use to keep every other path off a granted name. Zero once
+    ///      the grant expires.
     /// @param label Bare label to look up.
     /// @return winner Winning beneficiary.
     function granteeOf(string calldata label) external view returns (address winner);
 
+    /// @notice Returns when the grant on `label` expires, or zero when the name is not `Claimed`.
+    /// @dev The grant binds the name while `block.timestamp` is below this value. Reads
+    ///      `type(uint64).max` on a whitelist upgraded without `initializeGrantExpiry`, where
+    ///      grants do not expire yet.
+    /// @param label Bare label to look up.
+    /// @return expiresAt Timestamp the grant expires at.
+    function grantExpiresAt(string calldata label) external view returns (uint64 expiresAt);
+
     /// @notice Returns whether `account` won `label`.
-    /// @dev The pair check the controllers use to admit a registrant. False for the zero address.
+    /// @dev The pair check the controllers use to admit a registrant. False for the zero address
+    ///      and once the grant expires.
     /// @param label Bare label to look up.
     /// @param account Address to test against the winner.
     /// @return granted True when `account` is the winner.
@@ -356,7 +400,9 @@ interface IDotnsNameWhitelist {
     function nameCount() external view returns (uint256 count);
 
     /// @notice Returns a page of active names for review.
-    /// @dev Reads the canonical offset and limit window. Iteration order is not stable.
+    /// @dev Reads the canonical offset and limit window. Iteration order is not stable. An
+    ///      expired grant stays in the set until a write on the name clears it, and reads `Open`
+    ///      with no winner.
     /// @param offset Index of the first name.
     /// @param limit Maximum number of names to return.
     /// @return page Names in the window.

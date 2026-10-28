@@ -217,7 +217,8 @@ interface IDotnsPopController is IDotnsController {
     error InvalidPersonhoodLabel();
 
     /// @notice Thrown when a personhood name to reserve already has an owner on the registrar, so
-    /// the queued reservation could never be claimed.
+    /// the queued reservation could never be claimed, or when a personhood name to issue or reserve
+    /// holds a live grant on the name whitelist, which only its grantee may register.
     error PersonhoodNameUnavailable();
 
     /// @notice Thrown when a device name is issued again while its subname already exists.
@@ -273,9 +274,10 @@ interface IDotnsPopController is IDotnsController {
     /// @custom:emits PendingClaimStashed, with @custom:emits NameRegistered deferred to
     /// @custom:function settlePendingClaims when the claim settles. The reservation only runs
     /// when `reservedLabel` is non-empty: it requires a letters-only personhood label
-    /// (otherwise @custom:reverts InvalidPersonhoodLabel) with no owner on the registrar
-    /// (otherwise @custom:reverts PersonhoodNameUnavailable), since a name that already has an
-    /// owner could never be claimed. This validation runs before both the issuance and any queue
+    /// (otherwise @custom:reverts InvalidPersonhoodLabel) with no owner on the registrar and no
+    /// live grant on the name whitelist (otherwise @custom:reverts PersonhoodNameUnavailable),
+    /// since a name that already has an owner could never be claimed and a granted name is its
+    /// grantee's alone. This validation runs before both the issuance and any queue
     /// mutation, so an already-registered `reservedLabel` aborts the whole call and the candidate
     /// receives no device name either; callers should validate the reserved label before
     /// attesting rather than relying on this revert. It then clears up to
@@ -303,7 +305,8 @@ interface IDotnsPopController is IDotnsController {
     /// proof-size stays below per-call limits. Reverts with @custom:reverts InvalidPersonhoodLabel
     /// when the label is empty, is not lowercase ASCII letters (so a hyphen or any digit rejects
     /// it), or is governance-reserved, and with @custom:reverts PersonhoodNameUnavailable when the
-    /// label already has an owner on the registrar and so could never be claimed. When the user
+    /// label already has an owner on the registrar and so could never be claimed, or holds a live
+    /// grant on the name whitelist. When the user
     /// already holds an active reservation for `label`, that reservation stays as it is, with
     /// the same place in the queue and the same expiry, so the call is safe to retry. Otherwise
     /// moving the user out of a prior queue @custom:emits ReservationRelinquished and only empties
@@ -342,7 +345,10 @@ interface IDotnsPopController is IDotnsController {
     /// @dev Callable only under a Root origin (otherwise @custom:reverts NotRoot). The label must
     /// be a letters-only personhood label (otherwise @custom:reverts InvalidPersonhoodLabel), and
     /// must not classify as governance-reserved or as a device-name shape (otherwise
-    /// @custom:reverts InvalidPersonhoodLabel). The gateway also defers to PopRules as the single
+    /// @custom:reverts InvalidPersonhoodLabel). A label holding a live grant on the name whitelist
+    /// is its grantee's alone and @custom:reverts PersonhoodNameUnavailable for every user, the
+    /// grantee included, who registers it through the public controller's `registerReserved`.
+    /// The gateway also defers to PopRules as the single
     /// cross-flow authority: when PopRules carries a live base-name slot held by another user (this
     /// controller's prior queue head, or a sibling controller's write), the call reverts
     /// @custom:reverts NotHolder before any queue mutation. Two orthogonal axes drive the state
