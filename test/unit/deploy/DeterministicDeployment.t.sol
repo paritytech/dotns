@@ -2,6 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {Test} from "forge-std/Test.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 
 import {Create3Factory} from "../../../contracts/deploy/Create3Factory.sol";
 import {DotnsPopLens} from "../../../contracts/registrars/DotnsPopLens.sol";
@@ -37,6 +38,17 @@ contract DeterministicDeploymentTest is Test {
         // Mirror DeployCore: bootstrap the factory and prime it as the override
         // so the protocol registry can be deployed through it.
         factory = Create3Factory(payable(deployer.bootstrapCreate3Factory(owner)));
+    }
+
+    /// @notice Skips the calling test when it runs under `forge coverage`.
+    /// @dev Coverage runs tests against its own instrumented build, but the deployer reads each
+    ///      artefact's immutable offsets from the normal build in `out/`. The two builds place
+    ///      immutables differently, so an address-derived immutable such as
+    ///      `UUPSUpgradeable.__self` is not masked and an honest resume is rejected. Real deploys
+    ///      read a single build, so this only affects tests that adopt an immutable-carrying
+    ///      artefact, and only under coverage. The regular test run still covers them.
+    function _skipUnderCoverage() private {
+        if (vm.isContext(VmSafe.ForgeContext.Coverage)) vm.skip(true);
     }
 
     /// @notice An occupied CREATE3 address holding code this run would not have deployed is a
@@ -139,6 +151,8 @@ contract DeterministicDeploymentTest is Test {
     ///      from the occupant exactly where the comparison must skip. A check that compared
     ///      those bytes would force a salt bump on every interrupted run.
     function test_resume_adopts_an_immutable_carrying_artefact() public {
+        _skipUnderCoverage();
+
         address first =
             deployer.deployCreate3(owner, "StoreFactory.sol:StoreFactory", "", "StoreFactory");
         address second =
@@ -371,6 +385,8 @@ contract DeterministicDeploymentTest is Test {
     }
 
     function test_reDeployAdoptsProxyWithoutReinitialising() public {
+        _skipUnderCoverage();
+
         bytes memory initData = abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "dot"));
         address first = deployer.deployUups(
             owner,
