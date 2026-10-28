@@ -16,9 +16,10 @@ import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolReg
 /// @custom:security-contact admin@parity.io
 contract DeployPopSystem is BaseDeployer {
     /// @notice Default reservation duration for the PoP controller.
-    /// @dev Mirrors `pallet_resources::UsernameReservationDuration`; the owner
-    ///      rotates it post-deploy via `DotnsPopController.setReservationDuration`.
-    uint64 public constant DEFAULT_RESERVATION_DURATION = 7 days;
+    /// @dev Gives a device-name holder a month to reach personhood and claim the personhood
+    ///      name they reserved. The owner rotates it post-deploy via
+    ///      `DotnsPopController.setReservationDuration`.
+    uint64 public constant DEFAULT_RESERVATION_DURATION = 30 days;
 
     function run() external {
         address owner = msg.sender;

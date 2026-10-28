@@ -134,7 +134,7 @@ abstract contract BaseDotns is Test {
     bytes4 internal constant SELECTOR_LEGACY_REGISTER_BASE_NAME = 0x7c4b376b;
 
     /// @notice Default reservation duration used by the PoP controller.
-    uint64 public constant DEFAULT_RESERVATION_DURATION = 7 days;
+    uint64 public constant DEFAULT_RESERVATION_DURATION = 30 days;
 
     /// @notice Deployed Store factory instance.
     StoreFactory public storeFactory;
