@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/26a710425310b6b509e41bf570a730454910e131/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/53ffbcae5b436ac90035908ff471b80eb5288211/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a>, <a href="/contracts/registrars/IDotnsPopControllerLegacy.sol/interface.IDotnsPopControllerLegacy.html">IDotnsPopControllerLegacy</a></p>
 <p><strong>Title:</strong>
@@ -1200,12 +1200,13 @@ still register.</p>
     returns (bytes32 labelhash, bytes32 node);
 </code></pre>
 <h3 id="_requirenotgranted"><a class="header" href="#_requirenotgranted">_requireNotGranted</a></h3>
-<p>Reverts when <code>label</code> holds a live grant on the name whitelist.</p>
+<p>Reverts when the name at <code>node</code> holds a live grant on the name whitelist.</p>
 <p>A granted name is registered only through the public controller's
 <code>registerReserved</code>, which spends the grant, so the gateway neither issues nor reserves it,
 for any user. Reverts @custom:reverts PersonhoodNameUnavailable, an error the gateway
-already decodes. A network with no whitelist configured has no grants to honour.</p>
-<pre><code class="language-solidity">function _requireNotGranted(string calldata label) internal view;
+already decodes. A network with no whitelist configured has no grants to honour. Reads by
+node, so the whitelist makes no TLD lookup of its own inside the gateway's weight limit.</p>
+<pre><code class="language-solidity">function _requireNotGranted(bytes32 node) internal view;
 </code></pre>
 <h3 id="_requiredevicelabel"><a class="header" href="#_requiredevicelabel">_requireDeviceLabel</a></h3>
 <p>Reverts with the device-label error the caller decodes when <code>ok</code> is false.</p>

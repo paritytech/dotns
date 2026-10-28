@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/26a710425310b6b509e41bf570a730454910e131/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/53ffbcae5b436ac90035908ff471b80eb5288211/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -199,7 +199,9 @@ security-contact: admin@parity.io</p>
 <p>Validates the canonical DNS-label shape (otherwise @custom:reverts InvalidLabel)
 and rejects labels below the minimum-length policy with</p>
 <p><strong>Note:</strong>
-reverts: LabelTooShort before checking ERC721 availability on the registrar.</p>
+reverts: LabelTooShort before checking ERC721 availability on the registrar. A label
+that holds a live whitelist grant still reads available, though @custom:function register
+refuses it with @custom:reverts NameGranted.</p>
 <pre><code class="language-solidity">function available(string calldata label) external view returns (bool isAvailable);
 </code></pre>
 <h3 id="makecommitment"><a class="header" href="#makecommitment">makeCommitment</a></h3>
