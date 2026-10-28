@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistry"><a class="header" href="#idotnsregistry">IDotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/390fc3d4c2cc0e8572ad047661ffe09140bc405e/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/da7dc3703ae1e5626edef6d8232858f5f28bd340/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsRegistry</p>
 <p><strong>Author:</strong>
@@ -219,7 +219,15 @@ governed by <code>record.persist</code> (see @custom:struct SubnodeRecord); the 
 resolver record is written either way. A <code>record.persist</code> of false defers the store
 write and is restricted to registered controllers
 (@custom:function IDotnsRegistrar.controllers), otherwise @custom:reverts
-NotAuthorised. Emits @custom:emits NewOwner on each successful assignment.</p>
+NotAuthorised. Creating a subname, as opposed to reassigning one that resolves,
+requires it to sit at most <code>MAX_SUBNAME_DEPTH</code> levels below its second-level name,
+otherwise @custom:reverts SubnameTooDeep. A subname still on record but cut off by a
+clear above it is created again from nothing: its versions are bumped, emitting</p>
+</li>
+<li>
+<p>emits: RecordsCleared and @custom:emits SubnamesCleared, so none of its old
+records or subnames come back. Emits @custom:emits NewOwner on each successful
+assignment.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function setSubnodeOwner(SubnodeRecord calldata record) external returns (bytes32 subnode);
@@ -240,7 +248,7 @@ path of at most <code>StringUtils.MAX_NAME_PATH_OCTETS</code> octets whose nameh
 <code>record.parentNode</code> (otherwise</p>
 </li>
 <li>
-<p>reverts: ParentLabelMismatch). The resulting subnode must already exist,
+<p>reverts: ParentLabelMismatch). The resulting subnode must exist and resolve,
 otherwise @custom:reverts NotAuthorised. Emits @custom:emits NewResolver on
 success.</p>
 </li>
@@ -265,9 +273,16 @@ until the buyer overwrites it. That covers the node itself and not the nodes ben
 it: a subname stores its own owner, and @custom:function isAuthorised returns on that
 owner before consulting the registrar, so after the sale the seller keeps write
 authority over every subname whose stored owner is still the seller, until the buyer
-reassigns each one through @custom:function setSubnodeOwner. A subname created for
-someone else stays with that owner and leaves the seller no write path. The set is
-derivable from @custom:emits NewOwner, which indexes the parent node. Stores
+deletes each one through @custom:function deleteSubname or clears them all at once
+through @custom:function clearSubnames. Reassigning one through</p>
+</li>
+<li>
+<p>function: setSubnodeOwner keeps its records and the subnames beneath it. A
+subname created for someone else stays with that owner and leaves the seller no write
+path. The set is derivable from</p>
+</li>
+<li>
+<p>emits: NewOwner, which indexes the parent node. Stores
 <code>owner = address(0)</code> as a sentinel so reads delegate to <code>IDotnsRegistrar.ownerOf</code> and
 ERC-721 transfers remain authoritative. Emits</p>
 </li>
@@ -293,18 +308,40 @@ success.</p>
 <tr><td><code>resolverAddr</code></td><td><code>address</code></td><td>Resolver contract address (zero clears).</td></tr>
 </tbody></table>
 </div>
+<h3 id="parentof"><a class="header" href="#parentof">parentOf</a></h3>
+<p>Returns the recorded parent of a subname.</p>
+<p>Zero for a tokenised name, for a node that was never created or was deleted, and for
+a subname whose parent was never recorded and that has not been linked since
+(@custom:function linkSubname). A backfill reads it to find the subnames still to
+link.</p>
+<pre><code class="language-solidity">function parentOf(bytes32 node) external view returns (bytes32 parent);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>parent</code></td><td><code>bytes32</code></td><td>Recorded parent node, or zero.</td></tr>
+</tbody></table>
+</div>
 <h3 id="owner"><a class="header" href="#owner">owner</a></h3>
 <p>Returns the owner of a node.</p>
 <p>For tokenised nodes the stored owner is the zero sentinel; the implementation falls
-back to <code>IDotnsRegistrar.ownerOf(uint256(node))</code>.</p>
+back to <code>IDotnsRegistrar.ownerOf(uint256(node))</code>. A subname that no longer resolves,
+because it or a name above it was cleared or deleted, has no owner and returns zero, as
+do @custom:function resolver, @custom:function recordExists and</p>
+<p><strong>Note:</strong>
+function: isAuthorised for it.</p>
 <pre><code class="language-solidity">function owner(bytes32 node) external view returns (address);
 </code></pre>
 <h3 id="resolver"><a class="header" href="#resolver">resolver</a></h3>
-<p>Returns the resolver of a node.</p>
+<p>Returns the resolver of a node, or zero when the node does not resolve.</p>
 <pre><code class="language-solidity">function resolver(bytes32 node) external view returns (address);
 </code></pre>
 <h3 id="recordexists"><a class="header" href="#recordexists">recordExists</a></h3>
-<p>Returns whether a node exists.</p>
+<p>Returns whether a node exists and resolves.</p>
 <pre><code class="language-solidity">function recordExists(bytes32 node) external view returns (bool);
 </code></pre>
 <h3 id="isauthorised"><a class="header" href="#isauthorised">isAuthorised</a></h3>
@@ -328,6 +365,136 @@ false for a node that does not exist.</p>
 <tr><td><code>authorisedFlag</code></td><td><code>bool</code></td><td>True when <code>account</code> may manage <code>node</code>.</td></tr>
 </tbody></table>
 </div>
+<h3 id="clearrecords"><a class="header" href="#clearrecords">clearRecords</a></h3>
+<p>Clears the records of <code>node</code> on the resolvers that check <code>recordVersion</code>
+(<code>DotnsResolver</code> and <code>DotnsContentResolver</code>), and points it back at the default
+resolver.</p>
+<p>Callable by anyone @custom:function isAuthorised admits for <code>node</code>, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotAuthorised. Constant cost whatever the number of records: the node's
+record version is bumped rather than any record being visited. Subnames are untouched;
+see @custom:function clearSubnames. Emits @custom:emits RecordsCleared and</p>
+</li>
+<li>
+<p>emits: NewResolver.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function clearRecords(bytes32 node) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node to clear.</td></tr>
+</tbody></table>
+</div>
+<h3 id="clearsubnames"><a class="header" href="#clearsubnames">clearSubnames</a></h3>
+<p>Clears every subname beneath <code>node</code>, at any depth, together with their records.</p>
+<p>Callable by anyone @custom:function isAuthorised admits for <code>node</code>, otherwise</p>
+<p><strong>Note:</strong>
+reverts: NotAuthorised. Constant cost whatever the size or depth of the subtree:
+the node's subname version is bumped, and a subname resolves only while the version it
+was created under is still current at every level above it. A cleared subname can be
+created again through @custom:function setSubnodeOwner, and starts with no records and
+no subnames. The node's own records are untouched; see @custom:function clearRecords.
+Emits @custom:emits SubnamesCleared.</p>
+<pre><code class="language-solidity">function clearSubnames(bytes32 node) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node whose subnames are cleared.</td></tr>
+</tbody></table>
+</div>
+<h3 id="clear"><a class="header" href="#clear">clear</a></h3>
+<p>Clears every record and every subname of <code>node</code>.</p>
+<p>Equivalent to @custom:function clearRecords followed by @custom:function clearSubnames
+in one call, with the same authority. The escrow calls it on release, once it holds the
+token, which is what makes a released name start clean for whoever gets it next.</p>
+<pre><code class="language-solidity">function clear(bytes32 node) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node to clear.</td></tr>
+</tbody></table>
+</div>
+<h3 id="deletesubname"><a class="header" href="#deletesubname">deleteSubname</a></h3>
+<p>Deletes one subname of <code>parentNode</code>, together with its records and every subname
+beneath it.</p>
+<p>Callable by anyone @custom:function isAuthorised admits for <code>parentNode</code>, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotAuthorised: subnames are parent-sovereign, so the parent decides,
+not the subname's holder. The subname's record and parent link are zeroed, releasing
+their storage deposit to the signer of the transaction; one version slot stays so the
+subname, created again, starts empty. The subname need not resolve: one a clear has
+already cut off can still be deleted by whoever controls <code>parentNode</code> now, after a
+transfer included. Subnames beneath it are cleared but keep their storage, and once
+their own parent stops resolving nobody can delete them, so freeing every deposit means
+deleting from the deepest subname up, each by whoever holds that subname's parent,
+before clearing anything above them. A subname must exist there, otherwise</p>
+</li>
+<li>
+<p>reverts: SubnameNotFound. Emits @custom:emits NewOwner with a zero owner, the
+deletion convention indexers already follow, and @custom:emits RecordsCleared and</p>
+</li>
+<li>
+<p>emits: SubnamesCleared for the subname.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function deleteSubname(bytes32 parentNode, bytes32 labelhash) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>parentNode</code></td><td><code>bytes32</code></td><td>Parent of the subname.</td></tr>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the subname under <code>parentNode</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="linksubname"><a class="header" href="#linksubname">linkSubname</a></h3>
+<p>Records the parent of a subname whose parent was never recorded, so that clearing
+an ancestor reaches it.</p>
+<p>Permissionless: the parent is proven by the namehash, since <code>subnode</code> is
+<code>keccak256(parentNode, labelhash)</code>, so a caller cannot link a subname anywhere else.
+The subname is linked as created under its parent's first subname version, so a subname
+whose ancestor was cleared before it was linked reads as cleared once it and every
+level between it and that ancestor are linked; an unlinked level still ends the walk
+as resolving. Every successful write path that keeps the subname and names its parent
+(@custom:function setSubnodeOwner, @custom:function setSubnodeResolver) links it as a
+side effect; this entry point covers the rest. @custom:reverts SubnameNotFound when
+no subname exists there. A subname already linked is left as it is. Emits</p>
+<p><strong>Note:</strong>
+emits: SubnameLinked when it links.</p>
+<pre><code class="language-solidity">function linkSubname(bytes32 parentNode, bytes32 labelhash) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>parentNode</code></td><td><code>bytes32</code></td><td>Parent of the subname.</td></tr>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the subname under <code>parentNode</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="recordversion"><a class="header" href="#recordversion">recordVersion</a></h3>
+<p>Returns whether <code>node</code> resolves and the record version its records are written
+under.</p>
+<p>Resolvers stamp each write with <code>recordsVersion</code> and treat a record whose stamp
+differs, or any record of a node that does not resolve, as unset. A tokenised name
+resolves while its record exists; a subname resolves while no ancestor has cleared or
+deleted it.
+Version 0 is the version every node starts at, and a record stamped 0 matches it, so a
+node that was never cleared reads every record stamped 0.
+Checking a subname walks its ancestors, so the cost grows with its depth.</p>
+<pre><code class="language-solidity">function recordVersion(bytes32 node) external view returns (bool live, uint64 recordsVersion);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>live</code></td><td><code>bool</code></td><td>True when <code>node</code> currently resolves.</td></tr>
+<tr><td><code>recordsVersion</code></td><td><code>uint64</code></td><td>Record version of <code>node</code>.</td></tr>
+</tbody></table>
+</div>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
 <h3 id="newowner"><a class="header" href="#newowner">NewOwner</a></h3>
 <p>Emitted when a new subnode owner is set.</p>
@@ -348,6 +515,45 @@ false for a node that does not exist.</p>
 <p>Emitted when a resolver is set or updated.</p>
 <pre><code class="language-solidity">event NewResolver(bytes32 indexed node, address resolver);
 </code></pre>
+<h3 id="recordscleared"><a class="header" href="#recordscleared">RecordsCleared</a></h3>
+<p>Emitted when every record of <code>node</code> stops resolving.</p>
+<p>Records live on resolver contracts and cannot be listed, so nothing is erased: the
+node's record version moves to <code>version</code> and every resolver that stamps its writes with</p>
+<p><strong>Note:</strong>
+function: recordVersion reads anything written under an earlier version as
+unset. Consumers that cache records must drop every cached record of <code>node</code> on this
+event.</p>
+<pre><code class="language-solidity">event RecordsCleared(bytes32 indexed node, uint64 version);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node whose records were cleared.</td></tr>
+<tr><td><code>version</code></td><td><code>uint64</code></td><td>Record version the node's records are now written under.</td></tr>
+</tbody></table>
+</div>
+<h3 id="subnamescleared"><a class="header" href="#subnamescleared">SubnamesCleared</a></h3>
+<p>Emitted when every subname beneath <code>node</code>, at any depth, stops resolving.</p>
+<p>One event covers the whole subtree, because the subtree cannot be listed. Descendants
+emit nothing of their own: consumers that index subnames must treat this event as the
+removal of every node below <code>node</code>, together with their records.</p>
+<pre><code class="language-solidity">event SubnamesCleared(bytes32 indexed node, uint64 version);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node whose subnames were cleared.</td></tr>
+<tr><td><code>version</code></td><td><code>uint64</code></td><td>Subname version a new child of <code>node</code> is created under.</td></tr>
+</tbody></table>
+</div>
+<h3 id="subnamelinked"><a class="header" href="#subnamelinked">SubnameLinked</a></h3>
+<p>Emitted when a subname created without a recorded parent is linked to it.</p>
+<pre><code class="language-solidity">event SubnameLinked(bytes32 indexed node, bytes32 indexed parent);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The subname.</td></tr>
+<tr><td><code>parent</code></td><td><code>bytes32</code></td><td>Its parent node.</td></tr>
+</tbody></table>
+</div>
 <h2 id="errors"><a class="header" href="#errors">Errors</a></h2>
 <h3 id="notallowed"><a class="header" href="#notallowed">NotAllowed</a></h3>
 <p>Thrown when an invalid (zero) address is provided.</p>
@@ -365,6 +571,27 @@ false for a node that does not exist.</p>
 <p>Thrown when attempting to create a node that already exists.</p>
 <pre><code class="language-solidity">error NodeAlreadyOwned(bytes32 node);
 </code></pre>
+<h3 id="subnamenotfound"><a class="header" href="#subnamenotfound">SubnameNotFound</a></h3>
+<p>Thrown when a subname that should exist under a parent does not, or no longer
+resolves.</p>
+<pre><code class="language-solidity">error SubnameNotFound(bytes32 node);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The subname.</td></tr>
+</tbody></table>
+</div>
+<h3 id="subnametoodeep"><a class="header" href="#subnametoodeep">SubnameTooDeep</a></h3>
+<p>Thrown when a new subname would sit deeper below its second-level name than
+<code>MAX_SUBNAME_DEPTH</code> allows.</p>
+<pre><code class="language-solidity">error SubnameTooDeep(uint256 depth, uint256 maxDepth);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>depth</code></td><td><code>uint256</code></td><td>Depth the subname would have.</td></tr>
+<tr><td><code>maxDepth</code></td><td><code>uint256</code></td><td>Deepest allowed.</td></tr>
+</tbody></table>
+</div>
 <h3 id="invalidlabel"><a class="header" href="#invalidlabel">InvalidLabel</a></h3>
 <p>Thrown when a sublabel is not a canonical lowercase ASCII DNS label.</p>
 <pre><code class="language-solidity">error InvalidLabel();
