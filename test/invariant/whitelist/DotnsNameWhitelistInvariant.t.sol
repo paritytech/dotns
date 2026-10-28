@@ -97,10 +97,16 @@ contract DotnsNameWhitelistInvariant is BaseDotns {
         assertEq(page.length, count);
         for (uint256 i; i < page.length; ++i) {
             IDotnsNameWhitelist.NameView memory entry = page[i];
-            (IDotnsNameWhitelist.NameStatus stored,,) = _storedRecord(entry.label);
+            (IDotnsNameWhitelist.NameStatus stored, address winner,) = _storedRecord(entry.label);
             bool active = stored != IDotnsNameWhitelist.NameStatus.Open
                 || whitelist.claimantCount(entry.label) != 0;
             assertTrue(active, "an active name holds no state");
+            // Guards the `_names` slot decode: a name the view reads as Claimed or Reserved is
+            // stored that way, with the winner the view reports.
+            if (entry.status != IDotnsNameWhitelist.NameStatus.Open) {
+                assertEq(uint256(stored), uint256(entry.status), "slot 2 layout");
+                assertEq(winner, entry.winner, "slot 2 layout");
+            }
         }
     }
 
@@ -122,6 +128,8 @@ contract DotnsNameWhitelistInvariant is BaseDotns {
                 "a stored grant reads Claimed exactly while its period runs"
             );
             assertEq(whitelist.granteeOf(label), live ? winner : address(0));
+            assertEq(whitelist.isGrantedTo(label, winner), live);
+            assertEq(whitelist.grantExpiresAt(label), live ? start + duration : 0);
         }
     }
 

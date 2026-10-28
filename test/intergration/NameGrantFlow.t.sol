@@ -4,6 +4,7 @@ pragma solidity ^0.8.34;
 import {BaseDotns, IDotnsRegistrarController} from "../base/BaseDotns.t.sol";
 import {IDotnsNameWhitelist} from "../../contracts/whitelist/IDotnsNameWhitelist.sol";
 import {IDotnsPopController} from "../../contracts/registrars/IDotnsPopController.sol";
+import {IPopRules} from "../../contracts/pop/IPopRules.sol";
 import {IDotnsNameEscrow} from "../../contracts/escrow/IDotnsNameEscrow.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -199,19 +200,56 @@ contract NameGrantFlow is BaseDotns {
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(issuedName)), leonardo);
     }
 
-    /// @dev A whitelist reservation leaves the gateway as it was, like the paid path.
+    /// @dev A whitelist reservation leaves the gateway as it was, like the paid path, for both
+    ///      issuance and reservation.
     function test_a_whitelist_reservation_leaves_the_gateway_open() public {
-        string memory nameLabel = "withheldgate";
+        string memory issuedName = "withheldgate";
+        string memory queuedName = "withheldqueue";
         _mockOriginIsRoot(true);
-        dotnsNameWhitelist.setReserved(nameLabel, true);
+        dotnsNameWhitelist.setReserved(issuedName, true);
+        dotnsNameWhitelist.setReserved(queuedName, true);
         _mockOriginIsRoot(false);
 
         _rootIssuePersonhoodName(
             IDotnsPopController.PersonhoodNameIssuance({
-                label: nameLabel, user: tiago, link: _linkFresh(_validChatKey(0x58))
+                label: issuedName, user: tiago, link: _linkFresh(_validChatKey(0x58))
             })
         );
-        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(nameLabel)), tiago);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(issuedName)), tiago);
+
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({label: queuedName, user: leonardo})
+        );
+        assertEq(
+            dotnsPopController.userReservation(leonardo).labelhash, keccak256(bytes(queuedName))
+        );
+    }
+
+    /// @dev The case the grant has to protect most: a 6 to 8 letter name, which a verified person
+    ///      can take through the gateway and, with short names enabled, through the paid path.
+    function test_a_short_granted_name_is_refused_on_both_paths() public {
+        string memory nameLabel = "michael";
+        _grantName(nameLabel, ed);
+        _setShortNames(true);
+        _setUserPopStatus(tiago, IPopRules.PopStatus.Personhood);
+
+        (IDotnsRegistrarController.Registration memory registration, uint256 price) =
+            _commitPaidRegistration(nameLabel, tiago);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsRegistrarController.NameGranted.selector, nameLabel)
+        );
+        vm.prank(tiago);
+        dotnsRegistrarController.register{value: price}(registration);
+
+        vm.expectRevert(IDotnsPopController.PersonhoodNameUnavailable.selector);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: nameLabel, user: tiago, link: _linkFresh(_validChatKey(0x59))
+            })
+        );
+
+        _registerReserved(nameLabel, ed, ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(nameLabel)), ed);
     }
 
     /// @dev Governance grants a lapsed name afresh without revoking the old grant first.

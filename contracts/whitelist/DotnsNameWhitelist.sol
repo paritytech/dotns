@@ -150,19 +150,21 @@ contract DotnsNameWhitelist is
 
     /// @notice Starts grant expiry on a whitelist initialised without it.
     /// @dev Called once by the owner through `upgradeToAndCall`, so the upgrade and the clock
-    ///      start land in one call. Sets the default grant period and starts the clock for grants
-    ///      made before it, which have no `grantedAt`. A whitelist that `initialize` already set
-    ///      up @custom:reverts InvalidInitialization.
+    ///      start land in one call. Starts the clock for grants made before it, which have no
+    ///      `grantedAt`, and sets the default grant period unless governance already set one. A
+    ///      whitelist whose clock already runs @custom:reverts InvalidInitialization.
     function initializeGrantExpiry() external reinitializer(2) onlyOwner {
-        require(grantDuration == 0, InvalidInitialization());
+        require(_grantClockStart == 0, InvalidInitialization());
         _initializeGrantExpiry();
     }
 
-    /// @notice Sets the default grant period and starts the grant clock.
+    /// @notice Starts the grant clock, and sets the default grant period when none is set.
     function _initializeGrantExpiry() internal {
-        grantDuration = DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION;
         _grantClockStart = uint64(block.timestamp);
-        emit GrantDurationSet(DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION);
+        if (grantDuration == 0) {
+            grantDuration = DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION;
+            emit GrantDurationSet(DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION);
+        }
     }
 
     /// @inheritdoc IDotnsNameWhitelist
@@ -351,8 +353,12 @@ contract DotnsNameWhitelist is
 
     /// @inheritdoc IDotnsNameWhitelist
     function granteeOf(string calldata label) external view override returns (address winner) {
-        NameRecord storage record = _names[_nodeOf(label)];
-        return _statusOf(record) == NameStatus.Claimed ? record.winner : address(0);
+        return _granteeOf(_nodeOf(label));
+    }
+
+    /// @inheritdoc IDotnsNameWhitelist
+    function granteeOfNode(bytes32 node) external view override returns (address winner) {
+        return _granteeOf(node);
     }
 
     /// @inheritdoc IDotnsNameWhitelist
@@ -505,6 +511,14 @@ contract DotnsNameWhitelist is
         _clearClaimants(node, winner, label);
     }
 
+    /// @notice Returns the live winner of the name at `node`, or the zero address.
+    /// @param node Namehash of the label under the active TLD.
+    /// @return winner Winning beneficiary while the grant binds.
+    function _granteeOf(bytes32 node) internal view returns (address winner) {
+        NameRecord storage record = _names[node];
+        return _statusOf(record) == NameStatus.Claimed ? record.winner : address(0);
+    }
+
     /// @notice Returns the status of `record`, reading an expired grant as Open.
     /// @param record Stored record of the name.
     /// @return status Effective name status.
@@ -517,14 +531,15 @@ contract DotnsNameWhitelist is
 
     /// @notice Returns when the grant held in `record` expires.
     /// @dev The period runs from `grantedAt`, or from the grant clock start for a grant made
-    ///      before expiry was initialised. A zero `grantDuration` exists only on a whitelist
-    ///      upgraded without `initializeGrantExpiry`, since `setGrantDuration` refuses it; every
-    ///      grant then keeps binding, so a separate upgrade call cannot open granted names.
+    ///      before expiry was initialised. The clock is unset only on a whitelist upgraded
+    ///      without `initializeGrantExpiry`; every grant then keeps binding, whatever period
+    ///      governance sets in the meantime, so neither a separate upgrade call nor an early
+    ///      `setGrantDuration` can open granted names.
     /// @param record Stored record of a `Claimed` name.
-    /// @return expiresAt Timestamp the grant expires at; `type(uint64).max` while the period is
+    /// @return expiresAt Timestamp the grant expires at; `type(uint64).max` while the clock is
     ///         unset.
     function _expiryOf(NameRecord storage record) internal view returns (uint64 expiresAt) {
-        if (grantDuration == 0) return type(uint64).max;
+        if (_grantClockStart == 0) return type(uint64).max;
         uint64 start = record.grantedAt;
         if (start < _grantClockStart) start = _grantClockStart;
         return start + grantDuration;

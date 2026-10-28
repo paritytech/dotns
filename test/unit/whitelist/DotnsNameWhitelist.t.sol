@@ -647,6 +647,18 @@ contract DotnsNameWhitelistTests is BaseDotns {
         assertEq(page[0].winner, address(0));
     }
 
+    function test_granteeOfNode_agrees_with_granteeOf() public {
+        bytes32 node = _nodeOf(BASE_LABEL_A);
+        assertEq(whitelist.granteeOfNode(node), address(0));
+
+        _grant(ed, BASE_LABEL_A);
+        assertEq(whitelist.granteeOfNode(node), ed);
+        assertEq(whitelist.granteeOfNode(node), whitelist.granteeOf(BASE_LABEL_A));
+
+        vm.warp(block.timestamp + whitelist.grantDuration());
+        assertEq(whitelist.granteeOfNode(node), address(0), "zero once the grant expires");
+    }
+
     function test_consume_reverts_after_expiry() public {
         _grant(ed, BASE_LABEL_A);
         vm.warp(block.timestamp + whitelist.grantDuration());
@@ -783,6 +795,33 @@ contract DotnsNameWhitelistTests is BaseDotns {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         vm.prank(owner);
         whitelist.initializeGrantExpiry();
+    }
+
+    /// @dev Governance may set a period after an upgrade and before `initializeGrantExpiry`. The
+    ///      clock is still unset, so old grants keep binding, and the later call still starts it,
+    ///      keeping the period governance chose.
+    function test_an_early_setGrantDuration_keeps_old_grants_binding() public {
+        _grant(ed, BASE_LABEL_A);
+
+        bytes32 configSlot = bytes32(uint256(7));
+        uint256 config = uint256(vm.load(address(whitelist), configSlot));
+        vm.store(address(whitelist), configSlot, bytes32(config & type(uint128).max));
+        bytes32 recordSlot = keccak256(abi.encode(_nodeOf(BASE_LABEL_A), uint256(2)));
+        uint256 record = uint256(vm.load(address(whitelist), recordSlot));
+        vm.store(
+            address(whitelist), recordSlot, bytes32(record & ~(uint256(type(uint64).max) << 168))
+        );
+
+        vm.warp(block.timestamp + 400 days);
+        whitelist.setGrantDuration(90 days);
+        assertTrue(whitelist.isGrantedTo(BASE_LABEL_A, ed), "an early period opens nothing");
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), type(uint64).max);
+
+        uint64 upgradedAt = uint64(block.timestamp);
+        vm.prank(owner);
+        whitelist.initializeGrantExpiry();
+        assertEq(whitelist.grantDuration(), 90 days, "the governance period is kept");
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), upgradedAt + 90 days);
     }
 
     function test_initializeGrantExpiry_is_owner_only() public {

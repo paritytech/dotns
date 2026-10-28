@@ -119,7 +119,9 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @notice Returns whether a label is available for registration.
     /// @dev Validates the canonical DNS-label shape (otherwise @custom:reverts InvalidLabel)
     /// and rejects labels below the minimum-length policy with
-    /// @custom:reverts LabelTooShort before checking ERC721 availability on the registrar.
+    /// @custom:reverts LabelTooShort before checking ERC721 availability on the registrar. A label
+    /// that holds a live whitelist grant still reads available, though @custom:function register
+    /// refuses it with @custom:reverts NameGranted.
     function available(string calldata label) external view returns (bool isAvailable);
 
     /// @notice Computes the commitment hash for a registration.

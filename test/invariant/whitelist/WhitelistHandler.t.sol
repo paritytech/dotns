@@ -109,9 +109,13 @@ contract WhitelistHandler is Test {
     }
 
     /// @notice Moves time forward by up to twice the grant period, so grants lapse mid-campaign
-    /// and the writes that clear a lapsed grant get exercised.
+    /// and the writes that clear a lapsed grant get exercised. Reopens the request window after
+    /// the jump, so later requests keep reaching a lapsed grant.
     function elapse(uint256 seed) external {
         vm.warp(block.timestamp + (seed % (2 * uint256(WHITELIST.grantDuration()) + 1)));
+        _asRoot();
+        WHITELIST.setWindow(0, 3650 days);
+        _asSigned();
     }
 
     function tuneGrantDuration(uint256 seed) external {

@@ -301,7 +301,7 @@ Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label 
 
 That is the point of the design. As a security measure, no single key can grant a name; a grant costs a referendum, or on a test network a sudo-dispatched Root call.
 
-Two owner-level routes reach the same outcome and are **not** closed by this. `DotnsProtocolRegistry.set` is `onlyOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. `DotnsRegistrar.addController` is `onlyOwner`, and a controller can mint any available name directly, without the whitelist at all. Treat the guarantee here as covering the whitelist's own admin surface, not the protocol as a whole, until upgrade authority and deploy-time ownership are settled.
+Two owner-level routes reach the same outcome and are **not** closed by this. `DotnsProtocolRegistry.set` is `onlyOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. The same key gates the other paths too: `register` and gateway personhood issuance read it to keep granted names for their grantees, so a whitelist that reverts, or reports a grantee for every name, blocks both. `DotnsRegistrar.addController` is `onlyOwner`, and a controller can mint any available name directly, without the whitelist at all. Treat the guarantee here as covering the whitelist's own admin surface, not the protocol as a whole, until upgrade authority and deploy-time ownership are settled.
 
 The controller carries no roles either. It reads grants and consumes them, so `setRole` on the controller reverts with `UnsupportedRole`.
 
@@ -334,7 +334,7 @@ The gas and storage-deposit limits belong to the `Revive.call` extrinsic rather 
 
 ### Reading state
 
-Both views are open and need no authority:
+These views are open and need no authority:
 
 ```bash
 cast call "$WHITELIST" "isGrantedTo(string,address)(bool)" "$LABEL" "$ADDRESS"

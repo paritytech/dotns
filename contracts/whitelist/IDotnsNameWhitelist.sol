@@ -70,7 +70,8 @@ interface IDotnsNameWhitelist {
     /// @dev `status`, `winner` and `grantedAt` are ordered first so the 1-byte enum, the 20-byte
     ///      address and the 8-byte timestamp share one storage slot; the dynamic `label` is stored
     ///      separately. The stored `status` stays `Claimed` after a grant expires, until a write
-    ///      on the name clears it.
+    ///      on the name clears it. That clearing emits no event: indexers derive expiry from the
+    ///      grant's `NameAccepted` timestamp and the current `GrantDurationSet` value.
     /// @param status Name status; see NameStatus.
     /// @param winner Winning beneficiary when `Claimed`, otherwise the zero address.
     /// @param grantedAt Timestamp the name became `Claimed`, zero otherwise.
@@ -341,11 +342,18 @@ interface IDotnsNameWhitelist {
     function isReserved(string calldata label) external view returns (bool reserved);
 
     /// @notice Returns the winner of `label`, or the zero address when not `Claimed`.
-    /// @dev The check the controllers use to keep every other path off a granted name. Zero once
-    ///      the grant expires.
+    /// @dev Zero once the grant expires.
     /// @param label Bare label to look up.
     /// @return winner Winning beneficiary.
     function granteeOf(string calldata label) external view returns (address winner);
+
+    /// @notice Returns the winner of the name at `node`, or the zero address when not `Claimed`.
+    /// @dev The check the controllers use to keep every other path off a granted name. They
+    ///      already hold the node, so this skips the TLD lookup @custom:function granteeOf makes,
+    ///      which keeps the gateway's proof smaller. Zero once the grant expires.
+    /// @param node Namehash of the label under the active TLD.
+    /// @return winner Winning beneficiary.
+    function granteeOfNode(bytes32 node) external view returns (address winner);
 
     /// @notice Returns when the grant on `label` expires, or zero when the name is not `Claimed`.
     /// @dev The grant binds the name while `block.timestamp` is below this value. Reads

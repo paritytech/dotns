@@ -10,6 +10,7 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 | 2 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
 | 3 | Clearing hides records rather than erasing them | Current implementation | Deliberate; no change planned |
 | 4 | Root-written storage refunds deposits nobody paid | Runtime | pallet-revive fixes contract-issues#284 |
+| 5 | A grant strands a reservation queued before it | Current implementation | The reservation expires, or the grant expires unspent |
 
 ## 1. Deferred LabelStore deployment
 
@@ -58,3 +59,13 @@ pallet-revive records a storage deposit for a slot written under a Root dispatch
 In dotNS, Root writes the registry record, the registrar state and the escrow position of every name it mints. Gateway-issued names are soulbound and never released, but reserved names minted by governance can be, and their release and reclaim zero some of those slots, so the refund is funded by other users' deposits. The record and subname deletes in [issue 3](#3-clearing-hides-records-rather-than-erasing-them) only zero slots their owner wrote, never Root-written ones.
 
 **Resolution:** a pallet-revive fix for contract-issues#284. Nothing in the contracts depends on the drift, so the fix lands without a contract change.
+
+## 5. A grant strands a reservation queued before it
+
+**Type:** current implementation.
+
+A whitelist grant keeps its name for the grantee on every path, the gateway included. When governance grants a name that already has a reservation queue, the user at the front can no longer claim it (`PersonhoodNameUnavailable`), but the queue and its PopRules reservation stay in place, and `isReservedForClaim` keeps reporting that user. The grant decides who registers the name, so nothing is lost, but the reservation holds the base name, and so the device names with that stem, until it expires or is cleared.
+
+**Workaround:** `expireReservation` clears the queue once its reservations expire. Governance can check `isReservedForClaim` before granting a name.
+
+**Resolution:** the reservation expires and is cleared, or the grant expires unspent and the user at the front can claim the name again.

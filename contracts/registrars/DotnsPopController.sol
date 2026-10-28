@@ -373,7 +373,7 @@ contract DotnsPopController is
             required != IPopRules.PopStatus.Reserved && required != IPopRules.PopStatus.Devicehood,
             legacy
         );
-        _requireNotGranted(label);
+        _requireNotGranted(node);
 
         _advanceExpiredHead(deps, labelhash, MAX_QUEUE_STEPS_PER_CALL, false, user);
 
@@ -1104,19 +1104,20 @@ contract DotnsPopController is
         (IPopRules.PopStatus required,,) = PopClassification.classify(label);
         _requirePersonhoodLabel(required != IPopRules.PopStatus.Reserved, legacy);
         require(!_registrarOf(deps).exists(uint256(node)), PersonhoodNameUnavailable());
-        _requireNotGranted(label);
+        _requireNotGranted(node);
     }
 
-    /// @notice Reverts when `label` holds a live grant on the name whitelist.
+    /// @notice Reverts when the name at `node` holds a live grant on the name whitelist.
     /// @dev A granted name is registered only through the public controller's
     /// `registerReserved`, which spends the grant, so the gateway neither issues nor reserves it,
     /// for any user. Reverts @custom:reverts PersonhoodNameUnavailable, an error the gateway
-    /// already decodes. A network with no whitelist configured has no grants to honour.
-    function _requireNotGranted(string calldata label) internal view {
+    /// already decodes. A network with no whitelist configured has no grants to honour. Reads by
+    /// node, so the whitelist makes no TLD lookup of its own inside the gateway's weight limit.
+    function _requireNotGranted(bytes32 node) internal view {
         address whitelist = protocolRegistry.get(DotnsConstants.NAME_WHITELIST);
         if (whitelist == address(0)) return;
         require(
-            IDotnsNameWhitelist(whitelist).granteeOf(label) == address(0),
+            IDotnsNameWhitelist(whitelist).granteeOfNode(node) == address(0),
             PersonhoodNameUnavailable()
         );
     }
