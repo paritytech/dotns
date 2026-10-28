@@ -8,12 +8,12 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">dotNS Test Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-10-23 13:11 UTC | 47 suites</p>
+<p class="text-sm text-gray-500">Generated 2026-10-28 08:13 UTC | 47 suites</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">Status</p><p class="text-xl font-bold text-green-400">All Passed</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">748</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">748</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">738</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">738</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-gray-500">0</p></div>
 </div></div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
@@ -340,7 +340,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsNameEscrowTest</span><span class="ml-2 text-xs text-gray-500">test/unit/escrow/DotnsNameEscrow.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">29/29</span>
+<span class="text-sm font-mono text-green-400">30/30</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -349,17 +349,27 @@
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
 </tr></thead><tbody>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_cross_payer_downgrade_charges_only_owner_price</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_band_gated_downgrade_transfer_is_free</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_cross_payer_pays_the_curve_into_fees</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_cross_payer_deposit_refunds_the_owner</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_cross_payer_verified_sponsors_nostatus_pays_only_D</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_cross_payer_downgrade_funds_owner_deposit</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_cross_payer_funds_owner_deposit_at_the_curve</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_cross_payer_verified_sponsors_nostatus_funds_owner_deposit</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -374,7 +384,7 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_downgrade_transfer_pays_name_price</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_downgrade_transfer_is_free_and_rebinds_position</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -470,11 +480,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_solvency_after_force_sent_funds</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_charges_friction_and_rebinds_position</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -649,7 +654,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsNameEscrowRefundsTest</span><span class="ml-2 text-xs text-gray-500">test/unit/escrow/DotnsNameEscrowRefunds.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">15/15</span>
+<span class="text-sm font-mono text-green-400">10/10</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -694,31 +699,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_claimRefundsBatch_revertsOnEmpty</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_creditRefund_allocatesMonotonicEntryIds</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_creditRefund_emitsRefundCredited</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_creditRefund_independentCooldowns</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_creditRefund_revertsOnZeroAmount</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_creditRefund_revertsOnZeroRecipient</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -2255,7 +2235,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsRegistrarTests</span><span class="ml-2 text-xs text-gray-500">test/unit/registrar/DotnsRegistrar.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">48/48</span>
+<span class="text-sm font-mono text-green-400">44/44</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -2344,31 +2324,6 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_quote_transfer_fee_reverts_for_zero_recipient</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_quote_transfer_fee_reverts_when_escrow_unconfigured</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_quote_transfer_fee_zero_for_escrow_recipient</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_quote_transfer_fee_zero_for_self_transfer</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_quote_transfer_fee_zero_when_no_label_recorded</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_register_emits_name_registered</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
@@ -2414,7 +2369,7 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_self_transfer_skips_fee_charge</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_self_transfer_skips_escrow</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -2430,11 +2385,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_soulbound_provenance_is_only_the_pop_controller</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_soulbound_quote_transfer_fee_reverts</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -2489,12 +2439,22 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_below_band_is_free</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_transfer_into_a_poisoned_recipient_slot_reverts</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_reverts_when_fee_required_but_no_value_attached</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_reverts_when_escrow_unconfigured</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_reverts_with_attached_value</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -2722,6 +2682,11 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">test_transfer_rebinds_position_to_new_holder</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_transfer_round_trip_to_original_depositor_rebinds_position_back</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
@@ -2738,11 +2703,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_transfer_writes_label_and_creates_store</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_zero_fee_rebinds_position_to_new_holder</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -2843,12 +2803,12 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_register_cross_payer_charges_max_not_sum_of_price_and_reach</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_register_cross_payer_charges_only_the_owner_price</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_register_cross_payer_routes_owner_price_to_protocol_fees</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_register_cross_payer_locks_the_price_as_the_owner_deposit</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -2888,7 +2848,7 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_revert_register_cross_payer_when_msg_value_below_max_of_price_and_reach</td>
+<td class="py-2 px-3 font-mono text-gray-200">test_revert_register_cross_payer_when_msg_value_below_price</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -3638,7 +3598,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">PopRulesTests</span><span class="ml-2 text-xs text-gray-500">test/unit/pop/PopRules.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">44/44</span>
+<span class="text-sm font-mono text-green-400">42/42</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -3843,16 +3803,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">test_short_names_closed_reverts_sponsored_path</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transferFloor_matches_model</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">test_transfer_reprices_at_own_length</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
