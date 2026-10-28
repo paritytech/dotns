@@ -85,9 +85,8 @@ contract StoreIntegrationTest is BaseDotns {
         bytes32 node = _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = uint256(node);
 
-        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: outboundFee}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         address recipientStore = storeFactory.getLabelStore(leonardo);
         assertTrue(recipientStore != address(0));
@@ -101,12 +100,10 @@ contract StoreIntegrationTest is BaseDotns {
         bytes32 node = _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = uint256(node);
 
-        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: outboundFee}(ed, leonardo, tokenId);
-        uint256 returnFee = dotnsRegistrar.quoteTransferFee(tokenId, ed);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
         vm.prank(leonardo);
-        dotnsRegistrar.transferFrom{value: returnFee}(leonardo, ed, tokenId);
+        dotnsRegistrar.transferFrom(leonardo, ed, tokenId);
 
         address edStore = storeFactory.getLabelStore(ed);
         address leonardoStore = storeFactory.getLabelStore(leonardo);

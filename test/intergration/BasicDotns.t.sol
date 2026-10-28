@@ -151,9 +151,8 @@ contract BasicDotnsIntegration is BaseDotns {
         vm.stopPrank();
         assertEq(dotnsContentResolver.contenthash(otherSubnode), CID_B);
 
-        uint256 _xferFee = dotnsRegistrar.quoteTransferFee(tokenId, flow.transferTo);
         vm.startPrank(flow.nameOwner);
-        dotnsRegistrar.transferFrom{value: _xferFee}(flow.nameOwner, flow.transferTo, tokenId);
+        dotnsRegistrar.transferFrom(flow.nameOwner, flow.transferTo, tokenId);
         vm.stopPrank();
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), flow.transferTo);
