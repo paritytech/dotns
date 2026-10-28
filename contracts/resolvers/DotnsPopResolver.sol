@@ -12,6 +12,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 
 import {IDotnsPopResolver} from "./IDotnsPopResolver.sol";
+import {IDotnsPopResolverClearing} from "./IDotnsPopResolverClearing.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
@@ -27,7 +28,8 @@ contract DotnsPopResolver is
     UUPSUpgradeable,
     OwnableUpgradeable,
     ERC165Upgradeable,
-    IDotnsPopResolver
+    IDotnsPopResolver,
+    IDotnsPopResolverClearing
 {
     /// @notice Protocol-level address registry used to resolve the authorised writer.
     IDotnsProtocolRegistry public protocolRegistry;
@@ -120,6 +122,46 @@ contract DotnsPopResolver is
         emit DeviceLinkUpdated(personhoodNode, deviceLabelhash);
     }
 
+    /// @inheritdoc IDotnsPopResolverClearing
+    function clearRecords(
+        bytes32 node,
+        bytes32 deviceLabelhash
+    )
+        external
+        override
+        onlyPopController
+    {
+        if (_chatKeys[node].length != 0) {
+            delete _chatKeys[node];
+            emit ChatKeyUpdated(node, "");
+        }
+
+        // As a personhood name: its link to a device name, kept in both directions.
+        _unlink(node, _deviceLinks[node]);
+
+        // As a device name: the link from the personhood name that names it.
+        if (deviceLabelhash != bytes32(0)) {
+            _unlink(_personhoodNodes[deviceLabelhash], deviceLabelhash);
+        }
+    }
+
+    /// @notice Removes the link between `personhoodNode` and `deviceLabelhash` in both
+    ///         directions, when both are set and each names the other.
+    /// @dev @custom:function setDeviceLink keeps the two directions as a pair, so a direction that
+    ///      names something else belongs to another link and is left alone.
+    /// @param personhoodNode Node of the personhood name.
+    /// @param deviceLabelhash Labelhash of the device name.
+    function _unlink(bytes32 personhoodNode, bytes32 deviceLabelhash) private {
+        if (personhoodNode == bytes32(0) || deviceLabelhash == bytes32(0)) return;
+        if (_deviceLinks[personhoodNode] == deviceLabelhash) {
+            delete _deviceLinks[personhoodNode];
+            emit DeviceLinkUpdated(personhoodNode, bytes32(0));
+        }
+        if (_personhoodNodes[deviceLabelhash] == personhoodNode) {
+            delete _personhoodNodes[deviceLabelhash];
+        }
+    }
+
     /// @inheritdoc IDotnsPopResolver
     function chatKey(bytes32 node) external view override returns (bytes memory) {
         return _chatKeys[node];
@@ -148,9 +190,9 @@ contract DotnsPopResolver is
 
     /// @inheritdoc ERC165Upgradeable
     function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        return
-            interfaceId == type(IDotnsPopResolver).interfaceId
-                || super.supportsInterface(interfaceId);
+        return interfaceId == type(IDotnsPopResolver).interfaceId
+            || interfaceId == type(IDotnsPopResolverClearing).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     /// @notice Internal check enforcing PoP-controller-only access.

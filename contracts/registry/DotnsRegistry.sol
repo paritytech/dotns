@@ -16,6 +16,7 @@ import {LabelUtils} from "../utils/LabelUtils.sol";
 import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
+import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title dotNS Registry
 /// @author Parity
@@ -262,26 +263,38 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         override
         authorised(parentNode)
     {
-        bytes32 subnode = LabelUtils.namehashUnder(parentNode, labelhash);
-        Record storage existing = records[subnode];
-        // A subname a clear has already cut off can still be deleted, so the parent's holder can
-        // free its storage after a clear, a release or a transfer. `authorised(parentNode)` is
-        // what limits this to whoever controls the parent now.
-        require(existing.owner != address(0) && existing.exists, SubnameNotFound(subnode));
+        _deleteSubname(parentNode, labelhash);
+    }
 
-        // The record and the parent link are zeroed, which releases their storage deposit to the
-        // signer of the transaction. A node with no record is what a node that was never created
-        // looks like, so every read treats the subname as absent and every deeper subname fails
-        // its walk here.
-        // The versions are the one slot that stays, and are bumped rather than zeroed: a subname
-        // created here again must not match the stamps of records written for this one, nor the
-        // subnames created beneath it, none of which can be listed to delete.
-        delete records[subnode];
-        delete _parentOf[subnode];
-        _clearRecordVersion(subnode);
-        _clearSubnameVersion(subnode);
+    /// @inheritdoc IDotnsRegistry
+    function revokeName(bytes32 node) external override {
+        address registrar = protocolRegistry.get(DotnsConstants.REGISTRAR);
+        require(msg.sender == registrar, NotRegistrar(msg.sender));
 
-        emit NewOwner(parentNode, labelhash, address(0));
+        // Both versions are bumped before the record goes, for the reason given in
+        // `_deleteSubname`: the name registered again must not match the stamps of records written
+        // before, nor revive the subnames created beneath it. Deleting the record is what keeps
+        // reads from deferring to a burned token, whose `ownerOf` reverts.
+        _clearRecordVersion(node);
+        _clearSubnameVersion(node);
+        delete records[node];
+
+        emit NewResolver(node, address(0));
+        emit NodeTransferred(node, address(0));
+    }
+
+    /// @inheritdoc IDotnsRegistry
+    /// @dev Reads no `msg.sender` (see SystemUtils.originIsRoot).
+    function revokeSubname(bytes32 parentNode, bytes32 labelhash) external override {
+        require(SystemUtils.originIsRoot(), NotRoot());
+
+        address popController = protocolRegistry.get(DotnsConstants.POP_CONTROLLER);
+        require(
+            popController == address(0) || _owner(parentNode) != popController,
+            IssuedByGateway(LabelUtils.namehashUnder(parentNode, labelhash))
+        );
+
+        _deleteSubname(parentNode, labelhash);
     }
 
     /// @inheritdoc IDotnsRegistry
@@ -310,6 +323,13 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
 
     /// @inheritdoc IDotnsRegistry
     function owner(bytes32 node) external view override returns (address) {
+        return _owner(node);
+    }
+
+    /// @notice Body of @custom:function owner.
+    /// @param node Node identifier.
+    /// @return The address that owns `node`, or zero when it does not resolve.
+    function _owner(bytes32 node) internal view returns (address) {
         Record storage record = records[node];
         // Read `owner` first: a non-zero stored owner proves the record exists and is a subnode,
         // which then resolves only while every level above it does, so the subnode branch walks
@@ -462,6 +482,35 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
         for (uint256 i; i < raw.length; ++i) {
             if (raw[i] == bytes1(0x2e)) ++count;
         }
+    }
+
+    /// @notice Deletes one subname of `parentNode`, its records and every subname beneath it.
+    /// @dev Shared by @custom:function deleteSubname and @custom:function revokeSubname, which
+    ///      differ only in who may call them. Reads no `msg.sender`, so it also runs under a Root
+    ///      origin (see SystemUtils.originIsRoot).
+    /// @param parentNode Parent of the subname.
+    /// @param labelhash Labelhash of the subname under `parentNode`.
+    function _deleteSubname(bytes32 parentNode, bytes32 labelhash) internal {
+        bytes32 subnode = LabelUtils.namehashUnder(parentNode, labelhash);
+        Record storage existing = records[subnode];
+        // A subname a clear has already cut off can still be deleted, so the parent's holder can
+        // free its storage after a clear, a release or a transfer. The callers limit this to
+        // whoever controls the parent now, or to Root.
+        require(existing.owner != address(0) && existing.exists, SubnameNotFound(subnode));
+
+        // The record and the parent link are zeroed, which releases their storage deposit to the
+        // signer of the transaction. A node with no record is what a node that was never created
+        // looks like, so every read treats the subname as absent and every deeper subname fails
+        // its walk here.
+        // The versions are the one slot that stays, and are bumped rather than zeroed: a subname
+        // created here again must not match the stamps of records written for this one, nor the
+        // subnames created beneath it, none of which can be listed to delete.
+        delete records[subnode];
+        delete _parentOf[subnode];
+        _clearRecordVersion(subnode);
+        _clearSubnameVersion(subnode);
+
+        emit NewOwner(parentNode, labelhash, address(0));
     }
 
     /// @notice Links `subnode` to `parentNode` when it is a subname with no recorded parent.

@@ -238,6 +238,32 @@ cast call "$ESCROW_PROXY" 'releasedTokens(uint256,uint256)(uint256[])' 0 200 --r
 
 If that set is non-empty and any of it matters, the options are to let the holders reclaim or withdraw before the upgrade, or to notify them that the grace period will not cover their name.
 
+## Upgrading to governance revocation
+
+Governance can revoke any name and evict a personhood name's reservation queue (see [README → Revoking a name](./README.md#revoking-a-name)). Five proxies take part and none gains storage or a configuration value. The new calls live on the registrar, the registry and the PoP controller, and each calls the others, so the callees go first:
+
+1. **Registry, escrow and PoP resolver**, in any order. They gain the calls the revocation paths make into them: `revokeName` and `revokeSubname` on the registry, `revoke` on the escrow, `clearRecords` on the PoP resolver. Each is gated to the registrar, to Root, or to the PoP controller, so only the registry's Root-gated `revokeSubname` is usable before step 2.
+2. **Registrar.** `revoke` and `revokeIssued` call the escrow and the registry from step 1, and revert against either one without it.
+3. **PoP controller.** `revokeName` calls the registrar's `revokeIssued` and the PoP resolver's `clearRecords`. `evictReservations` and `evictReservation` call only PopRules, which needs no upgrade.
+
+Each step leaves the system working. Subnames can be revoked after step 1, names on the public and reserved paths after step 2, and names the gateway issued only after step 3, since the registrar refuses a soulbound name and the registry refuses a device name on the direct Root calls.
+
+Registry revocation builds on record and subname clearing, so that upgrade must be live first, with every existing subname linked (`linkSubname`, permissionless). Link them before governance revokes any name: a subname that was never linked keeps resolving after the name above it is revoked, and stays under its old owner's control, the same as after a clear.
+
+### What existing integrations keep
+
+Every existing function, event and error keeps its selector and arguments, and storage is unchanged in all five contracts. The escrow, the PoP resolver and the PoP controller report the same ERC-165 interface ids as before. Their new calls are on separate interfaces (`IDotnsNameEscrowRevocation`, `IDotnsPopResolverClearing`, `IDotnsPopGovernance`), which they report as well. `IDotnsRegistrar` and `IDotnsRegistry` gain functions and errors directly, but neither contract reports that interface through ERC-165, so no reported id changes.
+
+### What existing integrations see change
+
+- A name can now stop existing. `DotnsRegistrar.revoke` and `revokeIssued` burn the token, emitting the ERC-721 `Transfer` to the zero address and `NameRevoked`. `ownerOf` then reverts and `available` returns true, and the registry's `owner` returns zero for the name rather than deferring to the registrar. The registry emits `NodeTransferred` with a zero owner, alongside `RecordsCleared` and `SubnamesCleared`.
+- `isSoulbound` and `isPopIssued` can turn false for a name that was issued through the gateway, once governance revokes it.
+- The escrow emits `PositionRevoked`, and `RefundWithdrawn` when a deposit is credited. The token leaves `releasedTokens` with no redeem or reclaim event.
+- A revoked subname or device name emits the registry's usual `NewOwner(parent, label, 0)`, the same as `deleteSubname`. The PoP controller emits `IssuedNameRevoked(labelhash, holder, label)` for every name it revokes, and the registry emits `NewResolver` with a zero resolver for a revoked second-level name.
+- Settling a pending claim for a name the user no longer holds, or one whose store row is already written, removes the entry without writing and without `PendingClaimSettled` or `NameRegistered`. Before any revocation every pending claim is for a name its user holds, so the first case changes nothing for existing entries. The second only drops a duplicate log for a row that was already there.
+- The PoP resolver emits `ChatKeyUpdated` with empty bytes and `DeviceLinkUpdated` with a zero labelhash when a revocation removes those records.
+- The gateway pallet's record of an account's names is not updated by the contracts. Dispatch the pallet's own update in the same governance batch as `revokeName`.
+
 ## Deployment pipeline
 
 The fresh-deploy pipeline is split across five stages:
