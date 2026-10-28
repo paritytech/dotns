@@ -246,11 +246,11 @@ This open source code is provided for research, experimentation, and developer e
 </div>
 <h3 id="deposits"><a class="header" href="#deposits">Deposits</a></h3>
 <p>Registering a name under your own key locks a refundable deposit equal to the name's price. The deposit is bound to the name rather than to you, so it travels with the token on every transfer and unlocks only when the current holder releases the name back to escrow.</p>
-<p>A name someone else pays for locks the same deposit, owned by the name's owner: a third party who pays for another wallet's registration gives that owner the deposit, which the owner collects on release. A gateway grant carries no deposit. Refunds draw solely on the per-asset reserve that deposits fund, and a holder's deposit is their money held in trust. The escrow also holds a protocol fee balance from the transfer fees earlier releases charged. Nothing credits or debits it.</p>
+<p>A name someone else pays for locks the same deposit, owned by the name's owner: a third party who pays for another wallet's registration gives that owner the deposit, which the owner collects on release. A gateway grant carries no deposit. Refunds draw solely on the per-asset reserve that deposits fund, and a holder's deposit is their money held in trust. The escrow also holds a protocol fee balance that earlier releases collected from transfer fees and cross-payer registration charges. Nothing credits it, and nothing can spend it until <a href="https://github.com/paritytech/dotns/issues/354">#354</a> adds a Root withdrawal.</p>
 <h3 id="transfers-are-free"><a class="header" href="#transfers-are-free">Transfers are free</a></h3>
 <p>Every transferable name moves for free, whatever its length and the holders' tiers, and a transfer that carries value reverts. The bands apply at registration only: once registered, a name can go to any wallet. The deposit, when present, rides with the name: the escrow position rebinds to the new holder rather than refunding, and only releasing the name back to escrow unlocks the locked deposit.</p>
 <p>Names minted through the gateway pallet are soulbound: they stay bound to the person who earned them and cannot be transferred at all. Any transfer of a gateway-issued name reverts. Everything else about the name works normally, so its owner still sets records, issues subnames, and manages the name.</p>
-<p>A bare transfer does not reset the name's records. Registration and reclaim from escrow both point the registry record back at the default reverse resolver, but a direct ERC-721 <code>transferFrom</code> never calls the registry, so a name sold privately arrives still pointing at the seller's resolver. A buyer should overwrite the records they care about rather than assume they start clean.</p>
+<p>A transfer clears nothing. The name arrives with its records, its subnames and its resolver pointer, exactly as the seller left them, and the deposit moves with it. A seller who wants to hand over a clean name clears it first (see <a href="index.html#clearing-records-and-subnames">Clearing records and subnames</a>); a buyer should check what a name carries rather than assume it starts clean.</p>
 <h3 id="versioned-pricing"><a class="header" href="#versioned-pricing">Versioned pricing</a></h3>
 <p>The cost model is chosen by governance and swapped, not upgraded. Registering a new model adds it under a fresh version and points the current version at it; earlier versions stay priceable, so a registration already committed against an earlier version settles at the amount it committed to. A commitment binds the version current when it is made, and the reveal reverts if it is presented at a different version, so a model change between commit and reveal cannot move the amount. Governance can also point the current version back at an earlier registered model.</p>
 <h3 id="release-lifecycle"><a class="header" href="#release-lifecycle">Release lifecycle</a></h3>
@@ -262,15 +262,17 @@ This open source code is provided for research, experimentation, and developer e
 </div>
 <p>Both are stamped at release time, so a governance change never moves the clocks on a name already released. Inside the redeem window the name belongs to its previous holder, and <code>DotnsRegistrar.available</code> reports false so no client advertises it as free. The holder has two mutually exclusive options:</p>
 <ul>
-<li><code>redeem</code> returns the token and moves no value. The position keeps its recipient, asset and amount, so the deposit stays locked and the name lands back in its exact pre-release state, releasable again later on a fresh pair of clocks. This is the undo for an accidental release.</li>
+<li><code>redeem</code> returns the token and moves no value. The position keeps its recipient, asset and amount, so the deposit stays locked and the name is releasable again later on a fresh pair of clocks. This is the undo for an accidental release of the name, but not of its records: those were cleared at release and do not come back.</li>
 <li><code>withdraw</code> credits the deposit and forfeits the right to redeem. A holder paid for the name cannot also take it back, otherwise they would hold a name no deposit backs.</li>
 </ul>
 <p>Once <code>redeemableUntil</code> passes, <code>reclaim</code> is permissionless through the ordinary commit-reveal path, whether or not the previous holder ever withdrew. If the position still holds value, reclaim settles it: the amount is credited to the previous holder's pull-payment balance and stays claimable with no deadline. The value follows the departing holder; the name does not wait for them. Grant-backed reserved registrations seed zero-amount positions, so those names have nothing to withdraw and nothing to settle, but they move through release, redeem and reclaim like any other name.</p>
+<p>Releasing a name gives up its records and subnames along with it. The moment the escrow takes custody it clears the name, so every address, content hash and text record reads as unset and every subname beneath it, at any depth, stops resolving. Whoever gets the name next, the same holder through <code>redeem</code> or a new owner through <code>reclaim</code>, starts clean.</p>
+<p>Storage on Asset Hub carries a deposit, locked when a slot is first written and released to whoever signs the transaction that zeroes it. Release deletes the address and content hash outright, so their deposit returns to the holder releasing the name. Text records and subnames cannot be listed, so release only hides them and their deposit stays locked. A holder who wants it back deletes them before releasing (see <a href="index.html#clearing-records-and-subnames">Clearing records and subnames</a>); after release that path moves with the name.</p>
 <p>Gateway-issued (soulbound) names never enter this lifecycle. Releasing a name transfers it into escrow custody, and a soulbound name reverts on any transfer, so it holds no position and has no release, redeem, or reclaim path. It stays with the person who earned it.</p>
 <h3 id="cost-model-versioning"><a class="header" href="#cost-model-versioning">Cost-model versioning</a></h3>
 <p>A pricing model's values are fixed for its life: the flat model's deposit, or the scarcity candidate's base fee D and floor F. Changing them means deploying a fresh model with the new values and registering it, at which point it becomes the current version; there is no live setter that edits the numbers in place. Governance can also point the current version back at an earlier registered model to roll a change back. An in-flight registration prices at the version it committed to, so a model change between commit and reveal leaves its cost unchanged.</p>
 <h3 id="what-governance-controls"><a class="header" href="#what-governance-controls">What governance controls</a></h3>
-<p>Governance chooses a model's values when it deploys one, and the contracts hold them coherent and nothing more: a flat deposit above zero; for the scarcity candidate, D and F above zero, F no greater than D, and D within a ceiling that keeps the multiplication below nine characters from overflowing. Beyond these checks there is no cap on how high or low the amounts go and no limit on how fast they move, so any rate limit or advance notice comes from the governance process rather than from these contracts. Governance also opens or closes the short-name market with the switch, tunes the release cooldown within its one-hour bound, sets the redeem window between 1 and 30 days, and sets the gateway's reservation duration. Root can also move the protocol fee balance out of the escrow. None of these controls lets governance seize, reassign, or destroy a name anyone already holds.</p>
+<p>Governance chooses a model's values when it deploys one, and the contracts hold them coherent and nothing more: a flat deposit above zero; for the scarcity candidate, D and F above zero, F no greater than D, and D within a ceiling that keeps the multiplication below nine characters from overflowing. Beyond these checks there is no cap on how high or low the amounts go and no limit on how fast they move, so any rate limit or advance notice comes from the governance process rather than from these contracts. Governance also opens or closes the short-name market with the switch, tunes the release cooldown within its one-hour bound, sets the redeem window between 1 and 30 days, and sets the gateway's reservation duration. None of these controls lets governance seize, reassign, or destroy a name anyone already holds.</p>
 <h3 id="refund-ledgers"><a class="header" href="#refund-ledgers">Refund ledgers</a></h3>
 <p>The escrow keeps two separate pull-payment ledgers. One has no cooldown and serves as the fallback when a registration overpayment cannot be pushed back to the sender inline. The other gives every entry its own cooldown clock and holds the transfer-fee overpayments earlier releases credited; nothing adds to it. A deposit unlocked by releasing a funded name lands on the no-cooldown ledger; its delay comes instead from the position's own <code>withdrawAvailableAt</code> stamp, so once <code>withdraw</code> lands the credit is immediately pullable. Clients enumerate pending refunds through the escrow's public views, which page under a fixed cap so discovery stays bounded.</p>
 <p>Clients that need the exact moment a released name becomes registrable should read <code>redeemableUntil</code> from <code>getReleasePosition</code> rather than polling <code>available</code>.</p>
@@ -324,7 +326,22 @@ This open source code is provided for research, experimentation, and developer e
 <p>The registrar owns transferability. A name is marked soulbound at mint when the caller is the address registered under POP_CONTROLLER, so only the gateway path can issue a soulbound name and no other controller can lock a public one. The marker is set once and never cleared, and isSoulbound reports it. The transfer hook rejects every transfer of a soulbound name, including a move to the holder's own address and a release into escrow, so a gateway-issued name can never leave its holder's wallet. Only the mint is exempt, because the marker is set just after it.</p>
 <h3 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h3>
 <p>Forward registry mapping node to (owner, resolver) and supporting subnode creation. When a second-level name is minted on the registrar, the matching controller wires the node to the new owner through this registry. Privileged node wiring defers to the same controllers mapping on the registrar, so both controllers can write without the registry tracking controllers of its own.</p>
-<p>Subnames are created by the parent name's owner. A subname carries its own (owner, resolver) and can in turn carry subnames, so the registry is the place the name hierarchy actually lives. Nesting is bounded by the whole path rather than by a depth counter: the dotted parent path a caller submits is capped at 255 octets. That is a protocol limit rather than the RFC 1035 figure it resembles, since the RFC bound counts a wire-format name including its length bytes and its TLD. Each level of a subname is stored as its full dotted name in the owner's LabelStore, and that row cannot be deleted, so an uncapped path would let a parent owner write an arbitrarily long permanent row into an address they chose.</p>
+<p>Subnames are created by the parent name's owner. A subname carries its own (owner, resolver) and can in turn carry subnames, so the registry is the place the name hierarchy actually lives. Nesting is bounded twice. A new subname sits at most <code>MAX_SUBNAME_DEPTH</code> (8) levels below its second-level name, because every read of a subname checks each level above it (see <a href="index.html#clearing-records-and-subnames">Clearing records and subnames</a>). And the dotted parent path a caller submits is capped at 255 octets. That is a protocol limit rather than the RFC 1035 figure it resembles, since the RFC bound counts a wire-format name including its length bytes and its TLD. Each level of a subname is stored as its full dotted name in the owner's LabelStore, and that row cannot be deleted, so an uncapped path would let a parent owner write an arbitrarily long permanent row into an address they chose.</p>
+<h4 id="clearing-records-and-subnames"><a class="header" href="#clearing-records-and-subnames">Clearing records and subnames</a></h4>
+<p>Neither a name's text records nor its subnames can be listed on chain, so clearing never visits them. The registry keeps versions per node instead, and bumping one is a single write whatever the name holds:</p>
+<ul>
+<li><code>clearRecords(node)</code> bumps the node's record version. Resolvers stamp every record with the version it was written under and read anything stamped with an older one as unset. It also points the node back at the default resolver.</li>
+<li><code>clearSubnames(node)</code> bumps the node's subname version. A subname resolves only while the version it was created under is still its parent's, all the way up, so every subname beneath the node stops resolving: its owner reads as zero, it has no authority, and its records read as unset.</li>
+<li><code>clear(node)</code> does both. The escrow calls it on release.</li>
+<li><code>deleteSubname(parent, labelhash)</code> removes one subname and everything beneath it. Subnames are parent-sovereign, so this is the parent's call, not the subname holder's.</li>
+</ul>
+<p>All four take the same authority as any other write to the node, or for <code>deleteSubname</code> to its parent. A cleared or deleted subname can be created again and starts empty, even for the same holder. A clear leaves the bytes written before in storage, where nothing reads them, and their storage deposit stays locked.</p>
+<p>Deleting is how an owner gets that deposit back, and only what the owner knows about can be deleted:</p>
+<ul>
+<li>Writing an empty value deletes a record: <code>setAddress(node, address(0))</code>, <code>setContenthash(node, "")</code>, <code>setText(node, key, "")</code>. The value and its version stamp are both zeroed. This also frees a text key a clear has already hidden.</li>
+<li><code>deleteSubname</code> zeroes the subname's record and its parent link. One version slot stays, so the subname, created again, cannot pick up its old records or children. Subnames beneath it are cleared but keep their storage, so to free everything, delete from the deepest subname up. Consumers that index records or subnames learn of a clear from the registry's <code>RecordsCleared</code> and <code>SubnamesCleared</code> events, one per clear, since descendants emit nothing of their own.</li>
+</ul>
+<p>A record stamped zero matches the version every node starts at, so it stays readable until its node is first cleared. A subname with no recorded parent needs linking (<code>linkSubname</code>, permissionless) before a clear above it reaches it, and so does every level between it and that clear. The upgrade links every existing subname before anything is cleared.</p>
 <p>The registry exposes isAuthorised(node, account) as the canonical check for whether an address may manage a node: the stored owner for a subname, or the ERC-721 holder, a single-token approvee, or an operator-for-all on the registrar for a tokenised name. Sibling contracts consult this view so a single registrar-level approval delegates management across the protocol rather than each contract maintaining its own approval list.</p>
 <h3 id="poprules"><a class="header" href="#poprules">PopRules</a></h3>
 <p>PoP-aware name classification and pricing. Classification reads the label's <strong>base length</strong> and whether the label carries the gateway's separator, then maps to one of four tiers: NoStatus (base length 9 or more, open to anyone at the cost-model price), Personhood (base length 6-8, requires proof of personhood), Devicehood (a separated <code>stem.NN</code> device name whose stem is 6-8 characters, issued by the gateway to accounts with devicehood), and Reserved (base length 5 or fewer, governed by the protocol).</p>
@@ -364,7 +381,7 @@ This open source code is provided for research, experimentation, and developer e
 <p>Reverse records mapping an address to its primary name, with two write paths. The first, setReverseName, is the controller-only seeder: on the paid registration path, when the registrant asks for a default primary, registers under their own key, and has no existing primary, the commit-reveal controller calls this entry point. All three conditions matter, because this entry point overwrites unconditionally. The grant-gated reserved path never calls it: the submitter there is not necessarily the beneficiary, so writing would let a third party relabel another address. Writes through this path are restricted to the addresses registered under CONTROLLER and REGISTRAR on the protocol registry. The second, claimReverseRecord, is the self-service path open to any current name owner: the caller hands in a label and the resolver checks that registrar.ownerOf(namehash(label)) equals the caller before overwriting their reverse entry. Past ownership is never sufficient; the registrar is the single source of truth for the gate.</p>
 <p>Reads are open but fail-closed: nameOf(address) re-validates current ownership against the registrar before returning the stored name, so an address that has transferred their primary away resolves to the empty string until they claim a new name they currently hold. The protocol still best-effort clears reverse entries on transfer (cheaper reads, no behavioural change), but the security guarantee is the fail-closed read, not the eager clear.</p>
 <h3 id="dotnscontentresolver"><a class="header" href="#dotnscontentresolver">DotnsContentResolver</a></h3>
-<p>Stores contenthash and text records per node. This is where external content links (for example IPFS hashes) and arbitrary key-value text records (for example social handles, verification metadata) live. Writes accept the node owner, any address the registry recognises as authorised for the node through isAuthorised (the ERC-721 holder, a single-token approvee, or an operator-for-all on the registrar), or an operator approved directly on this resolver; reads are open. The registry-recognised path lets a registrar-level name admin manage records without a separate grant, while the resolver-local operator is a narrower record-only delegation that confers no power over ownership or transfer. Authority is evaluated against the current owner on every write, so transferring a name reassigns write access to it automatically. That covers the node transferred and not the nodes beneath it: a subname carries its own owner in the registry, and transferring the parent does not change it. A seller therefore keeps write access to every subname they minted until the buyer reassigns each one with <code>setSubnodeOwner</code>. The set is derivable from the registry's <code>NewOwner</code> events, and reclaiming is one call per subname.</p>
+<p>Stores contenthash and text records per node. This is where external content links (for example IPFS hashes) and arbitrary key-value text records (for example social handles, verification metadata) live. Every text write emits two events. <code>TextUpdated</code> logs the key only as its hash, which lets a consumer filter by key but not read it. <code>TextChanged</code>, emitted alongside it in the shape of the ENS public resolver's event, also carries the key in its data, so an indexer can list the keys a node has set. Writes accept the node owner, any address the registry recognises as authorised for the node through isAuthorised (the ERC-721 holder, a single-token approvee, or an operator-for-all on the registrar), or an operator approved directly on this resolver; reads are open. The registry-recognised path lets a registrar-level name admin manage records without a separate grant, while the resolver-local operator is a narrower record-only delegation that confers no power over ownership or transfer. Authority is evaluated against the current owner on every write, so transferring a name reassigns write access to it automatically. That covers the node transferred and not the nodes beneath it: a subname carries its own owner in the registry, and transferring the parent does not change it. A seller therefore keeps write access to every subname they minted until the buyer takes them back: one at a time with <code>deleteSubname</code>, or all at once with <code>clearSubnames</code>; reassigning one with <code>setSubnodeOwner</code> keeps its records and the subnames beneath it (see <a href="index.html#clearing-records-and-subnames">Clearing records and subnames</a>). The set is derivable from the registry's <code>NewOwner</code> events.</p>
 <p>Choosing a delegation mechanism:</p>
 <div class="table-wrapper"><table><thead><tr><th>Goal</th><th>Use</th><th>Why</th></tr></thead><tbody>
 <tr><td>Delegate full control of one name, including the right to transfer it, automatically revoked on sale</td><td>registrar <code>approve(operator, tokenId)</code></td><td>Single-token approval. ERC-721 clears it on every transfer, so it cannot follow the name to a buyer.</td></tr>
@@ -408,6 +425,8 @@ This open source code is provided for research, experimentation, and developer e
 <ul>
 <li><strong>Deferred LabelStore deployment</strong> (runtime). See <a href="index.html#early-testnet-quirk-labelstore-deployment">DotnsPopController</a>.</li>
 <li><strong>No standalone user-status mapping</strong> (current implementation). See <a href="index.html#dotnspopcontroller">DotnsPopController</a>.</li>
+<li><strong>Clearing hides records rather than erasing them</strong> (current implementation). See <a href="index.html#clearing-records-and-subnames">Clearing records and subnames</a>.</li>
+<li><strong>Root-written storage refunds deposits nobody paid</strong> (runtime). Releasing or reclaiming a name governance minted zeroes storage Root wrote, refunding a deposit that was never charged. See <a href="./KNOWN_ISSUES.html#4-root-written-storage-refunds-deposits-nobody-paid">KNOWN_ISSUES.md</a>.</li>
 </ul>
 <h2 id="license"><a class="header" href="#license">License</a></h2>
 <p>Licensed under the MIT License. See <a href="./LICENSE">LICENSE</a> and <a href="./NOTICE">NOTICE</a>. External interface definitions under <code>contracts/external/</code> retain their upstream licences (the SPDX header in each file is authoritative). Security policy and disclosure: see <a href="./SECURITY.html">SECURITY.md</a>.</p>
@@ -416,7 +435,7 @@ This open source code is provided for research, experimentation, and developer e
 <li><a href="contracts/deploy/Create3Factory.sol/contract.Create3Factory.html">Create3Factory</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="create3factory"><a class="header" href="#create3factory">Create3Factory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/deploy/Create3Factory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/deploy/Create3Factory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS CREATE3 Factory</p>
 <p>Permissionless wrapper around Solady's audited CREATE3 library.</p>
@@ -515,7 +534,7 @@ artefact lookup rather than land a useless deployment.</p>
 <li><a href="contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="contracts/escrow/DotnsNameEscrow.sol//contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
@@ -829,8 +848,10 @@ is keyed to the holder, not to any approval set, which keeps the deposit refund 
 to the on-chain owner. The slot for <code>tokenId</code> must already hold a position (sentinel:
 <code>position.recipient != address(0)</code>); an unseeded slot triggers @custom:reverts
 DepositNotConfigured, and a position already in the released phase triggers</p>
-<p><strong>Note:</strong>
-reverts: AlreadyReleased. Zero-amount positions are still releasable so every
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: AlreadyReleased. Zero-amount positions are still releasable so every
 minted name has a reachable lifecycle. The escrow must additionally be approved to
 move the NFT, otherwise @custom:reverts EscrowNotApproved. Emits @custom:emits
 NameReleased once the NFT is moved into custody.
@@ -838,8 +859,38 @@ Release stamps two independent clocks. <code>withdrawAvailableAt</code> (release
 opens the deposit withdrawal; <code>redeemableUntil</code> (release + <code>redeemWindow</code>) closes the
 holder's exclusive redeem phase and opens permissionless reclaim. Both are snapshots
 so later policy changes never move an in-flight position. A release attempted while
-<code>redeemWindow</code> is unseeded triggers @custom:reverts RedeemWindowNotConfigured.</p>
+<code>redeemWindow</code> is unseeded triggers @custom:reverts RedeemWindowNotConfigured.
+Releasing gives up the name's records and subnames along with the name: once the token
+is in custody the escrow, as its owner, deletes the address and content hash, which
+releases their storage deposit to the signer of this transaction, and calls</p>
+</li>
+<li>
+<p>function: IDotnsRegistry.clear, so every text record reads as unset and every
+linked subname stops resolving from this call on (a subname with no recorded parent
+is reached once @custom:function IDotnsRegistry.linkSubname links it). Whoever gets
+the name next, through @custom:function redeem or @custom:function reclaim, starts
+clean. Text records and subnames keep their storage and its deposit; a holder who wants
+that deposit back deletes them before releasing.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function release(uint256 tokenId) external override nonReentrant;
+</code></pre>
+<h3 id="clearcustodyonupgrade"><a class="header" href="#clearcustodyonupgrade">clearCustodyOnUpgrade</a></h3>
+<p>Clears, once, every name the escrow holds in custody that entered custody without
+being cleared.</p>
+<p>Release clears a name as it takes custody, and redeem and reclaim hand it back as it
+is, so a name that entered custody uncleared would otherwise leave it with its records.
+Meant to run as the post-upgrade call of <code>upgradeToAndCall</code>, so nothing can be
+redeemed or reclaimed between the upgrade and the clear. A deployment that never held
+such names never needs it. Owner-only (@custom:reverts OwnableUnauthorizedAccount) and
+callable once per proxy (@custom:reverts InvalidInitialization on a second call); it
+takes initializer version 2, so a later upgrade that needs a reinitializer starts at 3.
+It clears lazily only and deletes no record outright: deleting would release the
+storage deposit the holders paid to the signer of this call instead. Walks every name
+in custody in one call, so check @custom:function releasedTokenCount before relying on
+it. Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
+through ERC-165 stays the same.</p>
+<pre><code class="language-solidity">function clearCustodyOnUpgrade() external onlyOwner reinitializer(2);
 </code></pre>
 <h3 id="withdraw"><a class="header" href="#withdraw">withdraw</a></h3>
 <p>Credits the refundable deposit for a released token to the recipient's pending
@@ -1006,7 +1057,8 @@ still holds value, this call settles it: the amount is debited from <code>tokenR
 previous recipient's pull-payment balance, claimable through @custom:function
 claimWithdrawal with no deadline. That is what keeps a name recyclable when its
 previous holder never returns: the value follows them, the name does not wait for them.
-Emits @custom:emits RefundWithdrawn on settlement.</p>
+Emits @custom:emits RefundWithdrawn on settlement. The name arrives as release left it:
+cleared, so the new owner starts clean.</p>
 <pre><code class="language-solidity">function reclaim(
     uint256 tokenId,
     address newOwner
@@ -1042,8 +1094,9 @@ below <code>redeemableUntil</code>; a position failing any of those is not redee
 <p><strong>Note:</strong>
 reverts: NotRedeemable.
 No value moves. The position keeps its recipient, asset and amount, so the deposit
-stays locked exactly as it was before the release and the name returns to its
-pre-release state, releasable again later on a fresh pair of clocks. Excluding
+stays locked exactly as it was before the release, and the name is releasable again
+later on a fresh pair of clocks. The records and subnames the release cleared do not
+come back: the holder gets the name back clean. Excluding
 withdrawn positions is deliberate: a holder who has already pulled the deposit would
 otherwise recover the name without it being deposit-backed, breaking the one-deposit-
 per-live-name bound. The choice is therefore exclusive — take the value back, or take
@@ -1087,6 +1140,24 @@ registry.</p>
 <tr><td><code>versionString</code></td><td><code>string</code></td><td>Declared release as bare semver, empty when never declared.</td></tr>
 </tbody></table>
 </div>
+<h3 id="_clearname"><a class="header" href="#_clearname">_clearName</a></h3>
+<p>Clears every record and subname of a name the escrow holds.</p>
+<p>The address and the content hash are each one record per name, at a fixed place, so
+they are deleted outright when <code>deleteRecords</code> is set, and their storage deposit is
+released to the signer of the transaction. Text records and subnames cannot be listed,
+so the registry clear hides them at constant cost and their storage stays.
+A name with no registry record has nothing to clear, because records and subnames can
+only be written for a node the registry knows, and the registry admits no clear for a
+node it holds no record of. Such a name is skipped, so release, redeem and reclaim
+still work for it.</p>
+<pre><code class="language-solidity">function _clearName(uint256 tokenId, bool deleteRecords) internal;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>tokenId</code></td><td><code>uint256</code></td><td>Token in custody; its node is <code>bytes32(tokenId)</code>.</td></tr>
+<tr><td><code>deleteRecords</code></td><td><code>bool</code></td><td>Whether to delete the address and content hash outright.</td></tr>
+</tbody></table>
+</div>
 <h3 id="_registrar"><a class="header" href="#_registrar">_registrar</a></h3>
 <p>Returns the configured registrar from the protocol registry.</p>
 <pre><code class="language-solidity">function _registrar() internal view returns (IDotnsRegistrar registrar);
@@ -1118,7 +1189,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Name Escrow Interface</p>
 <p>Escrows refundable deposits for registered names and manages the release lifecycle.</p>
@@ -1216,8 +1287,8 @@ into escrow and wait the cooldown. A released position @custom:reverts AlreadyRe
 </div>
 <h3 id="protocolfees-1"><a class="header" href="#protocolfees-1">protocolFees</a></h3>
 <p>Returns the protocol fee balance the escrow holds.</p>
-<p>Nothing credits it: it holds the transfer fees collected by earlier implementations.
-Nothing spends it either.</p>
+<p>Nothing credits it: it holds the transfer fees and cross-payer registration charges
+collected by earlier implementations. Nothing spends it either.</p>
 <pre><code class="language-solidity">function protocolFees() external view returns (uint256 balance);
 </code></pre>
 <p><strong>Returns</strong></p>
@@ -1235,8 +1306,10 @@ is keyed to the holder, not to any approval set, which keeps the deposit refund 
 to the on-chain owner. The slot for <code>tokenId</code> must already hold a position (sentinel:
 <code>position.recipient != address(0)</code>); an unseeded slot triggers @custom:reverts
 DepositNotConfigured, and a position already in the released phase triggers</p>
-<p><strong>Note:</strong>
-reverts: AlreadyReleased. Zero-amount positions are still releasable so every
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: AlreadyReleased. Zero-amount positions are still releasable so every
 minted name has a reachable lifecycle. The escrow must additionally be approved to
 move the NFT, otherwise @custom:reverts EscrowNotApproved. Emits @custom:emits
 NameReleased once the NFT is moved into custody.
@@ -1244,7 +1317,20 @@ Release stamps two independent clocks. <code>withdrawAvailableAt</code> (release
 opens the deposit withdrawal; <code>redeemableUntil</code> (release + <code>redeemWindow</code>) closes the
 holder's exclusive redeem phase and opens permissionless reclaim. Both are snapshots
 so later policy changes never move an in-flight position. A release attempted while
-<code>redeemWindow</code> is unseeded triggers @custom:reverts RedeemWindowNotConfigured.</p>
+<code>redeemWindow</code> is unseeded triggers @custom:reverts RedeemWindowNotConfigured.
+Releasing gives up the name's records and subnames along with the name: once the token
+is in custody the escrow, as its owner, deletes the address and content hash, which
+releases their storage deposit to the signer of this transaction, and calls</p>
+</li>
+<li>
+<p>function: IDotnsRegistry.clear, so every text record reads as unset and every
+linked subname stops resolving from this call on (a subname with no recorded parent
+is reached once @custom:function IDotnsRegistry.linkSubname links it). Whoever gets
+the name next, through @custom:function redeem or @custom:function reclaim, starts
+clean. Text records and subnames keep their storage and its deposit; a holder who wants
+that deposit back deletes them before releasing.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function release(uint256 tokenId) external;
 </code></pre>
 <h3 id="withdraw-1"><a class="header" href="#withdraw-1">withdraw</a></h3>
@@ -1306,7 +1392,8 @@ still holds value, this call settles it: the amount is debited from <code>tokenR
 previous recipient's pull-payment balance, claimable through @custom:function
 claimWithdrawal with no deadline. That is what keeps a name recyclable when its
 previous holder never returns: the value follows them, the name does not wait for them.
-Emits @custom:emits RefundWithdrawn on settlement.</p>
+Emits @custom:emits RefundWithdrawn on settlement. The name arrives as release left it:
+cleared, so the new owner starts clean.</p>
 <pre><code class="language-solidity">function reclaim(uint256 tokenId, address newOwner) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -1340,8 +1427,9 @@ below <code>redeemableUntil</code>; a position failing any of those is not redee
 <p><strong>Note:</strong>
 reverts: NotRedeemable.
 No value moves. The position keeps its recipient, asset and amount, so the deposit
-stays locked exactly as it was before the release and the name returns to its
-pre-release state, releasable again later on a fresh pair of clocks. Excluding
+stays locked exactly as it was before the release, and the name is releasable again
+later on a fresh pair of clocks. The records and subnames the release cleared do not
+come back: the holder gets the name back clean. Excluding
 withdrawn positions is deliberate: a holder who has already pulled the deposit would
 otherwise recover the name without it being deposit-backed, breaking the one-deposit-
 per-live-name bound. The choice is therefore exclusive — take the value back, or take
@@ -1805,7 +1893,7 @@ batches once <code>availableAt</code> has elapsed.</p>
 <li><a href="contracts/external/personhood/IPersonhood.sol/interface.IPersonhood.html">IPersonhood</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ipersonhood"><a class="header" href="#ipersonhood">IPersonhood</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/external/personhood/IPersonhood.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/external/personhood/IPersonhood.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IPersonhood - Proof of Personhood Precompile</p>
 <p>Query personhood status of an account.</p>
@@ -1863,7 +1951,7 @@ If we add more types in the future, the existing ones remain unchanged.</p>
 <li><a href="contracts/external/revive/ISystem.sol/interface.ISystem.html">ISystem</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="isystem"><a class="header" href="#isystem">ISystem</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/external/revive/ISystem.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/external/revive/ISystem.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 ISystem</p>
 <p>Minimal subset of revive's System precompile, vendored from
@@ -1898,7 +1986,7 @@ than reverting, on a non-Root origin.</p>
 <li><a href="contracts/pop/PopRules.sol/contract.PopRules.html">PopRules</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnscostmodelregistry"><a class="header" href="#dotnscostmodelregistry">DotnsCostModelRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/pop/DotnsCostModelRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/pop/DotnsCostModelRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Ownable, <a href="contracts/pop/DotnsCostModelRegistry.sol//contracts/pop/IDotnsCostModelRegistry.sol/interface.IDotnsCostModelRegistry.html">IDotnsCostModelRegistry</a></p>
 <p><strong>Title:</strong>
@@ -2002,7 +2090,7 @@ CurrentModelSet.</p>
 <tr><td><code>weiPrice</code></td><td><code>uint256</code></td><td>Registration cost in wei at that version.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsflatpricing"><a class="header" href="#dotnsflatpricing">DotnsFlatPricing</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/pop/DotnsFlatPricing.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/pop/DotnsFlatPricing.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/pop/DotnsFlatPricing.sol//contracts/pop/IDotnsPricing.sol/interface.IDotnsPricing.html">IDotnsPricing</a></p>
 <p><strong>Title:</strong>
@@ -2065,7 +2153,7 @@ changes it.</p>
 <tr><td><code>modelVersion</code></td><td><code>uint256</code></td><td>Identifier derived from the model form and its parameters.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsscarcitypricing"><a class="header" href="#dotnsscarcitypricing">DotnsScarcityPricing</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/pop/DotnsScarcityPricing.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/pop/DotnsScarcityPricing.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/pop/DotnsScarcityPricing.sol//contracts/pop/IDotnsPricing.sol/interface.IDotnsPricing.html">IDotnsPricing</a></p>
 <p><strong>Title:</strong>
@@ -2146,7 +2234,7 @@ floor changes it.</p>
 <tr><td><code>modelVersion</code></td><td><code>uint256</code></td><td>Identifier derived from the model form and its parameters.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscostmodelregistry"><a class="header" href="#idotnscostmodelregistry">IDotnsCostModelRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/pop/IDotnsCostModelRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/pop/IDotnsCostModelRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Cost Model Registry</p>
 <p>Holds every cost model the protocol has run and names the current one.</p>
@@ -2306,7 +2394,7 @@ the version a name prices at cannot move after the commitment is made.</p>
 <tr><td><code>revealed</code></td><td><code>uint256</code></td><td>The version supplied at reveal.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspricing"><a class="header" href="#idotnspricing">IDotnsPricing</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/pop/IDotnsPricing.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/pop/IDotnsPricing.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Pricing Cost Model</p>
 <p>Prices a registration from the base length of its label alone.</p>
@@ -2360,7 +2448,7 @@ release declaration (<code>protocolVersion()</code> on the protocol registry).</
 <tr><td><code>reason</code></td><td><code>string</code></td><td>Human-readable explanation of the failed invariant.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="ipoprules"><a class="header" href="#ipoprules">IPopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/pop/IPopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/pop/IPopRules.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Proof of Personhood Rules for dotNS</p>
 <p>Proof of personhood interface defining dotNS price calculation, PoP-tier requirements,
@@ -2925,7 +3013,7 @@ user through the reservation table.</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="popclassification"><a class="header" href="#popclassification">PopClassification</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/pop/PopClassification.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/pop/PopClassification.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 PopClassification</p>
 <p>The pure dotNS naming rules: a label's base length, its trailing digits, and the PoP
@@ -3004,7 +3092,7 @@ device name), and 9 or more are open to any caller.</p>
 <tr><td><code>baseLength</code></td><td><code>uint256</code></td><td>Length of the label's base name.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="poprules-1"><a class="header" href="#poprules-1">PopRules</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/pop/PopRules.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/pop/PopRules.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/pop/PopRules.sol//contracts/pop/IPopRules.sol/interface.IPopRules.html">IPopRules</a></p>
 <p><strong>Title:</strong>
@@ -3739,7 +3827,7 @@ validation of its own so each public entry can layer additional eligibility chec
 <li><a href="contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspopcontroller-1"><a class="header" href="#dotnspopcontroller-1">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/registrars/DotnsPopController.sol//contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a>, <a href="contracts/registrars/DotnsPopController.sol//contracts/registrars/IDotnsPopControllerLegacy.sol/interface.IDotnsPopControllerLegacy.html">IDotnsPopControllerLegacy</a></p>
 <p><strong>Title:</strong>
@@ -4902,7 +4990,7 @@ external call, so each address is read once per call and reused.</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspoplens"><a class="header" href="#dotnspoplens">DotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/DotnsPopLens.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/DotnsPopLens.sol//contracts/registrars/IDotnsPopLens.sol/interface.IDotnsPopLens.html">IDotnsPopLens</a></p>
 <p><strong>Title:</strong>
@@ -5167,7 +5255,7 @@ other name hashes as a second-level label under the TLD.</p>
 <pre><code class="language-solidity">function _popRules() internal view returns (IPopRules);
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrar-1"><a class="header" href="#dotnsregistrar-1">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="contracts/registrars/DotnsRegistrar.sol//contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -5435,7 +5523,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistrarcontroller-1"><a class="header" href="#dotnsregistrarcontroller-1">DotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/DotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, ReentrancyGuardTransient, <a href="contracts/registrars/DotnsRegistrarController.sol//contracts/registrars/IDotnsRegistrarController.sol/interface.IDotnsRegistrarController.html">IDotnsRegistrarController</a></p>
 <p><strong>Title:</strong>
@@ -5765,7 +5853,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscontroller"><a class="header" href="#idotnscontroller">IDotnsController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/IDotnsController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/IDotnsController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC165</p>
 <p><strong>Title:</strong>
@@ -5779,7 +5867,7 @@ which concrete controller interface a given address implements.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopcontroller"><a class="header" href="#idotnspopcontroller">IDotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/IDotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/IDotnsPopController.sol//contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -6648,7 +6736,7 @@ key. The member order is part of the ABI: the gateway pallet encodes <code>Devic
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopcontrollerlegacy"><a class="header" href="#idotnspopcontrollerlegacy">IDotnsPopControllerLegacy</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/IDotnsPopControllerLegacy.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/IDotnsPopControllerLegacy.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopControllerLegacy</p>
 <p>Deprecated PoP controller entrypoints, kept with their original selectors for callers
@@ -6710,7 +6798,7 @@ reverts: InvalidPersonhoodLabel.</p>
 <pre><code class="language-solidity">error InvalidBaseLabel();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspoplens"><a class="header" href="#idotnspoplens">IDotnsPopLens</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/IDotnsPopLens.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopLens</p>
 <p>Read-only view over PoP identity data, composed from the controller, the registrar,
@@ -6917,7 +7005,7 @@ this precompile-free summary.</p>
 <tr><td><code>reservationLabelhash</code></td><td><code>bytes32</code></td><td>The personhood name the account holds a live reservation on, or zero when none.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -7117,7 +7205,7 @@ on a plain <code>transferFrom</code>, which is why the gate is enforced here too
 <pre><code class="language-solidity">error UnsolicitedEscrowDeposit(uint256 tokenId);
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/registrars/IDotnsRegistrarController.sol//contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -7395,7 +7483,7 @@ grant and never writes a reverse record.</p>
 <li><a href="contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsprotocolregistry-1"><a class="header" href="#dotnsprotocolregistry-1">DotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsProtocolRegistry.sol//contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></p>
 <p><strong>Title:</strong>
@@ -7586,7 +7674,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsregistry-1"><a class="header" href="#dotnsregistry-1">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/registry/DotnsRegistry.sol//contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -7598,6 +7686,16 @@ Parity</p>
 <code>IDotnsRegistrar.ownerOf</code>; subnodes carry an explicit owner address in <code>records</code>.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
+<h2 id="constants-7"><a class="header" href="#constants-7">Constants</a></h2>
+<h3 id="max_subname_depth"><a class="header" href="#max_subname_depth">MAX_SUBNAME_DEPTH</a></h3>
+<p>Deepest a new subname may sit below its second-level name: a subname directly under
+<code>alice</code> is at depth 1, one under <code>child.alice</code> at depth 2.</p>
+<p>Bounds the read cost, not the clear cost. Clearing is constant at any depth, but
+deciding whether a subname still resolves walks every level above it, and every
+read of a subname (owner, authority, each resolver record) pays that walk. Checked only
+when a subname is created, so a deeper subname that already exists keeps working.</p>
+<pre><code class="language-solidity">uint256 public constant MAX_SUBNAME_DEPTH = 8
+</code></pre>
 <h2 id="state-variables-7"><a class="header" href="#state-variables-7">State Variables</a></h2>
 <h3 id="records"><a class="header" href="#records">records</a></h3>
 <p>Mapping of node identifiers to records.</p>
@@ -7607,8 +7705,18 @@ security-contact: admin@parity.io</p>
 <p>Protocol-level address registry for all dotNS contracts.</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
+<h3 id="_versions"><a class="header" href="#_versions">_versions</a></h3>
+<p>Node =&gt; its versions.</p>
+<pre><code class="language-solidity">mapping(bytes32 node =&gt; NodeVersions versions) private _versions
+</code></pre>
+<h3 id="_parentof"><a class="header" href="#_parentof">_parentOf</a></h3>
+<p>Subname =&gt; its parent. Zero for tokenised names, for deleted subnames, and for a
+subname whose parent was never recorded until it is linked
+(@custom:function linkSubname).</p>
+<pre><code class="language-solidity">mapping(bytes32 node =&gt; bytes32 parent) private _parentOf
+</code></pre>
 <h3 id="__gap-6"><a class="header" href="#__gap-6">__gap</a></h3>
-<pre><code class="language-solidity">uint256[50] private __gap
+<pre><code class="language-solidity">uint256[48] private __gap
 </code></pre>
 <h2 id="functions-23"><a class="header" href="#functions-23">Functions</a></h2>
 <h3 id="authorised"><a class="header" href="#authorised">authorised</a></h3>
@@ -7652,8 +7760,17 @@ oz-upgrades-unsafe-allow: constructor</p>
 <h3 id="setsubnodeowner"><a class="header" href="#setsubnodeowner">setSubnodeOwner</a></h3>
 <p>Creates or reassigns a subnode and assigns its owner.</p>
 <p>Callable only by the current owner of <code>record.parentNode</code>, otherwise</p>
-<p><strong>Note:</strong>
-reverts: NotAuthorised. The new owner address must be non-zero, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotAuthorised. The new owner address must be non-zero, otherwise</p>
+</li>
+<li>
+<p>emits: RecordsCleared and @custom:emits SubnamesCleared, so none of its old
+records or subnames come back. Emits @custom:emits NewOwner on each successful
+assignment.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function setSubnodeOwner(SubnodeRecord calldata record)
     external
     override
@@ -7678,14 +7795,18 @@ until the buyer overwrites it. That covers the node itself and not the nodes ben
 it: a subname stores its own owner, and @custom:function isAuthorised returns on that
 owner before consulting the registrar, so after the sale the seller keeps write
 authority over every subname whose stored owner is still the seller, until the buyer
-reassigns each one through @custom:function setSubnodeOwner. A subname created for
-someone else stays with that owner and leaves the seller no write path. The set is
-derivable from @custom:emits NewOwner, which indexes the parent node. Stores
-<code>owner = address(0)</code> as a sentinel so reads delegate to <code>IDotnsRegistrar.ownerOf</code> and
-ERC-721 transfers remain authoritative. Emits</p>
+deletes each one through @custom:function deleteSubname or clears them all at once
+through @custom:function clearSubnames. Reassigning one through</p>
 </li>
 <li>
-<p>emits: NodeTransferred on success.</p>
+<p>function: setSubnodeOwner keeps its records and the subnames beneath it. A
+subname created for someone else stays with that owner and leaves the seller no write
+path. The set is derivable from</p>
+</li>
+<li>
+<p>emits: NewOwner, which indexes the parent node. Stores
+<code>owner = address(0)</code> as a sentinel so reads delegate to <code>IDotnsRegistrar.ownerOf</code> and
+ERC-721 transfers remain authoritative. Emits</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function setOwner(bytes32 node, address newOwner) external override onlyRegistrarController;
@@ -7723,18 +7844,176 @@ path of at most <code>StringUtils.MAX_NAME_PATH_OCTETS</code> octets whose nameh
     override
     authorised(record.parentNode);
 </code></pre>
+<h3 id="clearrecords"><a class="header" href="#clearrecords">clearRecords</a></h3>
+<p>Clears the records of <code>node</code> on the resolvers that check <code>recordVersion</code>
+(<code>DotnsResolver</code> and <code>DotnsContentResolver</code>), and points it back at the default
+resolver.</p>
+<p>Callable by anyone @custom:function isAuthorised admits for <code>node</code>, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotAuthorised. Constant cost whatever the number of records: the node's
+record version is bumped rather than any record being visited. Subnames are untouched;
+see @custom:function clearSubnames. Emits @custom:emits RecordsCleared and</p>
+</li>
+<li>
+<p>emits: NewResolver.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function clearRecords(bytes32 node) external override authorised(node);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node to clear.</td></tr>
+</tbody></table>
+</div>
+<h3 id="clearsubnames"><a class="header" href="#clearsubnames">clearSubnames</a></h3>
+<p>Clears every subname beneath <code>node</code>, at any depth, together with their records.</p>
+<p>Callable by anyone @custom:function isAuthorised admits for <code>node</code>, otherwise</p>
+<p><strong>Note:</strong>
+reverts: NotAuthorised. Constant cost whatever the size or depth of the subtree:
+the node's subname version is bumped, and a subname resolves only while the version it
+was created under is still current at every level above it. A cleared subname can be
+created again through @custom:function setSubnodeOwner, and starts with no records and
+no subnames. The node's own records are untouched; see @custom:function clearRecords.
+Emits @custom:emits SubnamesCleared.</p>
+<pre><code class="language-solidity">function clearSubnames(bytes32 node) external override authorised(node);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node whose subnames are cleared.</td></tr>
+</tbody></table>
+</div>
+<h3 id="clear"><a class="header" href="#clear">clear</a></h3>
+<p>Clears every record and every subname of <code>node</code>.</p>
+<p>Equivalent to @custom:function clearRecords followed by @custom:function clearSubnames
+in one call, with the same authority. The escrow calls it on release, once it holds the
+token, which is what makes a released name start clean for whoever gets it next.</p>
+<pre><code class="language-solidity">function clear(bytes32 node) external override authorised(node);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node to clear.</td></tr>
+</tbody></table>
+</div>
+<h3 id="deletesubname"><a class="header" href="#deletesubname">deleteSubname</a></h3>
+<p>Deletes one subname of <code>parentNode</code>, together with its records and every subname
+beneath it.</p>
+<p>Callable by anyone @custom:function isAuthorised admits for <code>parentNode</code>, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotAuthorised: subnames are parent-sovereign, so the parent decides,
+not the subname's holder. The subname's record and parent link are zeroed, releasing
+their storage deposit to the signer of the transaction; one version slot stays so the
+subname, created again, starts empty. The subname need not resolve: one a clear has
+already cut off can still be deleted by whoever controls <code>parentNode</code> now, after a
+transfer included. Subnames beneath it are cleared but keep their storage, and once
+their own parent stops resolving nobody can delete them, so freeing every deposit means
+deleting from the deepest subname up, each by whoever holds that subname's parent,
+before clearing anything above them. A subname must exist there, otherwise</p>
+</li>
+<li>
+<p>emits: SubnamesCleared for the subname.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function deleteSubname(
+    bytes32 parentNode,
+    bytes32 labelhash
+)
+    external
+    override
+    authorised(parentNode);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>parentNode</code></td><td><code>bytes32</code></td><td>Parent of the subname.</td></tr>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the subname under <code>parentNode</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="linksubname"><a class="header" href="#linksubname">linkSubname</a></h3>
+<p>Records the parent of a subname whose parent was never recorded, so that clearing
+an ancestor reaches it.</p>
+<p>Permissionless: the parent is proven by the namehash, since <code>subnode</code> is
+<code>keccak256(parentNode, labelhash)</code>, so a caller cannot link a subname anywhere else.
+The subname is linked as created under its parent's first subname version, so a subname
+whose ancestor was cleared before it was linked reads as cleared once it and every
+level between it and that ancestor are linked; an unlinked level still ends the walk
+as resolving. Every successful write path that keeps the subname and names its parent
+(@custom:function setSubnodeOwner, @custom:function setSubnodeResolver) links it as a
+side effect; this entry point covers the rest. @custom:reverts SubnameNotFound when
+no subname exists there. A subname already linked is left as it is. Emits</p>
+<p><strong>Note:</strong>
+emits: SubnameLinked when it links.</p>
+<pre><code class="language-solidity">function linkSubname(bytes32 parentNode, bytes32 labelhash) external override;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>parentNode</code></td><td><code>bytes32</code></td><td>Parent of the subname.</td></tr>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the subname under <code>parentNode</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="recordversion"><a class="header" href="#recordversion">recordVersion</a></h3>
+<p>Returns whether <code>node</code> resolves and the record version its records are written
+under.</p>
+<p>Resolvers stamp each write with <code>recordsVersion</code> and treat a record whose stamp
+differs, or any record of a node that does not resolve, as unset. A tokenised name
+resolves while its record exists; a subname resolves while no ancestor has cleared or
+deleted it.
+Version 0 is the version every node starts at, and a record stamped 0 matches it, so a
+node that was never cleared reads every record stamped 0.
+Checking a subname walks its ancestors, so the cost grows with its depth.</p>
+<pre><code class="language-solidity">function recordVersion(bytes32 node)
+    external
+    view
+    override
+    returns (bool live, uint64 recordsVersion);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>live</code></td><td><code>bool</code></td><td>True when <code>node</code> currently resolves.</td></tr>
+<tr><td><code>recordsVersion</code></td><td><code>uint64</code></td><td>Record version of <code>node</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="parentof"><a class="header" href="#parentof">parentOf</a></h3>
+<p>Returns the recorded parent of a subname.</p>
+<p>Zero for a tokenised name, for a node that was never created or was deleted, and for
+a subname whose parent was never recorded and that has not been linked since
+(@custom:function linkSubname). A backfill reads it to find the subnames still to
+link.</p>
+<pre><code class="language-solidity">function parentOf(bytes32 node) external view override returns (bytes32 parent);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>parent</code></td><td><code>bytes32</code></td><td>Recorded parent node, or zero.</td></tr>
+</tbody></table>
+</div>
 <h3 id="owner"><a class="header" href="#owner">owner</a></h3>
 <p>Returns the owner of a node.</p>
 <p>For tokenised nodes the stored owner is the zero sentinel; the implementation falls
-back to <code>IDotnsRegistrar.ownerOf(uint256(node))</code>.</p>
+back to <code>IDotnsRegistrar.ownerOf(uint256(node))</code>. A subname that no longer resolves,
+because it or a name above it was cleared or deleted, has no owner and returns zero, as
+do @custom:function resolver, @custom:function recordExists and</p>
+<p><strong>Note:</strong>
+function: isAuthorised for it.</p>
 <pre><code class="language-solidity">function owner(bytes32 node) external view override returns (address);
 </code></pre>
 <h3 id="resolver"><a class="header" href="#resolver">resolver</a></h3>
-<p>Returns the resolver of a node.</p>
+<p>Returns the resolver of a node, or zero when the node does not resolve.</p>
 <pre><code class="language-solidity">function resolver(bytes32 node) external view override returns (address);
 </code></pre>
 <h3 id="recordexists"><a class="header" href="#recordexists">recordExists</a></h3>
-<p>Returns whether a node exists.</p>
+<p>Returns whether a node exists and resolves.</p>
 <pre><code class="language-solidity">function recordExists(bytes32 node) external view override returns (bool);
 </code></pre>
 <h3 id="isauthorised"><a class="header" href="#isauthorised">isAuthorised</a></h3>
@@ -7795,6 +8074,86 @@ to the registrar's ERC-721 owner / approved / operator-for-all chain. This is th
 single source of truth <code>_authorised</code> and <code>isAuthorised</code> both delegate to.</p>
 <pre><code class="language-solidity">function _isAuthorised(bytes32 node, address account) internal view returns (bool);
 </code></pre>
+<h3 id="_islive-1"><a class="header" href="#_islive-1">_isLive</a></h3>
+<p>Returns whether <code>node</code> currently resolves.</p>
+<p>A tokenised name, or a node that was never created or was deleted, carries a zero
+stored owner, and resolves exactly when its record exists. A subname resolves while the
+subname version it was created under is still its parent's, and its parent resolves in
+turn, so the walk ends at the tokenised name above it. Clearing therefore costs the
+same at any depth, and the depth is paid on reads instead. A subname with no recorded
+parent ends the walk as resolving, because nothing above it can be checked, until</p>
+<p><strong>Note:</strong>
+function: linkSubname or a write through its parent links it.</p>
+<pre><code class="language-solidity">function _isLive(bytes32 node) internal view returns (bool live);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>live</code></td><td><code>bool</code></td><td>True when <code>node</code> resolves.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_labelcount"><a class="header" href="#_labelcount">_labelCount</a></h3>
+<p>Returns the number of labels in a dotted name path, which is the depth below its
+second-level name of a subname created under it.</p>
+<p><code>path</code> has already passed <code>isNamePath</code>, so it has no empty segment and no leading or
+trailing dot, and the count is one more than the number of dots.</p>
+<pre><code class="language-solidity">function _labelCount(string calldata path) internal pure returns (uint256 count);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>path</code></td><td><code>string</code></td><td>Dotted parent path without the TLD.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>count</code></td><td><code>uint256</code></td><td>Number of labels in <code>path</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_linkifunlinked"><a class="header" href="#_linkifunlinked">_linkIfUnlinked</a></h3>
+<p>Links <code>subnode</code> to <code>parentNode</code> when it is a subname with no recorded parent.</p>
+<p>The caller derives <code>subnode</code> from <code>parentNode</code>, which is what proves the parent. The
+subname is linked under its parent's first subname version, which is the version it
+was created under: every path that creates a subname records its parent, so one with no
+recorded parent was created while its parent's subname version was still zero.</p>
+<pre><code class="language-solidity">function _linkIfUnlinked(bytes32 subnode, bytes32 parentNode) internal;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>subnode</code></td><td><code>bytes32</code></td><td>The subname.</td></tr>
+<tr><td><code>parentNode</code></td><td><code>bytes32</code></td><td>Its parent.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_clearrecords"><a class="header" href="#_clearrecords">_clearRecords</a></h3>
+<p>Clears every record of <code>node</code> and returns its resolver pointer to the default.</p>
+<pre><code class="language-solidity">function _clearRecords(bytes32 node) internal;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node to clear.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_clearrecordversion"><a class="header" href="#_clearrecordversion">_clearRecordVersion</a></h3>
+<p>Bumps the record version of <code>node</code>.</p>
+<pre><code class="language-solidity">function _clearRecordVersion(bytes32 node) internal;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_clearsubnameversion"><a class="header" href="#_clearsubnameversion">_clearSubnameVersion</a></h3>
+<p>Bumps the subname version of <code>node</code>.</p>
+<pre><code class="language-solidity">function _clearSubnameVersion(bytes32 node) internal;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
 <h3 id="_onlyregistrarcontroller"><a class="header" href="#_onlyregistrarcontroller">_onlyRegistrarController</a></h3>
 <p>Internal check for registrar-authorised controller privileges.</p>
 <p>The registry trusts every controller the registrar trusts. Routing controller
@@ -7827,8 +8186,28 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 </code></pre>
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
+<h2 id="structs-7"><a class="header" href="#structs-7">Structs</a></h2>
+<h3 id="nodeversions"><a class="header" href="#nodeversions">NodeVersions</a></h3>
+<p>Versions that let a node, or everything beneath it, be cleared at constant cost.</p>
+<p>Neither records nor subnames can be listed, so clearing never visits them. It bumps a
+version instead, and readers compare against it:</p>
+<ul>
+<li><code>records</code> is the version a node's resolver records are stamped with. Bumping it makes
+every record of the node read as unset.</li>
+<li><code>subnames</code> is the version a new child is created under. Bumping it makes every child,
+and through them every deeper subname, stop resolving.</li>
+<li><code>parentSubnames</code> is the parent's <code>subnames</code> at the moment this subname was created.
+Kept apart from <code>records</code> because @custom:function setOwner rewrites a whole <code>Record</code>,
+and a version reset to zero would bring back every record written under it.</li>
+</ul>
+<pre><code class="language-solidity">struct NodeVersions {
+    uint64 records;
+    uint64 subnames;
+    uint64 parentSubnames;
+}
+</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p><strong>Author:</strong>
@@ -7975,7 +8354,7 @@ emits: ExpectedCodehashSet.</p>
 <pre><code class="language-solidity">error InvalidProtocolVersion();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsregistry"><a class="header" href="#idotnsregistry">IDotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/registry/IDotnsRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsRegistry</p>
 <p><strong>Author:</strong>
@@ -8014,7 +8393,15 @@ governed by <code>record.persist</code> (see @custom:struct SubnodeRecord); the 
 resolver record is written either way. A <code>record.persist</code> of false defers the store
 write and is restricted to registered controllers
 (@custom:function IDotnsRegistrar.controllers), otherwise @custom:reverts
-NotAuthorised. Emits @custom:emits NewOwner on each successful assignment.</p>
+NotAuthorised. Creating a subname, as opposed to reassigning one that resolves,
+requires it to sit at most <code>MAX_SUBNAME_DEPTH</code> levels below its second-level name,
+otherwise @custom:reverts SubnameTooDeep. A subname still on record but cut off by a
+clear above it is created again from nothing: its versions are bumped, emitting</p>
+</li>
+<li>
+<p>emits: RecordsCleared and @custom:emits SubnamesCleared, so none of its old
+records or subnames come back. Emits @custom:emits NewOwner on each successful
+assignment.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function setSubnodeOwner(SubnodeRecord calldata record) external returns (bytes32 subnode);
@@ -8035,7 +8422,7 @@ path of at most <code>StringUtils.MAX_NAME_PATH_OCTETS</code> octets whose nameh
 <code>record.parentNode</code> (otherwise</p>
 </li>
 <li>
-<p>reverts: ParentLabelMismatch). The resulting subnode must already exist,
+<p>reverts: ParentLabelMismatch). The resulting subnode must exist and resolve,
 otherwise @custom:reverts NotAuthorised. Emits @custom:emits NewResolver on
 success.</p>
 </li>
@@ -8060,9 +8447,16 @@ until the buyer overwrites it. That covers the node itself and not the nodes ben
 it: a subname stores its own owner, and @custom:function isAuthorised returns on that
 owner before consulting the registrar, so after the sale the seller keeps write
 authority over every subname whose stored owner is still the seller, until the buyer
-reassigns each one through @custom:function setSubnodeOwner. A subname created for
-someone else stays with that owner and leaves the seller no write path. The set is
-derivable from @custom:emits NewOwner, which indexes the parent node. Stores
+deletes each one through @custom:function deleteSubname or clears them all at once
+through @custom:function clearSubnames. Reassigning one through</p>
+</li>
+<li>
+<p>function: setSubnodeOwner keeps its records and the subnames beneath it. A
+subname created for someone else stays with that owner and leaves the seller no write
+path. The set is derivable from</p>
+</li>
+<li>
+<p>emits: NewOwner, which indexes the parent node. Stores
 <code>owner = address(0)</code> as a sentinel so reads delegate to <code>IDotnsRegistrar.ownerOf</code> and
 ERC-721 transfers remain authoritative. Emits</p>
 </li>
@@ -8088,18 +8482,40 @@ success.</p>
 <tr><td><code>resolverAddr</code></td><td><code>address</code></td><td>Resolver contract address (zero clears).</td></tr>
 </tbody></table>
 </div>
+<h3 id="parentof-1"><a class="header" href="#parentof-1">parentOf</a></h3>
+<p>Returns the recorded parent of a subname.</p>
+<p>Zero for a tokenised name, for a node that was never created or was deleted, and for
+a subname whose parent was never recorded and that has not been linked since
+(@custom:function linkSubname). A backfill reads it to find the subnames still to
+link.</p>
+<pre><code class="language-solidity">function parentOf(bytes32 node) external view returns (bytes32 parent);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>parent</code></td><td><code>bytes32</code></td><td>Recorded parent node, or zero.</td></tr>
+</tbody></table>
+</div>
 <h3 id="owner-1"><a class="header" href="#owner-1">owner</a></h3>
 <p>Returns the owner of a node.</p>
 <p>For tokenised nodes the stored owner is the zero sentinel; the implementation falls
-back to <code>IDotnsRegistrar.ownerOf(uint256(node))</code>.</p>
+back to <code>IDotnsRegistrar.ownerOf(uint256(node))</code>. A subname that no longer resolves,
+because it or a name above it was cleared or deleted, has no owner and returns zero, as
+do @custom:function resolver, @custom:function recordExists and</p>
+<p><strong>Note:</strong>
+function: isAuthorised for it.</p>
 <pre><code class="language-solidity">function owner(bytes32 node) external view returns (address);
 </code></pre>
 <h3 id="resolver-1"><a class="header" href="#resolver-1">resolver</a></h3>
-<p>Returns the resolver of a node.</p>
+<p>Returns the resolver of a node, or zero when the node does not resolve.</p>
 <pre><code class="language-solidity">function resolver(bytes32 node) external view returns (address);
 </code></pre>
 <h3 id="recordexists-1"><a class="header" href="#recordexists-1">recordExists</a></h3>
-<p>Returns whether a node exists.</p>
+<p>Returns whether a node exists and resolves.</p>
 <pre><code class="language-solidity">function recordExists(bytes32 node) external view returns (bool);
 </code></pre>
 <h3 id="isauthorised-1"><a class="header" href="#isauthorised-1">isAuthorised</a></h3>
@@ -8123,6 +8539,136 @@ false for a node that does not exist.</p>
 <tr><td><code>authorisedFlag</code></td><td><code>bool</code></td><td>True when <code>account</code> may manage <code>node</code>.</td></tr>
 </tbody></table>
 </div>
+<h3 id="clearrecords-1"><a class="header" href="#clearrecords-1">clearRecords</a></h3>
+<p>Clears the records of <code>node</code> on the resolvers that check <code>recordVersion</code>
+(<code>DotnsResolver</code> and <code>DotnsContentResolver</code>), and points it back at the default
+resolver.</p>
+<p>Callable by anyone @custom:function isAuthorised admits for <code>node</code>, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotAuthorised. Constant cost whatever the number of records: the node's
+record version is bumped rather than any record being visited. Subnames are untouched;
+see @custom:function clearSubnames. Emits @custom:emits RecordsCleared and</p>
+</li>
+<li>
+<p>emits: NewResolver.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function clearRecords(bytes32 node) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node to clear.</td></tr>
+</tbody></table>
+</div>
+<h3 id="clearsubnames-1"><a class="header" href="#clearsubnames-1">clearSubnames</a></h3>
+<p>Clears every subname beneath <code>node</code>, at any depth, together with their records.</p>
+<p>Callable by anyone @custom:function isAuthorised admits for <code>node</code>, otherwise</p>
+<p><strong>Note:</strong>
+reverts: NotAuthorised. Constant cost whatever the size or depth of the subtree:
+the node's subname version is bumped, and a subname resolves only while the version it
+was created under is still current at every level above it. A cleared subname can be
+created again through @custom:function setSubnodeOwner, and starts with no records and
+no subnames. The node's own records are untouched; see @custom:function clearRecords.
+Emits @custom:emits SubnamesCleared.</p>
+<pre><code class="language-solidity">function clearSubnames(bytes32 node) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node whose subnames are cleared.</td></tr>
+</tbody></table>
+</div>
+<h3 id="clear-1"><a class="header" href="#clear-1">clear</a></h3>
+<p>Clears every record and every subname of <code>node</code>.</p>
+<p>Equivalent to @custom:function clearRecords followed by @custom:function clearSubnames
+in one call, with the same authority. The escrow calls it on release, once it holds the
+token, which is what makes a released name start clean for whoever gets it next.</p>
+<pre><code class="language-solidity">function clear(bytes32 node) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node to clear.</td></tr>
+</tbody></table>
+</div>
+<h3 id="deletesubname-1"><a class="header" href="#deletesubname-1">deleteSubname</a></h3>
+<p>Deletes one subname of <code>parentNode</code>, together with its records and every subname
+beneath it.</p>
+<p>Callable by anyone @custom:function isAuthorised admits for <code>parentNode</code>, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotAuthorised: subnames are parent-sovereign, so the parent decides,
+not the subname's holder. The subname's record and parent link are zeroed, releasing
+their storage deposit to the signer of the transaction; one version slot stays so the
+subname, created again, starts empty. The subname need not resolve: one a clear has
+already cut off can still be deleted by whoever controls <code>parentNode</code> now, after a
+transfer included. Subnames beneath it are cleared but keep their storage, and once
+their own parent stops resolving nobody can delete them, so freeing every deposit means
+deleting from the deepest subname up, each by whoever holds that subname's parent,
+before clearing anything above them. A subname must exist there, otherwise</p>
+</li>
+<li>
+<p>reverts: SubnameNotFound. Emits @custom:emits NewOwner with a zero owner, the
+deletion convention indexers already follow, and @custom:emits RecordsCleared and</p>
+</li>
+<li>
+<p>emits: SubnamesCleared for the subname.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function deleteSubname(bytes32 parentNode, bytes32 labelhash) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>parentNode</code></td><td><code>bytes32</code></td><td>Parent of the subname.</td></tr>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the subname under <code>parentNode</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="linksubname-1"><a class="header" href="#linksubname-1">linkSubname</a></h3>
+<p>Records the parent of a subname whose parent was never recorded, so that clearing
+an ancestor reaches it.</p>
+<p>Permissionless: the parent is proven by the namehash, since <code>subnode</code> is
+<code>keccak256(parentNode, labelhash)</code>, so a caller cannot link a subname anywhere else.
+The subname is linked as created under its parent's first subname version, so a subname
+whose ancestor was cleared before it was linked reads as cleared once it and every
+level between it and that ancestor are linked; an unlinked level still ends the walk
+as resolving. Every successful write path that keeps the subname and names its parent
+(@custom:function setSubnodeOwner, @custom:function setSubnodeResolver) links it as a
+side effect; this entry point covers the rest. @custom:reverts SubnameNotFound when
+no subname exists there. A subname already linked is left as it is. Emits</p>
+<p><strong>Note:</strong>
+emits: SubnameLinked when it links.</p>
+<pre><code class="language-solidity">function linkSubname(bytes32 parentNode, bytes32 labelhash) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>parentNode</code></td><td><code>bytes32</code></td><td>Parent of the subname.</td></tr>
+<tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>Labelhash of the subname under <code>parentNode</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="recordversion-1"><a class="header" href="#recordversion-1">recordVersion</a></h3>
+<p>Returns whether <code>node</code> resolves and the record version its records are written
+under.</p>
+<p>Resolvers stamp each write with <code>recordsVersion</code> and treat a record whose stamp
+differs, or any record of a node that does not resolve, as unset. A tokenised name
+resolves while its record exists; a subname resolves while no ancestor has cleared or
+deleted it.
+Version 0 is the version every node starts at, and a record stamped 0 matches it, so a
+node that was never cleared reads every record stamped 0.
+Checking a subname walks its ancestors, so the cost grows with its depth.</p>
+<pre><code class="language-solidity">function recordVersion(bytes32 node) external view returns (bool live, uint64 recordsVersion);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>live</code></td><td><code>bool</code></td><td>True when <code>node</code> currently resolves.</td></tr>
+<tr><td><code>recordsVersion</code></td><td><code>uint64</code></td><td>Record version of <code>node</code>.</td></tr>
+</tbody></table>
+</div>
 <h2 id="events-8"><a class="header" href="#events-8">Events</a></h2>
 <h3 id="newowner"><a class="header" href="#newowner">NewOwner</a></h3>
 <p>Emitted when a new subnode owner is set.</p>
@@ -8143,6 +8689,45 @@ false for a node that does not exist.</p>
 <p>Emitted when a resolver is set or updated.</p>
 <pre><code class="language-solidity">event NewResolver(bytes32 indexed node, address resolver);
 </code></pre>
+<h3 id="recordscleared"><a class="header" href="#recordscleared">RecordsCleared</a></h3>
+<p>Emitted when every record of <code>node</code> stops resolving.</p>
+<p>Records live on resolver contracts and cannot be listed, so nothing is erased: the
+node's record version moves to <code>version</code> and every resolver that stamps its writes with</p>
+<p><strong>Note:</strong>
+function: recordVersion reads anything written under an earlier version as
+unset. Consumers that cache records must drop every cached record of <code>node</code> on this
+event.</p>
+<pre><code class="language-solidity">event RecordsCleared(bytes32 indexed node, uint64 version);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node whose records were cleared.</td></tr>
+<tr><td><code>version</code></td><td><code>uint64</code></td><td>Record version the node's records are now written under.</td></tr>
+</tbody></table>
+</div>
+<h3 id="subnamescleared"><a class="header" href="#subnamescleared">SubnamesCleared</a></h3>
+<p>Emitted when every subname beneath <code>node</code>, at any depth, stops resolving.</p>
+<p>One event covers the whole subtree, because the subtree cannot be listed. Descendants
+emit nothing of their own: consumers that index subnames must treat this event as the
+removal of every node below <code>node</code>, together with their records.</p>
+<pre><code class="language-solidity">event SubnamesCleared(bytes32 indexed node, uint64 version);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node whose subnames were cleared.</td></tr>
+<tr><td><code>version</code></td><td><code>uint64</code></td><td>Subname version a new child of <code>node</code> is created under.</td></tr>
+</tbody></table>
+</div>
+<h3 id="subnamelinked"><a class="header" href="#subnamelinked">SubnameLinked</a></h3>
+<p>Emitted when a subname created without a recorded parent is linked to it.</p>
+<pre><code class="language-solidity">event SubnameLinked(bytes32 indexed node, bytes32 indexed parent);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The subname.</td></tr>
+<tr><td><code>parent</code></td><td><code>bytes32</code></td><td>Its parent node.</td></tr>
+</tbody></table>
+</div>
 <h2 id="errors-10"><a class="header" href="#errors-10">Errors</a></h2>
 <h3 id="notallowed"><a class="header" href="#notallowed">NotAllowed</a></h3>
 <p>Thrown when an invalid (zero) address is provided.</p>
@@ -8160,6 +8745,27 @@ false for a node that does not exist.</p>
 <p>Thrown when attempting to create a node that already exists.</p>
 <pre><code class="language-solidity">error NodeAlreadyOwned(bytes32 node);
 </code></pre>
+<h3 id="subnamenotfound"><a class="header" href="#subnamenotfound">SubnameNotFound</a></h3>
+<p>Thrown when a subname that should exist under a parent does not, or no longer
+resolves.</p>
+<pre><code class="language-solidity">error SubnameNotFound(bytes32 node);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The subname.</td></tr>
+</tbody></table>
+</div>
+<h3 id="subnametoodeep"><a class="header" href="#subnametoodeep">SubnameTooDeep</a></h3>
+<p>Thrown when a new subname would sit deeper below its second-level name than
+<code>MAX_SUBNAME_DEPTH</code> allows.</p>
+<pre><code class="language-solidity">error SubnameTooDeep(uint256 depth, uint256 maxDepth);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>depth</code></td><td><code>uint256</code></td><td>Depth the subname would have.</td></tr>
+<tr><td><code>maxDepth</code></td><td><code>uint256</code></td><td>Deepest allowed.</td></tr>
+</tbody></table>
+</div>
 <h3 id="invalidlabel-2"><a class="header" href="#invalidlabel-2">InvalidLabel</a></h3>
 <p>Thrown when a sublabel is not a canonical lowercase ASCII DNS label.</p>
 <pre><code class="language-solidity">error InvalidLabel();
@@ -8175,7 +8781,7 @@ because the composed full name is stored in a <code>LabelStore</code> row that h
 path.</p>
 <pre><code class="language-solidity">error ParentLabelMismatch();
 </code></pre>
-<h2 id="structs-7"><a class="header" href="#structs-7">Structs</a></h2>
+<h2 id="structs-8"><a class="header" href="#structs-8">Structs</a></h2>
 <h3 id="subnoderecord"><a class="header" href="#subnoderecord">SubnodeRecord</a></h3>
 <p>Record describing a subnode creation request.</p>
 <pre><code class="language-solidity">struct SubnodeRecord {
@@ -8238,7 +8844,7 @@ path.</p>
 <li><a href="contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnscontentresolver-1"><a class="header" href="#dotnscontentresolver-1">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsContentResolver.sol//contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
@@ -8249,7 +8855,10 @@ operator approvals.</p>
 approval) or on a resolver-local operator the owner has approved, rather than on a
 privileged writer address. Content records are user-managed metadata, so write authority
 follows the node owner across transfers and honours the same delegates the registry
-recognises.</p>
+recognises. Each record is stamped with the node's record version from the registry
+(@custom:function IDotnsRegistry.recordVersion), and a read returns empty unless the node
+still resolves and the stamp is current, so clearing a name never has to list its text
+keys.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="state-variables-8"><a class="header" href="#state-variables-8">State Variables</a></h2>
@@ -8270,8 +8879,19 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap-7"><a class="header" href="#__gap-7">__gap</a></h3>
-<p>Reserved storage space to allow for layout changes in the future.</p>
+<p>Reserved storage space. It sits before <code>contenthashVersions</code> and <code>textVersions</code>, so it
+must never shrink: add new state after the last variable instead.</p>
 <pre><code class="language-solidity">uint256[50] private __gap
+</code></pre>
+<h3 id="contenthashversions"><a class="header" href="#contenthashversions">contenthashVersions</a></h3>
+<p>Node =&gt; registry record version its content hash was written under.</p>
+<p>Zero matches the record version every node starts at, so a content hash stamped zero
+reads as set until its node is first cleared. The same holds for <code>textVersions</code>.</p>
+<pre><code class="language-solidity">mapping(bytes32 node =&gt; uint64 version) private contenthashVersions
+</code></pre>
+<h3 id="textversions"><a class="header" href="#textversions">textVersions</a></h3>
+<p>Node =&gt; text key =&gt; registry record version the value was written under.</p>
+<pre><code class="language-solidity">mapping(bytes32 node =&gt; mapping(string key =&gt; uint64 version)) private textVersions
 </code></pre>
 <h2 id="functions-26"><a class="header" href="#functions-26">Functions</a></h2>
 <h3 id="constructor-11"><a class="header" href="#constructor-11">constructor</a></h3>
@@ -8302,10 +8922,11 @@ setup completes.</p>
 <h3 id="setcontenthash"><a class="header" href="#setcontenthash">setContenthash</a></h3>
 <p>Sets the content hash for a node.</p>
 <p>The caller must own the node in the dotNS registry or be an approved operator,
-otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an
-IPFS CID); the resolver stores them as-is and never interprets the payload. Emits</p>
-<p><strong>Note:</strong>
-emits: ContentHashUpdated on every successful write.</p>
+otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an IPFS
+CID); the resolver stores them as-is and never interprets the payload. An empty <code>hash</code>
+deletes the record: its storage is zeroed and the storage deposit released to the
+signer of the transaction. Emits @custom:emits ContentHashUpdated on every successful
+write.</p>
 <pre><code class="language-solidity">function setContenthash(bytes32 node, bytes calldata hash) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -8316,6 +8937,9 @@ emits: ContentHashUpdated on every successful write.</p>
 </div>
 <h3 id="contenthash"><a class="header" href="#contenthash">contenthash</a></h3>
 <p>Returns the content hash associated with a node.</p>
+<p>A record reads as unset once the node is cleared (@custom:function
+IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+even though the bytes written before stay in storage.</p>
 <pre><code class="language-solidity">function contenthash(bytes32 node) external view override returns (bytes memory hash);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -8332,8 +8956,11 @@ emits: ContentHashUpdated on every successful write.</p>
 <p>Sets a text record for a node.</p>
 <p>The caller must own the node in the dotNS registry or be an approved operator,
 otherwise @custom:reverts NotAuthorised. Text records are arbitrary key/value strings
-(e.g. <code>avatar</code>, <code>url</code>, <code>description</code>). Emits @custom:emits TextUpdated on every
-successful write.</p>
+(e.g. <code>avatar</code>, <code>url</code>, <code>description</code>). An empty <code>value</code> deletes the record: its storage
+is zeroed and the storage deposit released to the signer of the transaction. That also
+works for a key a clear has already hidden, which still holds storage until it is
+deleted. Emits @custom:emits TextUpdated and @custom:emits TextChanged on every
+successful write, a delete included.</p>
 <pre><code class="language-solidity">function setText(bytes32 node, string calldata key, string calldata value) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -8345,6 +8972,9 @@ successful write.</p>
 </div>
 <h3 id="text"><a class="header" href="#text">text</a></h3>
 <p>Returns a text record for a node.</p>
+<p>A record reads as unset once the node is cleared (@custom:function
+IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+even though the bytes written before stay in storage.</p>
 <pre><code class="language-solidity">function text(
     bytes32 node,
     string calldata key
@@ -8409,11 +9039,45 @@ approval (ERC-721 owner / approved / operator-for-all) also confers record-write
 authority, while the resolver-local operator mapping remains a narrower record-only
 delegation that grants no power over ownership or transfers. The cheap owner and
 local-operator checks run before the cross-contract registry call.</p>
-<pre><code class="language-solidity">function _requireNodeOwnerOrOperator(bytes32 node) internal view;
+<pre><code class="language-solidity">function _requireNodeOwnerOrOperator(bytes32 node)
+    internal
+    view
+    returns (uint64 currentVersion);
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>currentVersion</code></td><td><code>uint64</code></td><td>Record version of <code>node</code>, which the caller stamps the write with.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_iscurrent"><a class="header" href="#_iscurrent">_isCurrent</a></h3>
+<p>Returns whether a record stamped <code>stamp</code> is readable for <code>node</code>.</p>
+<p>Every getter goes through here. A getter that skipped it would serve records the node
+has cleared, so a new record type must read through it too.</p>
+<pre><code class="language-solidity">function _isCurrent(bytes32 node, uint64 stamp) internal view returns (bool current);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+<tr><td><code>stamp</code></td><td><code>uint64</code></td><td>Record version the record was written under.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>current</code></td><td><code>bool</code></td><td>True when <code>node</code> resolves and <code>stamp</code> is its current record version.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_forwardregistry"><a class="header" href="#_forwardregistry">_forwardRegistry</a></h3>
+<p>Returns the forward registry, resolved lazily so a rewire needs no upgrade here.</p>
+<pre><code class="language-solidity">function _forwardRegistry() internal view returns (IDotnsRegistry registry);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>registry</code></td><td><code>IDotnsRegistry</code></td><td>The forward registry.</td></tr>
 </tbody></table>
 </div>
 <h3 id="version-10"><a class="header" href="#version-10">version</a></h3>
@@ -8444,7 +9108,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnspopresolver-1"><a class="header" href="#dotnspopresolver-1">DotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/resolvers/DotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsPopResolver.sol//contracts/resolvers/IDotnsPopResolver.sol/interface.IDotnsPopResolver.html">IDotnsPopResolver</a></p>
 <p><strong>Title:</strong>
@@ -8643,7 +9307,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsresolver-1"><a class="header" href="#dotnsresolver-1">DotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/resolvers/DotnsResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsResolver.sol//contracts/resolvers/IDotnsResolver.sol/interface.IDotnsResolver.html">IDotnsResolver</a></p>
 <p><strong>Title:</strong>
@@ -8651,7 +9315,11 @@ dotNS Resolver</p>
 <p>Stores forward-resolution address records for dotNS nodes</p>
 <p>Writes are gated on node ownership in the forward registry, not on a
 privileged writer address. Address records describe where a name points
-and only the current node owner has the authority to set that target.</p>
+and only the current node owner has the authority to set that target.
+Each record is stamped with the node's record version from the registry
+(@custom:function IDotnsRegistry.recordVersion), and a read returns the zero address
+unless the node still resolves and the stamp is current. That is how a cleared name, or
+a name beneath a cleared one, stops resolving without its records being visited.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="state-variables-10"><a class="header" href="#state-variables-10">State Variables</a></h2>
@@ -8660,23 +9328,21 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="__gap-9"><a class="header" href="#__gap-9">__gap</a></h3>
-<p>Reserved storage space to allow for layout changes in the future.</p>
+<p>Reserved storage space. It sits before <code>addresses</code>, so it must never shrink: add new
+state after the last variable instead.</p>
 <pre><code class="language-solidity">uint256[50] private __gap
 </code></pre>
 <h3 id="addresses"><a class="header" href="#addresses">addresses</a></h3>
 <p>Node =&gt; resolved address.</p>
 <pre><code class="language-solidity">mapping(bytes32 node =&gt; address owner) private addresses
 </code></pre>
-<h2 id="functions-28"><a class="header" href="#functions-28">Functions</a></h2>
-<h3 id="onlynodeowner"><a class="header" href="#onlynodeowner">onlyNodeOwner</a></h3>
-<p>Restricts access to the owner of <code>node</code> as recorded in the registry.</p>
-<pre><code class="language-solidity">modifier onlyNodeOwner(bytes32 node) ;
+<h3 id="addressversions"><a class="header" href="#addressversions">addressVersions</a></h3>
+<p>Node =&gt; registry record version its address was written under.</p>
+<p>Zero matches the record version every node starts at, so an address stamped zero
+reads as set until its node is first cleared.</p>
+<pre><code class="language-solidity">mapping(bytes32 node =&gt; uint64 version) private addressVersions
 </code></pre>
-<p><strong>Parameters</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
-</tbody></table>
-</div>
+<h2 id="functions-28"><a class="header" href="#functions-28">Functions</a></h2>
 <h3 id="constructor-13"><a class="header" href="#constructor-13">constructor</a></h3>
 <p><strong>Note:</strong>
 oz-upgrades-unsafe-allow: constructor</p>
@@ -8706,18 +9372,23 @@ setup completes.</p>
 <p>Sets the resolved address for a node.</p>
 <p>The caller must be the current owner of <code>node</code> in the forward registry, otherwise</p>
 <p><strong>Note:</strong>
-reverts: NotAuthorised. Emits @custom:emits AddressSet on every successful
-write.</p>
-<pre><code class="language-solidity">function setAddress(bytes32 node, address value) external override onlyNodeOwner(node);
+reverts: NotAuthorised. A zero <code>value</code> deletes the record: its storage is zeroed
+and the storage deposit released to the signer of the transaction, which is how an
+owner reclaims it before giving the name up. Emits @custom:emits AddressSet on every
+successful write.</p>
+<pre><code class="language-solidity">function setAddress(bytes32 node, address value) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node identifier.</td></tr>
-<tr><td><code>value</code></td><td><code>address</code></td><td>The address to associate with the node.</td></tr>
+<tr><td><code>value</code></td><td><code>address</code></td><td>The address to associate with the node, or zero to delete the record.</td></tr>
 </tbody></table>
 </div>
 <h3 id="addressof"><a class="header" href="#addressof">addressOf</a></h3>
 <p>Returns the resolved address for a node.</p>
+<p>A record reads as unset once the node is cleared (@custom:function
+IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+even though the bytes written before stay in storage.</p>
 <pre><code class="language-solidity">function addressOf(bytes32 node) external view override returns (address value);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -8735,13 +9406,27 @@ write.</p>
 </code></pre>
 <h3 id="_onlynodeowner"><a class="header" href="#_onlynodeowner">_onlyNodeOwner</a></h3>
 <p>Internal ownership check for a registry node.</p>
-<p>Resolves the registry lazily through <code>protocolRegistry</code> so a registry
-upgrade or rewire is picked up automatically without a resolver upgrade.</p>
-<pre><code class="language-solidity">function _onlyNodeOwner(bytes32 node) internal view;
+<pre><code class="language-solidity">function _onlyNodeOwner(bytes32 node) internal view returns (IDotnsRegistry registry);
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td>Node identifier.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>registry</code></td><td><code>IDotnsRegistry</code></td><td>The forward registry, returned so the caller reads it once.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_registry-2"><a class="header" href="#_registry-2">_registry</a></h3>
+<p>Returns the forward registry.</p>
+<p>Resolved lazily through <code>protocolRegistry</code> so a registry upgrade or rewire is picked
+up automatically without a resolver upgrade.</p>
+<pre><code class="language-solidity">function _registry() internal view returns (IDotnsRegistry registry);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>registry</code></td><td><code>IDotnsRegistry</code></td><td>The forward registry.</td></tr>
 </tbody></table>
 </div>
 <h3 id="version-12"><a class="header" href="#version-12">version</a></h3>
@@ -8769,7 +9454,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsreverseresolver-1"><a class="header" href="#dotnsreverseresolver-1">DotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/resolvers/DotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/resolvers/DotnsReverseResolver.sol//contracts/resolvers/IDotnsReverseResolver.sol/interface.IDotnsReverseResolver.html">IDotnsReverseResolver</a></p>
 <p><strong>Title:</strong>
@@ -8889,7 +9574,7 @@ subname directly.</p>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node the name resolves to.</td></tr>
 </tbody></table>
 </div>
-<h3 id="_registry-2"><a class="header" href="#_registry-2">_registry</a></h3>
+<h3 id="_registry-3"><a class="header" href="#_registry-3">_registry</a></h3>
 <p>Resolves the registry via the protocol registry.</p>
 <pre><code class="language-solidity">function _registry() internal view returns (IDotnsRegistry);
 </code></pre>
@@ -8929,7 +9614,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnscontentresolver"><a class="header" href="#idotnscontentresolver">IDotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/resolvers/IDotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Content Resolver</p>
 <p>Defines storage and retrieval for content hash, text records, and operator approvals for
@@ -8942,10 +9627,11 @@ security-contact: admin@parity.io</p>
 <h3 id="setcontenthash-1"><a class="header" href="#setcontenthash-1">setContenthash</a></h3>
 <p>Sets the content hash for a node.</p>
 <p>The caller must own the node in the dotNS registry or be an approved operator,
-otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an
-IPFS CID); the resolver stores them as-is and never interprets the payload. Emits</p>
-<p><strong>Note:</strong>
-emits: ContentHashUpdated on every successful write.</p>
+otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an IPFS
+CID); the resolver stores them as-is and never interprets the payload. An empty <code>hash</code>
+deletes the record: its storage is zeroed and the storage deposit released to the
+signer of the transaction. Emits @custom:emits ContentHashUpdated on every successful
+write.</p>
 <pre><code class="language-solidity">function setContenthash(bytes32 node, bytes calldata hash) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -8956,6 +9642,9 @@ emits: ContentHashUpdated on every successful write.</p>
 </div>
 <h3 id="contenthash-1"><a class="header" href="#contenthash-1">contenthash</a></h3>
 <p>Returns the content hash associated with a node.</p>
+<p>A record reads as unset once the node is cleared (@custom:function
+IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+even though the bytes written before stay in storage.</p>
 <pre><code class="language-solidity">function contenthash(bytes32 node) external view returns (bytes memory hash);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -8972,8 +9661,11 @@ emits: ContentHashUpdated on every successful write.</p>
 <p>Sets a text record for a node.</p>
 <p>The caller must own the node in the dotNS registry or be an approved operator,
 otherwise @custom:reverts NotAuthorised. Text records are arbitrary key/value strings
-(e.g. <code>avatar</code>, <code>url</code>, <code>description</code>). Emits @custom:emits TextUpdated on every
-successful write.</p>
+(e.g. <code>avatar</code>, <code>url</code>, <code>description</code>). An empty <code>value</code> deletes the record: its storage
+is zeroed and the storage deposit released to the signer of the transaction. That also
+works for a key a clear has already hidden, which still holds storage until it is
+deleted. Emits @custom:emits TextUpdated and @custom:emits TextChanged on every
+successful write, a delete included.</p>
 <pre><code class="language-solidity">function setText(bytes32 node, string calldata key, string calldata value) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -8985,6 +9677,9 @@ successful write.</p>
 </div>
 <h3 id="text-1"><a class="header" href="#text-1">text</a></h3>
 <p>Returns a text record for a node.</p>
+<p>A record reads as unset once the node is cleared (@custom:function
+IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+even though the bytes written before stay in storage.</p>
 <pre><code class="language-solidity">function text(bytes32 node, string calldata key) external view returns (string memory value);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -9039,12 +9734,30 @@ idempotent writes that do not change the stored value.</p>
 </div>
 <h3 id="textupdated"><a class="header" href="#textupdated">TextUpdated</a></h3>
 <p>Emitted when a node's text record is updated.</p>
+<p>An indexed string is logged only as its keccak256 hash, so this event lets a consumer
+filter by key but never recover the key. @custom:emits TextChanged is emitted
+alongside it with the key readable.</p>
 <pre><code class="language-solidity">event TextUpdated(bytes32 indexed node, string indexed key, string value);
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node whose text record was updated.</td></tr>
-<tr><td><code>key</code></td><td><code>string</code></td><td>The text record key.</td></tr>
+<tr><td><code>key</code></td><td><code>string</code></td><td>The text record key, logged as its hash.</td></tr>
+<tr><td><code>value</code></td><td><code>string</code></td><td>The new text record value.</td></tr>
+</tbody></table>
+</div>
+<h3 id="textchanged"><a class="header" href="#textchanged">TextChanged</a></h3>
+<p>Emitted with every @custom:emits TextUpdated, carrying the key readably.</p>
+<p>The key appears twice: indexed, as a hash to filter on, and in the data, where an
+indexer can read it and so list the keys a node has set. The shape matches the ENS
+public resolver's <code>TextChanged</code>, so tooling built for it reads this event unchanged.</p>
+<pre><code class="language-solidity">event TextChanged(bytes32 indexed node, string indexed indexedKey, string key, string value);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node whose text record was updated.</td></tr>
+<tr><td><code>indexedKey</code></td><td><code>string</code></td><td>The text record key, logged as its hash.</td></tr>
+<tr><td><code>key</code></td><td><code>string</code></td><td>The text record key, readable.</td></tr>
 <tr><td><code>value</code></td><td><code>string</code></td><td>The new text record value.</td></tr>
 </tbody></table>
 </div>
@@ -9070,7 +9783,7 @@ idempotent writes that do not change the stored value.</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnspopresolver"><a class="header" href="#idotnspopresolver">IDotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopResolver</p>
 <p>Resolver for per-name records produced by the dotNS gateway pallet.</p>
@@ -9227,7 +9940,7 @@ been linked to a personhood name.</p>
 <tr><td><code>length</code></td><td><code>uint256</code></td><td>The length of the payload that was rejected.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsresolver"><a class="header" href="#idotnsresolver">IDotnsResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/resolvers/IDotnsResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Resolver</p>
 <p>Defines forward-resolution address records for dotNS nodes.</p>
@@ -9240,18 +9953,23 @@ security-contact: admin@parity.io</p>
 <p>Sets the resolved address for a node.</p>
 <p>The caller must be the current owner of <code>node</code> in the forward registry, otherwise</p>
 <p><strong>Note:</strong>
-reverts: NotAuthorised. Emits @custom:emits AddressSet on every successful
-write.</p>
+reverts: NotAuthorised. A zero <code>value</code> deletes the record: its storage is zeroed
+and the storage deposit released to the signer of the transaction, which is how an
+owner reclaims it before giving the name up. Emits @custom:emits AddressSet on every
+successful write.</p>
 <pre><code class="language-solidity">function setAddress(bytes32 node, address value) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node identifier.</td></tr>
-<tr><td><code>value</code></td><td><code>address</code></td><td>The address to associate with the node.</td></tr>
+<tr><td><code>value</code></td><td><code>address</code></td><td>The address to associate with the node, or zero to delete the record.</td></tr>
 </tbody></table>
 </div>
 <h3 id="addressof-1"><a class="header" href="#addressof-1">addressOf</a></h3>
 <p>Returns the resolved address for a node.</p>
+<p>A record reads as unset once the node is cleared (@custom:function
+IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+even though the bytes written before stay in storage.</p>
 <pre><code class="language-solidity">function addressOf(bytes32 node) external view returns (address value);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -9286,7 +10004,7 @@ write.</p>
 <tr><td><code>caller</code></td><td><code>address</code></td><td>The address attempting the modification.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsreverseresolver"><a class="header" href="#idotnsreverseresolver">IDotnsReverseResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/resolvers/IDotnsReverseResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Reverse Resolver</p>
 <p>Interface for writing and reading reverse name records for addresses.</p>
@@ -9385,7 +10103,7 @@ when the address no longer owns the name pointed to by the stored record.</p>
 <li><a href="contracts/store/UserStore.sol/contract.UserStore.html">UserStore</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsstore"><a class="header" href="#idotnsstore">IDotnsStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/store/IDotnsStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/store/IDotnsStore.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsStore</p>
 <p>Baseline interface implemented by every per-user dotNS store.</p>
@@ -9410,7 +10128,7 @@ and immutable thereafter.</p>
 <tr><td><code>owner_</code></td><td><code>address</code></td><td>The bound user address.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="ilabelstore"><a class="header" href="#ilabelstore">ILabelStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/store/ILabelStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/store/ILabelStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/ILabelStore.sol//contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></p>
 <p><strong>Title:</strong>
@@ -9659,7 +10377,7 @@ for the same labelhash fails with this error regardless of caller or session.</p
 <tr><td><code>labelhash</code></td><td><code>bytes32</code></td><td>The conflicting labelhash.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="istorefactory"><a class="header" href="#istorefactory">IStoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/store/IStoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/store/IStoreFactory.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IStoreFactory</p>
 <p>Interface for the dotNS per-user store factory.</p>
@@ -9985,7 +10703,7 @@ upgrade.</p>
 <pre><code class="language-solidity">error ImplementationBindingMismatch();
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="iuserstore"><a class="header" href="#iuserstore">IUserStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/store/IUserStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/store/IUserStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="contracts/store/IUserStore.sol//contracts/store/IDotnsStore.sol/interface.IDotnsStore.html">IDotnsStore</a></p>
 <p><strong>Title:</strong>
@@ -10205,7 +10923,7 @@ emits: ValueSet on every successful write.</p>
 <p>Thrown when a zero protocol registry is supplied at initialisation.</p>
 <pre><code class="language-solidity">error InvalidProtocolRegistry(address protocolRegistry);
 </code></pre>
-<h2 id="structs-8"><a class="header" href="#structs-8">Structs</a></h2>
+<h2 id="structs-9"><a class="header" href="#structs-9">Structs</a></h2>
 <h3 id="entry"><a class="header" href="#entry">Entry</a></h3>
 <p>A historical (prior) value for a key and the block timestamp at which it was
 snapshotted. @param value The prior value that was just superseded.</p>
@@ -10220,7 +10938,7 @@ snapshotted. @param value The prior value that was just superseded.</p>
 <tr><td><code>timestamp</code></td><td><code>uint256</code></td><td>Block timestamp at the moment of supersession.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="labelstore"><a class="header" href="#labelstore">LabelStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/store/LabelStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/store/LabelStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, <a href="contracts/store/LabelStore.sol//contracts/store/ILabelStore.sol/interface.ILabelStore.html">ILabelStore</a></p>
 <p><strong>Title:</strong>
@@ -10483,7 +11201,7 @@ registry.</p>
 <pre><code class="language-solidity">function _onlyAuthorisedProtocol() internal view;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="storefactory"><a class="header" href="#storefactory">StoreFactory</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/store/StoreFactory.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/store/StoreFactory.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="contracts/store/StoreFactory.sol//contracts/store/IStoreFactory.sol/interface.IStoreFactory.html">IStoreFactory</a></p>
 <p><strong>Title:</strong>
@@ -10831,7 +11549,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <tr><td><code>slice</code></td><td><code>address[]</code></td><td>Result slice; empty when <code>offset &gt;= source.length</code>.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="userstore"><a class="header" href="#userstore">UserStore</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/store/UserStore.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/store/UserStore.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, <a href="contracts/store/UserStore.sol//contracts/store/IUserStore.sol/interface.IUserStore.html">IUserStore</a></p>
 <p><strong>Title:</strong>
@@ -11108,7 +11826,7 @@ answers with the same "never declared" empty string instead of reverting.</p>
 <li><a href="contracts/utils/SystemUtils.sol/library.SystemUtils.html">SystemUtils</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Constants</p>
 <p>Protocol-level invariants shared across dotNS contracts.</p>
@@ -11119,7 +11837,7 @@ single <code>set</code> on the protocol registry without redeploying consumers. 
 constant here: it is set per network on the protocol registry and read by every consumer.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-7"><a class="header" href="#constants-7">Constants</a></h2>
+<h2 id="constants-8"><a class="header" href="#constants-8">Constants</a></h2>
 <h3 id="revive_system"><a class="header" href="#revive_system">REVIVE_SYSTEM</a></h3>
 <p>Address of revive's System precompile, exposed by every revive runtime
 that opts the precompile in.</p>
@@ -11343,7 +12061,7 @@ forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant NAME_WHITELIST = bytes32("nameWhitelist")
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="labelutils"><a class="header" href="#labelutils">LabelUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/utils/LabelUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/utils/LabelUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Label Utilities Library</p>
 <p>Canonical keccak labelhash and namehash helpers shared by every dotNS contract that
@@ -11460,7 +12178,7 @@ an empty return as a "do not trust this record" signal.</p>
 <tr><td><code>fullName</code></td><td><code>string</code></td><td>Stored full name to strip.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="multicall3-2"><a class="header" href="#multicall3-2">Multicall3</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/utils/Multicall3.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/utils/Multicall3.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 Multicall3</p>
 <p><strong>Authors:</strong>
@@ -11635,7 +12353,7 @@ Michael Elliot, Joshua Levine, Nick Johnson, Andreas Bigger, Matt Solomon</p>
 <p>Returns the chain id.</p>
 <pre><code class="language-solidity">function getChainId() public view returns (uint256 chainid);
 </code></pre>
-<h2 id="structs-9"><a class="header" href="#structs-9">Structs</a></h2>
+<h2 id="structs-10"><a class="header" href="#structs-10">Structs</a></h2>
 <h3 id="call"><a class="header" href="#call">Call</a></h3>
 <pre><code class="language-solidity">struct Call {
     address target;
@@ -11664,7 +12382,7 @@ Michael Elliot, Joshua Levine, Nick Johnson, Andreas Bigger, Matt Solomon</p>
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="registrationutils"><a class="header" href="#registrationutils">RegistrationUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/utils/RegistrationUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Registration Utilities Library</p>
 <p>Single canonical implementation of the "mint + forward-registry + store-write"
@@ -11747,7 +12465,7 @@ conventions change, the change lands here.</p>
     view
     returns (Siblings memory siblings);
 </code></pre>
-<h2 id="structs-10"><a class="header" href="#structs-10">Structs</a></h2>
+<h2 id="structs-11"><a class="header" href="#structs-11">Structs</a></h2>
 <h3 id="registrationcontext"><a class="header" href="#registrationcontext">RegistrationContext</a></h3>
 <p>Inputs describing a single name registration.</p>
 <p>Passed as a struct so callers do not have to thread a growing positional
@@ -11782,7 +12500,7 @@ callers; kept in memory for the lifetime of one <code>registerAndStore</code>.</
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="storeauth"><a class="header" href="#storeauth">StoreAuth</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/utils/StoreAuth.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/utils/StoreAuth.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 StoreAuth</p>
 <p>Decides which protocol components may act on a user's store.</p>
@@ -11836,7 +12554,7 @@ controller on a registration or a gateway name, and the registry on a subname.</
 <tr><td><code>authorised</code></td><td><code>bool</code></td><td>True if <code>caller</code> is the registrar, an authorised controller, or the registry.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="storeutils"><a class="header" href="#storeutils">StoreUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/utils/StoreUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/utils/StoreUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Store Utilities Library</p>
 <p>Canonical helpers for protocol writes into per-user <code>LabelStore</code> instances.</p>
@@ -11909,14 +12627,14 @@ re-registration by a previous holder, and a transfer back to one, working.</p>
 <tr><td><code>existing</code></td><td><code>string</code></td><td>The label already stored under <code>labelhash</code>.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="stringutils"><a class="header" href="#stringutils">StringUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/utils/StringUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/utils/StringUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 String Utilities Library</p>
 <p>Provides string manipulation utilities for dotNS contracts.</p>
 <p>Extends OpenZeppelin's Strings library with additional UTF-8 and conversion helpers.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
-<h2 id="constants-8"><a class="header" href="#constants-8">Constants</a></h2>
+<h2 id="constants-9"><a class="header" href="#constants-9">Constants</a></h2>
 <h3 id="device_suffix_digits"><a class="header" href="#device_suffix_digits">DEVICE_SUFFIX_DIGITS</a></h3>
 <p>Number of digits in a device name's suffix.</p>
 <p>The count the gateway emits, and an exact requirement here: the separator sits at a
@@ -12212,7 +12930,7 @@ Useful for converting short strings stored in bytes32 back to string type.</p>
 <tr><td><code>&lt;none&gt;</code></td><td><code>string</code></td><td>The extracted string (up to 32 characters).</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="subnodeutils"><a class="header" href="#subnodeutils">SubnodeUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/utils/SubnodeUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/utils/SubnodeUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Subnode Utilities Library</p>
 <p>General-purpose helpers for registering names that live as subnodes of another name,
@@ -12311,7 +13029,7 @@ never treated as the caller's parent. The caller then records each subname throu
 <tr><td><code>parentNode</code></td><td><code>bytes32</code></td><td>Node of a single label registered directly under the TLD.</td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="systemutils"><a class="header" href="#systemutils">SystemUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/utils/SystemUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/utils/SystemUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 SystemUtils</p>
 <p>Shared access to revive's System precompile for dotNS contracts.</p>
@@ -12337,7 +13055,7 @@ rather than reverting on a non-Root origin.</p>
 <li><a href="contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dotnsnamewhitelist"><a class="header" href="#dotnsnamewhitelist">DotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="contracts/whitelist/DotnsNameWhitelist.sol//contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></p>
 <p><strong>Title:</strong>
@@ -12923,7 +13641,7 @@ Normally, this function will use an xref:access.adoc[access control] modifier su
 <pre><code class="language-solidity">function _authorizeUpgrade(address newImplementation) internal override onlyOwner;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="idotnsnamewhitelist"><a class="header" href="#idotnsnamewhitelist">IDotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/08966c8ee9f11ab51972212c8b5e83fa053cdba9/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c13c37d69e4926c9f1c18c6e678e8a0af10c90b7/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsNameWhitelist</p>
 <p>Interface for the pre-launch name whitelist. A name is Open until governance either
@@ -13520,7 +14238,7 @@ grants, revokes, reserves, or retunes a cap.</p>
 <p>Thrown when <code>grantNames</code> is passed more than <code>maxGrantBatch</code> labels.</p>
 <pre><code class="language-solidity">error TooManyLabels();
 </code></pre>
-<h2 id="structs-11"><a class="header" href="#structs-11">Structs</a></h2>
+<h2 id="structs-12"><a class="header" href="#structs-12">Structs</a></h2>
 <h3 id="claim"><a class="header" href="#claim">Claim</a></h3>
 <p>A claim by one beneficiary on one name.</p>
 <p><code>user</code>, <code>status</code> and <code>requestedAt</code> co-locate in one storage slot; <code>submitter</code> takes the
