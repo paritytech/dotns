@@ -97,7 +97,7 @@ The path decides whether the amount is a refundable deposit or nothing at all. E
 
 Registering a name under your own key locks a refundable deposit equal to the name's price. The deposit is bound to the name rather than to you, so it travels with the token on every transfer and unlocks only when the current holder releases the name back to escrow.
 
-A name someone else pays for locks the same deposit, owned by the name's owner: a third party who pays for another wallet's registration gives that owner the deposit, which the owner collects on release. A gateway grant carries no deposit. Refunds draw solely on the per-asset reserve that deposits fund, and a holder's deposit is their money held in trust. The escrow also holds a protocol fee balance from the transfer fees earlier releases charged. Nothing credits or debits it.
+A name someone else pays for locks the same deposit, owned by the name's owner: a third party who pays for another wallet's registration gives that owner the deposit, which the owner collects on release. A gateway grant carries no deposit. Refunds draw solely on the per-asset reserve that deposits fund, and a holder's deposit is their money held in trust. The escrow also holds a protocol fee balance that earlier releases collected from transfer fees and cross-payer registration charges. Nothing credits it, and nothing can spend it until [#354](https://github.com/paritytech/dotns/issues/354) adds a Root withdrawal.
 
 ### Transfers are free
 
@@ -135,7 +135,7 @@ A pricing model's values are fixed for its life: the flat model's deposit, or th
 
 ### What governance controls
 
-Governance chooses a model's values when it deploys one, and the contracts hold them coherent and nothing more: a flat deposit above zero; for the scarcity candidate, D and F above zero, F no greater than D, and D within a ceiling that keeps the multiplication below nine characters from overflowing. Beyond these checks there is no cap on how high or low the amounts go and no limit on how fast they move, so any rate limit or advance notice comes from the governance process rather than from these contracts. Governance also opens or closes the short-name market with the switch, tunes the release cooldown within its one-hour bound, sets the redeem window between 1 and 30 days, and sets the gateway's reservation duration. Root can also move the protocol fee balance out of the escrow. None of these controls lets governance seize, reassign, or destroy a name anyone already holds.
+Governance chooses a model's values when it deploys one, and the contracts hold them coherent and nothing more: a flat deposit above zero; for the scarcity candidate, D and F above zero, F no greater than D, and D within a ceiling that keeps the multiplication below nine characters from overflowing. Beyond these checks there is no cap on how high or low the amounts go and no limit on how fast they move, so any rate limit or advance notice comes from the governance process rather than from these contracts. Governance also opens or closes the short-name market with the switch, tunes the release cooldown within its one-hour bound, sets the redeem window between 1 and 30 days, and sets the gateway's reservation duration. None of these controls lets governance seize, reassign, or destroy a name anyone already holds.
 
 ### Refund ledgers
 
