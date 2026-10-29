@@ -6,7 +6,7 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 
 | # | Issue | Type | Resolves when |
 | :- | :---- | :--- | :------------ |
-| 1 | Deferred LabelStore deployment | Runtime | pallet-revive fixes contract-issues#284 |
+| 1 | Deferred LabelStore deployment | Runtime | pallet-revive charges the storage deposit of Root writes |
 | 2 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
 | 3 | Clearing hides records rather than erasing them | Current implementation | Deliberate; no change planned |
 | 4 | Root-written storage refunds deposits nobody paid | Runtime | pallet-revive fixes contract-issues#284 |
@@ -15,11 +15,11 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 
 **Type:** runtime limitation.
 
-A gateway-path issuance runs under Root, and every storage slot a Root dispatch writes records a deposit that pallet-revive never charges ([issue 4](#4-root-written-storage-refunds-deposits-nobody-paid)). Deploying the user's `LabelStore` at that moment would add a whole contract of such slots, so the controller stamps a pending-claim entry instead, and the user settles it later by calling `claimLabelStore` from their own address. Settlement is permissionless: `settlePendingClaims` lets anyone settle a given owner's entries and pay the cost, and settlement always writes the label, so a pending name is never stranded.
+A gateway-path issuance runs under Root, and every storage slot a Root dispatch writes records a deposit that pallet-revive never charges (see [Root-written storage refunds deposits nobody paid](#4-root-written-storage-refunds-deposits-nobody-paid)). Deploying the user's `LabelStore` at that moment would add a whole contract of such slots, so the controller stamps a pending-claim entry instead, and the user settles it later by calling `claimLabelStore` from their own address. Settlement is permissionless: `settlePendingClaims` lets anyone settle a given owner's entries and pay the cost, and settlement always writes the label, so a pending name is never stranded.
 
 **Workaround:** `claimLabelStore` (user-signed) settles a bounded batch of the caller's pending claims, deploying the store on the first write; the caller calls it again while it reports `moreRemaining`.
 
-**Resolution:** once pallet-revive charges the deposit for Root writes ([contract-issues#284](https://github.com/paritytech/contract-issues/issues/284)), the controller can deploy the store at issuance, the deferred path collapses to a no-op, and issuance becomes one transaction end-to-end.
+**Resolution:** once pallet-revive charges the deposit for Root writes, the controller can deploy the store at issuance, the deferred path collapses to a no-op, and issuance becomes one transaction end-to-end.
 
 See [README → DotnsPopController](./README.md#early-testnet-quirk-labelstore-deployment).
 
