@@ -68,8 +68,7 @@ library DotnsConstants {
     uint256 internal constant MAX_PAGE_SIZE = 200;
 
     /// @notice Default per-name live-claim cap the name whitelist starts with.
-    /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_CLAIMANTS_LIMIT`. Leaves
-    ///      a quarter of a governance call's weight spare when a grant clears every claim.
+    /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_CLAIMANTS_LIMIT`.
     uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 24;
 
     /// @notice Default claim-reason byte cap the name whitelist starts with.
@@ -77,8 +76,6 @@ library DotnsConstants {
     uint256 internal constant WHITELIST_DEFAULT_MAX_REASON_BYTES = 256;
 
     /// @notice Upper bound on the whitelist live-claim cap.
-    /// @dev The most claims, each with a reason of `WHITELIST_MAX_REASON_LIMIT` bytes, that one
-    ///      grant can clear within a governance call's weight on Asset Hub.
     uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 32;
 
     /// @notice Upper bound on the whitelist reason byte cap.
@@ -86,12 +83,9 @@ library DotnsConstants {
 
     /// @notice Default cap on labels granted in one `grantNames` call.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_GRANT_BATCH_LIMIT`.
-    ///      Leaves a quarter of a governance call's weight spare.
     uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 32;
 
     /// @notice Upper bound on the `grantNames` batch cap.
-    /// @dev The most uncontested names one `grantNames` call can grant within a governance call's
-    ///      weight on Asset Hub.
     uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 40;
 
     /// @notice Well-known key the protocol registry is registered under, itself.
