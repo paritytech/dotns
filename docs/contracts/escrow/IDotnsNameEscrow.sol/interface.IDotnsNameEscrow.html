@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/da7dc3703ae1e5626edef6d8232858f5f28bd340/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/252eb321fbeabf765be37b3785a85456d5f11d06/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Name Escrow Interface</p>
 <p>Escrows refundable deposits for registered names and manages the release lifecycle.</p>
@@ -278,8 +278,8 @@ into escrow and wait the cooldown. A released position @custom:reverts AlreadyRe
 </div>
 <h3 id="protocolfees"><a class="header" href="#protocolfees">protocolFees</a></h3>
 <p>Returns the protocol fee balance the escrow holds.</p>
-<p>Nothing credits it: it holds the transfer fees collected by earlier implementations.
-Nothing spends it either.</p>
+<p>Nothing credits it: it holds the transfer fees and cross-payer registration charges
+collected by earlier implementations. Nothing spends it either.</p>
 <pre><code class="language-solidity">function protocolFees() external view returns (uint256 balance);
 </code></pre>
 <p><strong>Returns</strong></p>

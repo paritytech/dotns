@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnspopresolver"><a class="header" href="#idotnspopresolver">IDotnsPopResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/da7dc3703ae1e5626edef6d8232858f5f28bd340/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/252eb321fbeabf765be37b3785a85456d5f11d06/contracts/resolvers/IDotnsPopResolver.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsPopResolver</p>
 <p>Resolver for per-name records produced by the dotNS gateway pallet.</p>
@@ -202,9 +202,11 @@ resolver-per-record-category convention used by @custom:contract IDotnsContentRe
 <li>
 <p>contract: IDotnsReverseResolver.
 Write authorisation is delegated to the address registered as
-<code>DotnsProtocolRegistry.POP_CONTROLLER</code> at call time, so rotating the PoP
-controller is a single <code>set</code> on the protocol registry with no resolver
-upgrade required.</p>
+<code>DotnsProtocolRegistry.POP_CONTROLLER</code> at call time, so this resolver needs no upgrade
+when that key changes. The same key decides soulbinding in the registrar, and the numeric
+device containers stay owned by the controller that minted them. Containers are soulbound
+and cannot move, so a controller at a new address could not issue device names under
+them: change the PoP controller by upgrading it behind its proxy.</p>
 </li>
 <li>
 <p>security-contact: admin@parity.io</p>

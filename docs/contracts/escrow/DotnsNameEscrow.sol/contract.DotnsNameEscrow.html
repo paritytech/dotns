@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/da7dc3703ae1e5626edef6d8232858f5f28bd340/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/252eb321fbeabf765be37b3785a85456d5f11d06/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a></p>
 <p><strong>Title:</strong>
@@ -252,8 +252,9 @@ release-to-reclaim boundary is <code>redeemWindow</code>, a separate and longer 
 </code></pre>
 <h3 id="protocolfees"><a class="header" href="#protocolfees">protocolFees</a></h3>
 <p>Protocol fee balance held by the escrow.</p>
-<p>Holds the transfer fees collected by earlier implementations. Nothing credits or
-debits it, and refunds draw solely on the per-asset reserve.</p>
+<p>Holds the transfer fees and cross-payer registration charges collected by earlier
+implementations. Nothing credits or debits it, and refunds draw solely on the
+per-asset reserve.</p>
 <pre><code class="language-solidity">uint256 public protocolFees
 </code></pre>
 <h3 id="_pendingwithdrawals"><a class="header" href="#_pendingwithdrawals">_pendingWithdrawals</a></h3>
