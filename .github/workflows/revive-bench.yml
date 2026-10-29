@@ -50,11 +50,13 @@ jobs:
         if: matrix.target == 'build'
 
       - name: Run benchmark
+        env:
+          FAIL_AT: ${{ inputs.fail-at || '90' }}
         run: |
           bun scripts/bench/revive-bench.mjs \
             --network ${{ matrix.network }} \
             ${{ matrix.target == 'build' && '--build' || '' }} \
-            --fail-at ${{ inputs.fail-at || '90' }} \
+            --fail-at "$FAIL_AT" \
             --json revive-bench-${{ matrix.network }}-${{ matrix.target }}.json
 
       - uses: actions/upload-artifact@v4

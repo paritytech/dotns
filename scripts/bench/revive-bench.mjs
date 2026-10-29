@@ -110,6 +110,7 @@ const { values: args } = parseArgs({
 const net = NETWORKS[args.network];
 if (!net) throw new Error(`--network must be one of ${Object.keys(NETWORKS).join(", ")}`);
 const failAt = Number(args["fail-at"]);
+if (!(failAt > 0)) throw new Error(`--fail-at must be a positive percentage, got ${args["fail-at"]}`);
 
 const repo = path.resolve(import.meta.dirname, "../..");
 const manifest = JSON.parse(fs.readFileSync(path.join(repo, net.manifest), "utf8"));
