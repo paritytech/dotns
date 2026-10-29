@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/bc0ec299f08866d873956ab487057dca4b073a53/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/61da422c7a37e9859a3d93cab79a352ef3d4b744/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Constants</p>
 <p>Protocol-level invariants shared across dotNS contracts.</p>
@@ -260,8 +260,7 @@ and callers page through larger sets with <code>offset</code>.</p>
 </code></pre>
 <h3 id="whitelist_default_max_claimants"><a class="header" href="#whitelist_default_max_claimants">WHITELIST_DEFAULT_MAX_CLAIMANTS</a></h3>
 <p>Default per-name live-claim cap the name whitelist starts with.</p>
-<p>Governance retunes it on the whitelist within <code>WHITELIST_MAX_CLAIMANTS_LIMIT</code>. Leaves
-a quarter of a governance call's weight spare when a grant clears every claim.</p>
+<p>Governance retunes it on the whitelist within <code>WHITELIST_MAX_CLAIMANTS_LIMIT</code>.</p>
 <pre><code class="language-solidity">uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 24
 </code></pre>
 <h3 id="whitelist_default_max_reason_bytes"><a class="header" href="#whitelist_default_max_reason_bytes">WHITELIST_DEFAULT_MAX_REASON_BYTES</a></h3>
@@ -271,8 +270,6 @@ a quarter of a governance call's weight spare when a grant clears every claim.</
 </code></pre>
 <h3 id="whitelist_max_claimants_limit"><a class="header" href="#whitelist_max_claimants_limit">WHITELIST_MAX_CLAIMANTS_LIMIT</a></h3>
 <p>Upper bound on the whitelist live-claim cap.</p>
-<p>The most claims, each with a reason of <code>WHITELIST_MAX_REASON_LIMIT</code> bytes, that one
-grant can clear within a governance call's weight on Asset Hub.</p>
 <pre><code class="language-solidity">uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 32
 </code></pre>
 <h3 id="whitelist_max_reason_limit"><a class="header" href="#whitelist_max_reason_limit">WHITELIST_MAX_REASON_LIMIT</a></h3>
@@ -281,14 +278,11 @@ grant can clear within a governance call's weight on Asset Hub.</p>
 </code></pre>
 <h3 id="whitelist_default_max_grant_batch"><a class="header" href="#whitelist_default_max_grant_batch">WHITELIST_DEFAULT_MAX_GRANT_BATCH</a></h3>
 <p>Default cap on labels granted in one <code>grantNames</code> call.</p>
-<p>Governance retunes it on the whitelist within <code>WHITELIST_MAX_GRANT_BATCH_LIMIT</code>.
-Leaves a quarter of a governance call's weight spare.</p>
+<p>Governance retunes it on the whitelist within <code>WHITELIST_MAX_GRANT_BATCH_LIMIT</code>.</p>
 <pre><code class="language-solidity">uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 32
 </code></pre>
 <h3 id="whitelist_max_grant_batch_limit"><a class="header" href="#whitelist_max_grant_batch_limit">WHITELIST_MAX_GRANT_BATCH_LIMIT</a></h3>
 <p>Upper bound on the <code>grantNames</code> batch cap.</p>
-<p>The most uncontested names one <code>grantNames</code> call can grant within a governance call's
-weight on Asset Hub.</p>
 <pre><code class="language-solidity">uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 40
 </code></pre>
 <h3 id="protocol_registry"><a class="header" href="#protocol_registry">PROTOCOL_REGISTRY</a></h3>
