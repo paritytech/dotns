@@ -6,7 +6,7 @@ pragma solidity ^0.8.34;
 /// @notice Governance calls on the PoP controller: revoking a name it issued, and evicting a
 /// personhood name's reservation queue.
 /// @dev Kept apart from @custom:contract IDotnsPopController so the interface id that one
-/// reports through ERC-165 stays the same. The controller reports both. Both calls are
+/// reports through ERC-165 stays the same. The controller reports both. All three calls are
 /// Root-gated, read no `msg.sender` (see SystemUtils.originIsRoot), and revert with
 /// @custom:reverts IDotnsPopController.NotRoot outside a Root origin.
 /// @custom:security-contact admin@parity.io
