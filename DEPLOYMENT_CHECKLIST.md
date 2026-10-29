@@ -197,12 +197,12 @@ done
 
 - [ ] Containers `00` to `99` exist and are owned by `DotnsPopController`.
 
-`popController` must only ever point at this `DotnsPopController` proxy. The registrar marks every
-name minted by the address under that key as soulbound, so any contract registered there can lock
-names. The containers are soulbound to the controller that minted them, so pointing the key at a
-new controller would leave it unable to issue device names. Change the controller by upgrading it
-behind its proxy, and leave the key as it is. A repoint affects future mints only: names already
-marked stay soulbound.
+The `popController` key (`POP_CONTROLLER`) must only ever point at this `DotnsPopController` proxy.
+The registrar marks every name minted by the address under that key as soulbound, so any contract
+registered there can lock names. The containers are soulbound to the controller that minted them, so
+pointing the key at a new controller would leave it unable to issue device names. Change the
+controller by upgrading it behind its proxy, and leave the key as it is. A repoint affects future
+mints only: names already marked stay soulbound.
 
 ## Upgrading a live network
 

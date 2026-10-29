@@ -83,8 +83,9 @@ contract DotnsNameEscrow is
     mapping(uint256 tokenId => uint256 indexPlusOne) private _releasedIndexPlusOne;
 
     /// @notice Protocol fee balance held by the escrow.
-    /// @dev Holds the transfer fees collected by earlier implementations. Nothing credits or
-    ///      debits it, and refunds draw solely on the per-asset reserve.
+    /// @dev Holds the transfer fees and cross-payer registration charges collected by earlier
+    ///      implementations. Nothing credits or debits it, and refunds draw solely on the
+    ///      per-asset reserve.
     uint256 public protocolFees;
 
     /// @notice Pull-payment ledger storing each recipient's claimable refund balance.
