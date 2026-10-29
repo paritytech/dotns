@@ -42,9 +42,10 @@ interface IDotnsPopGovernance {
     /// linked subnames are cleared and it can be issued again; a personhood name can also be
     /// registered on the public path, under the usual rules. A pending claim for the label stays
     /// in the holder's queue and is dropped without a write when it is settled
-    /// (@custom:function IDotnsPopController.settlePendingClaims). The gateway pallet's own record
-    /// of the account's names is not on this chain, so governance updates it in the same
-    /// dispatch. Revoking a device name leaves its holder's personhood reservation in place,
+    /// (@custom:function IDotnsPopController.settlePendingClaims). The gateway pallet keeps its
+    /// own record of the account's names and its alias, and has no call that clears them, so the
+    /// pallet keeps rejecting that account and person for a new personhood name (KNOWN_ISSUES.md
+    /// issue 5). Revoking a device name leaves its holder's personhood reservation in place,
     /// because the reservation does not depend on it; @custom:function evictReservation removes
     /// it when governance wants that too. Emits @custom:emits IssuedNameRevoked.
     /// @param label The bare label without the TLD, for example `joseph.42` or `josephine`.

@@ -10,6 +10,7 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 | 2 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
 | 3 | Clearing hides records rather than erasing them | Current implementation | Deliberate; no change planned |
 | 4 | Root-written storage refunds deposits nobody paid | Runtime | pallet-revive fixes contract-issues#284 |
+| 5 | A revoked personhood holder stays registered in the gateway pallet | Gateway pallet | The gateway pallet gains a Root call that clears an account's names and alias |
 
 ## 1. Deferred LabelStore deployment
 
@@ -58,3 +59,13 @@ pallet-revive records a storage deposit for a slot written under a Root dispatch
 The registrar owns transferability. A name is marked soulbound at mint when the caller is the address registered under POP_CONTROLLER, so only the gateway path can issue a soulbound name and no other controller can lock a public one. The registrar reads the key at every mint, so whatever it names can mint soulbound names: it must only ever point at the PoP controller. Repointing it affects future mints only, since names already marked stay soulbound. The marker is set once and cleared only when governance revokes the name, and isSoulbound reports it. The transfer hook rejects every transfer of a soulbound name, including a move to the holder's own address and a release into escrow, so a gateway-issued name can never be moved out of its holder's wallet. Only a governance revocation ends the holding, by burning the name. Only the mint is exempt, because the marker is set just after it.
 
 **Resolution:** a pallet-revive fix for contract-issues#284. Nothing in the contracts depends on the drift, so the fix lands without a contract change.
+
+## 5. A revoked personhood holder stays registered in the gateway pallet
+
+**Type:** gateway pallet limitation.
+
+The dotNS gateway pallet keeps its own record of the names each account holds (`AccountNames`) and of each person's alias. Its only calls are `reserve_name`, `register_name`, the allowance calls and `set_dispatcher_address`, so nothing can update or clear those records. Governance revocation clears everything the contracts hold about a name (see [README → Revoking a name](./README.md#revoking-a-name)), but the pallet's records stay. The pallet then rejects that account with `AccountAlreadyRegistered` and that person with `AliasAlreadyRegistered`, so a revoked personhood holder cannot get a personhood name through the gateway again, under the same account or another one.
+
+**Workaround:** none in the contracts. The revoked name itself is free again and can be issued to someone else or registered on the public path.
+
+**Resolution:** a Root call in the gateway pallet that clears an account's names and alias, dispatched in the same governance batch as the revocation.
