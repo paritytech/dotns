@@ -171,6 +171,12 @@ contract DotnsRevocationTest is BaseDotns {
     // Revoking a public name
 
     function test_revoke_burns_the_name_and_clears_everything_beneath_it() public {
+        assertEq(
+            dotnsReverseResolver.nameOf(ed),
+            string.concat(LABEL, ".dot"),
+            "fixture sets the holder's reverse record"
+        );
+
         vm.expectEmit(true, true, true, true, address(dotnsNameEscrow));
         emit IDotnsNameEscrow.RefundWithdrawn(tokenId, ed, address(0), deposit);
         vm.expectEmit(true, true, false, false, address(dotnsNameEscrow));
@@ -190,6 +196,7 @@ contract DotnsRevocationTest is BaseDotns {
         _assertGone(node, "name");
         _assertGone(childNode, "child");
         _assertGone(grandchildNode, "grandchild");
+        assertEq(dotnsReverseResolver.nameOf(ed), "", "reverse record reads empty after revoke");
     }
 
     function test_revoke_refunds_the_deposit_to_the_holder_at_once() public {
@@ -235,6 +242,11 @@ contract DotnsRevocationTest is BaseDotns {
         assertEq(dotnsRegistrar.labelOf(tokenId), LABEL, "label store entry still matches");
         _assertRecordsUnset(node, "name");
         _assertGone(childNode, "child");
+        assertEq(
+            dotnsReverseResolver.nameOf(ed),
+            string.concat(LABEL, ".dot"),
+            "reverse record shows the name again"
+        );
     }
 
     function test_revoke_reaches_a_released_name_and_ends_its_redeem_window() public {
