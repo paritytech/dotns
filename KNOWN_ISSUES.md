@@ -6,7 +6,7 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 
 | # | Issue | Type | Resolves when |
 | :- | :---- | :--- | :------------ |
-| 1 | Deferred LabelStore deployment | Runtime | Runtime allows root-origin contract deployment |
+| 1 | Deferred LabelStore deployment | Runtime | pallet-revive charges the storage deposit of Root writes |
 | 2 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
 | 3 | Clearing hides records rather than erasing them | Current implementation | Deliberate; no change planned |
 | 4 | Root-written storage refunds deposits nobody paid | Runtime | pallet-revive fixes contract-issues#284 |
@@ -15,11 +15,11 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 
 **Type:** runtime limitation.
 
-Substrate Root cannot deploy a contract on behalf of an account it does not control, so a per-user `LabelStore` cannot be created at the moment a gateway-path issuance writes the name. The controller stamps a pending-claim entry instead, and the user settles it later by calling `claimLabelStore` from their own address. Settlement is permissionless: `settlePendingClaims` lets anyone settle a given owner's entries and pay the cost, and settlement always writes the label, so a pending name is never stranded.
+A gateway-path issuance runs under Root, and every storage slot a Root dispatch writes records a deposit that pallet-revive never charges (see [Root-written storage refunds deposits nobody paid](#4-root-written-storage-refunds-deposits-nobody-paid)). Deploying the user's `LabelStore` at that moment would add a whole contract of such slots, so the controller stamps a pending-claim entry instead, and the user settles it later by calling `claimLabelStore` from their own address. Settlement is permissionless: `settlePendingClaims` lets anyone settle a given owner's entries and pay the cost, and settlement always writes the label, so a pending name is never stranded.
 
 **Workaround:** `claimLabelStore` (user-signed) settles a bounded batch of the caller's pending claims, deploying the store on the first write; the caller calls it again while it reports `moreRemaining`.
 
-**Resolution:** when the runtime supports root-origin contract deployment, the deferred path collapses to a no-op and issuance becomes one transaction end-to-end.
+**Resolution:** once pallet-revive charges the deposit for Root writes, the controller can deploy the store at issuance, the deferred path collapses to a no-op, and issuance becomes one transaction end-to-end.
 
 See [README → DotnsPopController](./README.md#early-testnet-quirk-labelstore-deployment).
 
@@ -55,6 +55,6 @@ See [README → Clearing records and subnames](./README.md#clearing-records-and-
 
 pallet-revive records a storage deposit for a slot written under a Root dispatch but never charges it ([contract-issues#284](https://github.com/paritytech/contract-issues/issues/284)). When a signed transaction later zeroes that slot, the refund is paid out of deposits other users made to the same contract on Asset Hub Paseo and Polkadot, and the call reverts on a runtime without that deposit backend, such as Asset Hub Kusama. The reverse also holds: a slot a user paid for and Root zeroes refunds nobody.
 
-In dotNS, Root writes the registry record, the registrar state and the escrow position of every name it mints. Gateway-issued names are soulbound and never released, but reserved names minted by governance can be, and their release and reclaim zero some of those slots, so the refund is funded by other users' deposits. The record and subname deletes in [issue 3](#3-clearing-hides-records-rather-than-erasing-them) only zero slots their owner wrote, never Root-written ones.
+In dotNS, Root writes the registry record, the registrar state and the escrow position of every name it mints, and the label in the owner's `LabelStore` when they have one. A Root `registerReserved` for an owner with no store also deploys it; the gateway defers it (see [Deferred LabelStore deployment](#1-deferred-labelstore-deployment)). Gateway-issued names are soulbound and never released, but reserved names minted by governance can be, and their release and reclaim zero some of those slots, so the refund is funded by other users' deposits. The record and subname deletes in [issue 3](#3-clearing-hides-records-rather-than-erasing-them) only zero slots their owner wrote, never Root-written ones.
 
 **Resolution:** a pallet-revive fix for contract-issues#284. Nothing in the contracts depends on the drift, so the fix lands without a contract change.

@@ -19,8 +19,8 @@ interface IDotnsPricing {
 
     /// @notice Returns the registration cost in wei for a label of the given base length.
     /// @dev Pure amount lookup: the caller supplies the base length and the model
-    ///      returns the curve value for it. Runs on the ERC721 transfer floor read, so it stays a
-    ///      view with no state writes.
+    ///      returns the curve value for it. PopRules reads it from its pricing views, so it stays
+    ///      a view with no state writes.
     /// @param baseLength Base length of the label being priced: its length as written, less a
     ///        device name's suffix.
     /// @return weiPrice Registration cost in wei for that base length.

@@ -138,9 +138,10 @@ contract DotnsRegistrar is
         // here with the typed error so callers do not see OZ's `ERC721InvalidSender(0)`.
         require(!_exists(id), NameNotAvailable(id));
         require(owner != protocolRegistry.get(DotnsConstants.NAME_ESCROW), InvalidOwner());
-        // Empty labels are an intentional gateway-cold path (substrate Root cannot deploy a
-        // `LabelStore` under `pallet-revive`, so the controller stashes a pending claim and the
-        // user settles via @custom:function IDotnsPopController.claimLabelStore later). Non-empty
+        // Empty labels are an intentional gateway-cold path (the controller defers the user's
+        // `LabelStore` because Root writes record a storage deposit `pallet-revive` never charges,
+        // so it stashes a pending claim and the user settles via
+        // @custom:function IDotnsPopController.claimLabelStore later). Non-empty
         // labels must still be canonical, since every transfer mirrors the label into the new
         // holder's store and @custom:function labelOf reads it back.
         require(bytes(label).length == 0 || label.isSingleLabel(), InvalidLabel());
