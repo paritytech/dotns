@@ -19,9 +19,11 @@ pragma solidity ^0.8.34;
 ///      @custom:contract IDotnsReverseResolver.
 ///
 ///      Write authorisation is delegated to the address registered as
-///      `DotnsProtocolRegistry.POP_CONTROLLER` at call time, so rotating the PoP
-///      controller is a single `set` on the protocol registry with no resolver
-///      upgrade required.
+///      `DotnsProtocolRegistry.POP_CONTROLLER` at call time, so this resolver needs no upgrade
+///      when that key changes. The same key decides soulbinding in the registrar, and the numeric
+///      device containers stay owned by the controller that minted them. Containers are soulbound
+///      and cannot move, so a controller at a new address could not issue device names under
+///      them: change the PoP controller by upgrading it behind its proxy.
 /// @custom:security-contact admin@parity.io
 interface IDotnsPopResolver {
     /// @notice Emitted when a node's chat key is set or updated.

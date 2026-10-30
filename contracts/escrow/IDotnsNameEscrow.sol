@@ -284,8 +284,8 @@ interface IDotnsNameEscrow {
     function rebindPosition(uint256 tokenId, address to) external;
 
     /// @notice Returns the protocol fee balance the escrow holds.
-    /// @dev Nothing credits it: it holds the transfer fees collected by earlier implementations.
-    ///      Nothing spends it either.
+    /// @dev Nothing credits it: it holds the transfer fees and cross-payer registration charges
+    ///      collected by earlier implementations. Nothing spends it either.
     /// @return balance Current protocol fee balance, in wei.
     function protocolFees() external view returns (uint256 balance);
 
