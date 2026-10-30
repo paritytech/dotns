@@ -4,6 +4,7 @@ pragma solidity ^0.8.34;
 import {BaseDotns, IDotnsRegistrarController} from "../base/BaseDotns.t.sol";
 import {IDotnsNameWhitelist} from "../../contracts/whitelist/IDotnsNameWhitelist.sol";
 import {IDotnsPopController} from "../../contracts/registrars/IDotnsPopController.sol";
+import {IDotnsPopGovernance} from "../../contracts/registrars/IDotnsPopGovernance.sol";
 import {IPopRules} from "../../contracts/pop/IPopRules.sol";
 import {IDotnsNameEscrow} from "../../contracts/escrow/IDotnsNameEscrow.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
@@ -482,6 +483,80 @@ contract NameGrantFlow is BaseDotns {
 
         (address holder,) = popRules.getBaseNameReservation(nameLabel);
         assertEq(holder, leonardo, "a reservation the previous holder did not own survives");
+    }
+
+    /// @dev Revoking frees a name at once, so a commitment that matured before the referendum
+    ///      could take it. A grant in the same batch keeps it for the grantee.
+    function test_a_grant_batched_with_a_revoke_keeps_the_name_for_the_grantee() public {
+        string memory nameLabel = "revokedgrant";
+        uint256 tokenId = _tokenIdForLabel(nameLabel);
+        _commitAndRegister(nameLabel, tiago, false);
+        (IDotnsRegistrarController.Registration memory squat, uint256 price) =
+            _commitPaidRegistration(nameLabel, leonardo);
+
+        _mockOriginIsRoot(true);
+        dotnsRegistrar.revoke(tokenId);
+        dotnsNameWhitelist.grantName(nameLabel, ed);
+        _mockOriginIsRoot(false);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsRegistrarController.NameGranted.selector, nameLabel)
+        );
+        vm.prank(leonardo);
+        dotnsRegistrarController.register{value: price}(squat);
+
+        _registerReserved(nameLabel, ed, ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(tokenId), ed);
+    }
+
+    /// @dev A revoked personhood name goes to the grantee too, as a transferable name: the
+    ///      gateway refuses it to everyone else.
+    function test_a_grant_batched_with_a_revoke_takes_a_personhood_name_off_the_gateway() public {
+        string memory nameLabel = "revokedperson";
+        uint256 tokenId = _tokenIdForLabel(nameLabel);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: nameLabel, user: tiago, link: _linkFresh(_validChatKey(0x61))
+            })
+        );
+
+        _mockOriginIsRoot(true);
+        IDotnsPopGovernance(address(dotnsPopController)).revokeName(nameLabel);
+        dotnsNameWhitelist.grantName(nameLabel, ed);
+        _mockOriginIsRoot(false);
+
+        vm.expectRevert(IDotnsPopController.PersonhoodNameUnavailable.selector);
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: nameLabel, user: leonardo, link: _linkFresh(_validChatKey(0x62))
+            })
+        );
+
+        _registerReserved(nameLabel, ed, ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(tokenId), ed);
+        assertFalse(dotnsRegistrar.isSoulbound(tokenId));
+    }
+
+    /// @dev A grant leaves an existing reservation queue in place. Evicting the queue in the same
+    ///      batch frees the base name at once.
+    function test_an_eviction_batched_with_a_grant_frees_the_base_name() public {
+        string memory nameLabel = "evictedqueue";
+        _rootReservePersonhoodName(
+            IDotnsPopController.PersonhoodNameReservation({label: nameLabel, user: tiago})
+        );
+
+        _mockOriginIsRoot(true);
+        dotnsNameWhitelist.grantName(nameLabel, ed);
+        IDotnsPopGovernance(address(dotnsPopController)).evictReservations(nameLabel);
+        _mockOriginIsRoot(false);
+
+        (bool reserved,) = dotnsPopController.isReservedForClaim(nameLabel);
+        assertFalse(reserved);
+        (address holder,) = popRules.getBaseNameReservation(nameLabel);
+        assertEq(holder, address(0));
+
+        _registerReserved(nameLabel, ed, ed);
+        assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(nameLabel)), ed);
     }
 
     /// @notice Reclaims `nameLabel` through `registerReserved` while the previous holder still
