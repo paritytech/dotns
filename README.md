@@ -359,7 +359,7 @@ Addresses are recorded per network in `deployments/<network>/<chain-id>.json`, a
 
 ### Build and test
 
-Builds and tests are run with Foundry. Fork tests use the local Paseo Asset Hub adapter described in [DEPLOYMENTS.md](./DEPLOYMENTS.md); ordinary unit, fuzz, and invariant tests run against Foundry's in-process EVM.
+Builds and tests are run with Foundry. Fork tests use the local Paseo Asset Hub adapter described in [DEPLOYMENTS.md](./DEPLOYMENTS.md); ordinary unit, fuzz, and invariant tests run against Foundry's in-process EVM. A weekly benchmark measures the critical paths on pallet-revive against live Asset Hub state; see [CONTRIBUTING.md](./CONTRIBUTING.md#pallet-revive-benchmark).
 
 ## Security
 

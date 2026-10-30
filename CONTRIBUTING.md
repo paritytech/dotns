@@ -271,6 +271,17 @@ While a fork test is in flight, skip it with:
 forge test --no-match-path 'test/fork/**'
 ```
 
+### pallet-revive benchmark
+
+Foundry tests run on its in-process EVM, which does not meter weight and proof size the way pallet-revive does. `scripts/bench/revive-bench.mjs` measures the critical paths on pallet-revive itself: gateway issuance, reservations and claims, settlement, `expireReservation`, and the largest governance batches. It dry-runs each one as a Root batch against live Asset Hub state and compares it with the limit it runs under: the gateway's `MaxContractCallWeight`, the extrinsic limit for a user's own call, or the scheduler's limit for a referendum. Nothing is signed or submitted.
+
+```bash
+bun scripts/bench/revive-bench.mjs --network paseo            # contracts live on the network
+forge build && bun scripts/bench/revive-bench.mjs --network paseo --build   # this checkout
+```
+
+`--build` upgrades every proxy and store beacon to the implementations in `out/` inside the same dry run, so a change can be measured before it ships. A path fails above `--fail-at` percent of its limit (90 by default). The `pallet-revive Benchmark` workflow runs both modes on Paseo Asset Hub Next and Polkadot Asset Hub every Monday, and on demand.
+
 ### Cleanup checklist before merging an upgrade PR
 
 1. Delete the upgrade script under `scripts/deploy/`.

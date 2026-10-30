@@ -1,0 +1,67 @@
+name: pallet-revive Benchmark
+
+# Dry-runs the critical dotNS paths on pallet-revive against live Paseo Asset Hub Next and Polkadot
+# Asset Hub state, under the limit each one runs with in production. Read-only: nothing is signed
+# or submitted, and no secret is used. `deployed` measures the contracts live on the network,
+# `build` this checkout's implementations upgraded into the same state.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      fail-at:
+        description: Fail a path above this share of its limit, in percent
+        default: "90"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: revive-bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    name: ${{ matrix.network }} (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        network: [paseo, polkadot]
+        target: [deployed, build]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-foundry
+        if: matrix.target == 'build'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.6"
+          no-cache: true
+
+      # The postinstall (`setup.bash`) fetches `lib/`, which only the build needs.
+      - run: bun install ${{ matrix.target == 'deployed' && '--ignore-scripts' || '' }}
+
+      - run: forge build
+        if: matrix.target == 'build'
+
+      - name: Run benchmark
+        env:
+          FAIL_AT: ${{ inputs.fail-at || '90' }}
+        run: |
+          bun scripts/bench/revive-bench.mjs \
+            --network ${{ matrix.network }} \
+            ${{ matrix.target == 'build' && '--build' || '' }} \
+            --fail-at "$FAIL_AT" \
+            --json revive-bench-${{ matrix.network }}-${{ matrix.target }}.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: revive-bench-${{ matrix.network }}-${{ matrix.target }}
+          path: revive-bench-${{ matrix.network }}-${{ matrix.target }}.json
+          if-no-files-found: ignore

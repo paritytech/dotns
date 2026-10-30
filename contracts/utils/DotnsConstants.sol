@@ -69,26 +69,24 @@ library DotnsConstants {
 
     /// @notice Default per-name live-claim cap the name whitelist starts with.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_CLAIMANTS_LIMIT`.
-    uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 64;
+    uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 24;
 
     /// @notice Default claim-reason byte cap the name whitelist starts with.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_REASON_LIMIT`.
     uint256 internal constant WHITELIST_DEFAULT_MAX_REASON_BYTES = 256;
 
-    /// @notice Upper bound on the whitelist live-claim cap. Caps the claim clear-loop below the
-    ///         block gas limit.
-    uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 128;
+    /// @notice Upper bound on the whitelist live-claim cap.
+    uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 32;
 
     /// @notice Upper bound on the whitelist reason byte cap.
     uint256 internal constant WHITELIST_MAX_REASON_LIMIT = 256;
 
     /// @notice Default cap on labels granted in one `grantNames` call.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_GRANT_BATCH_LIMIT`.
-    uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 100;
+    uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 32;
 
-    /// @notice Upper bound on the `grantNames` batch cap. Bounds one call below the block gas
-    /// limit.
-    uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 256;
+    /// @notice Upper bound on the `grantNames` batch cap.
+    uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 40;
 
     /// @notice Well-known key the protocol registry is registered under, itself.
     /// @dev Not for discovery: the registry is the bootstrap contract every consumer already
