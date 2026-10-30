@@ -16,9 +16,11 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IDotnsPopController} from "./IDotnsPopController.sol";
 import {IDotnsPopControllerLegacy} from "./IDotnsPopControllerLegacy.sol";
+import {IDotnsPopGovernance} from "./IDotnsPopGovernance.sol";
 import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {IDotnsPopResolver} from "../resolvers/IDotnsPopResolver.sol";
+import {IDotnsPopResolverClearing} from "../resolvers/IDotnsPopResolverClearing.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
 import {PopClassification} from "../pop/PopClassification.sol";
 import {IStoreFactory} from "../store/IStoreFactory.sol";
@@ -79,7 +81,8 @@ contract DotnsPopController is
     OwnableUpgradeable,
     ERC165Upgradeable,
     IDotnsPopController,
-    IDotnsPopControllerLegacy
+    IDotnsPopControllerLegacy,
+    IDotnsPopGovernance
 {
     using StringUtils for *;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -156,10 +159,11 @@ contract DotnsPopController is
     mapping(address user => PendingClaim[] queue) internal _pendingClaimQueue;
 
     /// @notice Labels this controller minted, keyed by the bare label without the TLD.
-    /// @dev Provenance, not a transfer rule: written once at mint and never cleared, so it
-    ///      stays true if a name later becomes transferable. Keyed by the label text rather
-    ///      than the node because a reader holding only `joseph.42` cannot derive the node
-    ///      without first deciding whether the separator is part of the label or a subname
+    /// @dev Provenance, not a transfer rule: written at mint and cleared only when the name is
+    ///      revoked (@custom:function revokeName), so it stays true if a name later becomes
+    ///      transferable and turns false once governance takes the name back. Keyed by the label
+    ///      text rather than the node because a reader holding only `joseph.42` cannot derive the
+    ///      node without first deciding whether the separator is part of the label or a subname
     ///      boundary, which is the question it is asking.
     mapping(string label => bool issued) internal _popIssued;
 
@@ -168,7 +172,9 @@ contract DotnsPopController is
     /// issuance in the same container. See @custom:function _registerDeviceSubname. An entry is
     /// never cleared, because a recorded container cannot change hands: the registrar marks a
     /// name minted by this contract soulbound and rejects every transfer of it, release to the
-    /// escrow included, and it has no burn. If a container ever did change hands, the registry's
+    /// escrow included. Nor can it be revoked: the registrar's Root revocation refuses a soulbound
+    /// name, and @custom:function revokeName takes only labels this contract issued, which a
+    /// container is not. If a container ever did change hands, the registry's
     /// own parent check in @custom:function IDotnsRegistry.setSubnodeOwner would still reject
     /// issuance under it.
     mapping(bytes32 parentNode => bool ready) internal _deviceContainers;
@@ -432,6 +438,60 @@ contract DotnsPopController is
         }
     }
 
+    /// @inheritdoc IDotnsPopGovernance
+    function revokeName(string calldata label) external override onlyRoot {
+        bytes32 labelhash = LabelUtils.labelhash(label);
+        require(_popIssued[label], NotPopIssued(labelhash));
+        delete _popIssued[label];
+
+        Deps memory deps;
+        // A device name is the subname `stem` of the container `suffix`; a personhood name is a
+        // second-level name under the TLD.
+        bool isDevice = label.isDeviceLabel();
+        bytes32 parentNode = _tldNodeOf(deps);
+        bytes32 childhash = labelhash;
+        if (isDevice) {
+            (string memory stem, string memory suffix) = StringUtils.splitDeviceLabel(label);
+            parentNode = LabelUtils.namehashUnder(parentNode, LabelUtils.labelhashMemory(suffix));
+            childhash = LabelUtils.labelhashMemory(stem);
+        }
+        bytes32 node = LabelUtils.namehashUnder(parentNode, childhash);
+        address holder = _registryOf(deps).owner(node);
+
+        IDotnsPopResolverClearing(address(_popResolverOf(deps)))
+            .clearRecords(node, isDevice ? labelhash : bytes32(0));
+        if (isDevice) {
+            // This contract holds the container, so it deletes the subname as the parent's owner.
+            _registryOf(deps).deleteSubname(parentNode, childhash);
+        } else {
+            _registrarOf(deps).revokeIssued(uint256(node));
+        }
+
+        emit IssuedNameRevoked(labelhash, holder, label);
+    }
+
+    /// @inheritdoc IDotnsPopGovernance
+    function evictReservations(string calldata label) external override onlyRoot {
+        Deps memory deps;
+        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label, false);
+
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        if (meta.head == meta.tail) return;
+
+        _clearQueue(deps, labelhash);
+        emit ReservationsEvicted(labelhash);
+    }
+
+    /// @inheritdoc IDotnsPopGovernance
+    function evictReservation(address user) external override onlyRoot {
+        UserReservation memory reservation = _userReservations[user];
+        if (reservation.labelhash == bytes32(0) || _isEvicted(reservation)) return;
+
+        Deps memory deps;
+        // Governance runs outside the gateway's weight limit, so it can clear the whole queue.
+        _dropReservation(deps, user, reservation, MAX_RESERVATION_QUEUE);
+    }
+
     /// @inheritdoc IDotnsPopController
     function expireReservation(string calldata label) external override {
         Deps memory deps;
@@ -538,10 +598,15 @@ contract DotnsPopController is
         bytes32 node = label.isDeviceLabelMemory()
             ? _deviceSubnode(deps, label)
             : LabelUtils.namehashUnder(_tldNodeOf(deps), labelhash);
+        // A name revoked since the claim was stashed may already belong to someone else, and a
+        // name revoked and issued to the same user again leaves two entries for one row. Either
+        // entry is dropped without a write or an event, so the log never reports a registration
+        // that did not happen.
+        if (_registryOf(deps).owner(node) != user) return store;
         if (store == address(0)) {
             store = factory.deployLabelStoreFor(user);
         }
-        _writeRecord(store, node, label);
+        if (!_writeRecord(store, node, label)) return store;
         emit PendingClaimSettled(user, labelhash, store, msg.sender);
         emit NameRegistered(label, labelhash, user, store);
         return store;
@@ -689,6 +754,7 @@ contract DotnsPopController is
     {
         return interfaceId == type(IDotnsPopController).interfaceId
             || interfaceId == type(IDotnsPopControllerLegacy).interfaceId
+            || interfaceId == type(IDotnsPopGovernance).interfaceId
             || super.supportsInterface(interfaceId);
     }
 
@@ -780,9 +846,18 @@ contract DotnsPopController is
     /// container, so this is not always `namehash(tldNode, keccak(label))` for the whole label.
     /// @param label Bare label without the TLD, which is appended on write. A device name
     /// carries its separator, so this is not always a single DNS label.
-    function _writeRecord(address store, bytes32 node, string memory label) internal {
-        if (ILabelStore(store).isLocked(node)) return;
+    /// @return written False when the slot was already locked and nothing was written.
+    function _writeRecord(
+        address store,
+        bytes32 node,
+        string memory label
+    )
+        internal
+        returns (bool written)
+    {
+        if (ILabelStore(store).isLocked(node)) return false;
         ILabelStore(store).storeLabel(node, string.concat(label, protocolRegistry.tld()));
+        return true;
     }
 
     /// @notice Appends a deferred binding for `user` and adds them to the enumeration set.
@@ -847,15 +922,17 @@ contract DotnsPopController is
         emit ReservationQueued(labelhash, user, index - meta.head);
     }
 
-    /// @notice Ends the reservation queue for `labelhash` when its head claims the name, and
-    /// releases the corresponding PopRules reservation.
-    /// @dev The claim mints the name, so nothing is left to reserve and PopRules is told the slot
-    /// is free. Every entry, the claimant's and each waiter's, is evicted lazily, so the claim
-    /// costs the same whatever the queue holds: the head moves to the tail, which ends the queue,
-    /// and entries and pointers stay where they are, below the new head.
+    /// @notice Ends the reservation queue for `labelhash` when its head claims the name or
+    /// governance evicts the queue, and releases the corresponding PopRules reservation.
+    /// @dev After a claim the name is minted, and after an eviction nobody is waiting for it, so
+    /// either way nothing is left to reserve and PopRules is told the slot is free. Every entry,
+    /// the claimant's and each waiter's, is evicted lazily, so the call costs the same whatever
+    /// the queue holds: the head moves to the tail, which ends the queue, and entries and pointers
+    /// stay where they are, below the new head.
     /// @custom:function _isEvicted reads such a pointer as no reservation, and the user's next
-    /// reservation clears it. @custom:emits ReservationClaimed, emitted by the caller, therefore
-    /// ends the reservation of every waiter in the queue.
+    /// reservation clears it. The event the caller emits, @custom:emits ReservationClaimed or
+    /// @custom:emits ReservationsEvicted, therefore ends the reservation of every waiter in the
+    /// queue.
     function _clearQueue(Deps memory deps, bytes32 labelhash) internal {
         uint64 tail = _reservationMeta[labelhash].tail;
         _reservationMeta[labelhash] = ReservationQueueMeta({head: tail, tail: tail});

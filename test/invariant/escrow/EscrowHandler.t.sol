@@ -11,6 +11,7 @@ import {DotnsNameEscrow, IDotnsNameEscrow} from "../../../contracts/escrow/Dotns
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IPersonhood} from "../../../contracts/external/personhood/IPersonhood.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
+import {ISystem} from "../../../contracts/external/revive/ISystem.sol";
 
 /// @title Escrow Handler
 /// @notice Handler contract that executes bounded random actions against the escrow.
@@ -51,7 +52,8 @@ contract EscrowHandler is Test {
     /// @notice Label used to register each tokenId; required for re-registration after finalise.
     mapping(uint256 tokenId => string label) public labelByTokenId;
 
-    /// @notice Cumulative native amount credited to recipients via `withdraw()`.
+    /// @notice Cumulative native amount credited to pull-payment balances by `withdraw`,
+    ///         `reclaim` and revocation.
     uint256 public ghost_pendingCredits;
 
     /// @notice Cumulative native amount drained by recipients via `claimWithdrawal()`.
@@ -392,6 +394,53 @@ contract EscrowHandler is Test {
         } catch {
             return;
         }
+    }
+
+    /// @notice Revokes a name under a mocked Root origin, from whichever stage of its lifecycle the
+    ///         seed lands on: held with a deposit, released inside or after its window, or released
+    ///         and withdrawn.
+    /// @dev Revocation settles the position like reclaim does, so any amount still held moves from
+    ///      the reserve to the recipient's pull-payment balance and is mirrored into
+    ///      `ghost_pendingCredits`. The token leaves every list because it no longer exists.
+    /// @param listSeed Seed selecting the deposited, released or withdrawn list.
+    /// @param tokenSeed Seed selecting the token within that list.
+    function revokeName(uint256 listSeed, uint256 tokenSeed) external {
+        uint256[] storage list = listSeed % 3 == 0
+            ? _depositedTokenIds
+            : listSeed % 3 == 1 ? _releasedTokenIds : _withdrawnTokenIds;
+        if (list.length == 0) return;
+
+        uint256 index = tokenSeed % list.length;
+        uint256 tokenId = list[index];
+        uint256 outstanding = escrow.getReleasePosition(tokenId).amount;
+
+        // Restore the default origin on both paths before unwinding. A revert does not undo a
+        // mock, and a sticky Root origin would put a later reserved registration on its Root
+        // branch.
+        _mockOriginIsRoot(true);
+        (bool ok, bytes memory err) =
+            address(registrar).call(abi.encodeCall(registrar.revoke, (tokenId)));
+        _mockOriginIsRoot(false);
+        if (!ok) {
+            assembly {
+                revert(add(err, 32), mload(err))
+            }
+        }
+
+        uint256 lastIndex = list.length - 1;
+        if (index != lastIndex) list[index] = list[lastIndex];
+        list.pop();
+
+        ghost_pendingCredits += outstanding;
+    }
+
+    /// @notice Mocks the revive `originIsRoot()` query to return `returnValue`.
+    function _mockOriginIsRoot(bool returnValue) internal {
+        vm.mockCall(
+            DotnsConstants.REVIVE_SYSTEM,
+            abi.encodeWithSelector(ISystem.originIsRoot.selector),
+            abi.encode(returnValue)
+        );
     }
 
     /// @notice Pulls the caller's accumulated pending refund balance.
