@@ -173,8 +173,10 @@ contract DotnsPopController is
     /// issuance under it.
     mapping(bytes32 parentNode => bool ready) internal _deviceContainers;
 
-    /// @dev Reserved storage space to allow for layout changes in future upgrades.
-    uint256[49] private __gap;
+    /// @dev Reserved storage space to allow for layout changes in future upgrades. The
+    ///      `_popIssued` and `_deviceContainers` mappings consume two of the reserved slots, so
+    ///      the gap holds 48.
+    uint256[48] private __gap;
 
     /// @notice Contract addresses one call reads from the protocol registry, each at most once.
     /// @dev Filled on first use by the `_...Of` getters and passed by reference through the call.
