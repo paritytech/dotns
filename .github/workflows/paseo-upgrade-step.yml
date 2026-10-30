@@ -57,11 +57,19 @@ jobs:
           # Each step names the contracts it upgrades, whose snapshots are checked against the
           # chain right before it broadcasts. Steps that upgrade no proxy name none. Each campaign
           # adds its own steps here, next to its runbook.
+          # A rollback label runs `RollbackProxy` on the proxy it names, and checks no snapshot:
+          # the proxy has moved past its snapshot by then.
+          ROLLBACK_PROXY=""
           case "$SCRIPT" in
             UpgradePopRules) SUBJECTS="PopRules" ;;
             UpgradePopController) SUBJECTS="DotnsPopController" ;;
             UpgradeRegistrarController) SUBJECTS="DotnsRegistrarController" ;;
             SetReservationDuration|PrepareDeviceContainers|DeclareRelease) SUBJECTS="" ;;
+            RollbackPopRules|RollbackDotnsPopController|RollbackDotnsRegistrarController)
+              ROLLBACK_PROXY="${SCRIPT#Rollback}"
+              SCRIPT="RollbackProxy"
+              SUBJECTS=""
+              ;;
             *)
               echo "::error::'$SCRIPT' is not a runbook step; see docs/PASEO-V110-RUNBOOK.md"
               exit 1
@@ -69,6 +77,7 @@ jobs:
           esac
           echo "script=$SCRIPT" >> "$GITHUB_OUTPUT"
           echo "subjects=$SUBJECTS" >> "$GITHUB_OUTPUT"
+          echo "rollback_proxy=$ROLLBACK_PROXY" >> "$GITHUB_OUTPUT"
 
       # The head commit, not the merge ref. A pull_request checkout defaults to the PR merged
       # into its base, and master merged into this branch is not the code that was reviewed or
@@ -84,7 +93,7 @@ jobs:
       - run: bun install
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: ./.github/actions/setup-foundry
 
       # The same adapter the deploy pipeline broadcasts through, pointed at the same node. The
       # hosted gateway has only ever been exercised read-only here, and a broadcast is the wrong
@@ -116,6 +125,8 @@ jobs:
           # Step parameter, configured as an environment variable on `testnet-upgrades`: the
           # release tag `DeclareRelease` declares.
           DOTNS_RELEASE_TAG: ${{ vars.DOTNS_RELEASE_TAG }}
+          # Manifest label of the proxy a rollback label names; empty for every other step.
+          ROLLBACK_PROXY: ${{ steps.step.outputs.rollback_proxy }}
         run: |
           set -euo pipefail
           echo "::add-mask::$ACCOUNT_PASSWORD"

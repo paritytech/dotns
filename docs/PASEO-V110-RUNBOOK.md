@@ -16,7 +16,7 @@ alone.
 | 2 | `UpgradePopController` | Bounds the queue work in every gateway call. Refuses to run before step 1. |
 | 3 | `UpgradeRegistrarController` | Makes names minted through `registerReserved` releasable. |
 | 4 | `SetReservationDuration` | Sets the reservation duration to 30 days. |
-| 5 | `PrepareDeviceContainers` | Prepares containers `00` to `99`, one transaction each. |
+| 5 | `PrepareDeviceContainers` | Mints container `00` and records `01` to `99`, one transaction each. |
 | 6 | `DeclareRelease` | Declares every codehash, then `1.1.0`. Last, always. |
 
 Two dependencies fix the order:
@@ -45,8 +45,8 @@ Run both on the day. Every `*Old.sol` snapshot that has a deployed counterpart m
 implementation deployed now. The fork suite includes `PaseoV110CampaignForkTest`, which runs all
 six steps in order on one fork and ends on a verified `1.1.0` declaration.
 
-The broadcaster owns every proxy and the protocol registry. Each script asserts this before it
-broadcasts.
+The broadcaster owns every proxy and the protocol registry. The upgrade, duration and rollback
+scripts assert this before they broadcast. `prepareDeviceContainer` is permissionless.
 
 ## Broadcasting through the review PR
 
@@ -73,7 +73,8 @@ Setup:
 
 ```bash
 for s in UpgradePopRules UpgradePopController UpgradeRegistrarController \
-  SetReservationDuration PrepareDeviceContainers DeclareRelease; do
+  SetReservationDuration PrepareDeviceContainers DeclareRelease \
+  RollbackPopRules RollbackDotnsPopController RollbackDotnsRegistrarController; do
   gh label create "run:$s" --repo paritytech/dotns --color 4FEF0F \
     --description "Broadcast $s on Paseo (gated)" --force
 done
@@ -84,15 +85,18 @@ done
 ## After each step
 
 Verify from an independent client before the next label. The workflow's green check means the
-transactions landed; it does not read the chain back.
+transactions landed. Reading the chain back is what this checklist is for.
 
 - **Steps 1 to 3:** `cast implementation <proxy>` moved, the owner is unchanged, and one state
   read survives: `price` for a probe name on PopRules, `reservationDuration` and
   `pendingClaimUserCount` on the controller, `minCommitmentAge` on the registrar controller.
 - **Step 1, additionally:** PopRules reports `supportsInterface(type(IPopRules).interfaceId)`.
 - **Step 2, additionally:** the controller answers `MAX_QUEUE_STEPS_PER_CALL()` with `4`.
-- **Step 4:** `reservationDuration()` is `2592000`.
-- **Step 5:** the run logs how many containers it prepared. A second run prepares none.
+- **Step 4:** `reservationDuration()` is `2592000`. Queue entries that expired under the 7-day
+  duration and were never cleared count as live again while they are less than 30 days old. Their
+  names stay held in PopRules for its own 12-week window, so the two never disagree.
+- **Step 5:** the run logs how many containers it prepared. A second run prepares none. A
+  container another account holds is skipped and logged; on Paseo today none is.
 - **Step 6:**
 
 ```bash
@@ -128,8 +132,10 @@ Stop. Every step can be re-run by re-adding its label:
 Do not skip ahead to `DeclareRelease` to tidy up. Declaring a release the deployment does not
 fully run is the one state the declarations cannot represent.
 
-Rolling a proxy back means upgrading it to its previous implementation, recorded below, through
-the same console.
+Rolling a proxy back points it at its previous implementation, recorded below, with one
+`upgradeToAndCall` and no deployment. Each proxy has its own label on the console:
+`run:RollbackPopRules`, `run:RollbackDotnsPopController` and `run:RollbackDotnsRegistrarController`.
+The script holds the addresses below, and the fork suite checks them against the chain.
 
 | Proxy | Implementation before this campaign |
 | --- | --- |
@@ -137,8 +143,8 @@ the same console.
 | DotnsPopController `0xCC932348606cc1f3318cADeC5A5Cd2CA447f8a4b` | `0xf8901566396db4333ce511693992124d28507795` |
 | DotnsRegistrarController `0xBdaA01bD1bA67d709F2b1fF286Da0d854977EA30` | `0x310dd512fc43e267798e02e81fc0d9628307cfb2` |
 
-Rolling back PopRules alone, after step 2, breaks every gateway call that moves a reservation.
-Roll the controller back first.
+Rolling back PopRules alone, after step 2, breaks every gateway call that moves a reservation, so
+the PopRules rollback refuses to run until the controller is rolled back.
 
 ## Close-out
 

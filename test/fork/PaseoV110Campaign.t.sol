@@ -10,6 +10,7 @@ import {SetReservationDuration} from "../../scripts/deploy/SetReservationDuratio
 import {PrepareDeviceContainers} from "../../scripts/deploy/PrepareDeviceContainers.s.sol";
 import {IDotnsPopController} from "../../contracts/registrars/IDotnsPopController.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
+import {IDotnsRegistry} from "../../contracts/registry/IDotnsRegistry.sol";
 
 /// @title SetReservationDurationHarness
 /// @notice Runs the script's own internal under an explicit owner.
@@ -24,16 +25,19 @@ contract SetReservationDurationHarness is SetReservationDuration {
 /// @notice Runs the script's own internal under an explicit sender, and exposes its slot read.
 contract PrepareDeviceContainersHarness is PrepareDeviceContainers {
     /// @notice Prepares containers `from` to `to` on `controller` as `sender`.
+    /// @return prepared Number of containers the run prepared.
     function prepare(
         address sender,
         address controller,
+        IDotnsRegistry registry,
         bytes32 tldNode,
         uint256 from,
         uint256 to
     )
         external
+        returns (uint256 prepared)
     {
-        _prepareContainers(sender, controller, tldNode, from, to);
+        prepared = _prepareContainers(sender, controller, registry, tldNode, from, to);
     }
 
     /// @notice Whether `controller` has recorded container `number`.
@@ -48,22 +52,10 @@ contract PrepareDeviceContainersHarness is PrepareDeviceContainers {
     {
         return _isRecorded(controller, tldNode, _suffix(number));
     }
-}
 
-/// @title DeclareReleaseHarness
-/// @notice Runs the body of `DeclareRelease.declare` under an explicit owner and release tag.
-/// @dev The script reads the owner from `msg.sender` and the tag from the environment; a fork test
-///      passes both, and runs the same steps in the same order.
-contract DeclareReleaseHarness is DeclareRelease {
-    /// @notice Declares every key's codehash, verifies the deployment, then declares `releaseTag`.
-    function declareAs(address owner, string memory releaseTag) external {
-        initDeployment("paseo-assethub", vm.toString(block.chainid));
-        Addresses memory addr = _loadAddresses();
-        _requireKeysMatchManifest(addr);
-        _wireMissingKeys(owner, addr);
-        _declareCodeIdentity(owner, addr);
-        _verifyDeployment(addr, owner);
-        _declareProtocolVersion(owner, addr, releaseTag);
+    /// @notice Node of container `number`.
+    function containerNode(bytes32 tldNode, uint256 number) external pure returns (bytes32) {
+        return _containerNode(tldNode, _suffix(number));
     }
 }
 
@@ -88,17 +80,27 @@ contract PaseoV110CampaignForkTest is BasePopFork {
     /// @notice The protocol registry.
     IDotnsProtocolRegistry internal registry;
 
+    /// @notice The forward registry.
+    IDotnsRegistry internal names;
+
+    /// @notice The deployed PoP controller proxy.
+    address internal controller;
+
+    /// @notice Node of the TLD the containers sit under.
+    bytes32 internal tldNode;
+
     function setUp() public override {
         super.setUp();
         registry = IDotnsProtocolRegistry(_live("DotnsProtocolRegistry"));
+        names = IDotnsRegistry(_live("DotnsRegistry"));
+        controller = _live("DotnsPopController");
         owner = _ownerOf(address(registry));
+        tldNode = registry.tldNode();
     }
 
     /// @notice All six steps in order end on a verified 1.1.0 declaration, with the new duration,
     ///         every container recorded, and issuance working end to end.
     function test_campaign_ends_on_a_verified_release() public {
-        address controller = _live("DotnsPopController");
-        bytes32 tldNode = registry.tldNode();
         assertEq(registry.protocolVersion(), PREVIOUS_TAG, "starts on 1.0.0");
 
         new UpgradePopRulesHarness().upgrade(owner, _live("PopRules"));
@@ -106,8 +108,8 @@ contract PaseoV110CampaignForkTest is BasePopFork {
         new UpgradeRegistrarControllerHarness().upgrade(owner, _live("DotnsRegistrarController"));
         new SetReservationDurationHarness().set(owner, controller);
         PrepareDeviceContainersHarness containers = new PrepareDeviceContainersHarness();
-        containers.prepare(owner, controller, tldNode, 0, 99);
-        new DeclareReleaseHarness().declareAs(owner, RELEASE_TAG);
+        containers.prepare(owner, controller, names, tldNode, 0, 99);
+        _declare();
 
         assertEq(registry.protocolVersion(), RELEASE_TAG, "declares 1.1.0");
         assertEq(
@@ -118,27 +120,67 @@ contract PaseoV110CampaignForkTest is BasePopFork {
         }
 
         bytes32 personhoodNode = _issueLinkedPair(controller);
-        (bool ok, bytes memory data) = _live("DotnsRegistry")
-            .staticcall(abi.encodeWithSignature("owner(bytes32)", personhoodNode));
-        assertTrue(ok, "registry readable");
-        assertEq(abi.decode(data, (address)), popUser, "issuance works end to end");
+        assertEq(names.owner(personhoodNode), popUser, "issuance works end to end");
     }
 
-    /// @notice The settings steps are idempotent: a second run changes nothing.
+    /// @notice The settings steps are idempotent: a second run writes nothing.
     function test_settings_steps_rerun_as_no_ops() public {
-        address controller = _live("DotnsPopController");
-        bytes32 tldNode = registry.tldNode();
-        new UpgradePopRulesHarness().upgrade(owner, _live("PopRules"));
-        new UpgradePopControllerHarness().upgrade(owner, controller, _live("PopRules"));
-
+        _upgradeRulesAndController();
         SetReservationDurationHarness duration = new SetReservationDurationHarness();
-        duration.set(owner, controller);
         PrepareDeviceContainersHarness containers = new PrepareDeviceContainersHarness();
-        containers.prepare(owner, controller, tldNode, 0, 9);
+        duration.set(owner, controller);
+        assertEq(
+            containers.prepare(owner, controller, names, tldNode, 0, 9), 10, "first run prepares"
+        );
 
         vm.recordLogs();
         duration.set(owner, controller);
-        containers.prepare(owner, controller, tldNode, 0, 9);
-        assertEq(vm.getRecordedLogs().length, 0, "a rerun emits nothing");
+        assertEq(vm.getRecordedLogs().length, 0, "a duration rerun emits nothing");
+        assertEq(
+            containers.prepare(owner, controller, names, tldNode, 0, 9),
+            0,
+            "a container rerun prepares nothing"
+        );
+    }
+
+    /// @notice A container another account holds is skipped, and the rest of the range is still
+    ///         prepared.
+    function test_container_held_elsewhere_is_skipped() public {
+        _upgradeRulesAndController();
+        PrepareDeviceContainersHarness containers = new PrepareDeviceContainersHarness();
+        bytes32 held = containers.containerNode(tldNode, 5);
+        vm.mockCall(
+            address(names),
+            abi.encodeWithSelector(IDotnsRegistry.owner.selector, held),
+            abi.encode(makeAddr("someoneElse"))
+        );
+
+        assertEq(
+            containers.prepare(owner, controller, names, tldNode, 0, 9), 9, "nine of ten prepared"
+        );
+        assertFalse(containers.recorded(controller, tldNode, 5), "the held container is skipped");
+        assertTrue(containers.recorded(controller, tldNode, 6), "the range continues past it");
+    }
+
+    /// @notice Preparing containers before the controller swap stops with a clear message.
+    function test_containers_wait_for_the_controller() public {
+        PrepareDeviceContainersHarness containers = new PrepareDeviceContainersHarness();
+
+        vm.expectRevert(bytes("PrepareDeviceContainers: run UpgradePopController first"));
+        containers.prepare(owner, controller, names, tldNode, 0, 9);
+    }
+
+    /// @notice Upgrades the rules, then the PoP controller, through the scripts' own internals.
+    function _upgradeRulesAndController() internal {
+        new UpgradePopRulesHarness().upgrade(owner, _live("PopRules"));
+        new UpgradePopControllerHarness().upgrade(owner, controller, _live("PopRules"));
+    }
+
+    /// @notice Runs `DeclareRelease.declare` as the owner with the release tag the console sets.
+    function _declare() internal {
+        vm.setEnv("DOTNS_RELEASE_TAG", RELEASE_TAG);
+        DeclareRelease declarer = new DeclareRelease();
+        vm.prank(owner);
+        declarer.declare();
     }
 }

@@ -6,6 +6,7 @@ import {console} from "forge-std/Script.sol";
 import {BaseDeployer} from "./BaseDeployer.s.sol";
 import {IDotnsPopController} from "../../contracts/registrars/IDotnsPopController.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
+import {IDotnsRegistry} from "../../contracts/registry/IDotnsRegistry.sol";
 import {LabelUtils} from "../../contracts/utils/LabelUtils.sol";
 
 /// @title PrepareDeviceContainers
@@ -14,12 +15,14 @@ import {LabelUtils} from "../../contracts/utils/LabelUtils.sol";
 /// @dev The first device name issued in a container otherwise mints it inside the gateway's call,
 ///      which runs under a fixed weight limit and leaves that issuance little room. Preparing each
 ///      container from a signed transaction takes the cost out of issuance.
-/// `prepareDeviceContainer` is permissionless and records a container the controller already owns
-/// without minting it.
+///      `prepareDeviceContainer` is permissionless: it mints a container that does not exist yet,
+///      and records one the controller already owns.
 ///
 ///      One container per transaction keeps every broadcast bounded. Containers the controller has
-///      already recorded are skipped, so an interrupted run is finished by running it again.
-///      `CONTAINER_FROM` and `CONTAINER_TO` (inclusive, default 0 and 99) narrow the range.
+///      already recorded are skipped, so an interrupted run is finished by running it again. A
+///      container another account holds is skipped and logged, since the controller can never
+///      prepare it and it would otherwise stop the run. `CONTAINER_FROM` and `CONTAINER_TO`
+///      (inclusive, default 0 and 99) narrow the range for a local run.
 /// @custom:security-contact admin@parity.io
 contract PrepareDeviceContainers is BaseDeployer {
     /// @notice Storage slot of `DotnsPopController._deviceContainers` in this branch's layout.
@@ -36,6 +39,9 @@ contract PrepareDeviceContainers is BaseDeployer {
     /// @notice Manifest label the protocol registry is recorded under.
     string internal constant PROTOCOL_REGISTRY_LABEL = "DotnsProtocolRegistry";
 
+    /// @notice Manifest label the forward registry is recorded under.
+    string internal constant REGISTRY_LABEL = "DotnsRegistry";
+
     /// @notice Reads the manifest and prepares every container in the range as `msg.sender`.
     function run() external {
         address sender = msg.sender;
@@ -50,6 +56,7 @@ contract PrepareDeviceContainers is BaseDeployer {
         _prepareContainers(
             sender,
             _readAddress(POP_CONTROLLER_LABEL),
+            IDotnsRegistry(_readAddress(REGISTRY_LABEL)),
             IDotnsProtocolRegistry(_readAddress(PROTOCOL_REGISTRY_LABEL)).tldNode(),
             from,
             to
@@ -58,25 +65,39 @@ contract PrepareDeviceContainers is BaseDeployer {
         console.log("=== PrepareDeviceContainers complete ===");
     }
 
-    /// @notice Prepares containers `from` to `to` on `controller`, skipping recorded ones.
+    /// @notice Prepares containers `from` to `to` on `controller`, skipping recorded ones and ones
+    ///         another account holds.
     /// @param sender Account that broadcasts the calls.
     /// @param controller DotnsPopController proxy address resolved from the manifest.
+    /// @param registry Forward registry, read for each container's owner.
     /// @param tldNode Node of the TLD the containers sit under.
     /// @param from First container number.
     /// @param to Last container number, inclusive.
+    /// @return prepared Number of containers this run prepared.
     function _prepareContainers(
         address sender,
         address controller,
+        IDotnsRegistry registry,
         bytes32 tldNode,
         uint256 from,
         uint256 to
     )
         internal
+        returns (uint256 prepared)
     {
-        uint256 prepared;
+        (bool upgraded,) =
+            controller.staticcall(abi.encodeWithSignature("MAX_QUEUE_STEPS_PER_CALL()"));
+        require(upgraded, "PrepareDeviceContainers: run UpgradePopController first");
+
         for (uint256 number = from; number <= to; ++number) {
             string memory suffix = _suffix(number);
             if (_isRecorded(controller, tldNode, suffix)) continue;
+
+            address holder = registry.owner(_containerNode(tldNode, suffix));
+            if (holder != address(0) && holder != controller) {
+                console.log("  skipping container held by another account", suffix, holder);
+                continue;
+            }
 
             vm.broadcast(sender);
             IDotnsPopController(controller).prepareDeviceContainer(suffix);
@@ -104,9 +125,24 @@ contract PrepareDeviceContainers is BaseDeployer {
         view
         returns (bool recorded)
     {
-        bytes32 parentNode = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(suffix));
-        bytes32 slot = keccak256(abi.encode(parentNode, DEVICE_CONTAINERS_SLOT));
+        bytes32 slot =
+            keccak256(abi.encode(_containerNode(tldNode, suffix), DEVICE_CONTAINERS_SLOT));
         recorded = vm.load(controller, slot) != bytes32(0);
+    }
+
+    /// @notice Node of the container `suffix` under the TLD.
+    /// @param tldNode Node of the TLD.
+    /// @param suffix Two-digit container label.
+    /// @return node The container's node.
+    function _containerNode(
+        bytes32 tldNode,
+        string memory suffix
+    )
+        internal
+        pure
+        returns (bytes32 node)
+    {
+        node = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(suffix));
     }
 
     /// @notice Two-digit label for container `number`, zero-padded.

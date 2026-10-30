@@ -88,6 +88,10 @@ contract UpgradePopControllerForkTest is BasePopFork {
     function test_upgraded_pair_issues_and_records_the_container() public {
         new UpgradePopRulesHarness().upgrade(_ownerOf(rules), rules);
         upgrader.upgrade(owner, controller, rules);
+        bytes32 tldNode = IDotnsProtocolRegistry(_live("DotnsProtocolRegistry")).tldNode();
+        bytes32 container = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory("07"));
+        bytes32 slot = keccak256(abi.encode(container, DEVICE_CONTAINERS_SLOT));
+        assertEq(vm.load(controller, slot), bytes32(0), "container not yet recorded");
 
         bytes32 personhoodNode = _issueLinkedPair(controller);
 
@@ -95,10 +99,6 @@ contract UpgradePopControllerForkTest is BasePopFork {
             .staticcall(abi.encodeWithSignature("owner(bytes32)", personhoodNode));
         assertTrue(ok, "registry readable");
         assertEq(abi.decode(data, (address)), popUser, "personhood name issued");
-
-        bytes32 tldNode = IDotnsProtocolRegistry(_live("DotnsProtocolRegistry")).tldNode();
-        bytes32 container = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory("07"));
-        bytes32 slot = keccak256(abi.encode(container, DEVICE_CONTAINERS_SLOT));
         assertTrue(vm.load(controller, slot) != bytes32(0), "container recorded at the read slot");
     }
 
