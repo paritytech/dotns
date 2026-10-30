@@ -506,6 +506,11 @@ this repository depends on that: the store migration reads its holders from the 
 question about this network. Use an archive node, or Blockscout at
 `https://blockscout-paseo-next.polkadot.io`.
 
+### Broadcast order
+
+[`docs/PASEO-V110-RUNBOOK.md`](./docs/PASEO-V110-RUNBOOK.md) is the step list for the in-place
+upgrade to v1.1.0, with the order, why it is fixed, and what to check after each step.
+
 ### The deployed code is not always the code in a release
 
 This network's proxies are upgraded in place from the `dev/paseo-upgrades` branch, which is
