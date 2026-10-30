@@ -59,6 +59,17 @@ contract PrepareDeviceContainersHarness is PrepareDeviceContainers {
     }
 }
 
+/// @title DeclareReleaseHarness
+/// @notice Runs the script's own body under an explicit owner.
+/// @dev The script takes the owner from `msg.sender` and broadcasts, and forge cannot broadcast
+///      under a prank, so the test passes the owner to the body `run` and `declare` share.
+contract DeclareReleaseHarness is DeclareRelease {
+    /// @notice Declares every key's codehash and the release in `DOTNS_RELEASE_TAG` as `owner`.
+    function declareAs(address owner) external {
+        _declare(owner);
+    }
+}
+
 /// @title PaseoV110CampaignForkTest
 /// @notice The whole v1.0.0 to v1.1.0 campaign on one fork, in broadcast order: rules, PoP
 ///         controller, registrar controller, reservation duration, device containers, then the
@@ -179,8 +190,6 @@ contract PaseoV110CampaignForkTest is BasePopFork {
     /// @notice Runs `DeclareRelease.declare` as the owner with the release tag the console sets.
     function _declare() internal {
         vm.setEnv("DOTNS_RELEASE_TAG", RELEASE_TAG);
-        DeclareRelease declarer = new DeclareRelease();
-        vm.prank(owner);
-        declarer.declare();
+        new DeclareReleaseHarness().declareAs(owner);
     }
 }

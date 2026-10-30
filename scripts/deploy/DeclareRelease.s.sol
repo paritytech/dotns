@@ -30,7 +30,7 @@ contract DeclareRelease is WireDeployments {
     ///      the inherited wiring stage, which re-sets every key from the manifest and skips the
     ///      checks `declare` makes before it writes.
     function run() external override {
-        _declare();
+        _declare(msg.sender);
     }
 
     /// @notice Declares every key's codehash, verifies the deployment, then declares the release.
@@ -38,12 +38,12 @@ contract DeclareRelease is WireDeployments {
     ///      read before anything is broadcast, so a run that could not declare its release at the
     ///      end fails before it has written any of the codehashes.
     function declare() external {
-        _declare();
+        _declare(msg.sender);
     }
 
     /// @notice Body of @custom:function run and @custom:function declare.
-    function _declare() internal {
-        address owner = msg.sender;
+    /// @param owner Account that owns the registry and broadcasts.
+    function _declare(address owner) internal {
         vm.label(owner, "OWNER");
 
         string memory releaseTag = vm.envString("DOTNS_RELEASE_TAG");
