@@ -7,6 +7,9 @@ import {IDotnsNameWhitelist} from "../../../contracts/whitelist/IDotnsNameWhitel
 import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 /// @title DotnsNameWhitelist unit tests
@@ -231,7 +234,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
         string[] memory batch = new string[](1);
         batch[0] = BASE_LABEL_B;
 
-        bytes[] memory calls = new bytes[](10);
+        bytes[] memory calls = new bytes[](11);
         calls[0] = abi.encodeCall(IDotnsNameWhitelist.grantName, (BASE_LABEL_A, ed));
         calls[1] = abi.encodeCall(IDotnsNameWhitelist.grantNames, (batch, ed));
         calls[2] = abi.encodeCall(IDotnsNameWhitelist.accept, (BASE_LABEL_A, ed));
@@ -242,6 +245,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
         calls[7] = abi.encodeCall(IDotnsNameWhitelist.setMaxClaimants, (4));
         calls[8] = abi.encodeCall(IDotnsNameWhitelist.setMaxReasonBytes, (64));
         calls[9] = abi.encodeCall(IDotnsNameWhitelist.setMaxGrantBatch, (4));
+        calls[10] = abi.encodeCall(IDotnsNameWhitelist.setGrantDuration, (7 days));
 
         for (uint256 i = 0; i < calls.length; i++) {
             vm.prank(ed);
@@ -613,5 +617,222 @@ contract DotnsNameWhitelistTests is BaseDotns {
         vm.prank(leonardo);
         whitelist.setMaxClaimants(7);
         assertEq(whitelist.maxClaimants(), 7);
+    }
+
+    // grant expiry
+
+    function test_initial_grant_duration_is_the_default() public view {
+        assertEq(whitelist.grantDuration(), DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION);
+    }
+
+    function test_grant_binds_until_its_period_ends() public {
+        _grant(ed, BASE_LABEL_A);
+        uint64 expiresAt = uint64(block.timestamp) + whitelist.grantDuration();
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), expiresAt);
+
+        vm.warp(expiresAt - 1);
+        assertTrue(whitelist.isGrantedTo(BASE_LABEL_A, ed), "live until the last second");
+
+        vm.warp(expiresAt);
+        assertFalse(whitelist.isGrantedTo(BASE_LABEL_A, ed));
+        assertEq(whitelist.granteeOf(BASE_LABEL_A), address(0));
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), 0);
+        assertEq(
+            uint256(whitelist.statusOf(BASE_LABEL_A)), uint256(IDotnsNameWhitelist.NameStatus.Open)
+        );
+
+        IDotnsNameWhitelist.NameView[] memory page = whitelist.names(0, 10);
+        assertEq(page.length, 1, "the lapsed entry stays listed until a write clears it");
+        assertEq(uint256(page[0].status), uint256(IDotnsNameWhitelist.NameStatus.Open));
+        assertEq(page[0].winner, address(0));
+    }
+
+    function test_granteeOfNode_agrees_with_granteeOf() public {
+        bytes32 node = _nodeOf(BASE_LABEL_A);
+        assertEq(whitelist.granteeOfNode(node), address(0));
+
+        _grant(ed, BASE_LABEL_A);
+        assertEq(whitelist.granteeOfNode(node), ed);
+        assertEq(whitelist.granteeOfNode(node), whitelist.granteeOf(BASE_LABEL_A));
+
+        vm.warp(block.timestamp + whitelist.grantDuration());
+        assertEq(whitelist.granteeOfNode(node), address(0), "zero once the grant expires");
+    }
+
+    function test_consume_reverts_after_expiry() public {
+        _grant(ed, BASE_LABEL_A);
+        vm.warp(block.timestamp + whitelist.grantDuration());
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsNameWhitelist.NotWinner.selector, ed, _nodeOf(BASE_LABEL_A)
+            )
+        );
+        vm.prank(address(dotnsRegistrarController));
+        whitelist.consume(BASE_LABEL_A, ed);
+    }
+
+    function test_grantName_regrants_an_expired_grant_without_a_revoke() public {
+        _grant(ed, BASE_LABEL_A);
+        vm.warp(block.timestamp + whitelist.grantDuration());
+
+        _grant(tiago, BASE_LABEL_A);
+        assertEq(whitelist.granteeOf(BASE_LABEL_A), tiago);
+        assertEq(
+            whitelist.grantExpiresAt(BASE_LABEL_A),
+            uint64(block.timestamp) + whitelist.grantDuration(),
+            "the new grant runs its own period"
+        );
+        assertEq(whitelist.nameCount(), 1);
+    }
+
+    function test_requestName_accepts_an_expired_grant() public {
+        _grant(ed, BASE_LABEL_A);
+        vm.warp(block.timestamp + whitelist.grantDuration());
+        whitelist.setWindow(0, 30 days);
+
+        _request(tiago, BASE_LABEL_A);
+        assertEq(whitelist.claimantCount(BASE_LABEL_A), 1);
+        assertEq(whitelist.granteeOf(BASE_LABEL_A), address(0));
+    }
+
+    function test_setReserved_reserves_an_expired_grant() public {
+        _grant(ed, BASE_LABEL_A);
+        vm.warp(block.timestamp + whitelist.grantDuration());
+
+        whitelist.setReserved(BASE_LABEL_A, true);
+        assertTrue(whitelist.isReserved(BASE_LABEL_A));
+
+        whitelist.setReserved(BASE_LABEL_A, false);
+        assertEq(whitelist.granteeOf(BASE_LABEL_A), address(0), "the lapsed winner is gone");
+        assertEq(whitelist.nameCount(), 0);
+    }
+
+    function test_revokeName_tidies_an_expired_grant() public {
+        _grant(ed, BASE_LABEL_A);
+        vm.warp(block.timestamp + whitelist.grantDuration());
+
+        vm.expectEmit(true, true, false, true, address(whitelist));
+        emit IDotnsNameWhitelist.NameRevoked(_nodeOf(BASE_LABEL_A), ed, BASE_LABEL_A);
+        whitelist.revokeName(BASE_LABEL_A);
+        assertEq(whitelist.nameCount(), 0);
+    }
+
+    function test_a_reserved_name_never_expires() public {
+        whitelist.setReserved(BASE_LABEL_A, true);
+        vm.warp(block.timestamp + DotnsConstants.WHITELIST_MAX_GRANT_DURATION + 1);
+        assertTrue(whitelist.isReserved(BASE_LABEL_A));
+    }
+
+    function test_setGrantDuration_applies_to_live_grants() public {
+        _grant(ed, BASE_LABEL_A);
+        uint64 grantedAt = uint64(block.timestamp);
+
+        vm.expectEmit(false, false, false, true, address(whitelist));
+        emit IDotnsNameWhitelist.GrantDurationSet(90 days);
+        whitelist.setGrantDuration(90 days);
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), grantedAt + 90 days);
+
+        vm.warp(grantedAt + 60 days);
+        assertTrue(whitelist.isGrantedTo(BASE_LABEL_A, ed), "lengthening extends a live grant");
+
+        whitelist.setGrantDuration(30 days);
+        assertFalse(whitelist.isGrantedTo(BASE_LABEL_A, ed), "shortening can expire it at once");
+    }
+
+    function test_setGrantDuration_reverts_out_of_range() public {
+        uint64 belowLimit = DotnsConstants.WHITELIST_MIN_GRANT_DURATION - 1;
+        uint64 aboveLimit = DotnsConstants.WHITELIST_MAX_GRANT_DURATION + 1;
+
+        vm.expectRevert(IDotnsNameWhitelist.GrantDurationOutOfRange.selector);
+        whitelist.setGrantDuration(belowLimit);
+
+        vm.expectRevert(IDotnsNameWhitelist.GrantDurationOutOfRange.selector);
+        whitelist.setGrantDuration(aboveLimit);
+    }
+
+    function test_initializeGrantExpiry_reverts_on_an_initialised_whitelist() public {
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        vm.prank(owner);
+        whitelist.initializeGrantExpiry();
+    }
+
+    /// @dev Stands in for a whitelist upgraded from a version without expiry: the grant period,
+    ///      the clock start and the grant's `grantedAt` are zeroed in storage, as they read before
+    ///      the upgrade. Such a grant must run its period from the upgrade, not from zero.
+    function test_a_grant_made_before_expiry_runs_its_period_from_the_upgrade() public {
+        _grant(ed, BASE_LABEL_A);
+
+        // Slot 7 packs the window (low 128 bits) with `grantDuration` and the clock start.
+        bytes32 configSlot = bytes32(uint256(7));
+        uint256 config = uint256(vm.load(address(whitelist), configSlot));
+        vm.store(address(whitelist), configSlot, bytes32(config & type(uint128).max));
+
+        // A record's first slot packs status (byte 0), winner (bytes 1-20) and grantedAt.
+        bytes32 recordSlot = keccak256(abi.encode(_nodeOf(BASE_LABEL_A), uint256(2)));
+        uint256 record = uint256(vm.load(address(whitelist), recordSlot));
+        vm.store(
+            address(whitelist), recordSlot, bytes32(record & ~(uint256(type(uint64).max) << 168))
+        );
+
+        // Between an upgrade and `initializeGrantExpiry`, the grant keeps binding however long the
+        // gap, so an upgrade without the call cannot open the name to other paths.
+        vm.warp(block.timestamp + 400 days);
+        assertTrue(whitelist.isGrantedTo(BASE_LABEL_A, ed), "binds before the clock starts");
+        assertEq(whitelist.granteeOf(BASE_LABEL_A), ed);
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), type(uint64).max);
+
+        uint64 upgradedAt = uint64(block.timestamp);
+        vm.prank(owner);
+        whitelist.initializeGrantExpiry();
+
+        assertEq(whitelist.grantDuration(), DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION);
+        assertTrue(whitelist.isGrantedTo(BASE_LABEL_A, ed), "still bound right after the upgrade");
+        assertEq(
+            whitelist.grantExpiresAt(BASE_LABEL_A),
+            upgradedAt + DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION
+        );
+
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        vm.prank(owner);
+        whitelist.initializeGrantExpiry();
+    }
+
+    /// @dev Governance may set a period after an upgrade and before `initializeGrantExpiry`. The
+    ///      clock is still unset, so old grants keep binding, and the later call still starts it,
+    ///      keeping the period governance chose.
+    function test_an_early_setGrantDuration_keeps_old_grants_binding() public {
+        _grant(ed, BASE_LABEL_A);
+
+        bytes32 configSlot = bytes32(uint256(7));
+        uint256 config = uint256(vm.load(address(whitelist), configSlot));
+        vm.store(address(whitelist), configSlot, bytes32(config & type(uint128).max));
+        bytes32 recordSlot = keccak256(abi.encode(_nodeOf(BASE_LABEL_A), uint256(2)));
+        uint256 record = uint256(vm.load(address(whitelist), recordSlot));
+        vm.store(
+            address(whitelist), recordSlot, bytes32(record & ~(uint256(type(uint64).max) << 168))
+        );
+
+        vm.warp(block.timestamp + 400 days);
+        whitelist.setGrantDuration(90 days);
+        assertTrue(whitelist.isGrantedTo(BASE_LABEL_A, ed), "an early period opens nothing");
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), type(uint64).max);
+
+        uint64 upgradedAt = uint64(block.timestamp);
+        vm.prank(owner);
+        whitelist.initializeGrantExpiry();
+        assertEq(whitelist.grantDuration(), 90 days, "the governance period is kept");
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), upgradedAt + 90 days);
+    }
+
+    function test_initializeGrantExpiry_is_owner_only() public {
+        bytes32 configSlot = bytes32(uint256(7));
+        uint256 config = uint256(vm.load(address(whitelist), configSlot));
+        vm.store(address(whitelist), configSlot, bytes32(config & type(uint128).max));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, ed)
+        );
+        vm.prank(ed);
+        whitelist.initializeGrantExpiry();
     }
 }

@@ -108,6 +108,27 @@ contract WhitelistHandler is Test {
         _asSigned();
     }
 
+    /// @notice Moves time forward by up to twice the grant period, so grants lapse mid-campaign
+    /// and the writes that clear a lapsed grant get exercised. Reopens the request window after
+    /// the jump, so later requests keep reaching a lapsed grant.
+    function elapse(uint256 seed) external {
+        vm.warp(block.timestamp + (seed % (2 * uint256(WHITELIST.grantDuration()) + 1)));
+        _asRoot();
+        WHITELIST.setWindow(0, 3650 days);
+        _asSigned();
+    }
+
+    function tuneGrantDuration(uint256 seed) external {
+        uint64 span = DotnsConstants.WHITELIST_MAX_GRANT_DURATION
+            - DotnsConstants.WHITELIST_MIN_GRANT_DURATION + 1;
+        // The modulo keeps the value below `span`, which fits in uint64.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint64 newDuration = DotnsConstants.WHITELIST_MIN_GRANT_DURATION + uint64(seed % span);
+        _asRoot();
+        try WHITELIST.setGrantDuration(newDuration) {} catch {}
+        _asSigned();
+    }
+
     function _actor(uint256 seed) internal view returns (address actor) {
         return _actors[seed % _actors.length];
     }

@@ -11,6 +11,7 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 | 3 | Clearing hides records rather than erasing them | Current implementation | Deliberate; no change planned |
 | 4 | Root-written storage refunds deposits nobody paid | Runtime | pallet-revive fixes contract-issues#284 |
 | 5 | A revoked personhood holder stays registered in the gateway pallet | Gateway pallet | The gateway pallet gains a Root call that clears an account's names and alias |
+| 6 | A grant strands a reservation queued before it | Current implementation | The reservation expires, or the grant expires unspent |
 
 ## 1. Deferred LabelStore deployment
 
@@ -69,3 +70,13 @@ The dotNS gateway pallet keeps its own record of the names each account holds (`
 **Workaround:** none in the contracts. The revoked name itself is free again and can be issued to someone else or registered on the public path.
 
 **Resolution:** a Root call in the gateway pallet that clears an account's names and alias, dispatched in the same governance batch as the revocation.
+
+## 6. A grant strands a reservation queued before it
+
+**Type:** current implementation.
+
+A whitelist grant keeps its name for the grantee on every path, the gateway included. When governance grants a name that already has a reservation queue, the user at the front can no longer claim it (`PersonhoodNameUnavailable`), but the queue and its PopRules reservation stay in place, and `isReservedForClaim` keeps reporting that user. The grant decides who registers the name, so nothing is lost, but the reservation holds the base name, and so the device names with that stem, until it expires or is cleared.
+
+**Workaround:** governance batches `evictReservations` with the grant, which clears the queue and frees the base name at once. Otherwise `expireReservation` clears the queue once its reservations expire. Governance can check `isReservedForClaim` before granting a name.
+
+**Resolution:** the reservation expires and is cleared, or the grant expires unspent and the user at the front can claim the name again.

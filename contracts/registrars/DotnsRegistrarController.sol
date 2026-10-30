@@ -167,6 +167,7 @@ contract DotnsRegistrarController is
     function register(Registration calldata registration) external payable override nonReentrant {
         (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
             _requireAvailableLabel(registration.label);
+        _requireNotGranted(registration.label, node);
         _consumeCommitment(registration);
 
         address escrow = _escrow();
@@ -518,6 +519,20 @@ contract DotnsRegistrarController is
     /// @return versionString Declared release as bare semver, empty when never declared.
     function version() external view virtual returns (string memory versionString) {
         versionString = protocolRegistry.protocolVersion();
+    }
+
+    /// @notice Reverts when `label` holds a live grant on the name whitelist.
+    /// @dev A granted name is registered only through `registerReserved`, which spends the grant,
+    ///      so this path refuses it for every caller, the grantee included. A network with no
+    ///      whitelist configured has no grants to honour.
+    /// @param label Bare label being registered.
+    /// @param node Namehash of `label` under the active TLD.
+    function _requireNotGranted(string calldata label, bytes32 node) internal view {
+        address configured = protocolRegistry.get(DotnsConstants.NAME_WHITELIST);
+        if (configured == address(0)) return;
+        require(
+            IDotnsNameWhitelist(configured).granteeOfNode(node) == address(0), NameGranted(label)
+        );
     }
 
     /// @notice Returns the configured name whitelist from the protocol registry.
