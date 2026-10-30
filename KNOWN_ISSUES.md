@@ -6,21 +6,22 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 
 | # | Issue | Type | Resolves when |
 | :- | :---- | :--- | :------------ |
-| 1 | Deferred LabelStore deployment | Runtime | Runtime allows root-origin contract deployment |
+| 1 | Deferred LabelStore deployment | Runtime | pallet-revive charges the storage deposit of Root writes |
 | 2 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
 | 3 | Clearing hides records rather than erasing them | Current implementation | Deliberate; no change planned |
 | 4 | Root-written storage refunds deposits nobody paid | Runtime | pallet-revive fixes contract-issues#284 |
-| 5 | A grant strands a reservation queued before it | Current implementation | The reservation expires, or the grant expires unspent |
+| 5 | A revoked personhood holder stays registered in the gateway pallet | Gateway pallet | The gateway pallet gains a Root call that clears an account's names and alias |
+| 6 | A grant strands a reservation queued before it | Current implementation | The reservation expires, or the grant expires unspent |
 
 ## 1. Deferred LabelStore deployment
 
 **Type:** runtime limitation.
 
-Substrate Root cannot deploy a contract on behalf of an account it does not control, so a per-user `LabelStore` cannot be created at the moment a gateway-path issuance writes the name. The controller stamps a pending-claim entry instead, and the user settles it later by calling `claimLabelStore` from their own address. Settlement is permissionless: `settlePendingClaims` lets anyone settle a given owner's entries and pay the cost, and settlement always writes the label, so a pending name is never stranded.
+A gateway-path issuance runs under Root, and every storage slot a Root dispatch writes records a deposit that pallet-revive never charges (see [Root-written storage refunds deposits nobody paid](#4-root-written-storage-refunds-deposits-nobody-paid)). Deploying the user's `LabelStore` at that moment would add a whole contract of such slots, so the controller stamps a pending-claim entry instead, and the user settles it later by calling `claimLabelStore` from their own address. Settlement is permissionless: `settlePendingClaims` lets anyone settle a given owner's entries and pay the cost, and settlement always writes the label, so a pending name is never stranded.
 
 **Workaround:** `claimLabelStore` (user-signed) settles a bounded batch of the caller's pending claims, deploying the store on the first write; the caller calls it again while it reports `moreRemaining`.
 
-**Resolution:** when the runtime supports root-origin contract deployment, the deferred path collapses to a no-op and issuance becomes one transaction end-to-end.
+**Resolution:** once pallet-revive charges the deposit for Root writes, the controller can deploy the store at issuance, the deferred path collapses to a no-op, and issuance becomes one transaction end-to-end.
 
 See [README → DotnsPopController](./README.md#early-testnet-quirk-labelstore-deployment).
 
@@ -56,16 +57,26 @@ See [README → Clearing records and subnames](./README.md#clearing-records-and-
 
 pallet-revive records a storage deposit for a slot written under a Root dispatch but never charges it ([contract-issues#284](https://github.com/paritytech/contract-issues/issues/284)). When a signed transaction later zeroes that slot, the refund is paid out of deposits other users made to the same contract on Asset Hub Paseo and Polkadot, and the call reverts on a runtime without that deposit backend, such as Asset Hub Kusama. The reverse also holds: a slot a user paid for and Root zeroes refunds nobody.
 
-In dotNS, Root writes the registry record, the registrar state and the escrow position of every name it mints. Gateway-issued names are soulbound and never released, but reserved names minted by governance can be, and their release and reclaim zero some of those slots, so the refund is funded by other users' deposits. The record and subname deletes in [issue 3](#3-clearing-hides-records-rather-than-erasing-them) only zero slots their owner wrote, never Root-written ones.
+In dotNS, Root writes the registry record, the registrar state and the escrow position of every name it mints, and the label in the owner's `LabelStore` when they have one. A Root `registerReserved` for an owner with no store also deploys it; the gateway defers it (see [Deferred LabelStore deployment](#1-deferred-labelstore-deployment)). Gateway-issued names are soulbound and never released, but reserved names minted by governance can be, and their release and reclaim zero some of those slots, so the refund is funded by other users' deposits. The record and subname deletes in [issue 3](#3-clearing-hides-records-rather-than-erasing-them) only zero slots their owner wrote, never Root-written ones. Revocation runs under Root. For a name registered on the signed public path, and for any subname its holder created, it zeroes slots the holder paid for (the token, the registry record, the escrow position, a deleted subname), so their storage deposit is refunded to nobody. A name Root minted, through the gateway or the reserved path, is the balanced case, because Root zeroes slots Root wrote. A revoked holder gets back the escrow deposit for the name, not the storage deposit behind it. The escrow deposit is credited under Root too, so when the holder had no balance waiting, the slot that holds the credit is Root-written: claiming it refunds a storage deposit nobody paid, out of other users' deposits on Paseo and Polkadot, and reverts on a runtime without that deposit backend.
 
 **Resolution:** a pallet-revive fix for contract-issues#284. Nothing in the contracts depends on the drift, so the fix lands without a contract change.
 
-## 5. A grant strands a reservation queued before it
+## 5. A revoked personhood holder stays registered in the gateway pallet
+
+**Type:** gateway pallet limitation.
+
+The dotNS gateway pallet keeps its own record of the names each account holds (`AccountNames`) and of each person's alias. Its only calls are `reserve_name`, `register_name`, the allowance calls and `set_dispatcher_address`, so nothing can update or clear those records. Governance revocation clears everything the contracts hold about a name (see [README → Revoking a name](./README.md#revoking-a-name)), but the pallet's records stay. The pallet then rejects that account with `AccountAlreadyRegistered` and that person with `AliasAlreadyRegistered`, so a revoked personhood holder cannot get a personhood name through the gateway again, under the same account or another one.
+
+**Workaround:** none in the contracts. The revoked name itself is free again and can be issued to someone else or registered on the public path.
+
+**Resolution:** a Root call in the gateway pallet that clears an account's names and alias, dispatched in the same governance batch as the revocation.
+
+## 6. A grant strands a reservation queued before it
 
 **Type:** current implementation.
 
 A whitelist grant keeps its name for the grantee on every path, the gateway included. When governance grants a name that already has a reservation queue, the user at the front can no longer claim it (`PersonhoodNameUnavailable`), but the queue and its PopRules reservation stay in place, and `isReservedForClaim` keeps reporting that user. The grant decides who registers the name, so nothing is lost, but the reservation holds the base name, and so the device names with that stem, until it expires or is cleared.
 
-**Workaround:** `expireReservation` clears the queue once its reservations expire. Governance can check `isReservedForClaim` before granting a name.
+**Workaround:** governance batches `evictReservations` with the grant, which clears the queue and frees the base name at once. Otherwise `expireReservation` clears the queue once its reservations expire. Governance can check `isReservedForClaim` before granting a name.
 
 **Resolution:** the reservation expires and is cleared, or the grant expires unspent and the user at the front can claim the name again.

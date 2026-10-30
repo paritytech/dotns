@@ -21,10 +21,13 @@ import {StoreUtils} from "../utils/StoreUtils.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {IDotnsNameEscrow} from "../escrow/IDotnsNameEscrow.sol";
+import {IDotnsNameEscrowRevocation} from "../escrow/IDotnsNameEscrowRevocation.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
+import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title dotNS Registrar
-/// @notice ERC721-backed registrar implementing permanent name ownership.
+/// @notice ERC721-backed registrar implementing name ownership with no expiry.
 /// @dev Deliberately policy-free on pricing, reservations, and PoP gating; those live in the
 /// controllers and @custom:contract IPopRules. The registrar owns transferability itself: publicly
 /// registered names transfer freely, while names minted through the dotNS gateway pallet are
@@ -56,8 +59,9 @@ contract DotnsRegistrar is
 
     /// @notice Marks a token as soulbound: minted through the gateway pallet and non-transferable.
     /// @dev Set at mint by @custom:function register when the caller is the address registered
-    /// under `DotnsConstants.POP_CONTROLLER`. Write-once and never cleared: a name's soulbound
-    /// state is fixed at registration. Read by the `_update` transfer gate.
+    /// under `DotnsConstants.POP_CONTROLLER`. Fixed for as long as the token exists: cleared only
+    /// when the token is burned by @custom:function revokeIssued, so a later registration of the
+    /// same name through another controller is not soulbound. Read by the `_update` transfer gate.
     mapping(uint256 tokenId => bool soulbound) private _soulbound;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
@@ -138,9 +142,10 @@ contract DotnsRegistrar is
         // here with the typed error so callers do not see OZ's `ERC721InvalidSender(0)`.
         require(!_exists(id), NameNotAvailable(id));
         require(owner != protocolRegistry.get(DotnsConstants.NAME_ESCROW), InvalidOwner());
-        // Empty labels are an intentional gateway-cold path (substrate Root cannot deploy a
-        // `LabelStore` under `pallet-revive`, so the controller stashes a pending claim and the
-        // user settles via @custom:function IDotnsPopController.claimLabelStore later). Non-empty
+        // Empty labels are an intentional gateway-cold path (the controller defers the user's
+        // `LabelStore` because Root writes record a storage deposit `pallet-revive` never charges,
+        // so it stashes a pending claim and the user settles via
+        // @custom:function IDotnsPopController.claimLabelStore later). Non-empty
         // labels must still be canonical, since every transfer mirrors the label into the new
         // holder's store and @custom:function labelOf reads it back.
         require(bytes(label).length == 0 || label.isSingleLabel(), InvalidLabel());
@@ -153,6 +158,50 @@ contract DotnsRegistrar is
         if (soulbound) _soulbound[id] = true;
         if (bytes(label).length != 0) _writeOwnerLabel(owner, id, label);
         emit NameRegistered(id, owner, soulbound);
+    }
+
+    /// @inheritdoc IDotnsRegistrar
+    /// @dev Reads no `msg.sender` (see SystemUtils.originIsRoot). The burn branch of `_update`
+    /// returns before the transfer gate, which does read it.
+    function revoke(uint256 tokenId) external override {
+        require(SystemUtils.originIsRoot(), NotRoot());
+        require(!_soulbound[tokenId], NameSoulbound(tokenId));
+        _revoke(tokenId);
+    }
+
+    /// @inheritdoc IDotnsRegistrar
+    function revokeIssued(uint256 tokenId) external override {
+        address popController = protocolRegistry.get(DotnsConstants.POP_CONTROLLER);
+        require(msg.sender == popController, NotPopController(msg.sender));
+        require(_soulbound[tokenId], NotSoulbound(tokenId));
+        _revoke(tokenId);
+    }
+
+    /// @notice Body of @custom:function revoke and @custom:function revokeIssued.
+    /// @dev The order follows the rule that a name is cleared before it is revoked: the escrow
+    /// position and the registry record go first, while the token still exists, and the burn is
+    /// last. Every call out goes to a protocol contract resolved through the protocol registry,
+    /// never to a holder-controlled address, so nothing reachable from here can re-enter a
+    /// Root-gated function.
+    /// @param tokenId The token id (namehash node) of the name.
+    function _revoke(uint256 tokenId) private {
+        address holder = _requireOwned(tokenId);
+
+        IDotnsProtocolRegistry registry = protocolRegistry;
+        address escrow = registry.get(DotnsConstants.NAME_ESCROW);
+        require(escrow != address(0), EscrowNotConfigured());
+
+        // A name in escrow custody was taken from the holder who released it, who is also the
+        // position recipient the escrow reports.
+        address recipient = IDotnsNameEscrowRevocation(escrow).revoke(tokenId);
+        if (holder == escrow) holder = recipient;
+
+        IDotnsRegistry(registry.get(DotnsConstants.REGISTRY)).revokeName(bytes32(tokenId));
+
+        delete _soulbound[tokenId];
+        _burn(tokenId);
+
+        emit NameRevoked(tokenId, holder);
     }
 
     /// @inheritdoc IDotnsRegistrar
@@ -212,6 +261,11 @@ contract DotnsRegistrar is
             require(msg.value == 0, UnexpectedValue());
             return from;
         }
+
+        // A burn is reachable only from `_revoke`, which has already settled the escrow position
+        // and the registry record. Nothing is mirrored for a name that stops existing, and nothing
+        // below may run, because it reads `msg.sender` (see SystemUtils.originIsRoot).
+        if (to == address(0)) return from;
 
         // Soulbound names are non-transferable, including a move to the sender's own address. It
         // reverts rather than returning, unwinding the ownership move `super._update` has already

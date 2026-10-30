@@ -29,7 +29,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
 
         targetContract(address(handler));
 
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = handler.commitRegisterAndDeposit.selector;
         selectors[1] = handler.registerCrossTier.selector;
         selectors[2] = handler.releaseToken.selector;
@@ -43,6 +43,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         // way of a withdrawal, which is precisely the assumption the reclaim deadlock rested on.
         selectors[9] = handler.redeemReleased.selector;
         selectors[10] = handler.reRegisterReleased.selector;
+        selectors[11] = handler.revokeName.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
 
         excludeContract(address(dotnsRegistrarController));
@@ -69,6 +70,21 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
             escrowBalance,
             reservedAmount + protocolFees + pending + refundEntries,
             "Escrow balance must cover reserves + protocol fees + pending withdrawals + refund entries"
+        );
+    }
+
+    /// @notice The pull-payment ledger must hold exactly what the tracked flows credited, less what
+    ///         was claimed.
+    /// @dev Strict equality, because the bug this guards against is a settlement that forgets to
+    ///      credit the departing holder: the escrow then holds more than it owes, which
+    ///      @custom:function invariant_solvency accepts. Withdraw, reclaim and revocation credit
+    ///      this ledger, and claims drain it. Registration overpayments reach it only when pushing
+    ///      them back fails, which never happens to the handler's actors.
+    function invariant_pending_withdrawals_match_tracked_credits() public view {
+        assertEq(
+            handler.totalPendingWithdrawals(),
+            handler.ghost_pendingCredits() - handler.ghost_pendingPulls(),
+            "Pending withdrawals must equal tracked credits less claims"
         );
     }
 

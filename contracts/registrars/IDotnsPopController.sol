@@ -334,8 +334,9 @@ interface IDotnsPopController is IDotnsController {
     /// issued as a subname (`joseph` beneath its numeric container `42`) and a personhood name as
     /// a second-level name, so a caller holding a node must check that the node is the one `label`
     /// resolves to under those rules before reading this answer as being about what it holds; node
-    /// identity is what names the object. Set at mint and never cleared, so it is unaffected by a
-    /// name later becoming transferable; the soulbound flag is a transfer rule and cannot stand in
+    /// identity is what names the object. Set at mint and cleared only when governance revokes the
+    /// name (@custom:function IDotnsPopGovernance.revokeName), so it is unaffected by a name later
+    /// becoming transferable; the soulbound flag is a transfer rule and cannot stand in
     /// for it.
     /// @param label Bare label without the TLD, for example `joseph.42`.
     /// @return issued True when this controller issued `label`.
@@ -491,8 +492,10 @@ interface IDotnsPopController is IDotnsController {
     /// the user leaves the pending-claim enumeration set once their queue empties. At most
     /// `limit` entries are processed so a large queue cannot exceed the block gas limit;
     /// `moreRemaining` reports whether entries are left for a follow-up call, and a `limit` of
-    /// zero settles nothing. Writes are idempotent on an already-locked store slot, so a claim
-    /// whose label was independently written settles harmlessly. Emits
+    /// zero settles nothing. An entry whose store row is already written, for example
+    /// independently or by an earlier entry for the same name, is removed without a write or an
+    /// event. So is an entry for a name the user no longer holds, because governance revoked it.
+    /// Emits
     /// @custom:emits PendingClaimSettled and @custom:emits NameRegistered per settled entry, with
     /// `settledBy` set to the caller so a third-party settlement is distinguishable from a
     /// self-settlement.
