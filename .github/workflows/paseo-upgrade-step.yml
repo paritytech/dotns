@@ -58,9 +58,12 @@ jobs:
           # chain right before it broadcasts. Steps that upgrade no proxy name none. Each campaign
           # adds its own steps here, next to its runbook.
           case "$SCRIPT" in
-            DeclareRelease) SUBJECTS="" ;;
+            UpgradePopRules) SUBJECTS="PopRules" ;;
+            UpgradePopController) SUBJECTS="DotnsPopController" ;;
+            UpgradeRegistrarController) SUBJECTS="DotnsRegistrarController" ;;
+            SetReservationDuration|PrepareDeviceContainers|DeclareRelease) SUBJECTS="" ;;
             *)
-              echo "::error::'$SCRIPT' is not a runbook step of this campaign"
+              echo "::error::'$SCRIPT' is not a runbook step; see docs/PASEO-V110-RUNBOOK.md"
               exit 1
               ;;
           esac
