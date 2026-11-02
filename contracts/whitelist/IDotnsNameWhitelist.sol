@@ -117,7 +117,8 @@ interface IDotnsNameWhitelist {
     /// @notice Thrown when a claim names the zero-address beneficiary.
     error ZeroUser();
 
-    /// @notice Thrown when a label is not a canonical single DNS label.
+    /// @notice Thrown when a label is not a canonical single DNS label, or when a claimed or
+    ///         granted label is shorter than `DotnsConstants.MIN_LABEL_LENGTH`.
     error InvalidLabel();
 
     /// @notice Thrown when a reason exceeds `maxReasonBytes`.
@@ -186,8 +187,9 @@ interface IDotnsNameWhitelist {
 
     /// @notice Claims `label` for `user`.
     /// @dev Permissionless within the window; the submitter may differ from `user`. Requires the
-    ///      name Open, the window open, `user` non-zero, a canonical label, `user` without an
-    ///      existing claim, and fewer than `maxClaimants` claims on the name.
+    ///      name Open, the window open, `user` non-zero, a canonical label of at least three
+    ///      bytes, `user` without an existing claim, and fewer than `maxClaimants` claims on the
+    ///      name.
     ///      @custom:reverts WindowClosed, @custom:reverts NameNotOpen, @custom:reverts ZeroUser,
     ///      @custom:reverts InvalidLabel, @custom:reverts ReasonTooLong,
     ///      @custom:reverts AlreadyClaimed, or @custom:reverts TooManyClaimants.
@@ -215,9 +217,9 @@ interface IDotnsNameWhitelist {
 
     /// @notice Grants `label` to `user` directly, without a prior claim.
     /// @dev Restricted to a substrate Root dispatch. Requires the name Open, `user` non-zero
-    /// and a canonical label. Sets the name `Claimed` with `user` the winner and clears any pending
-    ///      claims. @custom:reverts NameNotOpen, @custom:reverts ZeroUser or
-    ///      @custom:reverts InvalidLabel. @custom:emits NameAccepted, and
+    /// and a canonical label of at least three bytes. Sets the name `Claimed` with `user` the
+    ///      winner and clears any pending claims. @custom:reverts NameNotOpen, @custom:reverts
+    ///      ZeroUser or @custom:reverts InvalidLabel. @custom:emits NameAccepted, and
     ///      @custom:emits NameRejected for each cleared claim.
     /// @param label Bare label to grant.
     /// @param user Beneficiary the name binds to.

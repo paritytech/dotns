@@ -115,6 +115,14 @@ contract DotnsNameWhitelistTests is BaseDotns {
         whitelist.requestName("bad.label", REASON, ed);
     }
 
+    /// @dev `registerReserved` never mints a label below the minimum length, so a claim on one
+    ///      could never be redeemed.
+    function test_requestName_reverts_for_a_label_too_short_to_mint() public {
+        vm.expectRevert(IDotnsNameWhitelist.InvalidLabel.selector);
+        vm.prank(ed);
+        whitelist.requestName("ab", REASON, ed);
+    }
+
     function test_requestName_reverts_when_reserved() public {
         whitelist.setReserved(BASE_LABEL_A, true);
         vm.expectRevert(
@@ -284,6 +292,11 @@ contract DotnsNameWhitelistTests is BaseDotns {
     function test_grantName_reverts_for_zero_user() public {
         vm.expectRevert(IDotnsNameWhitelist.ZeroUser.selector);
         whitelist.grantName(BASE_LABEL_A, address(0));
+    }
+
+    function test_grantName_reverts_for_a_label_too_short_to_mint() public {
+        vm.expectRevert(IDotnsNameWhitelist.InvalidLabel.selector);
+        whitelist.grantName("ab", ed);
     }
 
     function test_grantName_reverts_when_not_open() public {

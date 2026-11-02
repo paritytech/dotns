@@ -334,7 +334,7 @@ contract DotnsRegistrarController is
         returns (bytes32 labelhash, bytes32 node)
     {
         require(label.isSingleLabel(), InvalidLabel());
-        require(bytes(label).length >= 3, LabelTooShort(label));
+        require(bytes(label).length >= DotnsConstants.MIN_LABEL_LENGTH, LabelTooShort(label));
         (labelhash, node) = LabelUtils.deriveNode(protocolRegistry.tldNode(), label);
     }
 
