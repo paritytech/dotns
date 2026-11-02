@@ -80,8 +80,7 @@ interface IDotnsNameEscrow {
 
     /// @notice Emitted when an account pulls its accumulated pending refund balance.
     /// @dev `recipient` is the account whose balance was paid out, also when
-    ///      @custom:function IDotnsNameEscrowWithdrawalTo.claimWithdrawalTo sent it to another
-    ///      address.
+    ///      @custom:function claimWithdrawalTo sent it to another address.
     event WithdrawalClaimed(address indexed recipient, uint256 amount);
 
     /// @notice Emitted when a recipient claims a single refund entry.
@@ -269,8 +268,7 @@ interface IDotnsNameEscrow {
 
     /// @notice Credits `msg.value` to `recipient`'s pull-payment ledger so the caller can later
     ///         pull the balance with @custom:func claimWithdrawal, or with
-    ///         @custom:func IDotnsNameEscrowWithdrawalTo.claimWithdrawalTo when it rejects
-    ///         incoming value.
+    ///         @custom:func claimWithdrawalTo when it rejects incoming value.
     /// @dev Only the configured controller may call this, otherwise @custom:reverts NotController.
     ///      `recipient` must be non-zero (@custom:reverts InvalidRecipient) and `msg.value` must
     ///      be non-zero (@custom:reverts InvalidAmount). Used by the registrar controller to
@@ -348,6 +346,15 @@ interface IDotnsNameEscrow {
     ///      succeeds.
     /// @return amount Native amount transferred to the caller.
     function claimWithdrawal() external returns (uint256 amount);
+
+    /// @notice Pulls the caller's accumulated pending refund balance and sends it to `recipient`.
+    /// @dev The same as @custom:function claimWithdrawal, except where the value goes. It is how a
+    ///      contract that rejects incoming value collects a balance credited to it, such as a
+    ///      registration overpayment refund. `recipient` must be non-zero, otherwise
+    ///      @custom:reverts InvalidRecipient. Emits @custom:emits WithdrawalClaimed for the caller.
+    /// @param recipient Address the balance is sent to.
+    /// @return amount Native amount transferred to `recipient`.
+    function claimWithdrawalTo(address recipient) external returns (uint256 amount);
 
     /// @notice Returns the pending refund balance owed to `recipient`.
     /// @return amount Native amount currently credited to `recipient` and pullable via

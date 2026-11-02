@@ -5,9 +5,6 @@ import {BaseDotns, IDotnsRegistrarController} from "../../base/BaseDotns.t.sol";
 
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
-import {
-    IDotnsNameEscrowWithdrawalTo
-} from "../../../contracts/escrow/IDotnsNameEscrowWithdrawalTo.sol";
 
 import {AcceptingReceiver} from "../../helpers/AcceptingReceiver.sol";
 import {RegistrationProbe} from "../../helpers/RegistrationProbe.sol";
@@ -487,7 +484,7 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
 
         uint256 edBalanceBefore = ed.balance;
         vm.prank(address(receiver));
-        IDotnsNameEscrowWithdrawalTo(address(dotnsNameEscrow)).claimWithdrawalTo(ed);
+        dotnsNameEscrow.claimWithdrawalTo(ed);
         assertEq(ed.balance, edBalanceBefore + overpayment, "the credit reaches the named address");
         assertEq(dotnsNameEscrow.pendingWithdrawal(address(receiver)), 0, "the credit is spent");
     }

@@ -14,7 +14,6 @@ import {
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
 import {IDotnsNameEscrowRevocation} from "./IDotnsNameEscrowRevocation.sol";
-import {IDotnsNameEscrowWithdrawalTo} from "./IDotnsNameEscrowWithdrawalTo.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IDotnsResolver} from "../resolvers/IDotnsResolver.sol";
@@ -33,8 +32,7 @@ contract DotnsNameEscrow is
     ERC165Upgradeable,
     IERC721Receiver,
     IDotnsNameEscrow,
-    IDotnsNameEscrowRevocation,
-    IDotnsNameEscrowWithdrawalTo
+    IDotnsNameEscrowRevocation
 {
     /// @notice Maximum page size for releasedTokens pagination.
     uint256 public constant MAX_RELEASED_PAGE_SIZE = 200;
@@ -470,7 +468,7 @@ contract DotnsNameEscrow is
         amount = _claimWithdrawal(msg.sender);
     }
 
-    /// @inheritdoc IDotnsNameEscrowWithdrawalTo
+    /// @inheritdoc IDotnsNameEscrow
     function claimWithdrawalTo(address recipient)
         external
         override
@@ -779,7 +777,6 @@ contract DotnsNameEscrow is
     function supportsInterface(bytes4 interfaceId) public view override returns (bool supported) {
         supported = interfaceId == type(IDotnsNameEscrow).interfaceId
             || interfaceId == type(IDotnsNameEscrowRevocation).interfaceId
-            || interfaceId == type(IDotnsNameEscrowWithdrawalTo).interfaceId
             || interfaceId == type(IERC721Receiver).interfaceId
             || super.supportsInterface(interfaceId);
     }
