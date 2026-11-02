@@ -9,6 +9,9 @@ import {
     IDotnsRegistrarController
 } from "../../../contracts/registrars/IDotnsRegistrarController.sol";
 import {IDotnsNameEscrowRevocation} from "../../../contracts/escrow/IDotnsNameEscrowRevocation.sol";
+import {
+    IDotnsNameEscrowWithdrawalTo
+} from "../../../contracts/escrow/IDotnsNameEscrowWithdrawalTo.sol";
 import {IDotnsPopController} from "../../../contracts/registrars/IDotnsPopController.sol";
 import {
     IDotnsPopControllerLegacy
@@ -829,6 +832,10 @@ contract DotnsRevocationTest is BaseDotns {
         assertTrue(
             dotnsNameEscrow.supportsInterface(type(IDotnsNameEscrowRevocation).interfaceId),
             "escrow revocation"
+        );
+        assertTrue(
+            dotnsNameEscrow.supportsInterface(type(IDotnsNameEscrowWithdrawalTo).interfaceId),
+            "escrow withdrawal to"
         );
         assertTrue(dotnsPopResolver.supportsInterface(POP_RESOLVER_ID), "pop resolver");
         assertTrue(

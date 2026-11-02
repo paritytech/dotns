@@ -5,7 +5,9 @@ import {BaseDotns, IDotnsRegistrarController} from "../../base/BaseDotns.t.sol";
 
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
+import {
+    IDotnsNameEscrowWithdrawalTo
+} from "../../../contracts/escrow/IDotnsNameEscrowWithdrawalTo.sol";
 
 import {AcceptingReceiver} from "../../helpers/AcceptingReceiver.sol";
 import {RegistrationProbe} from "../../helpers/RegistrationProbe.sol";
@@ -231,7 +233,9 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         assertEq(atRelease.recipient, nameOwner, "release recipient must be the registrant");
     }
 
-    function test_register_reclaim_state_consistent_during_safe_transfer_callback() public {
+    /// @dev Reclaim moves the name like the mint does, without the ERC-721 receiver callback, so
+    ///      the new owner gets no call while the registration is still in progress.
+    function test_register_reclaim_hands_over_the_name_without_the_receiver_callback() public {
         string memory label = NOSTATUS_LABEL_A;
 
         _register(label, ed, IPopRules.PopStatus.NoStatus);
@@ -270,19 +274,10 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         vm.prank(address(probe));
         dotnsRegistrarController.register{value: ownerPrice}(registration);
 
-        assertTrue(probe.callbackFired(), "reclaim must run through onERC721Received");
-        bytes32 node = bytes32(tokenId);
-        assertEq(
-            probe.observedRegistryOwner(),
-            address(probe),
-            "registry owner must resolve to the new owner during the callback"
-        );
-        assertEq(
-            probe.observedReverseName(),
-            string.concat(label, ".dot"),
-            "reverse record must be wired before custody moves"
-        );
-        assertEq(dotnsRegistry.owner(node), address(probe));
+        assertFalse(probe.callbackFired(), "reclaim must not call onERC721Received");
+        assertEq(dotnsRegistrar.ownerOf(tokenId), address(probe));
+        assertEq(dotnsRegistry.owner(bytes32(tokenId)), address(probe));
+        assertEq(dotnsReverseResolver.nameOf(address(probe)), string.concat(label, ".dot"));
     }
 
     function test_revert_registerreserved_for_already_seeded_label() public {
@@ -484,6 +479,17 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
             overpayment,
             "rejected push must fall back to the pull-payment ledger"
         );
+
+        // The contract rejects value, so it collects the credit at an address that accepts it.
+        vm.prank(address(receiver));
+        vm.expectRevert(abi.encodeWithSelector(IDotnsNameEscrow.RefundFailed.selector, 0));
+        dotnsNameEscrow.claimWithdrawal();
+
+        uint256 edBalanceBefore = ed.balance;
+        vm.prank(address(receiver));
+        IDotnsNameEscrowWithdrawalTo(address(dotnsNameEscrow)).claimWithdrawalTo(ed);
+        assertEq(ed.balance, edBalanceBefore + overpayment, "the credit reaches the named address");
+        assertEq(dotnsNameEscrow.pendingWithdrawal(address(receiver)), 0, "the credit is spent");
     }
 
     function test_register_overpayment_reentrant_attacker_falls_back_to_ledger() public {
@@ -543,7 +549,9 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         );
     }
 
-    function test_revert_register_on_reentry_from_onerc721received() public {
+    /// @dev A receiver armed to re-enter `register` from `onERC721Received` never gets the call,
+    ///      so the reclaim completes and the armed registration never runs.
+    function test_register_reclaim_gives_a_receiver_no_callback_to_reenter() public {
         string memory label = NOSTATUS_LABEL_A;
 
         _register(label, ed, IPopRules.PopStatus.NoStatus);
@@ -594,7 +602,11 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         uint256 outerPrice = popRules.priceWithCheck(label, address(attacker)).price;
 
         vm.prank(address(attacker));
-        vm.expectRevert(ReentrancyGuardTransient.ReentrancyGuardReentrantCall.selector);
         dotnsRegistrarController.register{value: outerPrice}(outer);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), address(attacker));
+        assertFalse(
+            dotnsRegistrar.exists(_tokenIdForLabel(replayLabel)), "the armed replay never ran"
+        );
     }
 }

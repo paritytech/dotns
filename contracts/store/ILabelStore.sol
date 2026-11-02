@@ -88,8 +88,10 @@ interface ILabelStore is IDotnsStore {
     function getLabelCount() external view returns (uint256 count);
 
     /// @notice Returns the human-readable label at the given insertion-order index.
-    /// @dev Primary read for "give me my names"; does not require the caller to know any
-    ///      labelhash. For the underlying labelhash key see @custom:function getLabelhashAt.
+    /// @dev Reads the store's ownership history without needing a labelhash. Entries are never
+    ///      removed, so a label the owner has since transferred or released stays listed; check
+    ///      current ownership on the registry. For the underlying labelhash key see
+    ///      @custom:function getLabelhashAt.
     /// @param index Zero-based index into the insertion-order list.
     /// @return label The stored label string at `index`.
     function getLabelAt(uint256 index) external view returns (string memory label);
@@ -100,8 +102,9 @@ interface ILabelStore is IDotnsStore {
     function getLabelhashAt(uint256 index) external view returns (bytes32 labelhash);
 
     /// @notice Paginated read returning just the stored labels, in insertion order.
-    /// @dev Primary bulk read for "give me all my names". Callers never need to touch
-    ///      labelhashes. Length is `min(limit, getLabelCount() - offset)`;
+    /// @dev Bulk read of the store's ownership history, every label the owner has held, including
+    ///      ones since transferred or released; check current ownership on the registry. Callers
+    ///      never need to touch labelhashes. Length is `min(limit, getLabelCount() - offset)`;
     ///      `offset >= getLabelCount()` returns an empty array (not a revert).
     /// @param offset Start index.
     /// @param limit Maximum entries to return.

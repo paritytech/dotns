@@ -14,6 +14,7 @@ import {
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
 import {IDotnsNameEscrowRevocation} from "./IDotnsNameEscrowRevocation.sol";
+import {IDotnsNameEscrowWithdrawalTo} from "./IDotnsNameEscrowWithdrawalTo.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IDotnsResolver} from "../resolvers/IDotnsResolver.sol";
@@ -32,7 +33,8 @@ contract DotnsNameEscrow is
     ERC165Upgradeable,
     IERC721Receiver,
     IDotnsNameEscrow,
-    IDotnsNameEscrowRevocation
+    IDotnsNameEscrowRevocation,
+    IDotnsNameEscrowWithdrawalTo
 {
     /// @notice Maximum page size for releasedTokens pagination.
     uint256 public constant MAX_RELEASED_PAGE_SIZE = 200;
@@ -94,7 +96,8 @@ contract DotnsNameEscrow is
     /// @dev Per-recipient isolation ensures a failing or reentrant receiver cannot block other
     ///      users' withdrawals. Used as the fallback path for registration overpayments whose
     ///      direct push back to `msg.sender` failed (because the caller is a contract that
-    ///      rejects incoming value).
+    ///      rejects incoming value); such a contract collects the balance through
+    ///      `claimWithdrawalTo`, naming an address that accepts it.
     mapping(address recipient => uint256 amount) private _pendingWithdrawals;
 
     /// @notice Time-locked refund ledger keyed by entryId.
@@ -464,13 +467,31 @@ contract DotnsNameEscrow is
 
     /// @inheritdoc IDotnsNameEscrow
     function claimWithdrawal() external override nonReentrant returns (uint256 amount) {
+        amount = _claimWithdrawal(msg.sender);
+    }
+
+    /// @inheritdoc IDotnsNameEscrowWithdrawalTo
+    function claimWithdrawalTo(address recipient)
+        external
+        override
+        nonReentrant
+        returns (uint256 amount)
+    {
+        require(recipient != address(0), InvalidRecipient());
+        amount = _claimWithdrawal(recipient);
+    }
+
+    /// @notice Pays the caller's whole pending balance to `recipient`.
+    /// @param recipient Address the balance is sent to.
+    /// @return amount Native amount sent.
+    function _claimWithdrawal(address recipient) internal returns (uint256 amount) {
         amount = _pendingWithdrawals[msg.sender];
         require(amount > 0, NoPendingWithdrawal());
 
         // Effects before interaction.
         _pendingWithdrawals[msg.sender] = 0;
 
-        (bool ok,) = payable(msg.sender).call{value: amount}("");
+        (bool ok,) = payable(recipient).call{value: amount}("");
         // tokenId is not meaningful here since a single pending balance can aggregate
         // multiple positions; surface 0 to keep the existing error shape.
         require(ok, RefundFailed(0));
@@ -650,7 +671,9 @@ contract DotnsNameEscrow is
         delete _positions[tokenId];
         _removeReleasedToken(tokenId);
 
-        _registrar().safeTransferFrom(address(this), newOwner, tokenId);
+        // `transferFrom`, like the mint, which skips the receiver hook: a contract without
+        // `onERC721Received` can hold a reclaimed name as it can a freshly minted one.
+        _registrar().transferFrom(address(this), newOwner, tokenId);
 
         emit NameReclaimed(tokenId, previousRecipient, newOwner);
     }
@@ -725,7 +748,9 @@ contract DotnsNameEscrow is
 
         _removeReleasedToken(tokenId);
 
-        _registrar().safeTransferFrom(address(this), msg.sender, tokenId);
+        // `transferFrom` for the same reason as in `reclaim`: a contract that could register
+        // and release the name can also take it back.
+        _registrar().transferFrom(address(this), msg.sender, tokenId);
 
         emit NameRedeemed(tokenId, msg.sender);
     }
@@ -754,6 +779,7 @@ contract DotnsNameEscrow is
     function supportsInterface(bytes4 interfaceId) public view override returns (bool supported) {
         supported = interfaceId == type(IDotnsNameEscrow).interfaceId
             || interfaceId == type(IDotnsNameEscrowRevocation).interfaceId
+            || interfaceId == type(IDotnsNameEscrowWithdrawalTo).interfaceId
             || interfaceId == type(IERC721Receiver).interfaceId
             || super.supportsInterface(interfaceId);
     }

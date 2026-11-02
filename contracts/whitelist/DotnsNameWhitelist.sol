@@ -178,7 +178,7 @@ contract DotnsNameWhitelist is
         require(_isWindowOpen(), WindowClosed());
         require(user != address(0), ZeroUser());
         require(bytes(reason).length <= maxReasonBytes, ReasonTooLong());
-        require(label.isSingleLabel(), InvalidLabel());
+        _requireMintableLabel(label);
 
         bytes32 node = _nodeOf(label);
         require(_names[node].status == NameStatus.Open, NameNotOpen(node));
@@ -428,7 +428,7 @@ contract DotnsNameWhitelist is
     /// @param user Beneficiary the name binds to.
     function _grant(string calldata label, address user) internal {
         require(user != address(0), ZeroUser());
-        require(label.isSingleLabel(), InvalidLabel());
+        _requireMintableLabel(label);
         bytes32 node = _nodeOf(label);
         require(_names[node].status == NameStatus.Open, NameNotOpen(node));
         emit NameAccepted(node, user, label);
@@ -482,6 +482,17 @@ contract DotnsNameWhitelist is
             _activeNodes.remove(node);
             delete record.label;
         }
+    }
+
+    /// @notice Reverts unless `label` is a canonical single label `registerReserved` can mint.
+    /// @dev Applies the controller's minimum length, so a request or grant never names a label
+    ///      that can never be registered. @custom:reverts InvalidLabel otherwise.
+    /// @param label Bare label to check.
+    function _requireMintableLabel(string calldata label) internal pure {
+        require(
+            label.isSingleLabel() && bytes(label).length >= DotnsConstants.MIN_LABEL_LENGTH,
+            InvalidLabel()
+        );
     }
 
     /// @notice Derives the namehash of `label` under the active TLD read from the registry.
