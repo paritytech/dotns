@@ -691,12 +691,7 @@ contract DotnsPopController is
         returns (PendingClaim[] memory claims)
     {
         PendingClaim[] storage queue = _pendingClaimQueue[user];
-        uint256 total = queue.length;
-        if (offset >= total) return new PendingClaim[](0);
-
-        uint256 available = total - offset;
-        uint256 count = limit < available ? limit : available;
-        if (count > DotnsConstants.MAX_PAGE_SIZE) count = DotnsConstants.MAX_PAGE_SIZE;
+        uint256 count = _pageSize(queue.length, offset, limit);
 
         claims = new PendingClaim[](count);
         for (uint256 i; i < count; ++i) {
@@ -724,12 +719,7 @@ contract DotnsPopController is
         override
         returns (address[] memory users)
     {
-        uint256 total = _pendingClaimUsers.length();
-        if (offset >= total) return new address[](0);
-
-        uint256 available = total - offset;
-        uint256 count = limit < available ? limit : available;
-        if (count > DotnsConstants.MAX_PAGE_SIZE) count = DotnsConstants.MAX_PAGE_SIZE;
+        uint256 count = _pageSize(_pendingClaimUsers.length(), offset, limit);
 
         users = new address[](count);
         for (uint256 i; i < count; ++i) {
@@ -1187,9 +1177,10 @@ contract DotnsPopController is
     /// @notice Reverts when the name at `node` holds a live grant on the name whitelist.
     /// @dev A granted name is registered only through the public controller's
     /// `registerReserved`, which spends the grant, so the gateway neither issues nor reserves it,
-    /// for any user. Reverts @custom:reverts PersonhoodNameUnavailable, an error the gateway
-    /// already decodes. A network with no whitelist configured has no grants to honour. Reads by
-    /// node, so the whitelist makes no TLD lookup of its own inside the gateway's weight limit.
+    /// for any user. Reverts @custom:reverts PersonhoodNameUnavailable, the error the controller
+    /// raises for a name it cannot reserve. A network with no whitelist configured has no grants to
+    /// honour. Reads by node, so the whitelist makes no TLD lookup of its own inside the gateway's
+    /// weight limit.
     function _requireNotGranted(bytes32 node) internal view {
         address whitelist = protocolRegistry.get(DotnsConstants.NAME_WHITELIST);
         if (whitelist == address(0)) return;
@@ -1226,6 +1217,23 @@ contract DotnsPopController is
         require(
             chatKey.length == 0 || chatKey.length == CHAT_KEY_LENGTH, InvalidChatKey(chatKey.length)
         );
+    }
+
+    /// @notice Returns how many entries a page starting at `offset` holds: at most `limit` and
+    /// `MAX_PAGE_SIZE`, and zero when `offset` is past the end of `total` entries.
+    function _pageSize(
+        uint256 total,
+        uint256 offset,
+        uint256 limit
+    )
+        internal
+        pure
+        returns (uint256 count)
+    {
+        if (offset >= total) return 0;
+        uint256 available = total - offset;
+        count = limit < available ? limit : available;
+        if (count > DotnsConstants.MAX_PAGE_SIZE) count = DotnsConstants.MAX_PAGE_SIZE;
     }
 
     /// @notice Resolves the PoP resolver via the protocol registry.
