@@ -90,6 +90,18 @@ library DotnsConstants {
     /// limit.
     uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 256;
 
+    /// @notice Default period a whitelist grant binds its name before it expires.
+    /// @dev Governance retunes it on the whitelist within `WHITELIST_MIN_GRANT_DURATION` and
+    ///      `WHITELIST_MAX_GRANT_DURATION`.
+    uint64 internal constant WHITELIST_DEFAULT_GRANT_DURATION = 30 days;
+
+    /// @notice Lower bound on the whitelist grant period, so a grantee has time to commit and
+    ///         register.
+    uint64 internal constant WHITELIST_MIN_GRANT_DURATION = 1 days;
+
+    /// @notice Upper bound on the whitelist grant period, so no grant binds a name for good.
+    uint64 internal constant WHITELIST_MAX_GRANT_DURATION = 365 days;
+
     /// @notice Well-known key the protocol registry is registered under, itself.
     /// @dev Not for discovery: the registry is the bootstrap contract every consumer already
     ///      holds. The entry exists so the registry's own implementation has a declared codehash

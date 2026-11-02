@@ -153,7 +153,9 @@ Confirm these keys are present:
 The wiring stage already asserts every protocol-registry binding, so a green deploy means they
 are set. Two are worth confirming by hand, because their absence surfaces to users rather than
 to the pipeline. With `nameWhitelist` unset, `registerReserved` reverts `WhitelistNotConfigured`
-for every grant-backed caller; a Root dispatch skips the whitelist read and is unaffected. With
+for every grant-backed caller; a Root dispatch skips the whitelist read and is unaffected. `register`
+and gateway personhood issuance then skip the grant check, so nothing keeps a granted name for its
+grantee. With
 `nameEscrow` unset it reverts `EscrowNotConfigured` for every caller, Root included, because the
 mint seeds the zero-amount release position that keeps a granted name inside the release
 lifecycle.

@@ -293,7 +293,7 @@ Before deploying to a live network, diff its manifest against `deployments/expec
 
 ## Name grants (whitelisting)
 
-Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label to one beneficiary address and is single use: `registerReserved` requires a grant naming `registration.owner`, spends it on the mint, and refuses a second attempt. See the [README economics section](./README.md#economics) for what a grant does and does not confer; this section covers the mechanics.
+Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label to one beneficiary address and is single use: `registerReserved` requires a grant naming `registration.owner`, spends it on the mint, and refuses a second attempt. Until then the label is the grantee's alone: `register` refuses it with `NameGranted`, and the PoP controller refuses to issue or reserve it with `PersonhoodNameUnavailable`, for every caller. A grant expires `grantDuration` after it is made (30 days by default), and an expired grant reads as Open everywhere. See the [README economics section](./README.md#economics) for what a grant does and does not confer; this section covers the mechanics.
 
 `registerReserved` also needs `nameEscrow` registered, and reverts with `EscrowNotConfigured` without it. The mint charges nothing, but it seeds a zero-amount escrow release position so the granted name stays inside the normal release lifecycle; a name minted without one could never be released and would leave circulation permanently. For the same reason the path reclaims from escrow instead of minting when the escrow still holds the token, which is how a released reserved-tier label is granted again.
 
@@ -301,7 +301,7 @@ Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label 
 
 That is the point of the design. As a security measure, no single key can grant a name; a grant costs a referendum, or on a test network a sudo-dispatched Root call.
 
-Two owner-level routes reach the same outcome and are **not** closed by this. `DotnsProtocolRegistry.set` is `onlyOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. `DotnsRegistrar.addController` is `onlyOwner`, and a controller can mint any available name directly, without the whitelist at all. Treat the guarantee here as covering the whitelist's own admin surface, not the protocol as a whole, until upgrade authority and deploy-time ownership are settled.
+Two owner-level routes reach the same outcome and are **not** closed by this. `DotnsProtocolRegistry.set` is `onlyOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. The same key gates the other paths too: `register` and gateway personhood issuance read it to keep granted names for their grantees, so a whitelist that reverts, or reports a grantee for every name, blocks both. `DotnsRegistrar.addController` is `onlyOwner`, and a controller can mint any available name directly, without the whitelist at all. Treat the guarantee here as covering the whitelist's own admin surface, not the protocol as a whole, until upgrade authority and deploy-time ownership are settled.
 
 The controller carries no roles either. It reads grants and consumes them, so `setRole` on the controller reverts with `UnsupportedRole`.
 
@@ -334,18 +334,19 @@ The gas and storage-deposit limits belong to the `Revive.call` extrinsic rather 
 
 ### Reading state
 
-Both views are open and need no authority:
+These views are open and need no authority:
 
 ```bash
 cast call "$WHITELIST" "isGrantedTo(string,address)(bool)" "$LABEL" "$ADDRESS"
 cast call "$WHITELIST" "statusOf(string)(uint8)" "$LABEL"
+cast call "$WHITELIST" "grantExpiresAt(string)(uint64)" "$LABEL"
 ```
 
-A grant that has been spent reads `false`, so `isGrantedTo` also distinguishes an unused grant from a consumed one. `$WHITELIST` is the `DotnsNameWhitelist` address for the target network, read from the protocol registry under the `nameWhitelist` key or taken from the [deployment manifest](#addresses), never hardcoded across networks.
+A grant that has been spent or has expired reads `false`, so `isGrantedTo` also distinguishes a live grant from a consumed or lapsed one. `grantExpiresAt` returns the timestamp a live grant expires at, and zero when the label holds none. `$WHITELIST` is the `DotnsNameWhitelist` address for the target network, read from the protocol registry under the `nameWhitelist` key or taken from the [deployment manifest](#addresses), never hardcoded across networks.
 
 ### Configuration is Root too
 
-`setWindow`, `setMaxClaimants`, `setMaxReasonBytes` and `setMaxGrantBatch` are on the same gate, so the deploy cannot configure the whitelist and the values `initialize` sets are what a fresh network starts with. Changing any of them later costs a governance action, so check the defaults in `DotnsConstants` are the ones you want at launch.
+`setWindow`, `setMaxClaimants`, `setMaxReasonBytes`, `setMaxGrantBatch` and `setGrantDuration` are on the same gate, so the deploy cannot configure the whitelist and the values `initialize` sets are what a fresh network starts with. Changing any of them later costs a governance action, so check the defaults in `DotnsConstants` are the ones you want at launch.
 
 ## Deterministic addresses (CREATE3)
 
