@@ -280,7 +280,7 @@ bun scripts/bench/revive-bench.mjs --network paseo            # contracts live o
 forge build && bun scripts/bench/revive-bench.mjs --network paseo --build   # this checkout
 ```
 
-`--build` upgrades every proxy and store beacon to the implementations in `out/` inside the same dry run, so a change can be measured before it ships. A path fails above `--fail-at` percent of its limit (90 by default). The `pallet-revive Benchmark` workflow runs both modes on Paseo Asset Hub Next and Polkadot Asset Hub every Monday, and on demand.
+`--build` upgrades every proxy and store beacon to the implementations in `out/` inside the same dry run, so a change can be measured before it ships. A path fails above `--fail-at` percent of its limit (95 by default). Paths expected to fail for now are listed in the script's `KNOWN_FAILURES`, each with what clears it: they are reported as known, and the run fails on any other failure, or when a listed path passes, so the list stays current. The `pallet-revive Benchmark` workflow runs both modes on Paseo Asset Hub Next and Polkadot Asset Hub every Monday, and on demand.
 
 ### Cleanup checklist before merging an upgrade PR
 

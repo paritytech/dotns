@@ -76,7 +76,10 @@ library DotnsConstants {
     uint256 internal constant WHITELIST_DEFAULT_MAX_REASON_BYTES = 256;
 
     /// @notice Upper bound on the whitelist live-claim cap.
-    uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 32;
+    /// @dev A grant clears every claim on the name in one call, so at this bound a referendum's
+    ///      `grantName` still fits the weight one governance call can execute, with each claim
+    ///      carrying the longest reason. The pallet-revive benchmark checks it.
+    uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 30;
 
     /// @notice Upper bound on the whitelist reason byte cap.
     uint256 internal constant WHITELIST_MAX_REASON_LIMIT = 256;
@@ -86,7 +89,10 @@ library DotnsConstants {
     uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 32;
 
     /// @notice Upper bound on the `grantNames` batch cap.
-    uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 40;
+    /// @dev At this bound a referendum's `grantNames` still fits the weight one governance call
+    ///      can execute, with every label at the longest DNS label length, since the whitelist
+    ///      stores each label it grants. The pallet-revive benchmark checks it.
+    uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 36;
 
     /// @notice Well-known key the protocol registry is registered under, itself.
     /// @dev Not for discovery: the registry is the bootstrap contract every consumer already
