@@ -10,6 +10,7 @@ For the security and audit status of the codebase, see [SECURITY.md](./SECURITY.
 | 2 | No standalone user-status mapping | Current implementation | A dedicated status mapping is added, if ever needed |
 | 3 | Clearing hides records rather than erasing them | Current implementation | Deliberate; no change planned |
 | 4 | Root-written storage refunds deposits nobody paid | Runtime | pallet-revive fixes contract-issues#284 |
+| 5 | A revoked personhood holder stays registered in the gateway pallet | Gateway pallet | The gateway pallet gains a Root call that clears an account's names and alias |
 
 ## 1. Deferred LabelStore deployment
 
@@ -55,6 +56,16 @@ See [README → Clearing records and subnames](./README.md#clearing-records-and-
 
 pallet-revive records a storage deposit for a slot written under a Root dispatch but never charges it ([contract-issues#284](https://github.com/paritytech/contract-issues/issues/284)). When a signed transaction later zeroes that slot, the refund is paid out of deposits other users made to the same contract on Asset Hub Paseo and Polkadot, and the call reverts on a runtime without that deposit backend, such as Asset Hub Kusama. The reverse also holds: a slot a user paid for and Root zeroes refunds nobody.
 
-In dotNS, Root writes the registry record, the registrar state and the escrow position of every name it mints, and the label in the owner's `LabelStore` when they have one. A Root `registerReserved` for an owner with no store also deploys it; the gateway defers it (see [Deferred LabelStore deployment](#1-deferred-labelstore-deployment)). Gateway-issued names are soulbound and never released, but reserved names minted by governance can be, and their release and reclaim zero some of those slots, so the refund is funded by other users' deposits. The record and subname deletes in [issue 3](#3-clearing-hides-records-rather-than-erasing-them) only zero slots their owner wrote, never Root-written ones.
+In dotNS, Root writes the registry record, the registrar state and the escrow position of every name it mints, and the label in the owner's `LabelStore` when they have one. A Root `registerReserved` for an owner with no store also deploys it; the gateway defers it (see [Deferred LabelStore deployment](#1-deferred-labelstore-deployment)). Gateway-issued names are soulbound and never released, but reserved names minted by governance can be, and their release and reclaim zero some of those slots, so the refund is funded by other users' deposits. The record and subname deletes in [issue 3](#3-clearing-hides-records-rather-than-erasing-them) only zero slots their owner wrote, never Root-written ones. Revocation runs under Root. For a name registered on the signed public path, and for any subname its holder created, it zeroes slots the holder paid for (the token, the registry record, the escrow position, a deleted subname), so their storage deposit is refunded to nobody. A name Root minted, through the gateway or the reserved path, is the balanced case, because Root zeroes slots Root wrote. A revoked holder gets back the escrow deposit for the name, not the storage deposit behind it. The escrow deposit is credited under Root too, so when the holder had no balance waiting, the slot that holds the credit is Root-written: claiming it refunds a storage deposit nobody paid, out of other users' deposits on Paseo and Polkadot, and reverts on a runtime without that deposit backend.
 
 **Resolution:** a pallet-revive fix for contract-issues#284. Nothing in the contracts depends on the drift, so the fix lands without a contract change.
+
+## 5. A revoked personhood holder stays registered in the gateway pallet
+
+**Type:** gateway pallet limitation.
+
+The dotNS gateway pallet keeps its own record of the names each account holds (`AccountNames`) and of each person's alias. Its only calls are `reserve_name`, `register_name`, the allowance calls and `set_dispatcher_address`, so nothing can update or clear those records. Governance revocation clears everything the contracts hold about a name (see [README → Revoking a name](./README.md#revoking-a-name)), but the pallet's records stay. The pallet then rejects that account with `AccountAlreadyRegistered` and that person with `AliasAlreadyRegistered`, so a revoked personhood holder cannot get a personhood name through the gateway again, under the same account or another one.
+
+**Workaround:** none in the contracts. The revoked name itself is free again and can be issued to someone else or registered on the public path.
+
+**Resolution:** a Root call in the gateway pallet that clears an account's names and alias, dispatched in the same governance batch as the revocation.

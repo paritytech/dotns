@@ -14,7 +14,9 @@ library SystemUtils {
     /// @notice Returns whether the transaction-level origin is substrate Root.
     /// @dev Reads the stack origin through `ISystem.originIsRoot`, which holds through a UUPS
     ///      proxy's delegatecall frame where `callerIsRoot` returns false, and returns false
-    ///      rather than reverting on a non-Root origin.
+    ///      rather than reverting on a non-Root origin. A Root origin has no account behind it,
+    ///      so a function gated on this must not read `msg.sender` in the frame Root calls:
+    ///      reading it traps. Calls it makes are fine, because they see a contract as caller.
     /// @return root True when the transaction origin is Root.
     function originIsRoot() internal view returns (bool root) {
         return ISystem(DotnsConstants.REVIVE_SYSTEM).originIsRoot();
