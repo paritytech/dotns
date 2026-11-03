@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnamewhitelist"><a class="header" href="#dotnsnamewhitelist">DotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/9416d44fd0c5a4e9c219d2bee3118dddf954ba14/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/ae3531da4fe2e3f3eab1d17a1b8f3115cc6b70f8/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></p>
 <p><strong>Title:</strong>
@@ -296,9 +296,14 @@ protocol registry the node derivation reads the TLD from.</p>
 <h3 id="setmaxclaimants"><a class="header" href="#setmaxclaimants">setMaxClaimants</a></h3>
 <p>Sets the live-claim cap per name.</p>
 <p>Restricted to a substrate Root dispatch. The cap is bounded by
-<code>DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT</code>, which bounds the resolution clear-loop.</p>
+<code>DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT</code>, which bounds the resolution clear-loop.
+The cap only stops new requests: a name that collected more claims under a higher cap
+keeps them, and governance rejects some with @custom:function reject before a</p>
 <p><strong>Notes:</strong></p>
 <ul>
+<li>
+<p>function: grantName on it fits one call.</p>
+</li>
 <li>
 <p>reverts: MaxClaimantsOutOfRange when <code>newMax</code> is zero or above the ceiling.</p>
 </li>
