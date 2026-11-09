@@ -285,6 +285,9 @@ interface IDotnsNameWhitelist {
     /// @notice Sets the live-claim cap per name.
     /// @dev Restricted to a substrate Root dispatch. The cap is bounded by
     /// `DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT`, which bounds the resolution clear-loop.
+    /// The cap only stops new requests: a name that collected more claims under a higher cap
+    /// keeps them, and governance rejects some with @custom:function reject before a
+    /// @custom:function grantName on it fits one call.
     /// @custom:reverts MaxClaimantsOutOfRange when `newMax` is zero or above the ceiling.
     /// @custom:emits MaxClaimantsSet.
     /// @param newMax New per-name claim cap.
