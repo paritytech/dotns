@@ -428,7 +428,7 @@ This open source code is provided for research, experimentation, and developer e
 <h3 id="deployments"><a class="header" href="#deployments">Deployments</a></h3>
 <p>Addresses are recorded per network in <code>deployments/&lt;network&gt;/&lt;chain-id&gt;.json</code>, and published with each release as <code>deployments.json</code>. See <a href="./DEPLOYMENTS.html">DEPLOYMENTS.md</a> for how a deployment is run and <a href="./RELEASE_ARTIFACTS.html">RELEASE_ARTIFACTS.md</a> for what a release contains.</p>
 <h3 id="build-and-test"><a class="header" href="#build-and-test">Build and test</a></h3>
-<p>Builds and tests are run with Foundry. Fork tests use the local Paseo Asset Hub adapter described in <a href="./DEPLOYMENTS.html">DEPLOYMENTS.md</a>; ordinary unit, fuzz, and invariant tests run against Foundry's in-process EVM.</p>
+<p>Builds and tests are run with Foundry. Fork tests use the local Paseo Asset Hub adapter described in <a href="./DEPLOYMENTS.html">DEPLOYMENTS.md</a>; ordinary unit, fuzz, and invariant tests run against Foundry's in-process EVM. A weekly benchmark measures the critical paths on pallet-revive against live Asset Hub state; see <a href="./CONTRIBUTING.html#pallet-revive-benchmark">CONTRIBUTING.md</a>.</p>
 <h2 id="security"><a class="header" href="#security">Security</a></h2>
 <p>Before deploying it for real use cases, you are responsible for:</p>
 <ul>
