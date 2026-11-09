@@ -28,8 +28,8 @@ import {ILabelStore} from "../store/ILabelStore.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {SubnodeUtils} from "../utils/SubnodeUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
+import {WhitelistUtils} from "../utils/WhitelistUtils.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
-import {IDotnsNameWhitelist} from "../whitelist/IDotnsNameWhitelist.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
@@ -1182,10 +1182,8 @@ contract DotnsPopController is
     /// honour. Reads by node, so the whitelist makes no TLD lookup of its own inside the gateway's
     /// weight limit.
     function _requireNotGranted(bytes32 node) internal view {
-        address whitelist = protocolRegistry.get(DotnsConstants.NAME_WHITELIST);
-        if (whitelist == address(0)) return;
         require(
-            IDotnsNameWhitelist(whitelist).granteeOfNode(node) == address(0),
+            WhitelistUtils.granteeOf(protocolRegistry, node) == address(0),
             PersonhoodNameUnavailable()
         );
     }

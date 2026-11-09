@@ -27,6 +27,7 @@ import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
+import {WhitelistUtils} from "../utils/WhitelistUtils.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
 
@@ -528,11 +529,7 @@ contract DotnsRegistrarController is
     /// @param label Bare label being registered.
     /// @param node Namehash of `label` under the active TLD.
     function _requireNotGranted(string calldata label, bytes32 node) internal view {
-        address configured = protocolRegistry.get(DotnsConstants.NAME_WHITELIST);
-        if (configured == address(0)) return;
-        require(
-            IDotnsNameWhitelist(configured).granteeOfNode(node) == address(0), NameGranted(label)
-        );
+        require(WhitelistUtils.granteeOf(protocolRegistry, node) == address(0), NameGranted(label));
     }
 
     /// @notice Returns the configured name whitelist from the protocol registry.
