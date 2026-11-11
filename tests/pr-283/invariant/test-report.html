@@ -1,19 +1,19 @@
 <!DOCTYPE html><html lang="en" class="dark"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DotNS Test Report</title>
+<title>dotNS Test Report</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config={darkMode:'class'}</script>
 </head>
 <body class="bg-gray-950 text-gray-300 min-h-screen">
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
-<h1 class="text-2xl font-bold text-white mb-1">DotNS Test Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-09-09 07:53 UTC | 9 suites</p>
+<h1 class="text-2xl font-bold text-white mb-1">dotNS Test Report</h1>
+<p class="text-sm text-gray-500">Generated 2026-11-11 11:15 UTC | 9 suites</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">Status</p><p class="text-xl font-bold text-green-400">All Passed</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">59</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">59</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Total</p><p class="text-xl font-mono text-white">61</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Passed</p><p class="text-xl font-mono text-green-400">61</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Failed</p><p class="text-xl font-mono text-gray-500">0</p></div>
 </div></div>
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
@@ -42,7 +42,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsNameEscrowInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/escrow/DotnsNameEscrowInvariant.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">11/11</span>
+<span class="text-sm font-mono text-green-400">12/12</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -61,12 +61,17 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_pending_withdrawals_match_tracked_credits</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">invariant_position_recipient_mirrors_current_nft_holder</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_protocol_fees_match_tracked_inflows</td>
+<td class="py-2 px-3 font-mono text-gray-200">invariant_protocol_fees_stay_zero</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -138,7 +143,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsPopControllerInvariant</span><span class="ml-2 text-xs text-gray-500">test/invariant/registrar/DotnsPopControllerInvariant.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">14/14</span>
+<span class="text-sm font-mono text-green-400">13/13</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -147,22 +152,17 @@
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
 </tr></thead><tbody>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_fullClaim_liteLink_are_inverse</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">invariant_gateway_and_public_provenance_are_disjoint</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_no_stale_fullClaim</td>
+<td class="py-2 px-3 font-mono text-gray-200">invariant_no_stale_deviceLabelhash</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_no_stale_liteLink</td>
+<td class="py-2 px-3 font-mono text-gray-200">invariant_no_stale_personhoodNode</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -187,6 +187,11 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_personhoodLink_deviceLink_are_inverse</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">invariant_popIssued_is_never_cleared</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
@@ -198,11 +203,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">invariant_queue_length_bounded</td>
-<td class="py-2 px-3 font-mono text-green-400">PASS</td>
-<td class="py-2 px-3 text-sm text-red-300"></td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_rival_hierarchy_never_passes_for_a_person</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -284,7 +284,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsRegistrarReservedGrantInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registrar/DotnsRegistrarReservedGrantInvariant.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">7/7</span>
+<span class="text-sm font-mono text-green-400">8/8</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -294,6 +294,11 @@
 </tr></thead><tbody>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">invariant_a_grant_admits_only_its_beneficiary</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_every_granted_name_is_releasable</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
@@ -360,7 +365,7 @@
 <div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">
 <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
 <div><span class="font-semibold text-white">DotnsRegistryInvariantTest</span><span class="ml-2 text-xs text-gray-500">test/invariant/registry/DotnsRegistryInvariant.t.sol</span></div>
-<span class="text-sm font-mono text-green-400">4/4</span>
+<span class="text-sm font-mono text-green-400">5/5</span>
 </div>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
@@ -368,6 +373,11 @@
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Result</th>
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Error</th>
 </tr></thead><tbody>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-200">invariant_address_records_follow_clears</td>
+<td class="py-2 px-3 font-mono text-green-400">PASS</td>
+<td class="py-2 px-3 text-sm text-red-300"></td>
+</tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-200">invariant_parent_can_always_reassign_subnodes</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
@@ -384,7 +394,7 @@
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-200">invariant_subnodes_always_exist</td>
+<td class="py-2 px-3 font-mono text-gray-200">invariant_subnodes_exist_exactly_while_live</td>
 <td class="py-2 px-3 font-mono text-green-400">PASS</td>
 <td class="py-2 px-3 text-sm text-red-300"></td>
 </tr>
