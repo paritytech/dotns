@@ -28,6 +28,10 @@ The release surface is decided in `.github/abi-contracts.txt` so a contract reac
 ```json
 {
   "version": "v1.2.3",
+  "registryKeys": {
+    "protocolRegistry": "DotnsProtocolRegistry",
+    "registrar": "DotnsRegistrar"
+  },
   "networks": {
     "paseo-assethub": {
       "chainId": 420420417,
@@ -47,6 +51,9 @@ The release surface is decided in `.github/abi-contracts.txt` so a contract reac
 - The names under `contracts` (`DotnsRegistrar`, `PopRules`) do not change, and a name always means the same contract. Your code can depend on that.
 - Addresses are copied from the manifest verbatim, which the deploy pipeline writes EIP-55 checksummed. Compare them case-insensitively rather than relying on the casing.
 - Only per-network manifests are published. `deployments/expected.json` — the fresh-deploy address set that CI and the genesis builder verify against (see `DEPLOYMENTS.md`) — is not a network and never appears here (it ships separately as `dotns-genesis-addresses.json`), so a release cut while an address move is awaiting its network's redeploy still advertises the addresses each live network actually runs.
+- `registryKeys` names, for every protocol registry key from `DotnsConstants` (`registrar`, `controller`, `storeFactory`, ...), the contract under `contracts` that the key holds. The pairing is the same on every network, so it is published once, and every network carries each contract it names. Each key is the registry key itself: `get(bytes32("registrar"))` on chain returns the `DotnsRegistrar` address. `multicall3` is a `DotnsConstants` key but never appears here, because the registry never holds it; take Multicall3 from `contracts`.
+- To get a network's addresses by key, replace each name in `registryKeys` with that network's address: `jq --arg n polkadot '.networks[$n].contracts as $c | .registryKeys | map_values($c[.])' deployments.json`.
+- The protocol registry stays the authority: an upgrade campaign can move a key before the next release records it. The pairing is checked against a fresh deploy in CI and against a live network with `deployments:verify`.
 - `LabelStoreBeacon` and `UserStoreBeacon` appear when deployed but are not network-stable, because the `StoreFactory` initialiser deploys them. Read them from the factory rather than pinning them.
 
 ## `release-manifest.json`
@@ -115,7 +122,7 @@ bun run deployments:verify --network paseo-assethub --rpc <eth-rpc-url>
 
 It reads the well-known keys from `DotnsConstants.sol`, resolves each through the protocol registry, and checks that every resolved address is one the manifest records and has code, that every recorded contract is pointed at by some key. The beacons are reported as unverifiable, since nothing in the registry points at them. The `protocolRegistry` key (the registry registering itself, so its implementation has a declared codehash) is new; a network that predates it leaves the key unset, and verify skips that rather than treating it as a mismatch — except under `--tag`, which asserts a post-declaration network, so a missing self-key is an error there. That self-declared hash is sloppy-drift detection only — the declaration lives inside the contract it describes — so the trustless check against release artifacts stays off chain. `multicall3` is skipped unconditionally, for the opposite reason: it is deliberately never registered, since registry membership is a trust signal and Multicall3 is a generic call forwarder.
 
-It compares the two sides as sets, so it does not check that a given key holds the contract you would expect; that pairing is asserted when a deployment is wired. It reads a committed manifest rather than a published asset, so run it from a checkout at the tag.
+It also checks the pairing a release publishes under `registryKeys`: each key must resolve to the address of the contract named for it, so a key that holds a different contract from the one a release names is reported. It reads a committed manifest rather than a published asset, so run it from a checkout at the tag. `--manifest <path>` in place of `--network` checks an uncommitted `<chain-id>.json` manifest, which is how the Deploy Contracts workflow checks the pairing against its fresh deploy.
 
 With `--tag vX.Y.Z` it additionally checks the chain's own declarations: `protocolVersion()` must equal the tag, and each key's declared codehash (`expectedCodehash(key)`) must match the code actually executing behind it, implementation-aware for proxies. A mismatch there means the code changed after the declaration was written, which is what an upgrade performed outside the release tooling looks like. A deployment that predates the declarations reports an empty version and zero hashes, which the check reports rather than tolerates, so only pass `--tag` for networks deployed at or after the release that introduced them.
 
