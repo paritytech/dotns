@@ -74,6 +74,120 @@ contract DotnsContentResolverTests is BaseDotns {
         assertEq(dotnsContentResolver.text(node, textKey), textValue);
     }
 
+    function test_contenthash_updated_at_block_is_zero_when_unset() public {
+        bytes32 node = _register("unsetblock01", ed, IPopRules.PopStatus.NoStatus);
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 0);
+    }
+
+    function test_set_contenthash_records_block_number() public {
+        address nameOwner = ed;
+
+        bytes32 node = _register("blockrecord01", nameOwner, IPopRules.PopStatus.NoStatus);
+
+        bytes memory contentHash =
+            hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        vm.roll(1_234);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 1_234);
+    }
+
+    function test_set_contenthash_again_moves_block_number() public {
+        address nameOwner = ed;
+
+        bytes32 node = _register("blockmove0001", nameOwner, IPopRules.PopStatus.NoStatus);
+
+        bytes memory contentHash =
+            hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        vm.roll(100);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 100);
+
+        // A rewrite of the identical hash is still a write and is recorded as one, matching
+        // ContentHashUpdated, which is emitted on every call rather than only on a change.
+        vm.roll(250);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 250);
+    }
+
+    function test_set_text_does_not_touch_contenthash_block() public {
+        address nameOwner = ed;
+
+        bytes32 node = _register("textnoblock01", nameOwner, IPopRules.PopStatus.NoStatus);
+
+        bytes memory contentHash =
+            hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        vm.roll(40);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+
+        vm.roll(80);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setText(node, "url", "https://example.org");
+        vm.stopPrank();
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 40);
+    }
+
+    function testFuzz_set_contenthash_records_any_block(uint64 blockNumber) public {
+        blockNumber = uint64(bound(blockNumber, 1, type(uint64).max));
+        address nameOwner = ed;
+
+        bytes32 node = _register("fuzzblock0001", nameOwner, IPopRules.PopStatus.NoStatus);
+
+        bytes memory contentHash =
+            hex"e30101701220aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        vm.roll(blockNumber);
+        vm.startPrank(nameOwner);
+        dotnsContentResolver.setContenthash(node, contentHash);
+        vm.stopPrank();
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), blockNumber);
+    }
+
+    function test_empty_contenthash_resets_block_number() public {
+        bytes32 node = _register("blockdelete01", ed, IPopRules.PopStatus.NoStatus);
+
+        vm.roll(60);
+        vm.prank(ed);
+        dotnsContentResolver.setContenthash(node, hex"e301017012201111");
+
+        vm.roll(90);
+        vm.prank(ed);
+        dotnsContentResolver.setContenthash(node, "");
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 0);
+    }
+
+    function test_cleared_node_reads_zero_block_until_rewritten() public {
+        bytes32 node = _register("blockclear001", ed, IPopRules.PopStatus.NoStatus);
+
+        vm.roll(60);
+        vm.prank(ed);
+        dotnsContentResolver.setContenthash(node, hex"e301017012201111");
+
+        vm.prank(ed);
+        dotnsRegistry.clearRecords(node);
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 0);
+
+        vm.roll(75);
+        vm.prank(ed);
+        dotnsContentResolver.setContenthash(node, hex"e301017012202222");
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 75);
+    }
+
     /// @notice Every text write logs both events: `TextUpdated`, unchanged for consumers that
     ///         filter on it, and `TextChanged`, from which the key is recoverable without knowing
     ///         it in advance.
