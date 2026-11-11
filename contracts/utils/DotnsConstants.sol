@@ -204,4 +204,30 @@ library DotnsConstants {
     ///      controller does not consult it.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant NAME_WHITELIST = bytes32("nameWhitelist");
+
+    /// @notice Every well-known protocol registry key declared above.
+    /// @dev The protocol registry seeds its key index from this list (@custom:function
+    ///      IDotnsProtocolRegistry.initializeKeys). The release tooling fails when a key declared
+    ///      here is missing from the list.
+    /// @return keys The well-known keys, in declaration order.
+    function registryKeys() internal pure returns (bytes32[] memory keys) {
+        keys = new bytes32[](17);
+        keys[0] = COST_MODEL;
+        keys[1] = PROTOCOL_REGISTRY;
+        keys[2] = REGISTRAR;
+        keys[3] = CONTROLLER;
+        keys[4] = REGISTRY;
+        keys[5] = REVERSE_RESOLVER;
+        keys[6] = POP_RULES;
+        keys[7] = STORE_FACTORY;
+        keys[8] = RESOLVER;
+        keys[9] = CONTENT_RESOLVER;
+        keys[10] = POP_CONTROLLER;
+        keys[11] = POP_RESOLVER;
+        keys[12] = POP_LENS;
+        keys[13] = NAME_ESCROW;
+        keys[14] = MULTICALL3;
+        keys[15] = CREATE3_FACTORY;
+        keys[16] = NAME_WHITELIST;
+    }
 }

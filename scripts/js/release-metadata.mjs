@@ -809,14 +809,31 @@ function changelog(args) {
 
 // Read from the library that declares them, so adding a contract needs no edit here.
 // PERSONHOOD_CONTEXT is an application identifier that shares the bytes32 shape.
+// Also checks `DotnsConstants.registryKeys()`, the list the registry seeds `keys()` from, names
+// every declared key exactly once.
 function registryKeys() {
   const source = readFileSync(CONSTANTS_SOL, "utf8");
   const keys = [];
+  const declared = [];
   const pattern = /bytes32 internal constant (\w+) = bytes32\("([^"]+)"\)/g;
   for (const [, name, key] of source.matchAll(pattern)) {
-    if (name !== "PERSONHOOD_CONTEXT") keys.push(key);
+    if (name === "PERSONHOOD_CONTEXT") continue;
+    keys.push(key);
+    declared.push(name);
   }
   if (keys.length === 0) fail(`no registry keys found in ${CONSTANTS_SOL}`);
+
+  const body = source.match(/function registryKeys\(\)[^{]*\{([\s\S]*?)\n {4}\}/);
+  if (!body) fail(`no registryKeys() list found in ${CONSTANTS_SOL}`);
+  const listed = [...body[1].matchAll(/keys\[\d+\] = (\w+);/g)].map(([, name]) => name);
+  const missing = declared.filter((name) => !listed.includes(name));
+  const extra = listed.filter((name, i) => !declared.includes(name) || listed.indexOf(name) !== i);
+  if (missing.length > 0 || extra.length > 0) {
+    fail(
+      `DotnsConstants.registryKeys() must list every declared key once; ` +
+        `missing: ${missing.join(", ") || "none"}, unexpected or repeated: ${extra.join(", ") || "none"}`,
+    );
+  }
   return keys;
 }
 
@@ -827,6 +844,23 @@ function cast(args) {
     const detail = (err.stderr || err.message || "").toString().trim().split("\n")[0];
     fail(`cast ${args[0]} failed: ${detail}`);
   }
+}
+
+// The registry's `keys()` as labels, or null on a registry that predates it (the call reverts).
+function listedKeys(rpc, registry) {
+  let raw;
+  try {
+    raw = execFileSync("cast", ["call", registry, "keys()(bytes32[])", "--rpc-url", rpc], {
+      encoding: "utf8",
+      cwd: tmpdir(),
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return null;
+  }
+  return (raw.match(/0x[0-9a-fA-F]{64}/g) ?? []).map((word) =>
+    Buffer.from(word.slice(2), "hex").toString("ascii").replace(/\0+$/, ""),
+  );
 }
 
 // Solidity's bytes32("registrar"): the ASCII bytes, left aligned and right padded.
@@ -919,6 +953,7 @@ function verify(args) {
   }
 
   const resolved = new Set();
+  const resolving = new Set();
   for (const key of registryKeys()) {
     const address = cast([
       "call",
@@ -928,6 +963,7 @@ function verify(args) {
       "--rpc-url",
       rpc,
     ]);
+    if (address !== ZERO_ADDRESS) resolving.add(key);
     if (address === ZERO_ADDRESS) {
       // protocolRegistry's tolerance is transitional and lapses under --tag: passing a tag
       // asserts the network is post-declaration, so the self-key must exist there.
@@ -1022,6 +1058,26 @@ function verify(args) {
     }
   }
 
+
+  // On a registry with `keys()`, the on-chain list must be exactly the keys that resolve.
+  const listed = listedKeys(rpc, registry);
+  if (listed === null) {
+    console.log("  skip keys() (this registry predates it)");
+  } else {
+    for (const key of resolving) {
+      if (!listed.includes(key)) {
+        problems.push(`key '${key}' resolves, but keys() does not list it (run initializeKeys)`);
+      }
+    }
+    for (const key of listed) {
+      if (!resolving.has(key)) {
+        problems.push(`keys() lists '${key}', which is not a DotnsConstants key that resolves`);
+      }
+    }
+    if (listed.every((key) => resolving.has(key)) && [...resolving].every((key) => listed.includes(key))) {
+      console.log(`  ok   keys() lists all ${listed.length} keys that resolve`);
+    }
+  }
 
   for (const label of UNVERIFIABLE) {
     if (contracts[label]) {

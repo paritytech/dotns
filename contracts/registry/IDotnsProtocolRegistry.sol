@@ -45,7 +45,8 @@ interface IDotnsProtocolRegistry {
     ///      must be non-zero, otherwise @custom:reverts ZeroAddress. Idempotent when the new
     ///      value matches the stored one (no event emitted in that case). Maintains a
     ///      per-address refcount so the same contract can occupy multiple keys without losing
-    ///      its registered status until every key is rewired. Emits
+    ///      its registered status until every key is rewired. Lists `key` in
+    ///      @custom:function keys, including when the address is unchanged. Emits
     ///      @custom:emits AddressUpdated on each effective change.
     function set(bytes32 key, address addr) external;
 
@@ -57,8 +58,25 @@ interface IDotnsProtocolRegistry {
     ///      otherwise only ever grow: a contract retired from the protocol, or one published for
     ///      lookup that should no longer be listed, has no other way out. Also clears any
     ///      codehash declared for the key, so a later re-registration never starts out with a
-    ///      stale claim. Emits @custom:emits AddressRemoved.
+    ///      stale claim. Drops `key` from @custom:function keys. Emits
+    ///      @custom:emits AddressRemoved.
     function remove(bytes32 key) external;
+
+    /// @notice Returns every key that holds an address.
+    /// @dev Lets a client that holds only this registry's address list every key and resolve
+    ///      each through @custom:function get. Keys are ASCII labels padded to 32 bytes, such as
+    ///      `bytes32("registrar")`. The order is unspecified and can change when a key is removed.
+    /// @return registeredKeys Keys that currently hold an address.
+    function keys() external view returns (bytes32[] memory registeredKeys);
+
+    /// @notice Lists the well-known keys that already hold an address in @custom:function keys.
+    /// @dev For a registry upgraded onto a network whose keys were set before @custom:function
+    ///      keys existed; on a fresh deploy @custom:function set lists every key as it is set.
+    ///      Runs once, through the upgrade that introduces @custom:function keys, otherwise
+    ///      @custom:reverts InvalidInitialization. Owner-restricted, otherwise
+    ///      @custom:reverts OwnableUnauthorizedAccount. Takes no input: it seeds from
+    ///      `DotnsConstants.registryKeys`, so the list cannot be passed in incomplete.
+    function initializeKeys() external;
 
     /// @notice Returns true iff `addr` is currently registered under at least one well-known key.
     /// @dev O(1) refcount-backed lookup answering discovery, not authority: it reports that
