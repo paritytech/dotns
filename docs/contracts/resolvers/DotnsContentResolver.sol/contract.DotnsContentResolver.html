@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnscontentresolver"><a class="header" href="#dotnscontentresolver">DotnsContentResolver</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/21ff5cf8d8190dbee3f47d19402a8d5f798aecda/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c80b02b05e083ac4dbfbf9f44d2ffe6f7d14f7e3/contracts/resolvers/DotnsContentResolver.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/resolvers/IDotnsContentResolver.sol/interface.IDotnsContentResolver.html">IDotnsContentResolver</a></p>
 <p><strong>Title:</strong>
@@ -229,6 +229,11 @@ reads as set until its node is first cleared. The same holds for <code>textVersi
 <p>Node =&gt; text key =&gt; registry record version the value was written under.</p>
 <pre><code class="language-solidity">mapping(bytes32 node =&gt; mapping(string key =&gt; uint64 version)) private textVersions
 </code></pre>
+<h3 id="contenthashupdatedatblocks"><a class="header" href="#contenthashupdatedatblocks">contenthashUpdatedAtBlocks</a></h3>
+<p>Node =&gt; block in which its content hash was last written.</p>
+<p>Read through the content hash's version stamp, so a cleared hash reads zero.</p>
+<pre><code class="language-solidity">mapping(bytes32 node =&gt; uint64 blockNumber) private contenthashUpdatedAtBlocks
+</code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="constructor"><a class="header" href="#constructor">constructor</a></h3>
 <p><strong>Note:</strong>
@@ -261,8 +266,10 @@ setup completes.</p>
 otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an IPFS
 CID); the resolver stores them as-is and never interprets the payload. An empty <code>hash</code>
 deletes the record: its storage is zeroed and the storage deposit released to the
-signer of the transaction. Emits @custom:emits ContentHashUpdated on every successful
-write.</p>
+signer of the transaction. A non-empty <code>hash</code> records the current block for</p>
+<p><strong>Note:</strong>
+function: contenthashUpdatedAtBlock. Emits @custom:emits ContentHashUpdated on
+every successful write.</p>
 <pre><code class="language-solidity">function setContenthash(bytes32 node, bytes calldata hash) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -286,6 +293,28 @@ even though the bytes written before stay in storage.</p>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>hash</code></td><td><code>bytes</code></td><td>The stored content hash bytes, or empty if unset.</td></tr>
+</tbody></table>
+</div>
+<h3 id="contenthashupdatedatblock"><a class="header" href="#contenthashupdatedatblock">contenthashUpdatedAtBlock</a></h3>
+<p>Returns the block in which a node's content hash was last written.</p>
+<p>Recorded by every @custom:function setContenthash with a non-empty hash, so it
+answers "when did this hash last change" without scanning <code>ContentHashUpdated</code> logs.
+Like @custom:function contenthash, it reads as unset once the node is cleared or stops
+resolving.</p>
+<pre><code class="language-solidity">function contenthashUpdatedAtBlock(bytes32 node)
+    external
+    view
+    override
+    returns (uint64 blockNumber);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td>The node to query.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>blockNumber</code></td><td><code>uint64</code></td><td>Block of the last write of the current hash, or zero when the node has no current hash or no block is recorded for it.</td></tr>
 </tbody></table>
 </div>
 <h3 id="settext"><a class="header" href="#settext">setText</a></h3>
