@@ -48,7 +48,7 @@ def generate_html(findings):
     lines = []
     lines.append('<!DOCTYPE html><html lang="en" class="dark"><head><meta charset="utf-8">')
     lines.append('<meta name="viewport" content="width=device-width,initial-scale=1">')
-    lines.append("<title>DotNS Slither Report</title>")
+    lines.append("<title>dotNS Slither Report</title>")
     lines.append('<script src="https://cdn.tailwindcss.com"></script>')
     lines.append("<script>tailwind.config={darkMode:'class'}</script>")
     lines.append("</head>")
@@ -56,7 +56,7 @@ def generate_html(findings):
     lines.append('<div class="max-w-6xl mx-auto px-4 py-8">')
 
     lines.append('<div class="mb-8">')
-    lines.append('<h1 class="text-2xl font-bold text-white mb-1">DotNS Slither Report</h1>')
+    lines.append('<h1 class="text-2xl font-bold text-white mb-1">dotNS Slither Report</h1>')
     lines.append(f'<p class="text-sm text-gray-500">Generated {timestamp} | {total} findings</p>')
     lines.append("</div>")
 

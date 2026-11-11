@@ -5,7 +5,7 @@ import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {EscrowHandler} from "./EscrowHandler.t.sol";
 
-/// @title Dotns Name Escrow Invariant Suite
+/// @title dotNS Name Escrow Invariant Suite
 /// @notice Asserts solvency, custody, and recipient-locking properties of the name escrow
 ///         across randomised registration, release, withdraw, claim, and transfer flows.
 contract DotnsNameEscrowInvariantTest is BaseDotns {
@@ -38,12 +38,12 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         selectors[5] = handler.setRandomPopStatus.selector;
         selectors[6] = handler.reRegisterReclaimed.selector;
         selectors[7] = handler.transferDeposited.selector;
-        selectors[8] = handler.transferPayable.selector;
-        selectors[9] = handler.advanceTime.selector;
+        selectors[8] = handler.advanceTime.selector;
         // The two halves of the redeem window. Without both, the fuzzer can only reach reclaim by
         // way of a withdrawal, which is precisely the assumption the reclaim deadlock rested on.
-        selectors[10] = handler.redeemReleased.selector;
-        selectors[11] = handler.reRegisterReleased.selector;
+        selectors[9] = handler.redeemReleased.selector;
+        selectors[10] = handler.reRegisterReleased.selector;
+        selectors[11] = handler.revokeName.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
 
         excludeContract(address(dotnsRegistrarController));
@@ -57,8 +57,7 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
 
     /// @notice Escrow native balance must always cover the full liability set: tracked
     /// reserves, the protocol fees, unclaimed pull-payment balances, and the time-locked
-    /// refund-ledger entries credited by the refund-on-leave path. Under the deposit-binds-
-    /// to-depositor model these four flows are economically distinct; solvency is only
+    /// refund-ledger entries. These four flows are economically distinct; solvency is only
     /// meaningful against their sum.
     function invariant_solvency() public view {
         uint256 escrowBalance = address(dotnsNameEscrow).balance;
@@ -74,15 +73,25 @@ contract DotnsNameEscrowInvariantTest is BaseDotns {
         );
     }
 
-    /// @notice The handler's mirror of protocol-fee inflows must equal the escrow's on-chain
-    ///         protocol-fee balance. Protocol fees only ever accrue, so every inflow the handler
-    ///         tracks (cross-tier register and payable transfer) must sum to exactly the balance.
-    function invariant_protocol_fees_match_tracked_inflows() public view {
+    /// @notice The pull-payment ledger must hold exactly what the tracked flows credited, less what
+    ///         was claimed.
+    /// @dev Strict equality, because the bug this guards against is a settlement that forgets to
+    ///      credit the departing holder: the escrow then holds more than it owes, which
+    ///      @custom:function invariant_solvency accepts. Withdraw, reclaim and revocation credit
+    ///      this ledger, and claims drain it. Registration overpayments reach it only when pushing
+    ///      them back fails, which never happens to the handler's actors.
+    function invariant_pending_withdrawals_match_tracked_credits() public view {
         assertEq(
-            handler.ghost_protocolFeesPaidIn(),
-            dotnsNameEscrow.protocolFees(),
-            "Tracked protocol-fee inflows must equal on-chain protocol fees"
+            handler.totalPendingWithdrawals(),
+            handler.ghost_pendingCredits() - handler.ghost_pendingPulls(),
+            "Pending withdrawals must equal tracked credits less claims"
         );
+    }
+
+    /// @notice Nothing credits the protocol fee balance: registrations lock deposits and
+    ///         transfers are free, so it stays at zero whatever the handler does.
+    function invariant_protocol_fees_stay_zero() public view {
+        assertEq(dotnsNameEscrow.protocolFees(), 0, "Nothing may credit protocol fees");
     }
 
     /// @notice Sum of all active (deposited but not withdrawn) position amounts must equal

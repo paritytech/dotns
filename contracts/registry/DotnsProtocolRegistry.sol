@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -11,9 +12,9 @@ import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
 
-/// @title Dotns Protocol Registry
+/// @title dotNS Protocol Registry
 /// @author Parity
-/// @notice Upgradeable address registry for all DotNS protocol contracts, and the authority for
+/// @notice Upgradeable address registry for all dotNS protocol contracts, and the authority for
 ///         the network's top-level domain.
 /// @dev Single source of truth for sibling-contract lookups. All siblings resolve each other via
 ///      well-known `bytes32` constants in `DotnsConstants` rather than holding direct addresses,
@@ -43,6 +44,12 @@ contract DotnsProtocolRegistry is
     /// @notice TLD suffix including the leading dot, e.g. `.dot`.
     string private _tld;
 
+    /// @notice Codehash declared for the code that executes for each well-known key.
+    mapping(bytes32 key => bytes32 codehash) private _expectedCodehash;
+
+    /// @notice Release tag the network was last declared to run, bare semver (e.g. `0.8.0`).
+    string private _protocolVersion;
+
     uint256[50] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -52,13 +59,14 @@ contract DotnsProtocolRegistry is
 
     /// @notice Initialises the protocol registry and fixes the network's TLD.
     /// @dev Callable exactly once via `Initializable`, otherwise
-    ///      @custom:reverts InvalidInitialization. Sets the deployer as owner. `tldLabel` is the
+    ///      @custom:reverts InvalidInitialization. Sets `initialOwner` as owner. `tldLabel` is the
     ///      bare label without a dot (e.g. `dot`, `paseo`); it must be a single DNS label,
     ///      otherwise @custom:reverts InvalidTld. The TLD is fixed here because changing it after
     ///      names exist would reroot every node.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param tldLabel Bare TLD label, without the leading dot.
-    function initialize(string calldata tldLabel) external initializer {
-        __Ownable_init(msg.sender);
+    function initialize(address initialOwner, string calldata tldLabel) external initializer {
+        __Ownable_init(initialOwner);
 
         require(tldLabel.isSingleLabel(), InvalidTld());
         _tldNode = LabelUtils.namehashUnder(bytes32(0), LabelUtils.labelhash(tldLabel));
@@ -87,6 +95,20 @@ contract DotnsProtocolRegistry is
     }
 
     /// @inheritdoc IDotnsProtocolRegistry
+    function remove(bytes32 key) external override onlyOwner {
+        address previousAddress = _addresses[key];
+        require(previousAddress != address(0), KeyNotRegistered());
+
+        --_registeredRefcount[previousAddress];
+        delete _addresses[key];
+        // A codehash declared for a key nothing resolves any more describes nothing; leaving it
+        // would make a later re-registration under this key start out with a stale claim.
+        delete _expectedCodehash[key];
+
+        emit AddressRemoved(key, previousAddress);
+    }
+
+    /// @inheritdoc IDotnsProtocolRegistry
     function isRegisteredAddress(address addr) external view override returns (bool registered) {
         return addr != address(0) && _registeredRefcount[addr] > 0;
     }
@@ -101,10 +123,47 @@ contract DotnsProtocolRegistry is
         return _tld;
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @inheritdoc IDotnsProtocolRegistry
+    function protocolVersion() external view override returns (string memory semver) {
+        return _protocolVersion;
+    }
+
+    /// @inheritdoc IDotnsProtocolRegistry
+    function setProtocolVersion(string calldata semver) external override onlyOwner {
+        bytes calldata raw = bytes(semver);
+        require(raw.length != 0 && raw[0] >= "0" && raw[0] <= "9", InvalidProtocolVersion());
+        for (uint256 i = 1; i < raw.length; ++i) {
+            bytes1 char = raw[i];
+            bool allowed = (char >= "0" && char <= "9") || (char >= "a" && char <= "z")
+                || (char >= "A" && char <= "Z") || char == "." || char == "-";
+            require(allowed, InvalidProtocolVersion());
+        }
+
+        _protocolVersion = semver;
+        emit ProtocolVersionSet(semver);
+    }
+
+    /// @notice Returns the declared release, mirroring `protocolVersion` under the historical
+    ///         `version()` selector every dotNS contract exposes.
+    /// @dev Sibling contracts mirror the same stored value by reading it from here, so
+    ///      `version()` answers identically network-wide; this contract is where the value
+    ///      lives, so it reads its own storage.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = _protocolVersion;
+    }
+
+    /// @inheritdoc IDotnsProtocolRegistry
+    function expectedCodehash(bytes32 key) external view override returns (bytes32 codehash) {
+        return _expectedCodehash[key];
+    }
+
+    /// @inheritdoc IDotnsProtocolRegistry
+    function setExpectedCodehash(bytes32 key, bytes32 codehash) external override onlyOwner {
+        require(_addresses[key] != address(0), KeyNotRegistered());
+
+        _expectedCodehash[key] = codehash;
+        emit ExpectedCodehashSet(key, codehash);
     }
 
     /// @inheritdoc UUPSUpgradeable

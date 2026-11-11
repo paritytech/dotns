@@ -120,7 +120,7 @@
 
 - name: "dotns-sdk"
   color: "5319e7"
-  description: "DotNS SDK (UI, CLI, libraries)"
+  description: "dotNS SDK (UI, CLI, libraries)"
 
 - name: "smartcontracts"
   color: "e3a21a"

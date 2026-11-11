@@ -57,9 +57,9 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
 
     function testFuzz_register_refunds_overpayment_inline(uint256 extra, uint256 salt) public {
         address registrant = tiago;
-        string memory nameLabel = _labelPopFullPriced(bound(salt, 0, 64));
+        string memory nameLabel = _labelPersonhoodPriced(bound(salt, 0, 64));
 
-        _grantPopFull(registrant);
+        _grantPersonhood(registrant);
 
         IDotnsRegistrarController.Registration memory registration =
             _commitFor(nameLabel, registrant, false);
@@ -104,8 +104,8 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         address payer = leonardo;
         string memory nameLabel = _labelPopfull(bound(salt, 0, 64));
 
-        _grantPopFull(nameOwner);
-        _grantPopFull(payer);
+        _grantPersonhood(nameOwner);
+        _grantPersonhood(payer);
 
         IDotnsRegistrarController.Registration memory registration =
             _commitFor(nameLabel, nameOwner, true, payer);
@@ -151,7 +151,7 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         address recipient = leonardo;
         string memory nameLabel = _labelPopfull(bound(salt, 0, 64));
 
-        _grantPopFull(sender);
+        _grantPersonhood(sender);
 
         IDotnsRegistrarController.Registration memory registration =
             _commitFor(nameLabel, sender, true);
@@ -164,9 +164,8 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         bytes32 node = _namehash(dotNode, labelhash);
         uint256 tokenId = uint256(node);
 
-        uint256 _xferFee = dotnsRegistrar.quoteTransferFee(tokenId, recipient);
         vm.prank(sender);
-        dotnsRegistrar.transferFrom{value: _xferFee}(sender, recipient, tokenId);
+        dotnsRegistrar.transferFrom(sender, recipient, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), recipient);
 
@@ -185,7 +184,7 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         uint256 primarySalt = bound(salt, 0, 63);
         string memory primaryName = _labelPopfull(primarySalt);
 
-        _grantPopFull(nameOwner);
+        _grantPersonhood(nameOwner);
 
         IDotnsRegistrarController.Registration memory primaryRegistration =
             _commitFor(primaryName, nameOwner, true);
@@ -198,7 +197,7 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
 
         string memory giftedName = _labelNoStatusPriced(primarySalt + 1);
 
-        _grantPopFull(payer);
+        _grantPersonhood(payer);
 
         IDotnsRegistrarController.Registration memory giftedRegistration =
             _commitFor(giftedName, nameOwner, true, payer);
@@ -261,10 +260,8 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         uint256 depositorRefundsBefore = dotnsNameEscrow.pendingRefundCount(depositor);
         uint256 recipientRefundsBefore = dotnsNameEscrow.pendingRefundCount(recipientSeed);
 
-        uint256 transferFee = dotnsRegistrar.quoteTransferFee(tokenId, recipientSeed);
-
         vm.prank(depositor);
-        dotnsRegistrar.transferFrom{value: transferFee}(depositor, recipientSeed, tokenId);
+        dotnsRegistrar.transferFrom(depositor, recipientSeed, tokenId);
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), recipientSeed, "NFT must move to the recipient");
 
@@ -299,7 +296,7 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         address recipient = leonardo;
         string memory nameLabel = _labelPopfull(bound(salt, 0, 64));
 
-        _grantPopFull(sender);
+        _grantPersonhood(sender);
 
         IDotnsRegistrarController.Registration memory registration =
             _commitFor(nameLabel, sender, true);
@@ -314,9 +311,8 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
 
         assertEq(dotnsReverseResolver.nameOf(sender), string.concat(nameLabel, ".dot"));
 
-        uint256 _xferFee = dotnsRegistrar.quoteTransferFee(tokenId, recipient);
         vm.prank(sender);
-        dotnsRegistrar.transferFrom{value: _xferFee}(sender, recipient, tokenId);
+        dotnsRegistrar.transferFrom(sender, recipient, tokenId);
 
         assertEq(dotnsReverseResolver.nameOf(sender), "");
     }
@@ -366,7 +362,7 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
     }
 
-    /// @notice Generate a label that classifies as PopFull (baselength 8, no trailing digits).
+    /// @notice Generate a label that classifies as Personhood (baselength 8, no trailing digits).
     function _labelPopfull(uint256 salt) internal pure returns (string memory label) {
         return string(abi.encodePacked("popful", _uintToAlphaFixed(salt, 2)));
     }
@@ -377,10 +373,10 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
         return string(abi.encodePacked("nostatu", _uintToAlphaFixed(salt, 2), "01"));
     }
 
-    /// @notice Generate an 8-character PopFull-tier label, measured whole, that prices above
-    ///         the floor so the amount is non-zero. A public fixture cannot be PopLite: that is
+    /// @notice Generate an 8-character Personhood-tier label, measured whole, that prices above
+    ///         the floor so the amount is non-zero. A public fixture cannot be Devicehood: that is
     ///         the gateway's separated form and this path rejects a separator.
-    function _labelPopFullPriced(uint256 salt) internal pure returns (string memory label) {
+    function _labelPersonhoodPriced(uint256 salt) internal pure returns (string memory label) {
         return string(abi.encodePacked("free", _uintToAlphaFixed(salt, 2), "01"));
     }
 

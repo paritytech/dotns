@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {IDotnsController} from "../registrars/IDotnsController.sol";
@@ -11,8 +12,9 @@ import {DotnsConstants} from "./DotnsConstants.sol";
 /// @dev Registry membership is not authority. `DotnsProtocolRegistry` is an address book kept so
 ///      consumers can discover the protocol, and `isRegisteredAddress` answers true for every
 ///      address under every key, including entries that exist only to be found. Using it as the
-///      gate hands store authority to whatever is registered next, and the registry has no
-///      delete, so `set` can only repoint a key rather than clear it. A registered call
+///      gate hands store authority to whatever is registered next, and although
+///      @custom:function IDotnsProtocolRegistry.remove can now clear a key, a deployment already
+///      carrying one keeps it until governance acts. A registered call
 ///      forwarder is the sharpest case: it makes the call anyone asks it to, and the store sees
 ///      the forwarder as its caller.
 /// @dev Authority is instead the registrar, the registry, and whatever the registrar currently
@@ -28,7 +30,7 @@ library StoreAuth {
     /// @notice Whether `caller` is a protocol component allowed to act on a user's store.
     /// @dev Ordered by how often each one writes: the registrar on every mint and transfer, a
     ///      controller on a registration or a gateway name, and the registry on a subname.
-    /// @param protocolRegistry The canonical DotNS protocol registry.
+    /// @param protocolRegistry The canonical dotNS protocol registry.
     /// @param caller The address being checked, normally `msg.sender`.
     /// @return authorised True if `caller` is the registrar, an authorised controller, or the
     ///         registry.

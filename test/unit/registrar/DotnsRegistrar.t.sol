@@ -9,6 +9,7 @@ import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocol
 import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {ILabelStore} from "../../../contracts/store/ILabelStore.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
+import {StoreUtils} from "../../../contracts/utils/StoreUtils.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
@@ -21,6 +22,48 @@ import {
 ///         availability tracking, registration, transfer fee gate, label readback,
 ///         upgrade authorisation, and approval surfaces.
 contract DotnsRegistrarTests is BaseDotns {
+    /// @notice A transfer into a recipient whose slot for that name already holds a different
+    ///         string reverts, rather than mirroring nothing and handing over a stranded name.
+    /// @dev Skipping the write would strand the name: `storeLabel` has no delete, so the wrong
+    ///      label stands and every onward transfer reverts. Reverting is the recoverable outcome.
+    function test_transfer_into_a_poisoned_recipient_slot_reverts() public {
+        string memory label = "conflictname";
+        _register(label, ed, IPopRules.PopStatus.NoStatus);
+        uint256 tokenId = _tokenIdForLabel(label);
+
+        // A store writer occupies the recipient's slot for this name with a string that is not the
+        // name, the way a rogue or buggy controller could.
+        vm.prank(owner);
+        address store = storeFactory.deployLabelStoreFor(leonardo);
+        vm.prank(address(dotnsRegistrar));
+        ILabelStore(store).storeLabel(bytes32(tokenId), "not-the-name");
+
+        vm.prank(ed);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                StoreUtils.LabelEntryConflict.selector, store, bytes32(tokenId), "not-the-name"
+            )
+        );
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), ed, "the name stayed with its holder");
+    }
+
+    /// @notice A recipient slot already holding the same name stays a no-op, so a transfer back to
+    ///         a prior holder still passes.
+    function test_transfer_back_to_a_prior_holder_still_passes() public {
+        string memory label = "roundtripname";
+        _register(label, ed, IPopRules.PopStatus.NoStatus);
+        uint256 tokenId = _tokenIdForLabel(label);
+
+        vm.prank(ed);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
+        vm.prank(leonardo);
+        dotnsRegistrar.transferFrom(leonardo, ed, tokenId);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), ed, "the name returned to its prior holder");
+    }
+
     function test_add_controller() public {
         address additionalController = makeAddr("additionalController");
 
@@ -260,19 +303,8 @@ contract DotnsRegistrarTests is BaseDotns {
         label;
     }
 
-    function test_quote_transfer_fee_reverts_for_zero_recipient() public {
-        string memory label = "quotezero01";
-        _register(label, ed, IPopRules.PopStatus.NoStatus);
-        uint256 tokenId = _tokenIdForLabel(label);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(IERC721Errors.ERC721InvalidReceiver.selector, address(0))
-        );
-        dotnsRegistrar.quoteTransferFee(tokenId, address(0));
-    }
-
-    function test_quote_transfer_fee_reverts_when_escrow_unconfigured() public {
-        string memory label = "quoteneedsescrow01";
+    function test_transfer_reverts_when_escrow_unconfigured() public {
+        string memory label = "needsescrow01";
         _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = _tokenIdForLabel(label);
 
@@ -286,59 +318,45 @@ contract DotnsRegistrarTests is BaseDotns {
         );
 
         vm.expectRevert(IDotnsRegistrar.EscrowNotConfigured.selector);
-        dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-    }
-
-    function test_quote_transfer_fee_zero_for_self_transfer() public {
-        string memory label = "selfquote01";
-        _register(label, ed, IPopRules.PopStatus.NoStatus);
-        uint256 tokenId = _tokenIdForLabel(label);
-
-        assertEq(dotnsRegistrar.quoteTransferFee(tokenId, ed), 0);
-    }
-
-    function test_quote_transfer_fee_zero_for_escrow_recipient() public {
-        string memory label = "escrowquote01";
-        _register(label, ed, IPopRules.PopStatus.NoStatus);
-        uint256 tokenId = _tokenIdForLabel(label);
-
-        assertEq(dotnsRegistrar.quoteTransferFee(tokenId, address(dotnsNameEscrow)), 0);
-    }
-
-    function test_quote_transfer_fee_zero_when_no_label_recorded() public {
-        // Direct-controller registration with an empty label leaves no entry in the holder's
-        // LabelStore; the quoter has nothing to derive a tier-price from and must return zero.
-        string memory label = "noquotelabel01";
-        uint256 tokenId = _tokenIdForLabel(label);
-
-        vm.prank(address(dotnsRegistrarController));
-        dotnsRegistrar.register(tokenId, ed, "");
-
-        assertEq(dotnsRegistrar.quoteTransferFee(tokenId, leonardo), 0);
-        label;
-    }
-
-    function test_transfer_reverts_when_fee_required_but_no_value_attached() public {
-        string memory label = "feerequired01";
-        // Grant Full to ed so the mint succeeds, but leave leonardo at NoStatus so the
-        // transfer floor charges a non-zero downgrade fee.
-        _register(label, ed, IPopRules.PopStatus.PopFull);
-        uint256 tokenId = _tokenIdForLabel(label);
-
-        uint256 fee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-        assertGt(fee, 0, "test setup must produce a non-zero transfer floor");
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDotnsRegistrar.TransferFeeRequired.selector, tokenId, leonardo, fee
-            )
-        );
         vm.prank(ed);
         dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
     }
 
-    function test_self_transfer_skips_fee_charge() public {
-        // A `from == to` move must not touch the escrow at all: no fee, no position sync.
+    function test_transfer_below_band_is_free() public {
+        string memory label = "feegated";
+        // Ed holds personhood and leonardo does not, below the band of a base length of eight:
+        // the move costs nothing and the deposit follows the name.
+        _register(label, ed, IPopRules.PopStatus.Personhood);
+        uint256 tokenId = _tokenIdForLabel(label);
+        uint256 feesBefore = dotnsNameEscrow.protocolFees();
+
+        vm.prank(ed);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), leonardo);
+        assertEq(dotnsNameEscrow.getReleasePosition(tokenId).recipient, leonardo);
+        assertEq(dotnsNameEscrow.protocolFees(), feesBefore, "no fee reaches the pot");
+    }
+
+    function test_transfer_reverts_with_attached_value() public {
+        string memory label = "valuegated";
+        _register(label, ed, IPopRules.PopStatus.Personhood);
+        uint256 tokenId = _tokenIdForLabel(label);
+        vm.deal(ed, 1 ether);
+
+        // The transfer functions are not payable, so the call fails before `_update` runs.
+        vm.prank(ed);
+        (bool ok,) = address(dotnsRegistrar).call{value: 1}(
+            abi.encodeCall(IERC721.transferFrom, (ed, leonardo, tokenId))
+        );
+        assertFalse(ok, "a transfer carrying value must revert");
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), ed);
+        assertEq(ed.balance, 1 ether, "attached value must be returned on revert");
+    }
+
+    function test_self_transfer_skips_escrow() public {
+        // A `from == to` move must not touch the escrow at all: no position sync.
         string memory label = "selftransfer01";
         _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = _tokenIdForLabel(label);
@@ -346,7 +364,7 @@ contract DotnsRegistrarTests is BaseDotns {
         IDotnsNameEscrow.ReleasePosition memory before = dotnsNameEscrow.getReleasePosition(tokenId);
 
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: 0}(ed, ed, tokenId);
+        dotnsRegistrar.transferFrom(ed, ed, tokenId);
 
         IDotnsNameEscrow.ReleasePosition memory afterPos =
             dotnsNameEscrow.getReleasePosition(tokenId);
@@ -356,15 +374,11 @@ contract DotnsRegistrarTests is BaseDotns {
         assertEq(afterPos.amount, before.amount);
     }
 
-    function test_version_string() public view {
-        assertEq(dotnsRegistrar.version(), "1.0.0");
-    }
-
     function test_initialize_cannot_be_called_twice() public {
         // OZ InvalidInitialization
         vm.expectRevert();
         dotnsRegistrar.initialize(
-            "Dotns", "Dotns", IDotnsProtocolRegistry(address(protocolRegistry))
+            owner, "Dotns", "Dotns", IDotnsProtocolRegistry(address(protocolRegistry))
         );
     }
 
@@ -405,8 +419,8 @@ contract DotnsRegistrarTests is BaseDotns {
         assertTrue(dotnsRegistrar.supportsInterface(type(IERC721).interfaceId));
     }
 
-    /// @notice Mints a name as if through the PoP gateway: the caller is the address registered
-    /// under `POP_CONTROLLER`, and the gateway path passes an empty label.
+    /// @notice Mints a name as if through the dotNS gateway pallet: the caller is the address
+    /// registered under `POP_CONTROLLER`, and the gateway path passes an empty label.
     function _mintSoulbound(
         string memory label,
         address nameOwner
@@ -528,13 +542,6 @@ contract DotnsRegistrarTests is BaseDotns {
         assertEq(dotnsRegistrar.ownerOf(tokenId), ed);
     }
 
-    function test_soulbound_quote_transfer_fee_reverts() public {
-        uint256 tokenId = _mintSoulbound("sbquote01", ed);
-
-        vm.expectRevert(abi.encodeWithSelector(IDotnsRegistrar.NameSoulbound.selector, tokenId));
-        dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
-    }
-
     function test_soulbound_cannot_enter_escrow() public {
         // A soulbound name holds no escrow position, so `release` rejects it before any custody
         // move is attempted. The name can never be released into escrow.
@@ -591,9 +598,11 @@ contract DotnsRegistrarTests is BaseDotns {
         uint256 tokenId = _mintSoulbound("sbvalue01", ed);
         vm.deal(ed, 1 ether);
 
-        vm.expectRevert(abi.encodeWithSelector(IDotnsRegistrar.NameSoulbound.selector, tokenId));
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: 1 ether}(ed, leonardo, tokenId);
+        (bool ok,) = address(dotnsRegistrar).call{value: 1 ether}(
+            abi.encodeCall(IERC721.transferFrom, (ed, leonardo, tokenId))
+        );
+        assertFalse(ok, "a transfer carrying value must revert");
 
         assertEq(dotnsRegistrar.ownerOf(tokenId), ed);
         assertEq(ed.balance, 1 ether, "attached value must be returned on revert");
@@ -601,8 +610,7 @@ contract DotnsRegistrarTests is BaseDotns {
     }
 
     function test_soulbound_self_transfer_reverts() public {
-        // A soulbound name reverts even on a same-address move, keeping transferFrom in step with
-        // quoteTransferFee (which reverts regardless of recipient) and the interface contract.
+        // A soulbound name reverts even on a same-address move, as the interface contract states.
         uint256 tokenId = _mintSoulbound("sbself01", ed);
 
         vm.expectRevert(abi.encodeWithSelector(IDotnsRegistrar.NameSoulbound.selector, tokenId));

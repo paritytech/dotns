@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -12,11 +13,15 @@ import {
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
+import {IDotnsNameEscrowRevocation} from "./IDotnsNameEscrowRevocation.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
+import {IDotnsResolver} from "../resolvers/IDotnsResolver.sol";
+import {IDotnsContentResolver} from "../resolvers/IDotnsContentResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
-/// @title Dotns Name Escrow
+/// @title dotNS Name Escrow
 /// @notice Holds refundable deposits for registered names and manages the release/reclaim
 /// lifecycle. @custom:security-contact admin@parity.io
 contract DotnsNameEscrow is
@@ -26,7 +31,8 @@ contract DotnsNameEscrow is
     ReentrancyGuardTransient,
     ERC165Upgradeable,
     IERC721Receiver,
-    IDotnsNameEscrow
+    IDotnsNameEscrow,
+    IDotnsNameEscrowRevocation
 {
     /// @notice Maximum page size for releasedTokens pagination.
     uint256 public constant MAX_RELEASED_PAGE_SIZE = 200;
@@ -61,9 +67,7 @@ contract DotnsNameEscrow is
 
     /// @notice Delay after release before the deposit withdrawal may be credited.
     /// @dev Forces a delay between `release` and `withdraw`. It does not bound reclaim: the
-    ///      release-to-reclaim boundary is `redeemWindow`, a separate and longer quantity. Also
-    ///      supplies the per-entry clock for time-locked refund credits, which is why raising it
-    ///      would slow every refund path and not just the deposit one.
+    ///      release-to-reclaim boundary is `redeemWindow`, a separate and longer quantity.
     uint256 public cooldown;
 
     /// @notice Total amount of a specific asset reserved across all positions.
@@ -80,9 +84,10 @@ contract DotnsNameEscrow is
     /// @notice Reverse lookup into `_releasedTokens` (one-based) for O(1) remove-by-swap.
     mapping(uint256 tokenId => uint256 indexPlusOne) private _releasedIndexPlusOne;
 
-    /// @notice Cumulative balance of non-refundable protocol fees; only accumulates.
-    /// @dev Credited by cross-paid registration fees and transfer fees. Never debited: protocol
-    ///      fees do not back refunds, which draw solely on the per-asset reserve.
+    /// @notice Protocol fee balance held by the escrow.
+    /// @dev Holds the transfer fees and cross-payer registration charges collected by earlier
+    ///      implementations. Nothing credits or debits it, and refunds draw solely on the
+    ///      per-asset reserve.
     uint256 public protocolFees;
 
     /// @notice Pull-payment ledger storing each recipient's claimable refund balance.
@@ -93,17 +98,18 @@ contract DotnsNameEscrow is
     mapping(address recipient => uint256 amount) private _pendingWithdrawals;
 
     /// @notice Time-locked refund ledger keyed by entryId.
-    /// @dev Every credit allocates a fresh entryId so per-entry cooldowns are independent and
-    ///      drip-feed credits cannot reset an existing entry's clock.
-    mapping(uint256 entryId => RefundEntry entry) private _refundEntries;
+    /// @dev Nothing credits new entries; the claim functions serve the entries already here.
+    mapping(uint256 entryId => RefundEntry entry) internal _refundEntries;
 
     /// @notice Per-recipient list of pending entryIds for paginated enumeration and batch claim.
-    mapping(address recipient => uint256[] entryIds) private _entriesByRecipient;
+    mapping(address recipient => uint256[] entryIds) internal _entriesByRecipient;
 
     /// @notice Reverse lookup into `_entriesByRecipient` (one-based) for O(1) remove-by-swap.
-    mapping(uint256 entryId => uint256 indexPlusOne) private _entryIndexPlusOne;
+    mapping(uint256 entryId => uint256 indexPlusOne) internal _entryIndexPlusOne;
 
-    /// @notice Monotonic counter assigning entryIds to new refund credits.
+    /// @notice Counter that assigned entryIds to refund credits.
+    /// @dev Nothing credits new entries, so it no longer moves. Kept so every later variable stays
+    ///      at its slot across an upgrade.
     uint256 private _nextEntryId;
 
     /// @notice Period after release during which only the previous holder may act.
@@ -146,10 +152,12 @@ contract DotnsNameEscrow is
     ///      updateRedeemWindow, which rejects any value below @custom:constant MIN_REDEEM_WINDOW
     ///      (@custom:reverts RedeemWindowTooShort) or above @custom:constant MAX_REDEEM_WINDOW
     ///      (@custom:reverts RedeemWindowTooLong), and emits @custom:emits RedeemWindowUpdated.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol registry used to resolve registrar and controller addresses.
     /// @param cooldownSeconds Delay after release before the deposit withdrawal may be credited.
     /// @param redeemWindowSeconds Period after release in which only the previous holder may act.
     function initialize(
+        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint256 cooldownSeconds,
         uint256 redeemWindowSeconds
@@ -159,16 +167,31 @@ contract DotnsNameEscrow is
     {
         require(address(registry) != address(0), InvalidAsset());
 
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         __ERC165_init();
 
         protocolRegistry = registry;
-        updateCooldown(cooldownSeconds);
-        updateRedeemWindow(redeemWindowSeconds);
+        _updateCooldown(cooldownSeconds);
+        _updateRedeemWindow(redeemWindowSeconds);
     }
 
     /// @inheritdoc IDotnsNameEscrow
     function updateCooldown(uint256 newCooldown) public override onlyOwner {
+        _updateCooldown(newCooldown);
+    }
+
+    /// @inheritdoc IDotnsNameEscrow
+    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyOwner {
+        _updateRedeemWindow(newRedeemWindow);
+    }
+
+    /// @notice Validates and seeds the cooldown, without an ownership check.
+    /// @dev Split from @custom:function updateCooldown so the initialiser can seed the value:
+    ///      the owner is now an explicit argument rather than the caller, so `onlyOwner` would
+    ///      reject the deployer mid-initialisation. Every caller either is `onlyOwner` or runs
+    ///      inside `initializer`.
+    /// @param newCooldown Delay after release before the deposit withdrawal may be credited.
+    function _updateCooldown(uint256 newCooldown) private {
         require(newCooldown != 0, InvalidCooldown());
         require(newCooldown <= MAX_COOLDOWN, CooldownTooLong(newCooldown, MAX_COOLDOWN));
 
@@ -178,8 +201,11 @@ contract DotnsNameEscrow is
         emit CooldownUpdated(currentCooldown, newCooldown);
     }
 
-    /// @inheritdoc IDotnsNameEscrow
-    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyOwner {
+    /// @notice Validates and seeds the redeem window, without an ownership check.
+    /// @dev Split from @custom:function updateRedeemWindow for the reason given on
+    ///      @custom:function _updateCooldown.
+    /// @param newRedeemWindow Period after release in which only the previous holder may act.
+    function _updateRedeemWindow(uint256 newRedeemWindow) private {
         require(
             newRedeemWindow >= MIN_REDEEM_WINDOW,
             RedeemWindowTooShort(newRedeemWindow, MIN_REDEEM_WINDOW)
@@ -252,9 +278,9 @@ contract DotnsNameEscrow is
 
         ReleasePosition storage position = _positions[params.tokenId];
 
-        // Use `recipient` as the "is this slot funded?" sentinel so zero-amount
-        // positions (seeded by cross-paid registrations, which pay a fee rather than a deposit)
-        // still count as present and cannot be re-seeded with a different recipient.
+        // Use `recipient` as the "is this slot funded?" sentinel so zero-amount positions (seeded
+        // by grant-backed reserved registrations, which pay nothing) still count as present and
+        // cannot be re-seeded with a different recipient.
         require(position.recipient == address(0), PositionAlreadyFunded(params.tokenId));
         require(!position.released, AlreadyReleased(params.tokenId));
 
@@ -276,71 +302,21 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function depositProtocolFee(ProtocolFeeDepositParams calldata params)
-        external
-        payable
-        override
-        onlyController
-    {
-        require(msg.value > 0, InvalidAmount());
-
-        protocolFees += msg.value;
-
-        emit CrossTierFeePaid(
-            params.tokenId,
-            params.payer,
-            params.recipient,
-            msg.value,
-            /* isRegistration */
-            true
-        );
-    }
-
-    /// @inheritdoc IDotnsNameEscrow
-    function chargeTransferFee(ChargeTransferFeeParams calldata params)
-        external
-        payable
-        override
-        onlyRegistrar
-        returns (uint256 charged)
-    {
-        ReleasePosition storage position = _positions[params.tokenId];
+    function rebindPosition(uint256 tokenId, address to) external override onlyRegistrar {
+        ReleasePosition storage position = _positions[tokenId];
         // Released positions are mid-lifecycle in escrow custody and must not be rebound; the
         // recipient is the original releaser who will claim the refund. The canonical transfer
         // path never reaches here for released tokens (`_update` short-circuits on escrow-touching
         // transfers) but the guard hardens the contract against a divergent registrar.
-        require(!position.released, AlreadyReleased(params.tokenId));
-
-        address priorRecipient = position.recipient;
-
-        uint256 fee = params.transferFee;
-        require(msg.value >= fee, InsufficientValue());
+        require(!position.released, AlreadyReleased(tokenId));
 
         // Deposits follow the NFT, not the depositor. When the position is funded the locked
         // deposit travels with the name; when it is a zero-amount lifecycle marker the marker
         // travels with it. In both cases the position is rebound to the new holder so only
         // the current holder can later release into escrow and claim the refund.
-        if (priorRecipient != address(0) && params.to != priorRecipient) {
-            position.recipient = params.to;
-        }
-
-        charged = fee;
-
-        if (fee > 0) {
-            protocolFees += fee;
-            emit CrossTierFeePaid(
-                params.tokenId,
-                params.payer,
-                params.to,
-                fee,
-                /* isRegistration */
-                false
-            );
-        }
-
-        uint256 overpayment = msg.value - fee;
-        if (overpayment > 0) {
-            _creditRefund(params.payer, overpayment, params.tokenId);
+        address priorRecipient = position.recipient;
+        if (priorRecipient != address(0) && to != priorRecipient) {
+            position.recipient = to;
         }
     }
 
@@ -352,8 +328,8 @@ contract DotnsNameEscrow is
 
         ReleasePosition storage position = _positions[tokenId];
         // Recipient is the canonical "is this position present?" sentinel; zero-amount positions
-        // seeded for cross-paid registrations are still releasable so every minted name has a
-        // reachable lifecycle.
+        // seeded for grant-backed reserved registrations are still releasable so every minted name
+        // has a reachable lifecycle.
         require(position.recipient != address(0), DepositNotConfigured(tokenId));
         require(!position.released, AlreadyReleased(tokenId));
 
@@ -397,7 +373,33 @@ contract DotnsNameEscrow is
 
         _addReleasedToken(tokenId);
 
+        // Cleared once custody has moved, because the registry and the resolvers admit the escrow
+        // as the name's owner and need no escrow-specific authority to let it clear. Redeem and
+        // reclaim do not clear again: they hand back the name as release left it.
+        _clearName(tokenId, true);
+
         emit NameReleased(tokenId, msg.sender, asset, amount, availableAt, redeemUntil);
+    }
+
+    /// @notice Clears, once, every name the escrow holds in custody that entered custody without
+    ///         being cleared.
+    /// @dev Release clears a name as it takes custody, and redeem and reclaim hand it back as it
+    ///      is, so a name that entered custody uncleared would otherwise leave it with its records.
+    ///      Meant to run as the post-upgrade call of `upgradeToAndCall`, so nothing can be
+    ///      redeemed or reclaimed between the upgrade and the clear. A deployment that never held
+    ///      such names never needs it. Owner-only (@custom:reverts OwnableUnauthorizedAccount) and
+    ///      callable once per proxy (@custom:reverts InvalidInitialization on a second call); it
+    ///      takes initializer version 2, so a later upgrade that needs a reinitializer starts at 3.
+    ///      It clears lazily only and deletes no record outright: deleting would release the
+    ///      storage deposit the holders paid to the signer of this call instead. Walks every name
+    ///      in custody in one call, so check @custom:function releasedTokenCount before relying on
+    ///      it. Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
+    ///      through ERC-165 stays the same.
+    function clearCustodyOnUpgrade() external onlyOwner reinitializer(2) {
+        uint256 count = _releasedTokens.length;
+        for (uint256 i; i < count; ++i) {
+            _clearName(_releasedTokens[i], false);
+        }
     }
 
     /// @inheritdoc IDotnsNameEscrow
@@ -439,10 +441,8 @@ contract DotnsNameEscrow is
         // Nothing to settle: return before touching `claimed`. That flag is what `redeem` reads to
         // decide whether the holder has already been paid for the name, so setting it here would
         // make a zero-amount `withdraw`, which pays nothing and emits nothing, silently forfeit
-        // the holder's right to recover their own name for no consideration at all. Free PopFull
-        // and PopLite registrations seed exactly these positions, and `withdraw` is the step the
-        // old contract required before a name could be recycled, so that is a path holders will
-        // take.
+        // the holder's right to recover their own name for no consideration at all. Free
+        // registrations seed exactly these positions, and `withdraw` is a path holders will take.
         if (owed == 0) return;
 
         // Effects: from here the deposit really is being handed over, so the flag is set.
@@ -605,37 +605,6 @@ contract DotnsNameEscrow is
         entry = _refundEntries[entryId];
     }
 
-    /// @notice Internal helper: allocate a new entryId and credit a refund to `recipient`.
-    /// @dev Assigns the next monotonic entryId, stores the entry, appends to the recipient's
-    /// enumeration array, and emits @custom:emits RefundCredited. The cooldown is read from the
-    /// configured `cooldown` storage value; @custom:constant MAX_COOLDOWN bounds it so the cast to
-    /// `uint64` cannot truncate for any plausible block timestamp.
-    function _creditRefund(
-        address recipient,
-        uint256 amount,
-        uint256 tokenId
-    )
-        internal
-        returns (uint256 entryId)
-    {
-        require(recipient != address(0), InvalidRecipient());
-        require(amount > 0, InvalidAmount());
-
-        entryId = ++_nextEntryId;
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint64 availableAt = uint64(block.timestamp + cooldown);
-
-        _refundEntries[entryId] = RefundEntry({
-            recipient: recipient, amount: amount, availableAt: availableAt, tokenId: tokenId
-        });
-
-        uint256[] storage list = _entriesByRecipient[recipient];
-        list.push(entryId);
-        _entryIndexPlusOne[entryId] = list.length;
-
-        emit RefundCredited(recipient, entryId, amount, availableAt, tokenId);
-    }
-
     /// @notice Internal helper: delete a refund entry and swap-pop its slot in the recipient's
     ///         enumeration array.
     function _removeRefundEntry(uint256 entryId, address recipient) internal {
@@ -686,6 +655,29 @@ contract DotnsNameEscrow is
         emit NameReclaimed(tokenId, previousRecipient, newOwner);
     }
 
+    /// @inheritdoc IDotnsNameEscrowRevocation
+    /// @dev Settles before deleting, as @custom:function reclaim does: the holder loses the name
+    ///      but keeps their claim on the deposit. `_settleDeposit` is a no-op for a zero-amount
+    ///      position and for one already withdrawn.
+    function revoke(uint256 tokenId)
+        external
+        override
+        onlyRegistrar
+        nonReentrant
+        returns (address recipient)
+    {
+        ReleasePosition storage position = _positions[tokenId];
+        recipient = position.recipient;
+        if (recipient == address(0)) return recipient;
+
+        _settleDeposit(position, tokenId, recipient);
+
+        delete _positions[tokenId];
+        _removeReleasedToken(tokenId);
+
+        emit PositionRevoked(tokenId, recipient);
+    }
+
     /// @inheritdoc IDotnsNameEscrow
     /// @dev `public` rather than `external` so `reclaim` can gate on it without a self-call, which
     ///      is what keeps the condition in one place instead of two.
@@ -723,7 +715,8 @@ contract DotnsNameEscrow is
             NotRedeemable(tokenId)
         );
 
-        // Restore the pre-release state and nothing more. Recipient, asset and amount are left
+        // Restore the position's pre-release state and nothing more; the records and subnames
+        // release cleared stay cleared. Recipient, asset and amount are left
         // untouched so the deposit stays locked against the name; clearing the clocks means a later
         // release starts a fresh pair rather than inheriting stale deadlines.
         position.released = false;
@@ -750,10 +743,9 @@ contract DotnsNameEscrow is
         returns (bytes4 selector)
     {
         require(msg.sender == address(_registrar()), NotAcceptedTransfer(msg.sender));
-        // Only accept transfers that this contract itself initiated via `release`. A holder calling
-        // `registrar.safeTransferFrom(holder, escrow, tokenId)` directly would otherwise land the
-        // NFT in custody with no `released` position, leaving the token (and any prior deposit)
-        // permanently unreachable through `withdraw` / `reclaim`.
+        // Only accept transfers this contract initiated via `release`; custody with no `released`
+        // position leaves the token and any prior deposit unreachable. The registrar enforces the
+        // same rule, which is what covers the plain `transferFrom` spelling this hook never sees.
         require(_positions[tokenId].released, UnsolicitedDeposit(tokenId));
         selector = IERC721Receiver.onERC721Received.selector;
     }
@@ -761,14 +753,47 @@ contract DotnsNameEscrow is
     /// @inheritdoc ERC165Upgradeable
     function supportsInterface(bytes4 interfaceId) public view override returns (bool supported) {
         supported = interfaceId == type(IDotnsNameEscrow).interfaceId
+            || interfaceId == type(IDotnsNameEscrowRevocation).interfaceId
             || interfaceId == type(IERC721Receiver).interfaceId
             || super.supportsInterface(interfaceId);
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every dotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
+    }
+
+    /// @notice Clears every record and subname of a name the escrow holds.
+    /// @dev The address and the content hash are each one record per name, at a fixed place, so
+    ///      they are deleted outright when `deleteRecords` is set, and their storage deposit is
+    ///      released to the signer of the transaction. Text records and subnames cannot be listed,
+    ///      so the registry clear hides them at constant cost and their storage stays.
+    ///      A name with no registry record has nothing to clear, because records and subnames can
+    ///      only be written for a node the registry knows, and the registry admits no clear for a
+    ///      node it holds no record of. Such a name is skipped, so release, redeem and reclaim
+    ///      still work for it.
+    /// @param tokenId Token in custody; its node is `bytes32(tokenId)`.
+    /// @param deleteRecords Whether to delete the address and content hash outright.
+    function _clearName(uint256 tokenId, bool deleteRecords) internal {
+        IDotnsRegistry registry = IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
+        bytes32 node = bytes32(tokenId);
+        if (!registry.recordExists(node)) return;
+
+        if (deleteRecords) {
+            address resolver = protocolRegistry.get(DotnsConstants.RESOLVER);
+            if (resolver != address(0)) IDotnsResolver(resolver).setAddress(node, address(0));
+            address contentResolver = protocolRegistry.get(DotnsConstants.CONTENT_RESOLVER);
+            if (contentResolver != address(0)) {
+                IDotnsContentResolver(contentResolver).setContenthash(node, "");
+            }
+        }
+        registry.clear(node);
     }
 
     /// @notice Returns the configured registrar from the protocol registry.

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title DotNS Pricing Cost Model
+/// @title dotNS Pricing Cost Model
 /// @notice Prices a registration from the base length of its label alone.
 /// @dev The seam between name policy and the wei amount a registration costs. `PopRules` and the
 ///      public commit-reveal controller keep the classification, reservation, and tier rules; the
@@ -17,16 +18,19 @@ interface IDotnsPricing {
     error PricingError(string reason);
 
     /// @notice Returns the registration cost in wei for a label of the given base length.
-    /// @dev Pure amount lookup: the caller supplies the digit-stripped base length and the model
-    ///      returns the curve value for it. Runs on the ERC721 transfer floor read, so it stays a
-    ///      view with no state writes.
-    /// @param baseLength Digit-stripped length of the label being priced.
+    /// @dev Pure amount lookup: the caller supplies the base length and the model
+    ///      returns the curve value for it. PopRules reads it from its pricing views, so it stays
+    ///      a view with no state writes.
+    /// @param baseLength Base length of the label being priced: its length as written, less a
+    ///        device name's suffix.
     /// @return weiPrice Registration cost in wei for that base length.
     function priceForBaseLength(uint256 baseLength) external view returns (uint256 weiPrice);
 
     /// @notice Returns a stable identifier for this model and its parameters.
     /// @dev Changes when the model shape or its parameters change, so clients and telemetry can
-    ///      tell one live curve from another. Not consulted on the pricing path.
+    ///      tell one live curve from another. Not consulted on the pricing path. This is the
+    ///      cost-model identity used by `DotnsCostModelRegistry`, unrelated to the network's
+    ///      release declaration (`protocolVersion()` on the protocol registry).
     /// @return modelVersion Identifier derived from the model form and its parameters.
     function version() external view returns (uint256 modelVersion);
 }

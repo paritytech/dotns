@@ -18,7 +18,11 @@ contract DotnsRegistryFuzzTest is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "sub", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "sub",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -36,7 +40,11 @@ contract DotnsRegistryFuzzTest is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "app", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "app",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -59,7 +67,11 @@ contract DotnsRegistryFuzzTest is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "api", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "api",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);

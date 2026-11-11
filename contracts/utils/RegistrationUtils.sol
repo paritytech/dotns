@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
@@ -8,10 +9,10 @@ import {IStoreFactory} from "../store/IStoreFactory.sol";
 import {StoreUtils} from "./StoreUtils.sol";
 import {DotnsConstants} from "./DotnsConstants.sol";
 
-/// @title DotNS Registration Utilities Library
+/// @title dotNS Registration Utilities Library
 /// @notice Single canonical implementation of the "mint + forward-registry + store-write"
-///         triad used by every DotNS registration flow.
-/// @dev Exists so that every controller (public commit-reveal, PoP gateway, future
+///         triad used by every dotNS registration flow.
+/// @dev Exists so that every controller (public commit-reveal, gateway path, future
 ///      privileged flows) calls the same sequence. Without this library each controller
 ///      re-implements the sequence, and the implementations drift.
 /// @dev Scope: this library is deliberately minimal. It only performs the steps
@@ -62,7 +63,7 @@ library RegistrationUtils {
     ///      protocol registry on every write (@custom:function StoreAuth.isStoreWriter), so no
     ///      per-store allowlist bookkeeping is needed here.
     /// @dev The registrar writes the `LabelStore` entry directly inside `register`
-    ///      so this helper deliberately does not call `StoreUtils.writeLabel`.
+    ///      so this helper deliberately does not call `StoreUtils.writeNewLabel`.
     ///      Doing it twice would deploy or touch the store on every flow and
     ///      could conflict with the registrar's locked-entry semantics.
     /// @param context Registration inputs. See @custom:struct RegistrationContext.
@@ -73,10 +74,35 @@ library RegistrationUtils {
     {
         Siblings memory siblings = _resolveSiblings(context.protocolRegistry);
 
-        siblings.registrar.register(uint256(context.node), context.user, context.label);
-        siblings.registry.setOwner(context.node, context.user);
+        registerName(
+            siblings.registrar, siblings.registry, context.node, context.user, context.label
+        );
 
         labelStore = siblings.storeFactory.getLabelStore(context.user);
+    }
+
+    /// @notice Mints the name token for `node` to `user` and points the forward registry at
+    /// them: the first two steps of the triad.
+    /// @dev For a controller that already holds the registrar and registry addresses, so it
+    ///      runs the same steps as @custom:function registerAndStore without resolving them
+    ///      again. A non-empty `label` makes the registrar write the owner's `LabelStore` entry;
+    ///      an empty one leaves the store write to the caller.
+    /// @param registrar The base registrar.
+    /// @param registry The forward registry.
+    /// @param node `namehash(tldNode, labelhash)`.
+    /// @param user Address receiving the name.
+    /// @param label Label for the registrar's store write, or empty to skip it.
+    function registerName(
+        IDotnsRegistrar registrar,
+        IDotnsRegistry registry,
+        bytes32 node,
+        address user,
+        string memory label
+    )
+        internal
+    {
+        registrar.register(uint256(node), user, label);
+        registry.setOwner(node, user);
     }
 
     /// @notice Resolves sibling contracts via the protocol registry.

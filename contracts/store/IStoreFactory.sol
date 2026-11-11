@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 /// @title IStoreFactory
-/// @notice Interface for the DotNS per-user store factory.
+/// @notice Interface for the dotNS per-user store factory.
 /// @dev Owns two `UpgradeableBeacon` instances; one for `LabelStore` (protocol-managed),
 ///      one for `UserStore` (user-claimed). Each user may acquire at most one of each,
 ///      forever. There is no transfer, no redeploy, no additional store type.
@@ -35,12 +36,13 @@ interface IStoreFactory {
     /// @param user The invalid user argument.
     error InvalidUser(address user);
 
-    /// @notice Thrown when a zero protocol registry address is supplied to the constructor.
+    /// @notice Thrown when a zero protocol registry address is supplied to the initialiser.
     /// @param protocolRegistry The invalid registry argument.
     error InvalidProtocolRegistry(address protocolRegistry);
 
-    /// @notice Thrown when a zero implementation address is supplied to the constructor or an
-    /// upgrade. @param implementation The invalid implementation argument.
+    /// @notice Thrown when a zero implementation address is supplied to a store-implementation
+    /// upgrade.
+    /// @param implementation The invalid implementation argument.
     error InvalidImplementation(address implementation);
 
     /// @notice Thrown when an unauthorised address attempts to deploy a label store.
@@ -147,9 +149,11 @@ interface IStoreFactory {
     /// @dev Callable by the factory owner only, otherwise
     ///      @custom:reverts OwnableUnauthorizedAccount. `newImplementation` must be non-zero,
     ///      otherwise @custom:reverts InvalidImplementation. The candidate is sentinel-probed by
-    ///      calling `IUserStore.getKeyCount` on it before the beacon is rotated; if the address
-    ///      does not implement that selector the probe reverts and the upgrade does not land
-    ///      (deliberate fail-fast guard, no named error). Delegates to
+    ///      calling `IUserStore.protocolRegistry` on it before the beacon is rotated; if the
+    ///      address does not implement that selector the probe reverts and the upgrade does not
+    ///      land (deliberate fail-fast guard, no named error). That selector also rejects an
+    ///      implementation predating the two-argument `initialize`, whose claims would revert
+    ///      under this factory's claim calldata. Delegates to
     ///      `UpgradeableBeacon.upgradeTo` and emits
     ///      @custom:emits UserStoreImplementationUpgraded on success.
     /// @param newImplementation The new implementation address.

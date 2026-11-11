@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.34;
 
+import {Vm} from "forge-std/Vm.sol";
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {IDotnsContentResolver} from "../../../contracts/resolvers/IDotnsContentResolver.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
@@ -154,5 +155,67 @@ contract DotnsContentResolverTests is BaseDotns {
         vm.stopPrank();
 
         assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), blockNumber);
+    }
+
+    function test_empty_contenthash_resets_block_number() public {
+        bytes32 node = _register("blockdelete01", ed, IPopRules.PopStatus.NoStatus);
+
+        vm.roll(60);
+        vm.prank(ed);
+        dotnsContentResolver.setContenthash(node, hex"e301017012201111");
+
+        vm.roll(90);
+        vm.prank(ed);
+        dotnsContentResolver.setContenthash(node, "");
+
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 0);
+    }
+
+    function test_cleared_node_reads_zero_block_until_rewritten() public {
+        bytes32 node = _register("blockclear001", ed, IPopRules.PopStatus.NoStatus);
+
+        vm.roll(60);
+        vm.prank(ed);
+        dotnsContentResolver.setContenthash(node, hex"e301017012201111");
+
+        vm.prank(ed);
+        dotnsRegistry.clearRecords(node);
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 0);
+
+        vm.roll(75);
+        vm.prank(ed);
+        dotnsContentResolver.setContenthash(node, hex"e301017012202222");
+        assertEq(dotnsContentResolver.contenthashUpdatedAtBlock(node), 75);
+    }
+
+    /// @notice Every text write logs both events: `TextUpdated`, unchanged for consumers that
+    ///         filter on it, and `TextChanged`, from which the key is recoverable without knowing
+    ///         it in advance.
+    function test_set_text_logs_the_key_readably() public {
+        bytes32 node = _register("textrecord03", ed, IPopRules.PopStatus.NoStatus);
+
+        vm.recordLogs();
+        vm.prank(ed);
+        dotnsContentResolver.setText(node, "com.twitter", "@dotns");
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(logs.length, 2);
+
+        assertEq(logs[0].topics[0], IDotnsContentResolver.TextUpdated.selector);
+        assertEq(
+            logs[0].topics[0],
+            keccak256("TextUpdated(bytes32,string,string)"),
+            "the TextUpdated signature consumers filter on"
+        );
+        assertEq(logs[0].topics[1], node);
+        assertEq(logs[0].topics[2], keccak256("com.twitter"));
+        assertEq(abi.decode(logs[0].data, (string)), "@dotns");
+
+        assertEq(logs[1].topics[0], IDotnsContentResolver.TextChanged.selector);
+        assertEq(logs[1].topics[1], node);
+        assertEq(logs[1].topics[2], keccak256("com.twitter"), "the indexed copy is the key hash");
+        (string memory key, string memory value) = abi.decode(logs[1].data, (string, string));
+        assertEq(key, "com.twitter", "the data copy is the key itself");
+        assertEq(value, "@dotns");
     }
 }

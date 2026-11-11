@@ -9,6 +9,13 @@ permissions:
   pull-requests: write
   issues: write
 
+# Keyed by PR number so a new push (or label change) cancels this PR's still-running
+# title/label check instead of queuing behind it; every content-triggered workflow in
+# this repo does the same.
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   title:
     name: PR Title

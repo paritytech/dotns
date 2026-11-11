@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# DotNS pallet-revive genesis builder
+# dotNS pallet-revive genesis builder
 #
-# Deploys the full DotNS contract set to a local anvil, then extracts the
+# Deploys the full dotNS contract set to a local anvil, then extracts the
 # resulting EVM state (bytecodes + storage) as a pallet-revive GenesisConfig
-# artifact. A chain can then carry DotNS from genesis instead of deploying it
+# artifact. A chain can then carry dotNS from genesis instead of deploying it
 # after the fact.
 #
 # Output, into $1 (default ./release):
@@ -33,32 +33,33 @@ GENESIS_OUT=""   # set once DOTNS_TLD is validated, below
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOYMENT_FILE="deployments/localhost/31337.json"
-CANONICAL_MANIFEST="deployments/paseo-assethub/420420417.json"
+CANONICAL_MANIFEST="deployments/expected.json"
 
 # Who OWNS the contracts in the genesis state (REQUIRED, one of the three below).
 #
-# No DotNS *address* depends on this key — with CREATE3 the addresses are a pure
+# No dotNS *address* depends on this key — with CREATE3 the addresses are a pure
 # function of the factory (see FACTORY_DEPLOYER_KEY below, which owns only the
 # factory) — but every ownership and role assignment written into genesis storage
 # does: this key ends up owning the registry, the resolvers, the registrar, the
 # store factory and the beacons.
 #
-# Accepted, in order of precedence:
-#   DOTNS_ADMIN_KEY       a raw private key — the admin credential this repo already holds
-#   DOTNS_ADMIN_MNEMONIC  the admin mnemonic; index $DOTNS_ADMIN_INDEX (default 0)
+# Accepted:
+#   DOTNS_ADMIN_KEY       a raw private key — in CI it lives on the `releases` environment,
+#                         behind a required reviewer, paired with a DOTNS_ADMIN_ADDRESS
+#                         variable the workflow checks the key against before this runs
 #
-# Deliberately NOT accepted: DOTNS_MNEMONIC. That is an operational credential for driving
-# the `dotns` CLI, not the contract admin, and quietly making it the owner of every
-# contract in a genesis would be a hard mistake to spot.
+# Deliberately NOT accepted: DOTNS_ADMIN_MNEMONIC and DOTNS_MNEMONIC. A second credential
+# accepted here would let a different secret silently decide who owns every contract in a
+# genesis, and a wrong owner is a hard mistake to spot. One explicit key, or a loud failure.
 # Not DEPLOYER_KEY: that name is dotns-releases' own secret, and accepting it here
 # would make which key owns a published genesis depend on which repo the build ran in.
 ADMIN_KEY="${DOTNS_ADMIN_KEY:-}"
 
-# Single-purpose CREATE3 factory deployer key (REQUIRED). Every DotNS address is
+# Single-purpose CREATE3 factory deployer key (REQUIRED). Every dotNS address is
 # a pure function of the Create3Factory address, and the factory address is
 # keccak(deployer, nonce 0) — see "Deterministic addresses (CREATE3)" in
 # DEPLOYMENTS.md. Deploying the factory from this key as its first transaction is
-# what makes the genesis addresses equal the live ones, which is asserted below.
+# what makes the genesis addresses equal the expected set, which is asserted below.
 FACTORY_DEPLOYER_KEY="${FACTORY_DEPLOYER_KEY:-}"
 
 # TLD the genesis registry initialises with. Required by DeployCore, which reads
@@ -75,7 +76,7 @@ fi
 
 GENESIS_OUT="$OUT/dotns-genesis-$DOTNS_TLD.json"
 
-echo "=== DotNS genesis builder ==="
+echo "=== dotNS genesis builder ==="
 echo "Building a genesis for TLD .$DOTNS_TLD -> $(basename "$GENESIS_OUT")"
 echo ""
 
@@ -84,17 +85,11 @@ for tool in forge anvil cast node jq curl; do
     command -v "$tool" >/dev/null 2>&1 || { echo "Error: $tool is not on PATH" >&2; exit 1; }
 done
 
-# Needs cast, so it happens after the check above.
-if [ -z "$ADMIN_KEY" ] && [ -n "${DOTNS_ADMIN_MNEMONIC:-}" ]; then
-    ADMIN_KEY="$(cast wallet private-key --mnemonic "$DOTNS_ADMIN_MNEMONIC" "${DOTNS_ADMIN_INDEX:-0}")"
-    echo "Owner key derived from DOTNS_ADMIN_MNEMONIC, index ${DOTNS_ADMIN_INDEX:-0}."
-fi
-
 if [ -z "$ADMIN_KEY" ]; then
     cat >&2 <<'MSG'
-Error: no owner key. Set DOTNS_ADMIN_KEY or DOTNS_ADMIN_MNEMONIC.
+Error: no owner key. Set DOTNS_ADMIN_KEY.
 
-Whichever is given becomes the owner of every DotNS contract in the genesis
+Whichever is given becomes the owner of every dotNS contract in the genesis
 state, so this build refuses to fall back to a public dev key.
 MSG
     exit 1
@@ -175,6 +170,10 @@ forge clean
 forge build
 echo ""
 
+# The stages extend an existing manifest, and one left by an earlier build (for another TLD)
+# describes a chain this anvil never saw.
+rm -f "$DEPLOYMENT_FILE"
+
 # Deploy the Create3Factory from the single-purpose key at nonce 0 so it lands on
 # the canonical address, then hand it to the stages via CREATE3_FACTORY (read by
 # BaseDeployer._configuredCreate3Factory).
@@ -217,6 +216,25 @@ echo "Stages, from scripts/deploy/run.sh: $(printf '%s ' $STAGES)"
 # signer becomes the owner of every contract in the genesis storage, so it must stay the admin
 # key. Substituting the test key would hand control of a published genesis to a key printed in
 # Foundry's docs.
+# WireDeployments declares the release on the protocol registry and requires
+# DOTNS_RELEASE_TAG. This build runs the stages directly rather than through
+# run.sh, so it resolves the value itself: an explicit DOTNS_RELEASE_TAG wins,
+# then the publish workflows' RELEASE_TAG, then the tag the checkout sits
+# exactly on (a manual run of this script from a release tag must not bake a
+# placeholder into a genesis someone publishes), then 0.0.0 for genuinely
+# tag-less contexts such as the genesis-extractor CI, where the throwaway
+# chain's declaration is unmistakably not a release. Leading v stripped.
+if [ -z "${DOTNS_RELEASE_TAG:-}" ]; then
+    DOTNS_RELEASE_TAG="${RELEASE_TAG:-}"
+fi
+if [ -z "$DOTNS_RELEASE_TAG" ]; then
+    DOTNS_RELEASE_TAG="$(git describe --tags --exact-match 2>/dev/null || true)"
+fi
+DOTNS_RELEASE_TAG="${DOTNS_RELEASE_TAG#v}"
+: "${DOTNS_RELEASE_TAG:=0.0.0}"
+export DOTNS_RELEASE_TAG
+echo "Genesis declares protocol version: $DOTNS_RELEASE_TAG"
+
 echo "=== Baking TLD .$DOTNS_TLD into the genesis registry ==="
 for stage in $STAGES; do
     echo "  === $stage ==="
@@ -232,19 +250,22 @@ echo ""
 [ -f "$DEPLOYMENT_FILE" ] \
     || { echo "Error: no deployment manifest at $DEPLOYMENT_FILE — a stage failed above" >&2; exit 1; }
 
-# ---- Address parity with the live deployment ----
-# The committed manifest is the only source of truth for DotNS addresses, so this is a
-# hard failure, not a warning: a genesis built from a different factory key carries a
-# different address set, and nothing downstream would notice.
+# ---- Address parity with the expected set ----
+# The committed expected set (deployments/expected.json) records what a fresh deploy of
+# this revision lands through the pinned factory, so this is a hard failure, not a
+# warning: a genesis built from a different factory key carries a different address set,
+# and nothing downstream would notice. A genesis is a fresh chain, which is exactly what
+# the expected set describes; per-network manifests record live networks instead and are
+# not consulted here.
 #
-# Underscore-prefixed keys are metadata rather than contracts (`_seed`, and
-# `_deployedFrom` once dotns-releases#12 lands), so they are filtered by prefix.
+# Underscore-prefixed keys are metadata rather than contracts (`_seed` in a fresh
+# deploy's output), so they are filtered by prefix.
 #
-# Compared entry-by-entry: the local manifest may carry newer contracts not yet deployed
-# live, so only the canonical entries are asserted.
+# Compared entry-by-entry: the local manifest may carry newer contracts not yet in the
+# expected set, so only the expected entries are asserted.
 #
 if [ ! -f "$CANONICAL_MANIFEST" ]; then
-    echo "Error: no canonical manifest at $CANONICAL_MANIFEST." >&2
+    echo "Error: no expected-address set at $CANONICAL_MANIFEST." >&2
     echo "       Addresses cannot be verified, so the genesis would ship unchecked." >&2
     exit 1
 fi
@@ -260,19 +281,19 @@ ACTUAL=$(jq -r --slurpfile canon "$CANONICAL_MANIFEST" '
 if ! diff -u -L "expected ($CANONICAL_MANIFEST)" -L "actual (this build)" \
         <(printf '%s\n' "$EXPECTED") <(printf '%s\n' "$ACTUAL"); then
     {
-        echo "Error: the deploy no longer reproduces the committed address set."
+        echo "Error: the deploy no longer reproduces the expected address set."
         echo "       Lines marked -/+ above differ from $CANONICAL_MANIFEST."
         echo ""
         echo "       Two things cause this:"
         echo "         * FACTORY_DEPLOYER_KEY is not the key the live factory came from."
-        echo "           Every DotNS address derives from the factory address, which is"
+        echo "           Every dotNS address derives from the factory address, which is"
         echo "           keccak(deployer, nonce 0), so a different key moves all of them."
         echo "         * A salt or a label moved for one contract. Only that contract's"
         echo "           line differs; update $CANONICAL_MANIFEST, or restore the label."
     } >&2
     exit 1
 fi
-echo "  ✓ all live addresses reproduced ($(jq 'with_entries(select(.key | startswith("_") | not)) | length' "$CANONICAL_MANIFEST") contracts)"
+echo "  ✓ all expected addresses reproduced ($(jq 'with_entries(select(.key | startswith("_") | not)) | length' "$CANONICAL_MANIFEST") contracts)"
 echo ""
 
 # ---- Dump anvil state and extract ----

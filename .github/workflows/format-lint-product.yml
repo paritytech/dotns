@@ -2,16 +2,23 @@ name: Format & Lint
 
 on:
   pull_request:
-    paths: ['src/**', 'script/**', 'test/**', '**.sol']
 
 permissions:
   contents: read
   pull-requests: write
   issues: write
 
+# Keyed by PR number so a new push cancels this PR's still-running lint job instead of
+# queuing behind it; every other content-triggered workflow in this repo does the same.
+concurrency:
+  group: format-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
+    name: Format & Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,8 +65,9 @@ jobs:
           path: '*.log'
           retention-days: 7
 
+      # A pull request from a fork gets a read-only token, so posting would fail this check.
       - name: Update PR comment
-        if: always()
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         env:
           SECTION: Format & Lint

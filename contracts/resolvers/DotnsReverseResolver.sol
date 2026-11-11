@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -9,13 +10,15 @@ import {
 import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IDotnsReverseResolver} from "./IDotnsReverseResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
+import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
+import {SubnodeUtils} from "../utils/SubnodeUtils.sol";
+import {StringUtils} from "../utils/StringUtils.sol";
 
-/// @title Dotns Reverse Resolver
+/// @title dotNS Reverse Resolver
 /// @notice Resolves an address to its associated name under the network TLD.
 /// @dev Writes are gated on a fixed writer address resolved from the protocol
 ///      registry (the registrar or its controller), not on node ownership.
@@ -33,7 +36,7 @@ contract DotnsReverseResolver is
     ///      that no reverse name is set.
     mapping(address owner => string name) private reverseNames;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
@@ -56,9 +59,16 @@ contract DotnsReverseResolver is
     ///      @custom:reverts InvalidInitialization. Emits @custom:emits OwnershipTransferred when
     ///      `msg.sender` is recorded as the initial owner and @custom:emits Initialized once
     ///      setup completes.
+    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(IDotnsProtocolRegistry registry) external initializer {
-        __Ownable_init(msg.sender);
+    function initialize(
+        address initialOwner,
+        IDotnsProtocolRegistry registry
+    )
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
         __ERC165_init();
         protocolRegistry = registry;
     }
@@ -71,11 +81,8 @@ contract DotnsReverseResolver is
 
     /// @inheritdoc IDotnsReverseResolver
     function claimReverseRecord(string calldata label) external override {
-        bytes32 labelhash = LabelUtils.labelhash(label);
-        uint256 tokenId = uint256(LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash));
-
-        IERC721 registrar = IERC721(protocolRegistry.get(DotnsConstants.REGISTRAR));
-        require(registrar.ownerOf(tokenId) == msg.sender, NotNameOwner(msg.sender, tokenId));
+        bytes32 node = _nodeOf(label);
+        require(_registry().owner(node) == msg.sender, NotNameOwner(msg.sender, uint256(node)));
 
         string memory fullName = string.concat(label, protocolRegistry.tld());
         reverseNames[msg.sender] = fullName;
@@ -92,16 +99,28 @@ contract DotnsReverseResolver is
         string memory label = LabelUtils.stripTld(protocolRegistry.tld(), stored);
         if (bytes(label).length == 0) return "";
 
-        bytes32 labelhash = LabelUtils.labelhashMemory(label);
-        uint256 tokenId = uint256(LabelUtils.namehashUnder(protocolRegistry.tldNode(), labelhash));
+        if (_registry().owner(_nodeOf(label)) != addr) return "";
+        return stored;
+    }
 
-        IERC721 registrar = IERC721(protocolRegistry.get(DotnsConstants.REGISTRAR));
-        try registrar.ownerOf(tokenId) returns (address currentOwner) {
-            if (currentOwner != addr) return "";
-            return stored;
-        } catch {
-            return "";
+    /// @notice Resolves the node a name maps to, whether tokenised or a device-name subname.
+    /// @dev A device name is `stem` beneath its numeric container, so it hashes as a subnode; any
+    ///      other name hashes as a second-level label under the TLD. Ownership of either is read
+    ///      through the registry, which delegates a tokenised name to the registrar and holds a
+    ///      subname directly.
+    /// @param label Bare label without the TLD, e.g. `alice` or `alice.01`.
+    /// @return node The node the name resolves to.
+    function _nodeOf(string memory label) internal view returns (bytes32 node) {
+        bytes32 tldNode = protocolRegistry.tldNode();
+        if (StringUtils.isDeviceLabelMemory(label)) {
+            return SubnodeUtils.deviceSubnodeOf(tldNode, label);
         }
+        node = LabelUtils.namehashUnder(tldNode, LabelUtils.labelhashMemory(label));
+    }
+
+    /// @notice Resolves the registry via the protocol registry.
+    function _registry() internal view returns (IDotnsRegistry) {
+        return IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY));
     }
 
     /// @inheritdoc ERC165Upgradeable
@@ -124,12 +143,16 @@ contract DotnsReverseResolver is
         );
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every dotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
-
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

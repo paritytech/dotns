@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title DotNS Constants
-/// @notice Protocol-level invariants shared across DotNS contracts.
+/// @title dotNS Constants
+/// @notice Protocol-level invariants shared across dotNS contracts.
 /// @dev Centralises the well-known protocol-registry keys that every contract uses to discover
 ///      its siblings (registrar, controller, registry, resolvers, etc.). Each key is a
 ///      role address resolved at call time, so rotating an implementation is a
@@ -20,8 +21,9 @@ library DotnsConstants {
 
     /// @notice Address of the Proof-of-Personhood precompile backed by the
     ///         alias-accounts pallet on Asset Hub.
-    /// @dev Consumed by `PopRules` to read each account's personhood tier
-    ///      (`None` / `Lite` / `Full`) and the dotns-scoped `contextAlias`.
+    /// @dev Consumed by `PopRules` to read each account's proof status, which the precompile
+    ///      names `None` / `Lite` / `Full` (PopRules maps them to `NoStatus` / `Devicehood` /
+    ///      `Personhood`), and the dotns-scoped `contextAlias`.
     address internal constant PERSONHOOD = address(0x000000000000000000000000000000000a010000);
 
     /// @notice Application identifier passed to @custom:function IPersonhood.personhoodStatus.
@@ -67,26 +69,39 @@ library DotnsConstants {
 
     /// @notice Default per-name live-claim cap the name whitelist starts with.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_CLAIMANTS_LIMIT`.
-    uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 64;
+    uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 24;
 
     /// @notice Default claim-reason byte cap the name whitelist starts with.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_REASON_LIMIT`.
     uint256 internal constant WHITELIST_DEFAULT_MAX_REASON_BYTES = 256;
 
-    /// @notice Upper bound on the whitelist live-claim cap. Caps the claim clear-loop below the
-    ///         block gas limit.
-    uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 128;
+    /// @notice Upper bound on the whitelist live-claim cap.
+    /// @dev A grant clears every claim on the name in one call, so at this bound a referendum's
+    ///      `grantName` still fits the weight one governance call can execute, with each claim
+    ///      carrying the longest reason. The pallet-revive benchmark checks it.
+    uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 30;
 
     /// @notice Upper bound on the whitelist reason byte cap.
     uint256 internal constant WHITELIST_MAX_REASON_LIMIT = 256;
 
     /// @notice Default cap on labels granted in one `grantNames` call.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_GRANT_BATCH_LIMIT`.
-    uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 100;
+    uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 32;
 
-    /// @notice Upper bound on the `grantNames` batch cap. Bounds one call below the block gas
-    /// limit.
-    uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 256;
+    /// @notice Upper bound on the `grantNames` batch cap.
+    /// @dev At this bound a referendum's `grantNames` still fits the weight one governance call
+    ///      can execute, with every label at the longest DNS label length, since the whitelist
+    ///      stores each label it grants. The pallet-revive benchmark checks it.
+    uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 36;
+
+    /// @notice Well-known key the protocol registry is registered under, itself.
+    /// @dev Not for discovery: the registry is the bootstrap contract every consumer already
+    ///      holds. The entry exists so the registry's own implementation has a declared codehash
+    ///      (`expectedCodehash`) to drift from when it is upgraded outside the release tooling,
+    ///      like every other component. Self-declared, so it catches sloppy drift rather than a
+    ///      malicious registry; the trustless check against release artifacts lives off chain.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant PROTOCOL_REGISTRY = bytes32("protocolRegistry");
 
     /// @notice Well-known key for the ERC721 registrar backing name ownership.
     /// @dev Role: token-of-record for registered names. Mints, burns, and tracks the
@@ -136,16 +151,16 @@ library DotnsConstants {
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant CONTENT_RESOLVER = bytes32("contentResolver");
 
-    /// @notice Well-known key for the dedicated PoP controller orchestrating lite/full-person
-    ///         username issuance on behalf of the PoP gateway.
+    /// @notice Well-known key for the dedicated PoP controller that issues device names and
+    ///         personhood names on behalf of the dotNS gateway pallet.
     /// @dev Kept distinct from `CONTROLLER` (commit-reveal public controller) so the
     ///      two can coexist per `DotnsRegistrar`'s multi-controller affordance.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant POP_CONTROLLER = bytes32("popController");
 
     /// @notice Well-known key for the PoP resolver holding per-name records produced
-    ///         by the PoP username flow (chat keys, lite => full links).
-    /// @dev Role: `node => chatKey` and bidirectional `lite <=> full` link index.
+    ///         by the gateway pallet (chat keys, device links).
+    /// @dev Role: `node => chatKey` and bidirectional device-link index.
     ///      Writer is the `POP_CONTROLLER`, not the node owner.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant POP_RESOLVER = bytes32("popResolver");

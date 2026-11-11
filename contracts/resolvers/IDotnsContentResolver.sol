@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
-/// @title Dotns Content Resolver
+/// @title dotNS Content Resolver
 /// @notice Defines storage and retrieval for content hash, text records, and operator approvals for
-/// DotNS nodes. @dev Content hash and text records point to off-chain content such as IPFS CIDs or
+/// dotNS nodes. @dev Content hash and text records point to off-chain content such as IPFS CIDs or
 ///      future schemes; interpretation is handled off-chain. Operator approvals allow
 ///      third parties to manage records on behalf of the owner.
 /// @custom:security-contact admin@parity.io
@@ -14,10 +15,23 @@ interface IDotnsContentResolver {
     event ContentHashUpdated(bytes32 indexed node, bytes hash);
 
     /// @notice Emitted when a node's text record is updated.
+    /// @dev An indexed string is logged only as its keccak256 hash, so this event lets a consumer
+    ///      filter by key but never recover the key. @custom:emits TextChanged is emitted
+    ///      alongside it with the key readable.
     /// @param node The node whose text record was updated.
-    /// @param key The text record key.
+    /// @param key The text record key, logged as its hash.
     /// @param value The new text record value.
     event TextUpdated(bytes32 indexed node, string indexed key, string value);
+
+    /// @notice Emitted with every @custom:emits TextUpdated, carrying the key readably.
+    /// @dev The key appears twice: indexed, as a hash to filter on, and in the data, where an
+    ///      indexer can read it and so list the keys a node has set. The shape matches the ENS
+    ///      public resolver's `TextChanged`, so tooling built for it reads this event unchanged.
+    /// @param node The node whose text record was updated.
+    /// @param indexedKey The text record key, logged as its hash.
+    /// @param key The text record key, readable.
+    /// @param value The new text record value.
+    event TextChanged(bytes32 indexed node, string indexed indexedKey, string key, string value);
 
     /// @notice Emitted when an operator is approved or revoked.
     /// @param owner The owner of the nodes.
@@ -31,40 +45,52 @@ interface IDotnsContentResolver {
     error NotAuthorised(bytes32 node, address caller);
 
     /// @notice Sets the content hash for a node.
-    /// @dev The caller must own the node in the DotNS registry or be an approved operator,
-    ///      otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an
-    ///      IPFS CID); the resolver stores them as-is and never interprets the payload. Every
-    ///      successful write records the current block number for `contenthashUpdatedAtBlock`
-    ///      and emits @custom:emits ContentHashUpdated.
+    /// @dev The caller must own the node in the dotNS registry or be an approved operator,
+    ///      otherwise @custom:reverts NotAuthorised. Content hashes are opaque bytes (e.g. an IPFS
+    ///      CID); the resolver stores them as-is and never interprets the payload. An empty `hash`
+    ///      deletes the record: its storage is zeroed and the storage deposit released to the
+    ///      signer of the transaction. A non-empty `hash` records the current block for
+    ///      @custom:function contenthashUpdatedAtBlock. Emits @custom:emits ContentHashUpdated on
+    ///      every successful write.
     /// @param node The node whose content hash is being set.
     /// @param hash Opaque content hash bytes.
     function setContenthash(bytes32 node, bytes calldata hash) external;
 
     /// @notice Returns the content hash associated with a node.
+    /// @dev A record reads as unset once the node is cleared (@custom:function
+    ///      IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+    ///      even though the bytes written before stay in storage.
     /// @param node The node to query.
     /// @return hash The stored content hash bytes, or empty if unset.
     function contenthash(bytes32 node) external view returns (bytes memory hash);
 
     /// @notice Returns the block in which a node's content hash was last written.
-    /// @dev Recorded by every successful `setContenthash`, so it answers "when did this hash
-    ///      last change" without scanning `ContentHashUpdated` logs. Zero means no write has
-    ///      been recorded: the node's hash was never set, or it was set before this field
-    ///      existed and has not been rewritten since.
+    /// @dev Recorded by every @custom:function setContenthash with a non-empty hash, so it
+    ///      answers "when did this hash last change" without scanning `ContentHashUpdated` logs.
+    ///      Like @custom:function contenthash, it reads as unset once the node is cleared or stops
+    ///      resolving.
     /// @param node The node to query.
-    /// @return blockNumber Block number of the last `setContenthash`, or zero if none recorded.
+    /// @return blockNumber Block of the last write of the current hash, or zero when the node has
+    ///         no current hash or no block is recorded for it.
     function contenthashUpdatedAtBlock(bytes32 node) external view returns (uint64 blockNumber);
 
     /// @notice Sets a text record for a node.
-    /// @dev The caller must own the node in the DotNS registry or be an approved operator,
+    /// @dev The caller must own the node in the dotNS registry or be an approved operator,
     ///      otherwise @custom:reverts NotAuthorised. Text records are arbitrary key/value strings
-    ///      (e.g. `avatar`, `url`, `description`). Emits @custom:emits TextUpdated on every
-    ///      successful write.
+    ///      (e.g. `avatar`, `url`, `description`). An empty `value` deletes the record: its storage
+    ///      is zeroed and the storage deposit released to the signer of the transaction. That also
+    ///      works for a key a clear has already hidden, which still holds storage until it is
+    ///      deleted. Emits @custom:emits TextUpdated and @custom:emits TextChanged on every
+    ///      successful write, a delete included.
     /// @param node The node whose text record is being set.
     /// @param key Text record key (e.g., "ipfs", "avatar").
     /// @param value Text record value.
     function setText(bytes32 node, string calldata key, string calldata value) external;
 
     /// @notice Returns a text record for a node.
+    /// @dev A record reads as unset once the node is cleared (@custom:function
+    ///      IDotnsRegistry.clearRecords) or stops resolving because a name above it was cleared,
+    ///      even though the bytes written before stay in storage.
     /// @param node The node to query.
     /// @param key Text record key.
     /// @return value Stored text value, or empty string if unset.

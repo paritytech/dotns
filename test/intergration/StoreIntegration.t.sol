@@ -51,7 +51,7 @@ contract StoreIntegrationTest is BaseDotns {
     }
 
     function test_pop_controller_registration_writes_label_store() public {
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
         string memory base = BASE_LABEL_A;
         // DotnsPopResolver.setChatKey requires exactly 65 bytes (uncompressed ECDSA pubkey).
@@ -61,8 +61,10 @@ contract StoreIntegrationTest is BaseDotns {
             chatKey[i] = bytes1(uint8(i + 1));
         }
 
-        _rootRegisterBaseName(
-            IDotnsPopController.FullRegistration({label: base, user: ed, link: _linkFresh(chatKey)})
+        _rootIssuePersonhoodName(
+            IDotnsPopController.PersonhoodNameIssuance({
+                label: base, user: ed, link: _linkFresh(chatKey)
+            })
         );
 
         vm.prank(ed);
@@ -83,9 +85,8 @@ contract StoreIntegrationTest is BaseDotns {
         bytes32 node = _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = uint256(node);
 
-        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: outboundFee}(ed, leonardo, tokenId);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
 
         address recipientStore = storeFactory.getLabelStore(leonardo);
         assertTrue(recipientStore != address(0));
@@ -99,12 +100,10 @@ contract StoreIntegrationTest is BaseDotns {
         bytes32 node = _register(label, ed, IPopRules.PopStatus.NoStatus);
         uint256 tokenId = uint256(node);
 
-        uint256 outboundFee = dotnsRegistrar.quoteTransferFee(tokenId, leonardo);
         vm.prank(ed);
-        dotnsRegistrar.transferFrom{value: outboundFee}(ed, leonardo, tokenId);
-        uint256 returnFee = dotnsRegistrar.quoteTransferFee(tokenId, ed);
+        dotnsRegistrar.transferFrom(ed, leonardo, tokenId);
         vm.prank(leonardo);
-        dotnsRegistrar.transferFrom{value: returnFee}(leonardo, ed, tokenId);
+        dotnsRegistrar.transferFrom(leonardo, ed, tokenId);
 
         address edStore = storeFactory.getLabelStore(ed);
         address leonardoStore = storeFactory.getLabelStore(leonardo);

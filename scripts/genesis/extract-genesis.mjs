@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * DotNS Genesis State Extractor
+ * dotNS Genesis State Extractor
  *
- * Reads an anvil state dump and a DotNS deployments file, extracts all
+ * Reads an anvil state dump and a dotNS deployments file, extracts all
  * contract bytecodes and storage, and outputs a JSON file compatible with
  * pallet-revive's GenesisConfig format.
  *

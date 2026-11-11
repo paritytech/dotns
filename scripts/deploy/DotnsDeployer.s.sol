@@ -28,7 +28,7 @@ import {
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 
 /// @title DotnsDeployer
-/// @notice Fresh-deploy script for the full DotNS contract set behind UUPS proxies.
+/// @notice Fresh-deploy script for the full dotNS contract set behind UUPS proxies.
 /// @dev Deploys every proxy in its own broadcast scope to cap forge's per-tx
 ///      memory accounting; every proxy still runs OZ upgrade-safety validation.
 ///      The protocol registry is deployed first so every downstream proxy can
@@ -37,9 +37,10 @@ import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 /// @custom:security-contact admin@parity.io
 contract DotnsDeployer is BaseDeployer {
     /// @notice Default reservation duration for the freshly-deployed PoP controller.
-    /// @dev Mirrors `pallet_resources::UsernameReservationDuration`; the protocol owner
-    ///      rotates this post-deploy via `DotnsPopController.setReservationDuration`.
-    uint64 public constant DEFAULT_RESERVATION_DURATION = 7 days;
+    /// @dev Gives a device-name holder a month to reach personhood and claim the personhood
+    ///      name they reserved. The protocol owner rotates this post-deploy via
+    ///      `DotnsPopController.setReservationDuration`.
+    uint64 public constant DEFAULT_RESERVATION_DURATION = 30 days;
 
     /// @notice Default refund cooldown for the freshly-deployed name escrow.
     /// @dev Sized to the release-and-withdraw safety window, well below the escrow's
@@ -92,7 +93,7 @@ contract DotnsDeployer is BaseDeployer {
         address nameWhitelist;
     }
 
-    /// @notice Deploys the full DotNS contract set, wires the protocol registry,
+    /// @notice Deploys the full dotNS contract set, wires the protocol registry,
     ///         and writes the resulting manifest under `deployments/`.
     /// @dev Network-specific output folder comes from `networkFolder`, honouring
     ///      the `DEPLOYMENT_NETWORK` override and otherwise the `block.chainid`
@@ -149,7 +150,7 @@ contract DotnsDeployer is BaseDeployer {
         proxy = _broadcastDeployUups(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
-            abi.encodeCall(DotnsProtocolRegistry.initialize, (tldLabel())),
+            abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, tldLabel())),
             "DotnsProtocolRegistry"
         );
         protocolRegistry = DotnsProtocolRegistry(proxy);
@@ -163,10 +164,10 @@ contract DotnsDeployer is BaseDeployer {
         returns (address proxy)
     {
         storeFactory = StoreFactory(
-            _broadcastDeployCreate3(
+            _broadcastDeployUups(
                 owner,
                 "StoreFactory.sol:StoreFactory",
-                abi.encode(protocolRegistryProxy, owner),
+                abi.encodeCall(StoreFactory.initialize, (owner, protocolRegistryProxy)),
                 "StoreFactory"
             )
         );
@@ -190,7 +191,7 @@ contract DotnsDeployer is BaseDeployer {
             "DotnsRegistrar.sol:DotnsRegistrar",
             abi.encodeCall(
                 DotnsRegistrar.initialize,
-                ("Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistryProxy))
+                (owner, "Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsRegistrar"
         );
@@ -208,7 +209,8 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsReverseResolver.sol:DotnsReverseResolver",
             abi.encodeCall(
-                DotnsReverseResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsReverseResolver.initialize,
+                (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsReverseResolver"
         );
@@ -226,7 +228,7 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsRegistry.sol:DotnsRegistry",
             abi.encodeCall(
-                DotnsRegistry.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsRegistry.initialize, (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsRegistry"
         );
@@ -244,7 +246,8 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsContentResolver.sol:DotnsContentResolver",
             abi.encodeCall(
-                DotnsContentResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsContentResolver.initialize,
+                (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsContentResolver"
         );
@@ -262,7 +265,7 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsResolver.sol:DotnsResolver",
             abi.encodeCall(
-                DotnsResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsResolver.initialize, (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsResolver"
         );
@@ -307,7 +310,9 @@ contract DotnsDeployer is BaseDeployer {
         proxy = _broadcastDeployUups(
             owner,
             "PopRules.sol:PopRules",
-            abi.encodeCall(PopRules.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))),
+            abi.encodeCall(
+                PopRules.initialize, (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
+            ),
             "PopRules"
         );
         popRules = PopRules(proxy);
@@ -325,7 +330,7 @@ contract DotnsDeployer is BaseDeployer {
             "DotnsRegistrarController.sol:DotnsRegistrarController",
             abi.encodeCall(
                 DotnsRegistrarController.initialize,
-                (IDotnsProtocolRegistry(protocolRegistryProxy), 6 seconds, 1 days)
+                (owner, IDotnsProtocolRegistry(protocolRegistryProxy), 6 seconds, 1 days)
             ),
             "DotnsRegistrarController"
         );
@@ -345,6 +350,7 @@ contract DotnsDeployer is BaseDeployer {
             abi.encodeCall(
                 DotnsNameEscrow.initialize,
                 (
+                    owner,
                     IDotnsProtocolRegistry(protocolRegistryProxy),
                     ESCROW_COOLDOWN,
                     ESCROW_REDEEM_WINDOW
@@ -366,7 +372,7 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsPopResolver.sol:DotnsPopResolver",
             abi.encodeCall(
-                DotnsPopResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsPopResolver.initialize, (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsPopResolver"
         );
@@ -385,7 +391,7 @@ contract DotnsDeployer is BaseDeployer {
             "DotnsPopController.sol:DotnsPopController",
             abi.encodeCall(
                 DotnsPopController.initialize,
-                (IDotnsProtocolRegistry(protocolRegistryProxy), DEFAULT_RESERVATION_DURATION)
+                (owner, IDotnsProtocolRegistry(protocolRegistryProxy), DEFAULT_RESERVATION_DURATION)
             ),
             "DotnsPopController"
         );
@@ -418,7 +424,8 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsNameWhitelist.sol:DotnsNameWhitelist",
             abi.encodeCall(
-                DotnsNameWhitelist.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsNameWhitelist.initialize,
+                (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsNameWhitelist"
         );
@@ -459,6 +466,8 @@ contract DotnsDeployer is BaseDeployer {
         _verifyRegistryKeys(deployment, expectedOwner);
         _verifyRegistryPointers(deployment);
         _verifyControllerAuthorisation(deployment);
+
+        _verifyStoreImplementations(deployment.storeFactory, address(protocolRegistry));
 
         require(DotnsRegistry(deployment.registry).recordExists(bytes32(0)), "Root record missing");
         require(
@@ -605,6 +614,8 @@ contract DotnsDeployer is BaseDeployer {
             expected,
             "NameWhitelist: not wired"
         );
+        // StoreFactory's pointer is asserted in `_verifyStoreImplementations`, with the rest of
+        // what has to be read out of its proxy storage.
     }
 
     function _assertPointer(address actual, address expected, string memory label) internal pure {

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -48,7 +49,7 @@ contract DotnsNameWhitelist is
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @notice Live-claim cap per name, tunable by governance within
@@ -116,12 +117,19 @@ contract DotnsNameWhitelist is
 
     /// @notice Initialises the whitelist.
     /// @dev Callable once through the UUPS proxy; direct calls on the implementation
-    ///      @custom:reverts InvalidInitialization. Sets the deployer as owner and wires the
+    ///      @custom:reverts InvalidInitialization. Sets `initialOwner` as owner and wires the
     ///      protocol registry the node derivation reads the TLD from.
-    /// @param registry Protocol registry all DotNS contracts resolve through.
-    function initialize(IDotnsProtocolRegistry registry) external initializer {
+    /// @param initialOwner Address that owns the contract once initialised.
+    /// @param registry Protocol registry all dotNS contracts resolve through.
+    function initialize(
+        address initialOwner,
+        IDotnsProtocolRegistry registry
+    )
+        external
+        initializer
+    {
         __ERC165_init();
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
         protocolRegistry = registry;
         maxClaimants = DotnsConstants.WHITELIST_DEFAULT_MAX_CLAIMANTS;
         maxGrantBatch = DotnsConstants.WHITELIST_DEFAULT_MAX_GRANT_BATCH;

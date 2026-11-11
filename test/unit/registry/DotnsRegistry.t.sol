@@ -41,7 +41,7 @@ contract DotnsRegistryTests is BaseDotns {
     }
 
     /// @notice A separator is never valid in a subname label.
-    /// @dev This is what reserves the dotted-label space to the PoP gateway. Loosen it and a
+    /// @dev This is what reserves the dotted-label space to the gateway path. Loosen it and a
     ///      subname could be minted whose label equals a person's, putting two claimants on one
     ///      node. Both subnode entry points are checked, since either would open the space.
     function test_subname_label_carrying_a_separator_is_rejected() public {
@@ -53,7 +53,11 @@ contract DotnsRegistryTests is BaseDotns {
         vm.expectRevert(IDotnsRegistry.InvalidLabel.selector);
         dotnsRegistry.setSubnodeOwner(
             IDotnsRegistry.SubnodeRecord({
-                parentNode: parentNode, subLabel: "ali.ce", parentLabel: parentLabel, owner: ed
+                parentNode: parentNode,
+                subLabel: "ali.ce",
+                parentLabel: parentLabel,
+                owner: ed,
+                persist: true
             })
         );
 
@@ -70,15 +74,14 @@ contract DotnsRegistryTests is BaseDotns {
         vm.stopPrank();
     }
 
-    /// @notice A subname under a two-digit name lands on its own node, not on a person's.
-    /// @dev `michael.01` reads two ways: the whole label the gateway mints, and the subname
-    ///      `michael` under `01`. The text alone cannot identify a person, since the node it
-    ///      resolves to depends on which reading you take, and provenance is what tells them
-    ///      apart. No production controller entry point can create the parent: the public and
-    ///      reserved paths require three characters, and both gateway paths are letters only.
-    ///      An owner-authorised controller can still call the registrar directly, which is what
-    ///      the test does to pin what the two readings resolve to.
-    function test_subname_under_a_two_digit_name_does_not_collide_with_a_person() public {
+    /// @notice A subname created outside the gateway carries no person provenance.
+    /// @dev The gateway issues a device name as the subname `michael` under `01` and records it in
+    ///      `_popIssued`. This test creates the same subname directly, without the gateway, and
+    ///      shows it reads back as not `isPopIssued`: provenance, not the name text, is what marks
+    /// a gateway-issued person. No production controller entry point can create the parent here:
+    ///      the public and reserved paths require three characters, and both gateway paths are
+    ///      letters only. An owner-authorised controller calls the registrar directly to set it up.
+    function test_subname_created_outside_the_gateway_has_no_person_provenance() public {
         bytes32 twoDigitNode = _nodeOf("01");
 
         vm.startPrank(address(dotnsRegistrarController));
@@ -89,16 +92,18 @@ contract DotnsRegistryTests is BaseDotns {
         vm.prank(owner);
         bytes32 subnode = dotnsRegistry.setSubnodeOwner(
             IDotnsRegistry.SubnodeRecord({
-                parentNode: twoDigitNode, subLabel: "michael", parentLabel: "01", owner: ed
+                parentNode: twoDigitNode,
+                subLabel: "michael",
+                parentLabel: "01",
+                owner: ed,
+                persist: true
             })
         );
 
-        bytes32 personNode = _nodeOf("michael.01");
-        assertTrue(subnode != personNode, "subname node is not the person's node");
         assertEq(dotnsRegistry.owner(subnode), ed, "subname belongs to its own owner");
         assertFalse(
             dotnsPopController.isPopIssued("michael.01"),
-            "no gateway mint, so the text is a subname and not a person"
+            "created outside the gateway, so it carries no person provenance"
         );
     }
 
@@ -111,7 +116,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 expectedSubnode = _namehash(parentNode, subLabelHash);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: subLabel,
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.expectEmit(true, true, false, true, address(dotnsRegistry));
@@ -127,6 +136,123 @@ contract DotnsRegistryTests is BaseDotns {
         assertEq(dotnsRegistry.resolver(returnedSubnode), address(dotnsReverseResolver));
     }
 
+    /// @notice A registered controller may defer the store write, recording ownership and a
+    ///         resolver but no store row.
+    /// @dev Only a registered controller may pass `persist: false`, so the parent here is owned by
+    /// a controller. It backfills the label later, so the registry leaves the store untouched and
+    ///      no store is deployed for the owner here.
+    function test_setSubnodeOwner_registered_controller_defers_and_writes_no_store_row() public {
+        string memory parentLabel = "parentnode07";
+        bytes32 parentNode = _registerNodeTo(parentLabel, address(dotnsPopController));
+
+        vm.prank(address(dotnsPopController));
+        bytes32 subnode = dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: parentNode,
+                subLabel: "alice",
+                parentLabel: parentLabel,
+                owner: ed,
+                persist: false
+            })
+        );
+
+        assertEq(dotnsRegistry.owner(subnode), ed, "ownership recorded");
+        assertEq(
+            dotnsRegistry.resolver(subnode), address(dotnsReverseResolver), "resolver recorded"
+        );
+        assertEq(storeFactory.getLabelStore(ed), address(0), "no store row written");
+    }
+
+    /// @notice A caller that is not a registered controller cannot defer the store write.
+    /// @dev The parent owner here is a plain account that owns the parent, so it clears the
+    ///      ownership gate; the deferral then fails the controller gate. Deferring would strand the
+    ///      label under an owner who can never backfill it, so the caller must persist eagerly.
+    function test_setSubnodeOwner_reverts_when_a_non_controller_defers() public {
+        string memory parentLabel = "parentnode10";
+        bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
+
+        IDotnsRegistry.SubnodeRecord memory record = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNode,
+            subLabel: "alice",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: false
+        });
+
+        vm.prank(owner);
+        vm.expectRevert(IDotnsRegistry.NotAuthorised.selector);
+        dotnsRegistry.setSubnodeOwner(record);
+
+        // Positive control: the same caller creating the same subname with `persist: true`
+        // succeeds, proving `owner` holds parent authority and the revert above is the deferral
+        // gate rather than the ownership modifier (both revert `NotAuthorised`).
+        record.persist = true;
+        vm.prank(owner);
+        bytes32 subnode = dotnsRegistry.setSubnodeOwner(record);
+        assertEq(dotnsRegistry.owner(subnode), ed, "eager persist by the parent owner is allowed");
+    }
+
+    /// @notice A same-owner re-call with `persist: true` does not backfill the store.
+    /// @dev The registry writes the store on creation or on reassignment to a new owner, so a
+    /// repeat call that leaves the owner unchanged is a no-op for the store. Backfilling is done by
+    /// an
+    ///      authorised store writer instead (see the backfill test below), not by re-calling this.
+    function test_setSubnodeOwner_same_owner_recall_does_not_backfill_store() public {
+        string memory parentLabel = "parentnode08";
+        bytes32 parentNode = _registerNodeTo(parentLabel, address(dotnsPopController));
+
+        IDotnsRegistry.SubnodeRecord memory deferred = IDotnsRegistry.SubnodeRecord({
+            parentNode: parentNode,
+            subLabel: "alice",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: false
+        });
+        vm.prank(address(dotnsPopController));
+        dotnsRegistry.setSubnodeOwner(deferred);
+
+        // Re-issue the same subname to the same owner, now asking to persist.
+        IDotnsRegistry.SubnodeRecord memory reissue = deferred;
+        reissue.persist = true;
+        vm.prank(address(dotnsPopController));
+        dotnsRegistry.setSubnodeOwner(reissue);
+
+        assertEq(storeFactory.getLabelStore(ed), address(0), "same-owner re-call does not backfill");
+    }
+
+    /// @notice A deferred (`persist: false`) subname is backfilled by an authorised store writer.
+    /// @dev The name owner cannot write their own store; the write is gated to protocol store
+    /// writers (the registrar and its controllers). So the deferring writer backfills by deploying
+    /// the
+    ///      owner's store and writing the label as an authorised writer, which is what settlement
+    ///      does. The registry is not re-called.
+    function test_deferred_subname_is_backfilled_by_an_authorised_store_writer() public {
+        string memory parentLabel = "parentnode09";
+        bytes32 parentNode = _registerNodeTo(parentLabel, address(dotnsPopController));
+
+        vm.prank(address(dotnsPopController));
+        bytes32 subnode = dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: parentNode,
+                subLabel: "alice",
+                parentLabel: parentLabel,
+                owner: ed,
+                persist: false
+            })
+        );
+        assertEq(storeFactory.getLabelStore(ed), address(0), "deferred: no store yet");
+
+        // An authorised store writer deploys ed's store and writes the label. ed cannot do this.
+        string memory fullName = string.concat("alice.", parentLabel, protocolRegistry.tld());
+        vm.startPrank(address(dotnsPopController));
+        address store = storeFactory.deployLabelStoreFor(ed);
+        ILabelStore(store).storeLabel(subnode, fullName);
+        vm.stopPrank();
+
+        assertEq(storeFactory.getLabelStore(ed), store, "store deployed for the owner");
+        assertEq(ILabelStore(store).getLabel(subnode), fullName, "deferred label backfilled");
+    }
+
     function test_node_owner_sets_resolver_emits_event_and_persists() public {
         string memory parentLabel = "parentnode03";
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
@@ -137,7 +263,11 @@ contract DotnsRegistryTests is BaseDotns {
         address newResolver = makeAddr("resolver");
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: subLabel,
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.startPrank(owner);
@@ -164,7 +294,11 @@ contract DotnsRegistryTests is BaseDotns {
         address newResolver = makeAddr("resolver");
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: subLabel, parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: subLabel,
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.startPrank(owner);
@@ -186,7 +320,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory childRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "child", parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: "child",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.prank(owner);
@@ -194,7 +332,11 @@ contract DotnsRegistryTests is BaseDotns {
 
         string memory nestedParentLabel = string.concat("child.", parentLabel);
         IDotnsRegistry.SubnodeRecord memory leafRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: childNode, subLabel: "leaf", parentLabel: nestedParentLabel, owner: tiago
+            parentNode: childNode,
+            subLabel: "leaf",
+            parentLabel: nestedParentLabel,
+            owner: tiago,
+            persist: true
         });
 
         vm.prank(ed);
@@ -217,7 +359,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 expectedChildNode = _namehash(parentNode, childLabelHash);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: childLabel, parentLabel: parentLabel, owner: tiago
+            parentNode: parentNode,
+            subLabel: childLabel,
+            parentLabel: parentLabel,
+            owner: tiago,
+            persist: true
         });
 
         vm.startPrank(ed);
@@ -232,10 +378,14 @@ contract DotnsRegistryTests is BaseDotns {
 
     function test_revert_subnode_owner_with_parent_label_mismatch() public {
         string memory parentLabel = "actualparent01";
-        bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.PopFull);
+        bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.Personhood);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "docs", parentLabel: "parity", owner: leonardo
+            parentNode: parentNode,
+            subLabel: "docs",
+            parentLabel: "parity",
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -248,7 +398,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "docs.api", parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: "docs.api",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.prank(owner);
@@ -261,7 +415,7 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "", parentLabel: parentLabel, owner: ed
+            parentNode: parentNode, subLabel: "", parentLabel: parentLabel, owner: ed, persist: true
         });
 
         vm.prank(owner);
@@ -274,7 +428,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "Docs", parentLabel: parentLabel, owner: ed
+            parentNode: parentNode,
+            subLabel: "Docs",
+            parentLabel: parentLabel,
+            owner: ed,
+            persist: true
         });
 
         vm.prank(owner);
@@ -287,7 +445,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "docs", parentLabel: "Parentnode10", owner: ed
+            parentNode: parentNode,
+            subLabel: "docs",
+            parentLabel: "Parentnode10",
+            owner: ed,
+            persist: true
         });
 
         vm.prank(owner);
@@ -300,7 +462,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "blog", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "blog",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -320,7 +486,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "app", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "app",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -344,7 +514,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "docs", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "docs",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -368,7 +542,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "api", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "api",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -386,7 +564,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "mail", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "mail",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -408,7 +590,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "web", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "web",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -430,17 +616,25 @@ contract DotnsRegistryTests is BaseDotns {
     function test_same_sublabel_under_different_parents_owned_by_same_address() public {
         string memory parentLabelA = "alphaomega";
         string memory parentLabelB = "bravobro";
-        bytes32 parentNodeA = _register(parentLabelA, owner, IPopRules.PopStatus.PopFull);
-        bytes32 parentNodeB = _register(parentLabelB, owner, IPopRules.PopStatus.PopFull);
+        bytes32 parentNodeA = _register(parentLabelA, owner, IPopRules.PopStatus.Personhood);
+        bytes32 parentNodeB = _register(parentLabelB, owner, IPopRules.PopStatus.Personhood);
 
         string memory subLabel = "app";
 
         IDotnsRegistry.SubnodeRecord memory recordA = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNodeA, subLabel: subLabel, parentLabel: parentLabelA, owner: ed
+            parentNode: parentNodeA,
+            subLabel: subLabel,
+            parentLabel: parentLabelA,
+            owner: ed,
+            persist: true
         });
 
         IDotnsRegistry.SubnodeRecord memory recordB = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNodeB, subLabel: subLabel, parentLabel: parentLabelB, owner: ed
+            parentNode: parentNodeB,
+            subLabel: subLabel,
+            parentLabel: parentLabelB,
+            owner: ed,
+            persist: true
         });
 
         vm.startPrank(owner);
@@ -457,7 +651,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "api", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "api",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -483,7 +681,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "web", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "web",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -508,7 +710,11 @@ contract DotnsRegistryTests is BaseDotns {
         bytes32 parentNode = _register(parentLabel, ed, IPopRules.PopStatus.NoStatus);
 
         IDotnsRegistry.SubnodeRecord memory subnodeRecord = IDotnsRegistry.SubnodeRecord({
-            parentNode: parentNode, subLabel: "mail", parentLabel: parentLabel, owner: leonardo
+            parentNode: parentNode,
+            subLabel: "mail",
+            parentLabel: parentLabel,
+            owner: leonardo,
+            persist: true
         });
 
         vm.prank(ed);
@@ -537,5 +743,20 @@ contract DotnsRegistryTests is BaseDotns {
         vm.prank(ed);
         vm.expectRevert(IDotnsRegistry.NotAuthorised.selector);
         dotnsRegistry.setSubnodeResolver(resolverRecord);
+    }
+
+    /// @notice Registers `label` directly under the TLD, owned by `nodeOwner`, without
+    /// commit-reveal.
+    /// @dev Lets a registered controller own a parent node, which the deferred-persist tests need
+    ///      since only a registered controller may pass `persist: false`.
+    function _registerNodeTo(string memory label, address nodeOwner)
+        private
+        returns (bytes32 node)
+    {
+        node = _nodeOf(label);
+        vm.startPrank(address(dotnsRegistrarController));
+        dotnsRegistrar.register(uint256(node), nodeOwner, "");
+        dotnsRegistry.setOwner(node, nodeOwner);
+        vm.stopPrank();
     }
 }

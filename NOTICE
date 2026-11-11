@@ -1,0 +1,18 @@
+dotNS
+© 2026 Parity Technologies
+
+This product is licensed under the MIT License; see the LICENSE file.
+
+Third-party components retain their own licences, stated in each file's
+SPDX-License-Identifier header, which is authoritative:
+
+- contracts/external/revive/ISystem.sol: pallet-revive system interface,
+  from the polkadot-sdk project (Apache-2.0).
+- contracts/external/personhood/IPersonhood.sol: Proof-of-Personhood
+  interface (GPL-3.0-only).
+- contracts/utils/Multicall3.sol: Multicall3 by its original authors
+  (mds1/multicall3, MIT), vendored with only a pragma update.
+
+Build and test dependencies (OpenZeppelin Contracts, forge-std, and
+others) are fetched at build time under their own licences and stay
+outside this repository and its release artifacts.

@@ -166,13 +166,13 @@ contract RegistrarControllerHandler is Test {
     }
 
     /// @notice Mocks the personhood precompile so it reports `tier` for `account`.
-    /// @dev Mirrors the `BaseDotns._setUserPopStatus` mapping (PopFull = 2,
-    ///      PopLite = 1, anything else = 0) so the handler stays consistent
+    /// @dev Mirrors the `BaseDotns._setUserPopStatus` mapping (Personhood = 2,
+    ///      Devicehood = 1, anything else = 0) so the handler stays consistent
     ///      with the test base.
     function _mockPersonhoodTier(address account, IPopRules.PopStatus tier) internal {
         uint8 statusByte;
-        if (tier == IPopRules.PopStatus.PopFull) statusByte = 2;
-        else if (tier == IPopRules.PopStatus.PopLite) statusByte = 1;
+        if (tier == IPopRules.PopStatus.Personhood) statusByte = 2;
+        else if (tier == IPopRules.PopStatus.Devicehood) statusByte = 1;
 
         bytes32 contextAlias =
             statusByte == 0 ? bytes32(0) : keccak256(abi.encode(account, statusByte));

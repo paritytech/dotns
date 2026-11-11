@@ -25,9 +25,11 @@ DotnsProtocolRegistry
 DotnsNameEscrow
 DotnsPopController
 DotnsPopResolver
+DotnsPopLens
 DotnsNameWhitelist
 DotnsCostModelRegistry
 DotnsFlatPricing
+Create3Factory
 
 IStoreFactory
 ILabelStore
@@ -41,8 +43,13 @@ IDotnsResolver
 IPopRules
 IDotnsProtocolRegistry
 IDotnsNameEscrow
+IDotnsNameEscrowRevocation
 IDotnsPopController
+IDotnsPopControllerLegacy
+IDotnsPopGovernance
 IDotnsPopResolver
+IDotnsPopResolverClearing
+IDotnsPopLens
 IDotnsController
 IDotnsNameWhitelist
 IDotnsCostModelRegistry

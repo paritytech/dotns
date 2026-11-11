@@ -2,7 +2,7 @@
 
 ## Security status
 
-This repository contains the DotNS smart-contract suite: reference and proof-of-concept code and
+This repository contains the dotNS smart-contract suite: reference and proof-of-concept code and
 patterns for a Polkadot naming system. It is intended for reference and experimentation, not as a
 production-ready artefact.
 

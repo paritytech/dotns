@@ -1,7 +1,7 @@
 #!/usr/bin/env node --test
 
 /**
- * Unit tests for the DotNS genesis extractor.
+ * Unit tests for the dotNS genesis extractor.
  *
  * The regression these guard against shipped once: the extractor followed only
  * the EIP-1967 proxy slot, so the two store implementations behind the
@@ -24,7 +24,7 @@ import {
   BEACON_IMPL_SLOT,
 } from "./extract-genesis.mjs";
 
-// Fixture: a miniature anvil dump shaped like the real DotNS deploy
+// Fixture: a miniature anvil dump shaped like the real dotNS deploy
 
 const REGISTRY = "0x00000000000000000000000000000000000000a1";
 const REGISTRY_IMPL = "0x00000000000000000000000000000000000000a2";

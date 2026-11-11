@@ -1,7 +1,7 @@
 {
   "name": "@dotns/dotns-contracts",
   "version": "2.0.0",
-  "description": "Dotns contracts",
+  "description": "dotNS contracts",
   "type": "module",
   "scripts": {
     "test": "forge test -vvvvv",
@@ -18,6 +18,7 @@
     "bun": ">=1.2.6"
   },
   "devDependencies": {
+    "@polkadot/api": "16.5.6",
     "cross-env": "^10.1.0",
     "dotenv": "^16.4.5",
     "prettier": "^2.6.2",

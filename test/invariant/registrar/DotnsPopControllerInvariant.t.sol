@@ -37,7 +37,7 @@ contract DotnsPopControllerInvariant is BaseDotns {
         );
         targetContract(address(handler));
 
-        bytes4[] memory selectors = new bytes4[](12);
+        bytes4[] memory selectors = new bytes4[](11);
         selectors[0] = handler.reserve.selector;
         selectors[1] = handler.relinquish.selector;
         selectors[2] = handler.expire.selector;
@@ -49,7 +49,6 @@ contract DotnsPopControllerInvariant is BaseDotns {
         selectors[8] = handler.publicRegister.selector;
         selectors[9] = handler.attemptTransfer.selector;
         selectors[10] = handler.createSubname.selector;
-        selectors[11] = handler.createRivalSubname.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
 
         _seedCoverage();
@@ -64,7 +63,7 @@ contract DotnsPopControllerInvariant is BaseDotns {
     ///      warp, relink and the two settlement paths) fill no list of their own and are left
     ///      to the campaign.
     function _seedCoverage() internal {
-        // A reserve, then a claim on the same base label, so a lite name and a full-person name
+        // A reserve, then a claim on the same base label, so a device name and a personhood name
         // both exist and the actor's store is settled.
         handler.reserve(0, 0, true);
         handler.claim(0, 0);
@@ -72,12 +71,10 @@ contract DotnsPopControllerInvariant is BaseDotns {
         // An odd base index takes a label of the public path's own, which the gateway cannot
         // have claimed; the transfer then picks the public token that registration minted.
         handler.publicRegister(1, 1);
-        handler.attemptTransfer(handler.mintedLiteTokenCount(), 0);
-
-        handler.createRivalSubname(0, 0);
+        handler.attemptTransfer(handler.mintedDeviceTokenCount(), 0);
 
         // Sub-labels come from a seed and most are not valid DNS labels, so walk seeds until
-        // one is accepted under a full-person parent.
+        // one is accepted under a personhood parent.
         for (uint256 seed; seed < 64 && handler.subnodeCreatedCount() == 0; ++seed) {
             handler.createSubname(seed, seed, seed);
         }
@@ -91,38 +88,12 @@ contract DotnsPopControllerInvariant is BaseDotns {
         assertGt(handler.publicLabelCount(), 0, "campaign took no label publicly");
         assertGt(handler.transferSuccessCount(), 0, "campaign moved no name");
         assertGt(handler.subnodeCreatedCount(), 0, "campaign created no subname");
-        assertGt(handler.rivalSubnodeCount(), 0, "campaign built no rival hierarchy");
     }
 
-    /// @notice The two readings of a lite name's text stay distinct, and the text-keyed signal
-    ///         answers for the whole-label one.
-    /// @dev `michael.01` is one label to the gateway and `michael` under `01` to the registry,
-    ///      and both render as the same text. `isPopIssued` is keyed by that text, so a true
-    ///      answer proves the whole-label reading was issued and says nothing about the rival
-    ///      standing beside it: the two coexist here, which is exactly why the node is what
-    ///      names the object. The first assertion pins that the nodes never converge; the
-    ///      soulbound flag is node-keyed, so it does discriminate between them, and is asserted
-    ///      in both directions.
-    function invariant_rival_hierarchy_never_passes_for_a_person() public view {
-        uint256 n = handler.rivalSubnodeCount();
-        for (uint256 i = 0; i < n; i++) {
-            string memory text = handler.rivalTexts(i);
-            bytes32 rival = handler.rivalSubnodes(i);
-            bytes32 person = _nodeOf(text);
-
-            assertTrue(rival != person, "rival hierarchy reached the person's node");
-            assertTrue(dotnsPopController.isPopIssued(text), "person lost their provenance");
-            assertTrue(dotnsRegistrar.isSoulbound(uint256(person)), "person's name is unlocked");
-            assertFalse(dotnsRegistrar.isSoulbound(uint256(rival)), "rival reads as gateway-minted");
-        }
-    }
-
-    /// @notice A subname never lands on a name the gateway issued.
-    /// @dev The two readings of `joseph.42`, one whole label or `joseph` beneath `42`, are what
-    ///      the separated form has to keep apart. The registry derives a parent's node by
-    ///      splitting the path on the separator, so a lite name's own node is unreachable as a
-    ///      parent and no subname can be created under one at all; the second assertion pins
-    ///      that, and the first pins that no subnode collides with an issued name either way.
+    /// @notice A user-created subname never collides with a name the gateway issued.
+    /// @dev A gateway personhood name is a second-level node and a gateway device name is a subname
+    ///      of its numeric container; a subname a user builds under a name they own must land on
+    ///      neither, or a user could reach a gateway-issued node.
     function invariant_subnames_never_reach_a_gateway_node() public view {
         uint256 subnodeCount = handler.subnodeCreatedCount();
         uint256 gatewayCount = handler.gatewayLabelCount();
@@ -130,14 +101,11 @@ contract DotnsPopControllerInvariant is BaseDotns {
         for (uint256 i = 0; i < subnodeCount; i++) {
             bytes32 subnode = handler.subnodesCreated(i);
             for (uint256 j = 0; j < gatewayCount; j++) {
-                assertTrue(
-                    subnode != _nodeOf(handler.gatewayLabelsSeen(j)),
-                    "subnode collided with a gateway name"
-                );
+                string memory label = handler.gatewayLabelsSeen(j);
+                bytes32 gatewayNode =
+                    _carriesSeparator(label) ? _deviceNodeOf(label) : _nodeOf(label);
+                assertTrue(subnode != gatewayNode, "subnode collided with a gateway name");
             }
-            assertFalse(
-                _carriesSeparator(handler.subnameParents(i)), "subname created under a lite name"
-            );
         }
     }
 
@@ -181,7 +149,15 @@ contract DotnsPopControllerInvariant is BaseDotns {
         for (uint256 i = 0; i < gatewayCount; i++) {
             string memory label = handler.gatewayLabelsSeen(i);
             assertFalse(handler.isPublicLabel(label), "gateway label taken publicly");
-            assertTrue(dotnsRegistrar.isSoulbound(uint256(_nodeOf(label))), "gateway name free");
+            if (_carriesSeparator(label)) {
+                // A device name is a subname owned in the registry, non-transferable because there
+                // is no token behind it, not through the soulbound flag.
+                bytes32 node = _deviceNodeOf(label);
+                assertTrue(dotnsRegistry.owner(node) != address(0), "gateway device name unowned");
+                assertFalse(dotnsRegistrar.exists(uint256(node)), "gateway device name is a token");
+            } else {
+                assertTrue(dotnsRegistrar.isSoulbound(uint256(_nodeOf(label))), "gateway name free");
+            }
         }
     }
 
@@ -233,7 +209,14 @@ contract DotnsPopControllerInvariant is BaseDotns {
             if (head >= tail) {
                 (bool slotLive,,) = popRules.isBaseNameReserved(baseLabel);
                 assertFalse(slotLive, "PopRules slot outlived an empty queue");
+                continue;
             }
+
+            // A queue whose front is not active keeps its slot until clearing reaches an active
+            // reservation or empties the queue. The slot may name a user the queue has moved
+            // past, which gains them nothing: the public flow rejects a reserved name for
+            // everyone, and the gateway decides from the queue alone.
+            assertTrue(popHolder != address(0), "a non-empty queue lost its PopRules slot");
         }
     }
 
@@ -261,56 +244,72 @@ contract DotnsPopControllerInvariant is BaseDotns {
         }
     }
 
-    /// @notice For every historic (liteLabelhash, fullNode) pair the resolver's
+    /// @notice For every historic (deviceLabelhash, personhoodNode) pair the resolver's
     ///         forward and reverse indexes either still round-trip to each
     ///         other or have both been cleared by a later overwrite. A partial
     ///         overwrite, where one side still points at a stale partner, is
     ///         the corruption signature this invariant guards against.
-    function invariant_fullClaim_liteLink_are_inverse() public view {
+    function invariant_personhoodLink_deviceLink_are_inverse() public view {
         uint256 n = handler.claimedCount();
         for (uint256 i = 0; i < n; i++) {
-            bytes32 liteLabelhash = handler.claimedLiteLabelhashes(i);
-            bytes32 fullNode = handler.claimedFullNodes(i);
+            bytes32 deviceLabelhash = handler.claimedDeviceLabelhashes(i);
+            bytes32 personhoodNode = handler.claimedPersonhoodNodes(i);
 
-            bytes32 currentFullForLite = dotnsPopResolver.fullClaim(liteLabelhash);
-            bytes32 currentLiteForFull = dotnsPopResolver.liteLink(fullNode);
+            bytes32 currentPersonhoodForDevice = dotnsPopResolver.personhoodNodeOf(deviceLabelhash);
+            bytes32 currentDeviceForPersonhood = dotnsPopResolver.deviceLabelhashOf(personhoodNode);
 
             // Either the pair is still live on both sides, or both sides
             // have been cleared. Anything else is a partial overwrite.
-            if (currentFullForLite == fullNode) {
-                assertEq(currentLiteForFull, liteLabelhash, "live fullClaim but liteLink drifted");
-            } else if (currentLiteForFull == liteLabelhash) {
-                assertEq(currentFullForLite, fullNode, "live liteLink but fullClaim drifted");
+            if (currentPersonhoodForDevice == personhoodNode) {
+                assertEq(
+                    currentDeviceForPersonhood,
+                    deviceLabelhash,
+                    "live personhoodNodeOf but deviceLabelhashOf drifted"
+                );
+            } else if (currentDeviceForPersonhood == deviceLabelhash) {
+                assertEq(
+                    currentPersonhoodForDevice,
+                    personhoodNode,
+                    "live deviceLabelhashOf but personhoodNodeOf drifted"
+                );
             }
             // Else: both sides were overwritten. Covered by the stale
             // invariants below.
         }
     }
 
-    /// @notice No stale `liteLink`: for every touched fullNode, a non-zero
-    ///         liteLink value round-trips through `fullClaim` back to the same
-    ///         fullNode. A drifting liteLink is the corruption footprint this
+    /// @notice No stale `deviceLabelhashOf`: for every touched personhoodNode, a non-zero
+    ///         device labelhash round-trips through `personhoodNodeOf` back to the same
+    ///         personhoodNode. A drifting device labelhash is the corruption footprint this
     ///         invariant guards against.
-    function invariant_no_stale_liteLink() public view {
+    function invariant_no_stale_deviceLabelhash() public view {
         uint256 n = handler.claimedCount();
         for (uint256 i = 0; i < n; i++) {
-            bytes32 fullNode = handler.claimedFullNodes(i);
-            bytes32 currentLite = dotnsPopResolver.liteLink(fullNode);
-            if (currentLite == bytes32(0)) continue;
-            assertEq(dotnsPopResolver.fullClaim(currentLite), fullNode, "stale liteLink");
+            bytes32 personhoodNode = handler.claimedPersonhoodNodes(i);
+            bytes32 currentDevice = dotnsPopResolver.deviceLabelhashOf(personhoodNode);
+            if (currentDevice == bytes32(0)) continue;
+            assertEq(
+                dotnsPopResolver.personhoodNodeOf(currentDevice),
+                personhoodNode,
+                "stale deviceLabelhashOf"
+            );
         }
     }
 
-    /// @notice No stale `fullClaim`: symmetric to `invariant_no_stale_liteLink`,
-    ///         every claimed liteLabelhash with a non-zero fullClaim round-trips
-    ///         through `liteLink` back to the same liteLabelhash.
-    function invariant_no_stale_fullClaim() public view {
+    /// @notice No stale `personhoodNodeOf`: symmetric to `invariant_no_stale_deviceLabelhash`,
+    ///         every claimed deviceLabelhash with a non-zero personhood node round-trips
+    ///         through `deviceLabelhashOf` back to the same deviceLabelhash.
+    function invariant_no_stale_personhoodNode() public view {
         uint256 n = handler.claimedCount();
         for (uint256 i = 0; i < n; i++) {
-            bytes32 liteLabelhash = handler.claimedLiteLabelhashes(i);
-            bytes32 currentFull = dotnsPopResolver.fullClaim(liteLabelhash);
-            if (currentFull == bytes32(0)) continue;
-            assertEq(dotnsPopResolver.liteLink(currentFull), liteLabelhash, "stale fullClaim");
+            bytes32 deviceLabelhash = handler.claimedDeviceLabelhashes(i);
+            bytes32 currentPersonhood = dotnsPopResolver.personhoodNodeOf(deviceLabelhash);
+            if (currentPersonhood == bytes32(0)) continue;
+            assertEq(
+                dotnsPopResolver.deviceLabelhashOf(currentPersonhood),
+                deviceLabelhash,
+                "stale personhoodNodeOf"
+            );
         }
     }
 
@@ -374,35 +373,55 @@ contract DotnsPopControllerInvariant is BaseDotns {
         assertEq(page.length, count, "count != enumeration length");
     }
 
-    /// @notice Settlement writes labels and never strands a minted name. Every
-    ///         minted token is either settled, with its label readable in the
-    ///         owner's store, or still staged in the owner's pending queue.
-    ///         Age never drops an entry, so a minted name is never left in
-    ///         neither place.
-    /// @dev The stranded case the old model allowed, a lapsed entry swept out of
-    ///      the queue with nothing written, is now unreachable: settlement always
-    ///      writes the label regardless of the reservation deadline.
+    /// @notice Settlement writes labels and never strands a minted name. A personhood name is a
+    ///         token whose settled label reads back from the registrar; a device name is a registry
+    ///         subname whose settled label lives in the owner's store. Either is settled or still
+    ///         staged in the owner's pending queue, so a minted name is never left in neither
+    /// place.
+    /// @dev A pending entry is never dropped without its label being written: settlement always
+    ///      writes the label, whatever the claim's age. A deployed store and a pending claim are
+    ///      mutually exclusive in this suite, so a device name whose owner holds a store has
+    ///      necessarily been settled.
     function invariant_settled_names_written_and_never_stranded() public view {
-        uint256 n = handler.mintedLiteTokenCount();
+        uint256 n = handler.mintedDeviceTokenCount();
         for (uint256 i = 0; i < n; i++) {
-            uint256 tokenId = handler.mintedLiteTokenIds(i);
-            if (!dotnsRegistrar.exists(tokenId)) continue;
+            uint256 id = handler.mintedDeviceTokenIds(i);
 
-            // A settled name reads its label back from the owner's store.
-            if (bytes(dotnsRegistrar.labelOf(tokenId)).length != 0) continue;
-
-            // Otherwise the name must still be staged in its owner's pending queue.
-            address nameOwner = dotnsRegistrar.ownerOf(tokenId);
-            IDotnsPopController.PendingClaim[] memory pending =
-                dotnsPopController.pendingClaims(nameOwner, 0, type(uint256).max);
-            bool staged;
-            for (uint256 j = 0; j < pending.length; j++) {
-                if (_nodeOf(pending[j].label) == bytes32(tokenId)) {
-                    staged = true;
-                    break;
-                }
+            if (dotnsRegistrar.exists(id)) {
+                // Personhood name: a tokenised second-level name. A settled name reads its label
+                // back from the registrar; otherwise it must still be staged in its owner's queue.
+                if (bytes(dotnsRegistrar.labelOf(id)).length != 0) continue;
+                assertTrue(
+                    _stagedInPending(dotnsRegistrar.ownerOf(id), bytes32(id)),
+                    "minted name neither settled nor staged"
+                );
+                continue;
             }
-            assertTrue(staged, "minted name neither settled nor staged");
+
+            // Device name: a registry subname, not a token. It is owned in the registry, and
+            // settled into the owner's store or still staged in pending. Store and pending are
+            // mutually exclusive here, so a deployed store means the label was written.
+            bytes32 node = bytes32(id);
+            address nameOwner = dotnsRegistry.owner(node);
+            assertTrue(nameOwner != address(0), "device name lost its registry owner");
+            if (IStoreFactory(address(storeFactory)).getLabelStore(nameOwner) != address(0)) {
+                continue;
+            }
+            assertTrue(_stagedInPending(nameOwner, node), "device name neither settled nor staged");
+        }
+    }
+
+    /// @notice Whether `owner` holds a pending claim whose label derives to `node`.
+    /// @dev A device name carries the separator and derives to its subnode; any other label derives
+    ///      to a second-level node under the TLD.
+    function _stagedInPending(address owner, bytes32 node) internal view returns (bool staged) {
+        IDotnsPopController.PendingClaim[] memory pending =
+            dotnsPopController.pendingClaims(owner, 0, type(uint256).max);
+        for (uint256 j = 0; j < pending.length; j++) {
+            bytes32 pendingNode = _carriesSeparator(pending[j].label)
+                ? _deviceNodeOf(pending[j].label)
+                : _nodeOf(pending[j].label);
+            if (pendingNode == node) return true;
         }
     }
 }

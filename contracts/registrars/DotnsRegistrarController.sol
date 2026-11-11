@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -29,7 +30,7 @@ import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
 
-/// @title Dotns Registrar Controller
+/// @title dotNS Registrar Controller
 /// @notice Allocates top-level labels using a commit reveal scheme.
 /// @dev Orchestrates allocation, PoP validation, pricing enforcement, forward registry
 /// wiring, default reverse resolution, and immutable store writing.
@@ -69,7 +70,7 @@ contract DotnsRegistrarController is
     ///      from this stamp.
     mapping(bytes32 hash => uint256 version) public committedPricingVersion;
 
-    /// @notice Protocol-level address registry for all DotNS contracts.
+    /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
@@ -90,7 +91,9 @@ contract DotnsRegistrarController is
     /// @custom:reverts MaxCommitmentAgeTooLow) and must stay within
     /// `MAX_ALLOWED_COMMITMENT_AGE` (otherwise @custom:reverts MaxCommitmentAgeTooHigh) before
     /// wiring the protocol registry.
+    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
+        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint256 minAge,
         uint256 maxAge
@@ -99,7 +102,7 @@ contract DotnsRegistrarController is
         initializer
     {
         __ERC165_init();
-        __Ownable_init(msg.sender);
+        __Ownable_init(initialOwner);
 
         require(minAge > 0, MinCommitmentAgeZero());
         require(maxAge > minAge, MaxCommitmentAgeTooLow());
@@ -172,20 +175,13 @@ contract DotnsRegistrarController is
         uint256 tokenId = uint256(node);
         bool isReclaim = registrar.exists(tokenId);
 
-        string memory stem = rules.stripDigits(registration.label);
-        bool stemCanonical = stem.isSingleLabelMemory();
-        // Reclaim hands the name back from a prior occupant who may hold a sibling-controller's
-        // stem reservation, which is garbage once the name moves on, so clear it. Non-reclaim
-        // paths intentionally leave an existing reservation in place: the slot belongs to the
-        // sibling controller that wrote it (e.g. the PoP queue head stamp), and clearing it from
-        // here would brick that controller's release and advance paths.
-        if (stemCanonical && isReclaim) {
-            (address reservationOwner,) = rules.getBaseNameReservation(stem);
-            address expectedOwner =
-                IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId).recipient;
-            if (reservationOwner != address(0) && reservationOwner == expectedOwner) {
-                rules.releaseReservationForReclaim(stem, expectedOwner);
-            }
+        // Runs before pricing: the price reads below enforce reservations against the new owner,
+        // so a slot the previous holder left behind would otherwise block this registration.
+        // Non-reclaim paths intentionally leave an existing reservation in place: the slot belongs
+        // to the sibling controller that wrote it (e.g. the PoP queue head stamp), and clearing it
+        // from here would brick that controller's release and advance paths.
+        if (isReclaim) {
+            _clearStaleReservation(rules, escrow, tokenId, registration.label);
         }
 
         bool isDirect = msg.sender == registration.owner;
@@ -232,15 +228,11 @@ contract DotnsRegistrarController is
         );
 
         if (isReclaim) {
-            IDotnsNameEscrow(payable(escrow)).reclaim(tokenId, registration.owner);
-            // Reclaim hands the NFT to the new holder; rewrite the registry record so the prior
-            // owner's resolver pointer cannot follow the name. Must run after `escrow.reclaim`
-            // so the registry's `ownerOf` check sees the new holder, not the escrow.
-            IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY))
-                .setOwner(node, registration.owner);
+            _reclaimFromEscrow(escrow, tokenId, node, registration.owner);
         }
 
-        _settleEscrow(escrow, tokenId, registration.owner, isDirect, totalCharged);
+        // The price is the owner's refundable deposit, whoever paid it.
+        _seedReleasePosition(escrow, tokenId, registration.owner, totalCharged);
 
         if (msg.value > totalCharged) {
             uint256 refund = msg.value - totalCharged;
@@ -250,38 +242,6 @@ contract DotnsRegistrarController is
             } else {
                 IDotnsNameEscrow(payable(escrow)).creditOverpayment{value: refund}(msg.sender);
             }
-        }
-    }
-
-    /// @notice Settles every escrow side-effect of a successful registration.
-    /// @dev Extracted to keep `register` under the stack-depth ceiling. On a direct
-    ///      registration the full `chargeAmount` lands in the refundable deposit position
-    ///      keyed to `nameOwner`. On a cross-payer registration the deposit position is
-    ///      seeded with a zero amount so the release lifecycle stays reachable, and the same
-    ///      `chargeAmount` routes to the protocol fee pot via `depositProtocolFee` keyed to
-    ///      `msg.sender` as the payer.
-    function _settleEscrow(
-        address escrow,
-        uint256 tokenId,
-        address nameOwner,
-        bool isDirect,
-        uint256 chargeAmount
-    )
-        internal
-    {
-        uint256 depositAmount = isDirect ? chargeAmount : 0;
-        IDotnsNameEscrow(payable(escrow)).deposit{value: depositAmount}(
-            IDotnsNameEscrow.DepositParams({
-                tokenId: tokenId, asset: address(0), amount: depositAmount, recipient: nameOwner
-            })
-        );
-
-        if (!isDirect && chargeAmount > 0) {
-            IDotnsNameEscrow(payable(escrow)).depositProtocolFee{value: chargeAmount}(
-                IDotnsNameEscrow.ProtocolFeeDepositParams({
-                    tokenId: tokenId, payer: msg.sender, recipient: nameOwner
-                })
-            );
         }
     }
 
@@ -301,7 +261,8 @@ contract DotnsRegistrarController is
             );
         }
 
-        (, bytes32 labelhash, bytes32 node) = _requireAvailableLabel(registration.label);
+        (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
+            _requireAvailableLabel(registration.label);
         _consumeCommitment(registration);
 
         // Spend the grant before minting so a grant in the wrong state fails before any name is
@@ -315,13 +276,39 @@ contract DotnsRegistrarController is
             whitelist.consume(registration.label, registration.owner);
         }
 
+        address escrow = _escrow();
+        uint256 tokenId = uint256(node);
+        // `available` is true both for a never-minted label and for one the escrow still holds
+        // past its redeem window, so a grant can land on either and this path has to serve both:
+        // `DotnsRegistrar.register` rejects an id the escrow holds, so an existing token is
+        // reclaimed rather than minted. Reserved-tier labels reach circulation only through this
+        // function, so a released grant has no other route back out of custody.
+        bool isReclaim = registrar.exists(tokenId);
+
         // No reverse record. `setReverseName` overwrites unconditionally, and the gate above lets
         // anyone submit for the beneficiary, so writing here would let a third party relabel
         // another address. The owner claims their own record through `claimReverseRecord`, which
         // checks ownership and writes only their own key.
         _completeRegistration(
-            registration, labelhash, node, 0, false, IDotnsReverseResolver(address(0)), false
+            registration, labelhash, node, 0, false, IDotnsReverseResolver(address(0)), isReclaim
         );
+
+        if (isReclaim) {
+            _clearStaleReservation(
+                IPopRules(protocolRegistry.get(DotnsConstants.POP_RULES)),
+                escrow,
+                tokenId,
+                registration.label
+            );
+            _reclaimFromEscrow(escrow, tokenId, node, registration.owner);
+        }
+
+        // Seed the position last, after `reclaim` has deleted whatever the previous holder left
+        // behind. A grant costs nothing, so there is no deposit to lock, but the position is also
+        // the lifecycle marker: `release` rejects a token whose position carries no recipient, so
+        // a name minted without one can never be released, never becomes reclaimable, and never
+        // returns to circulation.
+        _seedReleasePosition(escrow, tokenId, registration.owner, 0);
     }
 
     /// @inheritdoc IERC165
@@ -390,7 +377,7 @@ contract DotnsRegistrarController is
     /// Store.
     /// @dev On a fresh mint the triad of mint + forward-registry + store-write is delegated
     /// to @custom:function RegistrationUtils.registerAndStore, the single canonical implementation
-    /// shared across every DotNS registration flow. On a reclaim the mint step is skipped (the
+    /// shared across every dotNS registration flow. On a reclaim the mint step is skipped (the
     /// escrow has already moved custody) and only the registry wiring and store write run.
     /// Reverse-record setting and the priced-registration event stay here because they are
     /// commit-reveal-specific policy.
@@ -422,7 +409,7 @@ contract DotnsRegistrarController is
             IStoreFactory factory =
                 IStoreFactory(protocolRegistry.get(DotnsConstants.STORE_FACTORY));
             string memory fullName = string.concat(registration.label, protocolRegistry.tld());
-            labelStore = factory.writeLabel(registration.owner, node, fullName);
+            labelStore = factory.writeNewLabel(registration.owner, node, fullName);
         }
 
         if (setReverseRecord) {
@@ -440,10 +427,97 @@ contract DotnsRegistrarController is
         require(escrow != address(0), EscrowNotConfigured());
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Clears the base-name reservation that the previous holder of a reclaimed name still
+    ///         owns.
+    /// @dev Shared by both registration paths so their reclaim clean-up cannot drift apart. The
+    ///      previous holder may own a reservation on the name's base name, written by a sibling
+    ///      controller (e.g. the PoP queue head stamp). Once the name moves on, that slot is
+    ///      garbage, and left alone it blocks the base name for everyone else until it expires.
+    ///      Only a slot owned by the previous holder is cleared; a slot held by anyone else is
+    ///      still theirs and stays. Must run before `escrow.reclaim`, which deletes the position
+    ///      the previous holder is read from. Reads no `msg.sender`, so it is safe under a Root
+    ///      origin: `PopRules` sees this controller as its caller either way.
+    /// @param rules Configured PopRules.
+    /// @param escrow Configured name escrow.
+    /// @param tokenId Token being reclaimed.
+    /// @param label Label being registered.
+    function _clearStaleReservation(
+        IPopRules rules,
+        address escrow,
+        uint256 tokenId,
+        string calldata label
+    )
+        internal
+    {
+        string memory baseName = rules.stripDigits(label);
+        if (!baseName.isSingleLabelMemory()) return;
+
+        (address reservationOwner,) = rules.getBaseNameReservation(baseName);
+        address previousHolder =
+            IDotnsNameEscrow(payable(escrow)).getReleasePosition(tokenId).recipient;
+        if (reservationOwner != address(0) && reservationOwner == previousHolder) {
+            rules.releaseReservationForReclaim(baseName, previousHolder);
+        }
+    }
+
+    /// @notice Takes a name out of escrow custody and repoints the forward registry at its new
+    ///         holder.
+    /// @dev Shared by both registration paths so the ordering constraint lives in one place: the
+    ///      registry write must follow `escrow.reclaim`, because `setOwner` checks `ownerOf` and
+    ///      would otherwise see the escrow rather than `newOwner`. Without the rewrite the prior
+    ///      owner's resolver pointer follows the name to its new holder.
+    /// @param escrow Configured name escrow.
+    /// @param tokenId Token being reclaimed, equal to `uint256(node)`.
+    /// @param node Namehash of the label, as the forward registry keys it.
+    /// @param newOwner Address taking custody of the name.
+    function _reclaimFromEscrow(
+        address escrow,
+        uint256 tokenId,
+        bytes32 node,
+        address newOwner
+    )
+        internal
+    {
+        IDotnsNameEscrow(payable(escrow)).reclaim(tokenId, newOwner);
+        IDotnsRegistry(protocolRegistry.get(DotnsConstants.REGISTRY)).setOwner(node, newOwner);
+    }
+
+    /// @notice Opens the escrow release position that every registration path must leave behind.
+    /// @dev The single construction site for a position, so "every minted name is releasable" is
+    ///      one rule rather than one per path. `amount` is the refundable deposit and may be zero:
+    ///      `DotnsNameEscrow` treats `recipient` as the presence sentinel, so a zero-amount
+    ///      position is still a position. Public registrations lock the price as the owner's
+    ///      deposit, whoever paid it. Grant-backed reserved registrations seed zero because they
+    ///      charge nothing at all; their position carries no value and exists only so `release`,
+    ///      `redeem` and `reclaim` stay reachable.
+    /// @param escrow Configured name escrow.
+    /// @param tokenId Token the position is keyed to.
+    /// @param recipient Address the deposit (when non-zero) and the lifecycle are keyed to.
+    /// @param amount Refundable deposit to lock, forwarded as `msg.value`.
+    function _seedReleasePosition(
+        address escrow,
+        uint256 tokenId,
+        address recipient,
+        uint256 amount
+    )
+        internal
+    {
+        IDotnsNameEscrow(payable(escrow)).deposit{value: amount}(
+            IDotnsNameEscrow.DepositParams({
+                tokenId: tokenId, asset: address(0), amount: amount, recipient: recipient
+            })
+        );
+    }
+
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every dotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = protocolRegistry.protocolVersion();
     }
 
     /// @notice Returns the configured name whitelist from the protocol registry.

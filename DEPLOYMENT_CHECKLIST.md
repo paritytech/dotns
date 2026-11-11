@@ -1,6 +1,6 @@
-# DotNS Deployment Checklist
+# dotNS Deployment Checklist
 
-A step-by-step, copy/paste checklist for deploying DotNS to **any** Polkadot
+A step-by-step, copy/paste checklist for deploying dotNS to **any** Polkadot
 chain (any PolkaVM / `revive`-backed Asset Hub-style chain that exposes an
 ETH-RPC adapter).
 
@@ -111,6 +111,13 @@ invocation:
 After each stage the runner verifies every manifest address actually has
 bytecode. On any failure it restores the previous manifest and stops.
 
+The runner also needs to know which release it is deploying, because the final
+stage declares it on chain (`protocolVersion()` on the protocol registry). From
+a checkout of a release tag this resolves automatically; anywhere else, export
+`DOTNS_RELEASE_TAG` (bare semver, e.g. `0.8.0`; pre-release identifiers such as
+`0.8.0-rc.1` are accepted, since deploys run from pre-release tags, but build
+metadata is not) or the run aborts before deploying anything.
+
 - [ ] Ends with `=== Pipeline complete ===` and
   `Deleted one-off env file: .env`.
 
@@ -138,11 +145,18 @@ Confirm these keys are present:
 - [ ] `LabelStoreBeacon`
 - [ ] `UserStoreBeacon`
 - [ ] `Multicall3`
+- [ ] `Create3Factory`
+- [ ] `DotnsCostModelRegistry`
+- [ ] `DotnsFlatPricing`
+- [ ] `DotnsPopLens`
 
 The wiring stage already asserts every protocol-registry binding, so a green deploy means they
-are set. One is worth confirming by hand, because it is the only key whose absence surfaces to
-users rather than to the pipeline: with `nameWhitelist` unset, `registerReserved` reverts
-`WhitelistNotConfigured` for every caller, Root included.
+are set. Two are worth confirming by hand, because their absence surfaces to users rather than
+to the pipeline. With `nameWhitelist` unset, `registerReserved` reverts `WhitelistNotConfigured`
+for every grant-backed caller; a Root dispatch skips the whitelist read and is unaffected. With
+`nameEscrow` unset it reverts `EscrowNotConfigured` for every caller, Root included, because the
+mint seeds the zero-amount release position that keeps a granted name inside the release
+lifecycle.
 
 ```bash
 cast call "$PROTOCOL_REGISTRY" "get(bytes32)(address)" \
@@ -151,7 +165,82 @@ cast call "$PROTOCOL_REGISTRY" "get(bytes32)(address)" \
 
 - [ ] The address returned matches `DotnsNameWhitelist` in the manifest.
 
+The chain should also say what it runs. The wiring stage declared the release
+tag and, per registry key, the codehash of the code that executes for it; both
+are best-effort claims consumers rely on, and this checks them against the
+chain in one command:
+
+```bash
+node scripts/js/release-metadata.mjs verify --network <folder> --rpc "$RPC_URL" \
+  --tag "$DOTNS_RELEASE_TAG"
+```
+
+- [ ] Ends with `<network> matches the chain`, including
+  `ok   protocolVersion <tag>`.
+
 Done. ✅
+
+## Before enabling the PoP gateway
+
+The gateway pallet calls `DotnsPopController` as Root under a fixed weight limit, and pallet-revive
+meters proof size pessimistically, so the first device name in a numeric container, which also
+mints the container, costs noticeably more than the ones after it. Mint all 100 containers before
+the gateway's dispatcher address is set. `prepareDeviceContainer` is permissionless, so any funded
+account can send it, and a container already minted is a no-op:
+
+```bash
+for n in $(seq -w 0 99); do
+  cast send "$POP_CONTROLLER" "prepareDeviceContainer(string)" "$n" \
+    --rpc-url "$RPC_URL" --private-key "$KEY"
+done
+```
+
+- [ ] Containers `00` to `99` exist and are owned by `DotnsPopController`.
+
+The `popController` key (`POP_CONTROLLER`) must only ever point at this `DotnsPopController` proxy.
+The registrar marks every name minted by the address under that key as soulbound, so any contract
+registered there can lock names. The containers are soulbound to the controller that minted them, so
+pointing the key at a new controller would leave it unable to issue device names. Change the
+controller by upgrading it behind its proxy, and leave the key as it is. A repoint affects future
+mints only: names already marked stay soulbound.
+
+## Upgrading a live network
+
+Upgrade tooling does not live in this repository; operations do. What lives
+here is the contract every upgrade has to honour, because the network's
+declared version and code identity must move together with the code or every
+consumer that reads them is lied to:
+
+- Upgrade only to code built from a release tag, and cover everything that
+  release changed. The release's `codehashes.json` diffed against the previous
+  release's (`release-metadata.mjs changedset --previous <file>`) is the exact
+  list; declaring a tag while only part of that list is applied is the one
+  state the declarations cannot represent.
+- After upgrading a proxy, re-declare its key:
+  `setExpectedCodehash(key, <implementation codehash>)`. A registry rewire
+  (`protocolRegistry.set`) must be paired with the same call for its key.
+  An unpaired upgrade or rewire is not silent: the next `verify --tag` run
+  reports it as drift, indistinguishable from an unauthorised swap, which is
+  the check working as designed.
+- Store implementations sit behind the factory's beacons, so a beacon upgrade
+  (`upgradeLabelStoreImplementation` / `upgradeUserStoreImplementation`) moves
+  no declared hash: `expectedCodehash(storeFactory)` covers the factory's own
+  code only. Store code identity has to be audited through the beacons, not
+  via the registry declarations. Note also that this release changed
+  `UserStore.initialize`'s shape, so a user-store beacon upgrade that crosses
+  it must land together with a factory implementation upgrade (the factory is
+  a UUPS proxy owning its beacons): new store code with the old factory's
+  one-argument claim calldata breaks every claim that follows.
+- Declare the release last: `setProtocolVersion("X.Y.Z")` only once every
+  upgraded contract verifies. An aborted upgrade then leaves the previous
+  declaration standing (under-claiming, which clients handle) rather than a
+  false new one.
+- The declarations are claims, not proofs. `verify --tag` checks the chain
+  against them. A trustless check needs to compare the chain against the release's
+  `codehashes.json` instead.
+
+- [ ] `verify --network <folder> --rpc <url> --tag vX.Y.Z` passes after the
+  upgrade.
 
 ## Troubleshooting — the four things that actually go wrong
 

@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {IDotnsStore} from "./IDotnsStore.sol";
 import {ILabelStore} from "./ILabelStore.sol";
+import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {StoreAuth} from "../utils/StoreAuth.sol";
 
 /// @title LabelStore
-/// @notice Permanent per-user DotNS label store.
+/// @notice Permanent per-user dotNS label store.
 /// @dev One instance per user, deployed as a `BeaconProxy` by `StoreFactory` during registration.
 ///      Bound to its user forever: `_owner` and `_protocolRegistry` are set once at `initialize`
 ///      and never mutate. Writes are gated to the registrar, an authorised controller or the
@@ -16,7 +18,7 @@ import {StoreAuth} from "../utils/StoreAuth.sol";
 ///      (@custom:function StoreAuth.isStoreWriter); every labelhash is single-write and
 ///      permanently locked on first use.
 /// @dev Labels-only by invariant: this store holds registration records only. Every other
-///      per-name category (reverse, content, forward address, chat key, lite link) lives on a
+///      per-name category (reverse, content, forward address, chat key, device link) lives on a
 ///      dedicated resolver, never here.
 /// @dev Storage collision: the `BeaconProxy` stores the beacon address at EIP-1967 slot
 ///      `keccak256("eip1967.proxy.beacon") - 1`, which is non-sequential and cannot collide
@@ -26,7 +28,7 @@ contract LabelStore is Initializable, ILabelStore {
     /// @dev Permanent user this store belongs to. Set in `initialize`.
     address private _owner;
 
-    /// @dev Canonical DotNS protocol registry. Set in `initialize`.
+    /// @dev Canonical dotNS protocol registry. Set in `initialize`.
     address private _protocolRegistry;
 
     /// @dev labelhash => stored label string.
@@ -170,10 +172,15 @@ contract LabelStore is Initializable, ILabelStore {
         }
     }
 
-    /// @notice Returns implementation version.
-    /// @return versionString Current version string.
-    function version() external pure virtual returns (string memory versionString) {
-        versionString = "1.0.0";
+    /// @notice Returns the release this network declares it runs, read live from the protocol
+    ///         registry so every dotNS contract reports one synchronised value.
+    /// @dev Mirror of `IDotnsProtocolRegistry.protocolVersion`, kept under the historical
+    ///      `version()` selector for ABI compatibility. It reports the network's declaration,
+    ///      not this contract's build; per-contract identity is the codehash declared on the
+    ///      registry.
+    /// @return versionString Declared release as bare semver, empty when never declared.
+    function version() external view virtual returns (string memory versionString) {
+        versionString = IDotnsProtocolRegistry(_protocolRegistry).protocolVersion();
     }
 
     /// @notice Internal authorisation check deferred from the `onlyAuthorisedProtocol` modifier.

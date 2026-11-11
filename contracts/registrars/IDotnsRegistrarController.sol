@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {IDotnsController} from "./IDotnsController.sol";
 import {IPopRules} from "../pop/IPopRules.sol";
 
-/// @title Dotns Registrar Controller
+/// @title dotNS Registrar Controller
 /// @notice Interface for registering top-level labels using a commit reveal scheme.
 /// @dev Defines allocation only; forward resolution, reverse lookup, pricing mechanics, PoP
 /// validation, and store writing are handled by external contracts. Users commit a hash of
@@ -150,16 +151,15 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @custom:reverts CommitmentTooOld past `maxCommitmentAge`, and finally resolves the
     /// configured escrow address from the protocol registry (otherwise
     /// @custom:reverts EscrowNotConfigured). Splits on direct vs cross-payer at
-    /// `msg.sender == registration.owner`. The direct path runs `priceWithCheck` (personhood
-    /// + reservation gate) and routes the charge to a refundable escrow deposit owned by
-    /// `registration.owner`. The cross-payer path skips the personhood revert in
+    /// `msg.sender == registration.owner`. The direct path runs `priceWithCheck` (PoP-status
+    /// + reservation gate). The cross-payer path skips the PoP-status revert in
     /// `priceWithCheck` but applies it directly via @custom:reverts OwnerStatusInsufficient
     /// when the owner's recorded tier does not meet the label's required tier, and still
     /// rejects governance-reserved labels with @custom:reverts GovernanceReserved and live
-    /// cross-user stem reservations with @custom:reverts NameReserved. The cross-payer charge is
-    /// the owner-side registration price; the path applies no separate transfer friction. The
-    /// charge routes to the escrow protocol fee pot while seeding a zero-amount deposit slot so
-    /// the release lifecycle stays reachable. The reveal prices the name at the committed
+    /// cross-user base-name reservations with @custom:reverts NameReserved. Both paths charge the
+    /// registration price and lock it as a refundable escrow deposit owned by
+    /// `registration.owner`, so a payer who registers for someone else gives that owner the
+    /// deposit. The reveal prices the name at the committed
     /// `pricingVersion`, so a model change between commit and reveal leaves the amount unchanged,
     /// and rejects a total charge above the committed ceiling with @custom:reverts PriceExceedsMax
     /// before checking payment. The caller must supply at least the charge
@@ -171,7 +171,7 @@ interface IDotnsRegistrarController is IDotnsController {
     function register(Registration calldata registration) external payable;
 
     /// @notice Registers a granted name after the commitment delay, at zero base cost.
-    /// @dev Grant-backed issuance path: skips the PoP price check and the escrow deposit, but
+    /// @dev Grant-backed issuance path: skips the PoP price check and charges no deposit, but
     /// reuses the same commit-reveal pipeline so the same anti-front-running guarantees apply.
     ///
     /// Authority is either a substrate Root dispatch or a grant naming `registration.owner` on the
@@ -192,6 +192,16 @@ interface IDotnsRegistrarController is IDotnsController {
     /// (otherwise @custom:reverts NameNotAvailable), then consumes the prior commitment, which
     /// fails with @custom:reverts CommitmentNotFound, @custom:reverts CommitmentTooNew, or
     /// @custom:reverts CommitmentTooOld under the same conditions as @custom:function register.
-    /// Emits @custom:emits NameRegistered on success.
+    ///
+    /// Availability covers both a never-minted label and one the escrow still holds past its
+    /// redeem window, so this path reclaims from escrow when the token already exists, exactly as
+    /// @custom:function register does. Like @custom:function register, a reclaim first clears a
+    /// base-name reservation that the previous holder still owns, so it does not outlive their
+    /// hold on the name. It then seeds a zero-amount escrow release position keyed
+    /// to `registration.owner`. The grant is free, so there is nothing to refund, but the position
+    /// is what makes the name releasable: without it the holder cannot release, the name never
+    /// becomes reclaimable, and a reserved-tier label leaves circulation permanently. The escrow
+    /// must therefore be registered under `DotnsConstants.NAME_ESCROW`, otherwise
+    /// @custom:reverts EscrowNotConfigured. Emits @custom:emits NameRegistered on success.
     function registerReserved(Registration calldata registration) external;
 }

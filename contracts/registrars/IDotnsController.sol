@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2026 Parity Technologies
 pragma solidity ^0.8.34;
 
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -6,7 +7,7 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 /// @title IDotnsController
 /// @notice Baseline interface implemented by every controller authorised on `DotnsRegistrar`.
 /// @dev Marker interface that types `DotnsRegistrar.controllers` so every authorised caller
-/// (public commit-reveal, PoP gateway, any future privileged flow) fits the same mapping and
+/// (public commit-reveal, gateway path, any future privileged flow) fits the same mapping and
 /// the same `addController` / `removeController` signatures without forcing a common call
 /// surface. Extending @custom:contract IERC165 lets the registrar (or any observer) runtime-check
 /// which concrete controller interface a given address implements.

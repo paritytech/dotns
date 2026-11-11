@@ -8,34 +8,34 @@ import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 /// @notice Property-based tests for @custom:contract PopRules classification, reservation and
 /// pricing.
 contract PopRulesFuzzTest is BaseDotns {
-    function testFuzz_popfull_user_can_access_poplite(uint256 seed, uint256 length) public {
+    function testFuzz_personhood_user_can_access_devicehood(uint256 seed, uint256 length) public {
         length = bound(length, 6, 8);
-        // PopLite is the gateway's separated form, so the stem carries the separator; `length`
-        // bounds the stem, which is what sets the band.
+        // Devicehood is the gateway's separated form, so the label carries the separator;
+        // `length` bounds the stem, which is what sets the band.
         string memory nameLabel = string(abi.encodePacked(_makeAlpha(seed, length), ".01"));
 
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
         IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck(nameLabel, ed);
 
-        assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.PopLite));
-        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.PopFull));
+        assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.Devicehood));
+        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.Personhood));
     }
 
-    function testFuzz_popfull_user_can_access_nostatus(uint256 seed, uint256 length) public {
+    function testFuzz_personhood_user_can_access_nostatus(uint256 seed, uint256 length) public {
         length = bound(length, 9, 14);
         // Measured whole, so the suffix only lengthens it and the band stays NoStatus.
         string memory nameLabel = string(abi.encodePacked(_makeAlpha(seed, length), "01"));
 
-        _grantPopFull(ed);
+        _grantPersonhood(ed);
 
         IPopRules.PriceWithMeta memory priceMetadata = popRules.priceWithCheck(nameLabel, ed);
 
         assertEq(uint256(priceMetadata.status), uint256(IPopRules.PopStatus.NoStatus));
-        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.PopFull));
+        assertEq(uint256(priceMetadata.userStatus), uint256(IPopRules.PopStatus.Personhood));
     }
 
-    function testFuzz_nostatus_user_cannot_access_popfull(uint256 seed) public {
+    function testFuzz_nostatus_user_cannot_access_personhood(uint256 seed) public {
         string memory nameLabel = _makeAlpha(seed, 8);
 
         _grantNoStatus(ed);
@@ -103,7 +103,7 @@ contract PopRulesFuzzTest is BaseDotns {
         assertEq(priceMetadata.price, popRules.price(nameLabel));
     }
 
-    function testFuzz_expired_reservation_rolls_forward_to_next_lite_registrant(uint256 seed)
+    function testFuzz_expired_reservation_rolls_forward_to_next_device_registrant(uint256 seed)
         public
     {
         string memory baseName = _makeAlpha(seed, 6);
@@ -135,7 +135,7 @@ contract PopRulesFuzzTest is BaseDotns {
         baseName[0] = bytes1(uint8(baseName[0]) - 32);
         string memory mixedCaseName = string(abi.encodePacked(string(baseName), "01"));
 
-        _grantPopLite(ed);
+        _grantDevicehood(ed);
 
         vm.expectPartialRevert(IPopRules.PopError.selector);
         popRules.priceWithCheck(mixedCaseName, ed);

@@ -88,11 +88,6 @@ init_submodules(){
   done
 }
 
-apply_dependency_patches(){
-  echo "Applying dependency patches..."
-  bash scripts/shell/apply-oz-patches.sh
-}
-
 check_missing_files(){
   echo "Checking for missing source files..."
   
@@ -114,7 +109,6 @@ install_git_hooks(){
 }
 
 init_submodules
-apply_dependency_patches
 check_missing_files
 install_git_hooks
 echo "Setup complete!"

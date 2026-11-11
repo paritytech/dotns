@@ -14,7 +14,6 @@ name: Run Solidity Tests
 on:
   pull_request:
     branches: [master]
-    paths: ["contracts/**", "test/**", "**.sol"]
   push:
     branches: [master]
     paths: ["contracts/**", "test/**", "**.sol"]
@@ -35,6 +34,7 @@ jobs:
     if: github.event.action != 'closed'
     name: ${{ matrix.kind.label }}
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.kind.timeout[github.event_name] }}
     strategy:
       # Each matrix kind runs on its own runner so neither has to hold the
       # other's peak memory. Don't fail-fast: surfacing both shards' results
@@ -45,9 +45,13 @@ jobs:
           - id: unit-fuzz
             label: Contract Tests (Unit + Fuzz)
             forge_args: --no-match-contract Invariant --no-match-path 'test/fork/**'
+            timeout: { pull_request: 30, push: 30 }
           - id: invariant
             label: Contract Tests (Invariant)
             forge_args: --match-contract Invariant --no-match-path 'test/fork/**'
+            # Pull requests run 100 invariant runs per campaign (about 30 minutes), master 300
+            # (about 100 minutes).
+            timeout: { pull_request: 60, push: 150 }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,6 +82,30 @@ jobs:
 
       - run: bun install
 
+      # `cache/` and `out/` are forge's own incremental-compile state: it hashes each
+      # source file and only recompiles what changed since the hash it last saw. A
+      # restored cache from an unrelated commit is always safe to build on top of.
+      # Forge just recompiles whatever the content hashes say is dirty, so a partial
+      # match via `restore-keys` still saves most of a cold `via_ir` build. This has
+      # to sit after `bun install`: its postinstall (`setup.bash`) force-reclones
+      # `lib/`'s pinned dependencies, so hashing `lib/` any earlier would key the
+      # cache off content these steps are about to replace.
+      #
+      # Forge also drops persisted fuzz/invariant/test failure state under
+      # `cache/fuzz`, `cache/invariant`, and `cache/test-failures`, and replays it
+      # on the next run before exploring anything new (see foundry.toml's
+      # `[profile.ci.invariant]` comment). That state is cleared below, both before
+      # this job's `forge test` runs and again right before the job ends, so it
+      # never rides along in what gets restored or saved here.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            cache
+            out
+          key: foundry-build-${{ runner.os }}-${{ hashFiles('foundry.toml', 'remappings.txt', 'contracts/**/*.sol', 'test/**/*.sol', 'scripts/**/*.sol', 'lib/**/*.sol') }}
+          restore-keys: |
+            foundry-build-${{ runner.os }}-
+
       # Only the unit-fuzz job needs the fork adapter, and only when fork tests
       # actually exist in the tree. Fork tests are PR-scoped, so `test/fork/` is
       # empty on master and `hashFiles` returns '' (step skipped, no docker build).
@@ -104,6 +132,13 @@ jobs:
           # build-info from another solc invocation would otherwise survive.
           # Preserving `cache/` keeps incremental compile fast.
           rm -rf out/build-info
+
+          # A restored cache can carry a fuzz/invariant/test failure persisted by
+          # an earlier, unrelated run. Forge replays those before running anything
+          # new, so a stale one would fail this job even after the real bug behind
+          # it was fixed. Clear it before building or testing.
+          rm -rf cache/fuzz cache/invariant cache/test-failures
+
           forge build --sizes > build.log 2>&1
           BUILD=$?
 
@@ -111,6 +146,14 @@ jobs:
             echo "result=Failed - Build error" >> "$GITHUB_OUTPUT"
             echo "has_details=false" >> "$GITHUB_OUTPUT"
             exit 1
+          fi
+
+          # Pull requests run 100 invariant runs per campaign to keep the check short; pushes to
+          # master keep the ci profile's 300. No seed is fixed, so every run explores new
+          # sequences. The unit + fuzz leg runs no invariants, so this only affects the invariant
+          # leg.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            export FOUNDRY_INVARIANT_RUNS=100
           fi
 
           forge test -vv --summary ${{ matrix.kind.forge_args }} 2>&1 | tee test.log
@@ -163,11 +206,24 @@ jobs:
       - if: steps.run.outputs.result && contains(steps.run.outputs.result, 'Failed')
         run: exit 1
 
+      # Last step in the job on purpose: `actions/cache`'s save only runs once
+      # every step above has finished, and it caches whatever is on disk at that
+      # point, not just what "Run tests" left behind. Clearing here too means
+      # nothing this job did can leave a persisted failure in the saved cache.
+      - name: Clear persisted Foundry failure state before cache save
+        if: always()
+        run: rm -rf cache/fuzz cache/invariant cache/test-failures
+
   report:
     name: Report Test Results
     needs: test
-    if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
+    # A pull request from a fork gets a read-only token, so publishing the reports and the comment
+    # would fail.
+    if: >-
+      always() && github.event_name == 'pull_request' && github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -290,6 +346,7 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event.action == 'closed'
     steps:
       - uses: actions/checkout@v4

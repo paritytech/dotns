@@ -30,6 +30,9 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
+    # Invariant suites are left out of this job (see "Run coverage"), so this is plenty of
+    # headroom. It stops a stuck run long before GitHub's 6 hour default.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,6 +63,39 @@ jobs:
 
       - run: bun install
 
+      # `cache/` and `out/` are forge's own incremental-compile state: it hashes each
+      # source file and only recompiles what changed since the hash it last saw. A
+      # restored cache from an unrelated commit is always safe to build on top of.
+      # Forge just recompiles whatever the content hashes say is dirty, so a partial
+      # match via `restore-keys` still saves most of a cold `via_ir` build. This has
+      # to sit after `bun install`: its postinstall (`setup.bash`) force-reclones
+      # `lib/`'s pinned dependencies, so hashing `lib/` any earlier would key the
+      # cache off content these steps are about to replace.
+      #
+      # Forge also drops persisted fuzz/invariant/test failure state under
+      # `cache/fuzz`, `cache/invariant`, and `cache/test-failures`, and replays it
+      # on the next run before exploring anything new (see foundry.toml's
+      # `[profile.ci.invariant]` comment). That state is cleared below, both before
+      # this job's `forge coverage` run and again right before the job ends, so it
+      # never rides along in what gets restored or saved here.
+      #
+      # This job keys its cache under `foundry-build-coverage-`, with `coverage`
+      # ahead of the OS on purpose. `forge coverage --ir-minimum` compiles under
+      # different settings from the test job and leaves different content in
+      # `cache/`/`out/`, so the two must never restore each other's builds. The
+      # test job restores anything starting with `foundry-build-${{ runner.os }}-`
+      # and GitHub picks the newest match, so any key that starts with that
+      # prefix (even `foundry-build-${{ runner.os }}-coverage-...`) would get
+      # picked up by it. Putting `coverage` first keeps it out of that prefix.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            cache
+            out
+          key: foundry-build-coverage-${{ runner.os }}-${{ hashFiles('foundry.toml', 'remappings.txt', 'contracts/**/*.sol', 'test/**/*.sol', 'scripts/**/*.sol', 'lib/**/*.sol') }}
+          restore-keys: |
+            foundry-build-coverage-${{ runner.os }}-
+
       - name: Build contracts
         env:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
@@ -78,10 +114,23 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
         run: |
           set +e
+
+          # A restored cache can carry a fuzz/invariant/test failure persisted by
+          # an earlier, unrelated run. Forge replays those before running anything
+          # new, so a stale one would fail this job even after the real bug behind
+          # it was fixed. Clear it before running coverage.
+          rm -rf cache/fuzz cache/invariant cache/test-failures
+
+          # Invariant suites are left out, using the same split as the test workflow.
+          # Each one runs hundreds of random call sequences and coverage slows every
+          # call, so together they kept this job running for hours. The test workflow
+          # still runs them on every pull request; this report covers unit and fuzz
+          # tests only.
           forge coverage --ir-minimum --report summary \
+            --no-match-contract Invariant \
             --no-match-coverage "test/|lib/" \
             2>&1 | tee coverage.log
-          CODE=$?
+          CODE=${PIPESTATUS[0]}
 
           python3 scripts/reports/coverage-report.py coverage.log
           exit $CODE
@@ -230,6 +279,14 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number, body });
             }
+
+      # Last step in the job on purpose: `actions/cache`'s save only runs once
+      # every step above has finished, and it caches whatever is on disk at that
+      # point, not just what "Run coverage" left behind. Clearing here too means
+      # nothing this job did can leave a persisted failure in the saved cache.
+      - name: Clear persisted Foundry failure state before cache save
+        if: always()
+        run: rm -rf cache/fuzz cache/invariant cache/test-failures
 
   cleanup:
     runs-on: ubuntu-latest
