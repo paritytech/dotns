@@ -104,15 +104,15 @@ contract DotnsRevocationTest is BaseDotns {
     }
 
     function _rootRevoke(uint256 id) internal {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         dotnsRegistrar.revoke(id);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
     function _rootRevokeSubname(bytes32 parentNode, string memory subLabel) internal {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         dotnsRegistry.revokeSubname(parentNode, keccak256(bytes(subLabel)));
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
     function _rootRevokeIssued(string memory label) internal {
@@ -333,34 +333,34 @@ contract DotnsRevocationTest is BaseDotns {
 
     function test_revoke_reverts_for_a_name_that_does_not_exist() public {
         uint256 missing = uint256(_nodeOf("neverregistered"));
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.expectRevert(
             abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, missing)
         );
         dotnsRegistrar.revoke(missing);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
     function test_revoke_refuses_a_soulbound_name() public {
         _issuePersonhood(PERSONHOOD_LABEL_A, ed, _validChatKey(0x01));
         uint256 personhoodId = uint256(_nodeOf(PERSONHOOD_LABEL_A));
 
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.expectRevert(
             abi.encodeWithSelector(IDotnsRegistrar.NameSoulbound.selector, personhoodId)
         );
         dotnsRegistrar.revoke(personhoodId);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
     function test_revoke_refuses_a_device_container() public {
         _issueDevice(DEVICE_LABEL_A, ed, _validChatKey(0x01));
         uint256 containerId = uint256(_nodeOf("01"));
 
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.expectRevert(abi.encodeWithSelector(IDotnsRegistrar.NameSoulbound.selector, containerId));
         dotnsRegistrar.revoke(containerId);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         vm.expectRevert(
             abi.encodeWithSelector(IDotnsPopGovernance.NotPopIssued.selector, keccak256("01"))
@@ -417,10 +417,10 @@ contract DotnsRevocationTest is BaseDotns {
 
     function test_revokeSubname_reverts_for_a_missing_subname() public {
         bytes32 missing = _namehash(node, keccak256("missing"));
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.expectRevert(abi.encodeWithSelector(IDotnsRegistry.SubnameNotFound.selector, missing));
         dotnsRegistry.revokeSubname(node, keccak256("missing"));
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
     function test_revokeSubname_refuses_a_device_name() public {
@@ -430,21 +430,21 @@ contract DotnsRevocationTest is BaseDotns {
         bytes32 stemhash = keccak256("michael");
         assertEq(_namehash(container, stemhash), _deviceNodeOf(DEVICE_LABEL_A), "fixture shape");
 
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IDotnsRegistry.IssuedByGateway.selector, _deviceNodeOf(DEVICE_LABEL_A)
             )
         );
         dotnsRegistry.revokeSubname(container, stemhash);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
     function test_revokeSubname_cannot_reach_a_second_level_name() public {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.expectRevert(abi.encodeWithSelector(IDotnsRegistry.SubnameNotFound.selector, node));
         dotnsRegistry.revokeSubname(_tldNode(), keccak256(bytes(LABEL)));
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         assertEq(dotnsRegistry.owner(node), ed, "name untouched");
     }

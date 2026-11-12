@@ -554,16 +554,16 @@ contract PopControllerHandler is Test {
         internal
         returns (bool ok)
     {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         try CONTROLLER.issueDeviceNameWithReservation(params) {
             ok = true;
         } catch {
             ok = false;
         }
         // Restore before returning. The mock is campaign-scoped in an invariant run, and
-        // `DotnsRegistrarController.registerReserved` reads `originIsRoot` too, so leaving it
+        // `DotnsRegistrarController.registerReserved` reads `callerIsRoot` too, so leaving it
         // `true` would put any later reserved registration on the Root branch.
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
     /// @notice Mirror of `_callIssueDeviceNameWithReservation` for `issuePersonhoodName`.
@@ -572,20 +572,20 @@ contract PopControllerHandler is Test {
         internal
         returns (bool ok)
     {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         try CONTROLLER.issuePersonhoodName(params) {
             ok = true;
         } catch {
             ok = false;
         }
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
-    /// @notice Mocks the revive `originIsRoot()` query to return `returnValue`.
-    function _mockOriginIsRoot(bool returnValue) internal {
+    /// @notice Mocks the revive `callerIsRoot()` query to return `returnValue`.
+    function _mockCallerIsRoot(bool returnValue) internal {
         vm.mockCall(
             DotnsConstants.REVIVE_SYSTEM,
-            abi.encodeWithSelector(ISystem.originIsRoot.selector),
+            abi.encodeWithSelector(ISystem.callerIsRoot.selector),
             abi.encode(returnValue)
         );
     }

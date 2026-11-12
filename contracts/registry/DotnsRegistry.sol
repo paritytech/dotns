@@ -284,9 +284,9 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     }
 
     /// @inheritdoc IDotnsRegistry
-    /// @dev Reads no `msg.sender` (see SystemUtils.originIsRoot).
+    /// @dev Reads no `msg.sender` (see SystemUtils.callerIsRoot).
     function revokeSubname(bytes32 parentNode, bytes32 labelhash) external override {
-        require(SystemUtils.originIsRoot(), NotRoot());
+        require(SystemUtils.callerIsRoot(), NotRoot());
 
         address popController = protocolRegistry.get(DotnsConstants.POP_CONTROLLER);
         require(
@@ -487,7 +487,7 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @notice Deletes one subname of `parentNode`, its records and every subname beneath it.
     /// @dev Shared by @custom:function deleteSubname and @custom:function revokeSubname, which
     ///      differ only in who may call them. Reads no `msg.sender`, so it also runs under a Root
-    ///      origin (see SystemUtils.originIsRoot).
+    ///      origin (see SystemUtils.callerIsRoot).
     /// @param parentNode Parent of the subname.
     /// @param labelhash Labelhash of the subname under `parentNode`.
     function _deleteSubname(bytes32 parentNode, bytes32 labelhash) internal {
