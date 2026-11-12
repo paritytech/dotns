@@ -361,6 +361,8 @@ Without it, each contract would store direct addresses to every contract it call
 
 The registered keys include REGISTRAR, CONTROLLER, REGISTRY, REVERSE_RESOLVER, RESOLVER, CONTENT_RESOLVER, POP_RULES, STORE_FACTORY, POP_CONTROLLER, POP_RESOLVER, and NAME_ESCROW. Multicall3 is not among them: it is a generic call forwarder rather than a protocol component, and registry membership is a trust signal protocol contracts read. Its address comes from the deployment manifest.
 
+`keys()` lists every key that holds an address, so a client that holds only the registry's address can read the whole set: each key is its ASCII label padded to 32 bytes (`bytes32("registrar")`), and `get(key)` resolves it.
+
 ### Multicall3
 
 Generic arbitrary-target batching helper using the standard Multicall3 interface. It is protocol infrastructure rather than a dotNS-specific authorisation surface: anyone can call it, and each target contract still enforces its own permissions.

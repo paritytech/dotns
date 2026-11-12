@@ -7,10 +7,12 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {StringUtils} from "../utils/StringUtils.sol";
+import {DotnsConstants} from "../utils/DotnsConstants.sol";
 
 /// @title dotNS Protocol Registry
 /// @author Parity
@@ -29,6 +31,7 @@ contract DotnsProtocolRegistry is
     IDotnsProtocolRegistry
 {
     using StringUtils for string;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @notice Address stored for each well-known protocol key.
     mapping(bytes32 key => address addr) private _addresses;
@@ -50,7 +53,10 @@ contract DotnsProtocolRegistry is
     /// @notice Release tag the network was last declared to run, bare semver (e.g. `0.8.0`).
     string private _protocolVersion;
 
-    uint256[50] private __gap;
+    /// @notice Every key that holds an address, so the keys can be listed on chain.
+    EnumerableSet.Bytes32Set private _keys;
+
+    uint256[48] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -82,6 +88,7 @@ contract DotnsProtocolRegistry is
     function set(bytes32 key, address addr) external override onlyOwner {
         require(addr != address(0), ZeroAddress());
 
+        _keys.add(key);
         address previousAddress = _addresses[key];
         if (previousAddress == addr) return;
 
@@ -101,11 +108,25 @@ contract DotnsProtocolRegistry is
 
         --_registeredRefcount[previousAddress];
         delete _addresses[key];
+        _keys.remove(key);
         // A codehash declared for a key nothing resolves any more describes nothing; leaving it
         // would make a later re-registration under this key start out with a stale claim.
         delete _expectedCodehash[key];
 
         emit AddressRemoved(key, previousAddress);
+    }
+
+    /// @inheritdoc IDotnsProtocolRegistry
+    function keys() external view override returns (bytes32[] memory registeredKeys) {
+        return _keys.values();
+    }
+
+    /// @inheritdoc IDotnsProtocolRegistry
+    function initializeKeys() external override reinitializer(2) onlyOwner {
+        bytes32[] memory known = DotnsConstants.registryKeys();
+        for (uint256 i = 0; i < known.length; ++i) {
+            if (_addresses[known[i]] != address(0)) _keys.add(known[i]);
+        }
     }
 
     /// @inheritdoc IDotnsProtocolRegistry
