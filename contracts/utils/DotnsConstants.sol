@@ -74,26 +74,42 @@ library DotnsConstants {
 
     /// @notice Default per-name live-claim cap the name whitelist starts with.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_CLAIMANTS_LIMIT`.
-    uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 64;
+    uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 24;
 
     /// @notice Default claim-reason byte cap the name whitelist starts with.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_REASON_LIMIT`.
     uint256 internal constant WHITELIST_DEFAULT_MAX_REASON_BYTES = 256;
 
-    /// @notice Upper bound on the whitelist live-claim cap. Caps the claim clear-loop below the
-    ///         block gas limit.
-    uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 128;
+    /// @notice Upper bound on the whitelist live-claim cap.
+    /// @dev A grant clears every claim on the name in one call, so at this bound a referendum's
+    ///      `grantName` still fits the weight one governance call can execute, with each claim
+    ///      carrying the longest reason. The pallet-revive benchmark checks it.
+    uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 30;
 
     /// @notice Upper bound on the whitelist reason byte cap.
     uint256 internal constant WHITELIST_MAX_REASON_LIMIT = 256;
 
     /// @notice Default cap on labels granted in one `grantNames` call.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_GRANT_BATCH_LIMIT`.
-    uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 100;
+    uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 32;
 
-    /// @notice Upper bound on the `grantNames` batch cap. Bounds one call below the block gas
-    /// limit.
-    uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 256;
+    /// @notice Upper bound on the `grantNames` batch cap.
+    /// @dev At this bound a referendum's `grantNames` still fits the weight one governance call
+    ///      can execute, with every label at the longest DNS label length, since the whitelist
+    ///      stores each label it grants. The pallet-revive benchmark checks it.
+    uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 36;
+
+    /// @notice Default period a whitelist grant binds its name before it expires.
+    /// @dev Governance retunes it on the whitelist within `WHITELIST_MIN_GRANT_DURATION` and
+    ///      `WHITELIST_MAX_GRANT_DURATION`.
+    uint64 internal constant WHITELIST_DEFAULT_GRANT_DURATION = 30 days;
+
+    /// @notice Lower bound on the whitelist grant period, so a grantee has time to commit and
+    ///         register.
+    uint64 internal constant WHITELIST_MIN_GRANT_DURATION = 1 days;
+
+    /// @notice Upper bound on the whitelist grant period, so no grant binds a name for good.
+    uint64 internal constant WHITELIST_MAX_GRANT_DURATION = 365 days;
 
     /// @notice Well-known key the protocol registry is registered under, itself.
     /// @dev Not for discovery: the registry is the bootstrap contract every consumer already
@@ -205,4 +221,30 @@ library DotnsConstants {
     ///      controller does not consult it.
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant NAME_WHITELIST = bytes32("nameWhitelist");
+
+    /// @notice Every well-known protocol registry key declared above.
+    /// @dev The protocol registry seeds its key index from this list (@custom:function
+    ///      IDotnsProtocolRegistry.initializeKeys). The release tooling fails when a key declared
+    ///      here is missing from the list.
+    /// @return keys The well-known keys, in declaration order.
+    function registryKeys() internal pure returns (bytes32[] memory keys) {
+        keys = new bytes32[](17);
+        keys[0] = COST_MODEL;
+        keys[1] = PROTOCOL_REGISTRY;
+        keys[2] = REGISTRAR;
+        keys[3] = CONTROLLER;
+        keys[4] = REGISTRY;
+        keys[5] = REVERSE_RESOLVER;
+        keys[6] = POP_RULES;
+        keys[7] = STORE_FACTORY;
+        keys[8] = RESOLVER;
+        keys[9] = CONTENT_RESOLVER;
+        keys[10] = POP_CONTROLLER;
+        keys[11] = POP_RESOLVER;
+        keys[12] = POP_LENS;
+        keys[13] = NAME_ESCROW;
+        keys[14] = MULTICALL3;
+        keys[15] = CREATE3_FACTORY;
+        keys[16] = NAME_WHITELIST;
+    }
 }

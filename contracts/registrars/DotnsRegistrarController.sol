@@ -27,6 +27,7 @@ import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
 import {LabelUtils} from "../utils/LabelUtils.sol";
 import {RegistrationUtils} from "../utils/RegistrationUtils.sol";
+import {WhitelistUtils} from "../utils/WhitelistUtils.sol";
 import {StoreUtils} from "../utils/StoreUtils.sol";
 import {SystemUtils} from "../utils/SystemUtils.sol";
 
@@ -167,6 +168,7 @@ contract DotnsRegistrarController is
     function register(Registration calldata registration) external payable override nonReentrant {
         (IDotnsRegistrar registrar, bytes32 labelhash, bytes32 node) =
             _requireAvailableLabel(registration.label);
+        _requireNotGranted(registration.label, node);
         _consumeCommitment(registration);
 
         address escrow = _escrow();
@@ -518,6 +520,16 @@ contract DotnsRegistrarController is
     /// @return versionString Declared release as bare semver, empty when never declared.
     function version() external view virtual returns (string memory versionString) {
         versionString = protocolRegistry.protocolVersion();
+    }
+
+    /// @notice Reverts when `label` holds a live grant on the name whitelist.
+    /// @dev A granted name is registered only through `registerReserved`, which spends the grant,
+    ///      so this path refuses it for every caller, the grantee included. A network with no
+    ///      whitelist configured has no grants to honour.
+    /// @param label Bare label being registered.
+    /// @param node Namehash of `label` under the active TLD.
+    function _requireNotGranted(string calldata label, bytes32 node) internal view {
+        require(WhitelistUtils.granteeOf(protocolRegistry, node) == address(0), NameGranted(label));
     }
 
     /// @notice Returns the configured name whitelist from the protocol registry.

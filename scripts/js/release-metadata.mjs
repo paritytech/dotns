@@ -47,6 +47,32 @@ const UNSET_TOLERATED = {
 // derives from. A manifest without them is not publishable.
 const REQUIRED_LABELS = ["DotnsProtocolRegistry", "Create3Factory"];
 
+// The contract each protocol registry key holds, by manifest name. `WireDeployments` sets the
+// keys at deploy time; this table lets a release publish its addresses under those keys. The
+// Deploy Contracts workflow runs `verify` against a fresh deploy, so a pairing that disagrees
+// with the wiring fails there before it can reach a release.
+const REGISTRY_KEY_CONTRACTS = {
+  protocolRegistry: "DotnsProtocolRegistry",
+  create3Factory: "Create3Factory",
+  registrar: "DotnsRegistrar",
+  controller: "DotnsRegistrarController",
+  registry: "DotnsRegistry",
+  reverseResolver: "DotnsReverseResolver",
+  resolver: "DotnsResolver",
+  contentResolver: "DotnsContentResolver",
+  costModel: "DotnsCostModelRegistry",
+  popRules: "PopRules",
+  storeFactory: "StoreFactory",
+  nameEscrow: "DotnsNameEscrow",
+  nameWhitelist: "DotnsNameWhitelist",
+  popController: "DotnsPopController",
+  popResolver: "DotnsPopResolver",
+  popLens: "DotnsPopLens",
+};
+
+// Keys that are never published, because the registry never holds them.
+const UNPUBLISHED_KEYS = ["multicall3"];
+
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 function fail(message) {
@@ -143,6 +169,29 @@ function contractsFromManifest(path) {
     if (!contracts[label]) fail(`${path}: missing ${label}`);
   }
   return contracts;
+}
+
+// The contract name behind every key the registry holds. Fails when DotnsConstants and the
+// pairing table disagree, so a new key cannot ship unpublished.
+function publishedRegistryKeys() {
+  const keys = registryKeys().filter((key) => !UNPUBLISHED_KEYS.includes(key));
+  const unpaired = keys.filter((key) => !REGISTRY_KEY_CONTRACTS[key]);
+  if (unpaired.length > 0) {
+    fail(`no contract paired with registry key(s): ${unpaired.join(", ")}`);
+  }
+  const stale = Object.keys(REGISTRY_KEY_CONTRACTS).filter((key) => !keys.includes(key));
+  if (stale.length > 0) fail(`paired key(s) not in DotnsConstants: ${stale.join(", ")}`);
+  return Object.fromEntries(keys.map((key) => [key, REGISTRY_KEY_CONTRACTS[key]]));
+}
+
+// Every key's address on a network, through the contract the pairing names for it.
+function registryFromManifest(path, contracts) {
+  const registry = {};
+  for (const [key, name] of Object.entries(publishedRegistryKeys())) {
+    if (!contracts[name]) fail(`${path}: missing ${name}, which registry key '${key}' holds`);
+    registry[key] = contracts[name];
+  }
+  return registry;
 }
 
 function writeJson(path, value) {
@@ -643,9 +692,16 @@ function build(args) {
   if (withAddresses) {
     const networks = {};
     for (const [network, { chainId, path }] of committedManifests()) {
-      networks[network] = { chainId, contracts: contractsFromManifest(path) };
+      const contracts = contractsFromManifest(path);
+      // Fails when the network lacks a contract a key names, which `registryKeys` promises.
+      registryFromManifest(path, contracts);
+      networks[network] = { chainId, contracts };
     }
-    writeJson(join(outDir, "deployments.json"), { version: tag, networks });
+    writeJson(join(outDir, "deployments.json"), {
+      version: tag,
+      registryKeys: publishedRegistryKeys(),
+      networks,
+    });
     const names = Object.keys(networks);
     log(`${tag}: ${names.length} network(s): ${names.join(", ")}`);
   } else {
@@ -673,7 +729,11 @@ function validate() {
   const manifests = committedManifests();
   for (const [network, { chainId, path }] of manifests) {
     const contracts = contractsFromManifest(path);
-    log(`${network} (chain ${chainId}): ${Object.keys(contracts).length} addresses`);
+    const registry = registryFromManifest(path, contracts);
+    log(
+      `${network} (chain ${chainId}): ${Object.keys(contracts).length} addresses, ` +
+        `${Object.keys(registry).length} registry keys`,
+    );
   }
   const names = readContractNames();
   const sources = trackedSourceNames();
@@ -749,14 +809,31 @@ function changelog(args) {
 
 // Read from the library that declares them, so adding a contract needs no edit here.
 // PERSONHOOD_CONTEXT is an application identifier that shares the bytes32 shape.
+// Also checks `DotnsConstants.registryKeys()`, the list the registry seeds `keys()` from, names
+// every declared key exactly once.
 function registryKeys() {
   const source = readFileSync(CONSTANTS_SOL, "utf8");
   const keys = [];
+  const declared = [];
   const pattern = /bytes32 internal constant (\w+) = bytes32\("([^"]+)"\)/g;
   for (const [, name, key] of source.matchAll(pattern)) {
-    if (name !== "PERSONHOOD_CONTEXT") keys.push(key);
+    if (name === "PERSONHOOD_CONTEXT") continue;
+    keys.push(key);
+    declared.push(name);
   }
   if (keys.length === 0) fail(`no registry keys found in ${CONSTANTS_SOL}`);
+
+  const body = source.match(/function registryKeys\(\)[^{]*\{([\s\S]*?)\n {4}\}/);
+  if (!body) fail(`no registryKeys() list found in ${CONSTANTS_SOL}`);
+  const listed = [...body[1].matchAll(/keys\[\d+\] = (\w+);/g)].map(([, name]) => name);
+  const missing = declared.filter((name) => !listed.includes(name));
+  const extra = listed.filter((name, i) => !declared.includes(name) || listed.indexOf(name) !== i);
+  if (missing.length > 0 || extra.length > 0) {
+    fail(
+      `DotnsConstants.registryKeys() must list every declared key once; ` +
+        `missing: ${missing.join(", ") || "none"}, unexpected or repeated: ${extra.join(", ") || "none"}`,
+    );
+  }
   return keys;
 }
 
@@ -767,6 +844,23 @@ function cast(args) {
     const detail = (err.stderr || err.message || "").toString().trim().split("\n")[0];
     fail(`cast ${args[0]} failed: ${detail}`);
   }
+}
+
+// The registry's `keys()` as labels, or null on a registry that predates it (the call reverts).
+function listedKeys(rpc, registry) {
+  let raw;
+  try {
+    raw = execFileSync("cast", ["call", registry, "keys()(bytes32[])", "--rpc-url", rpc], {
+      encoding: "utf8",
+      cwd: tmpdir(),
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return null;
+  }
+  return (raw.match(/0x[0-9a-fA-F]{64}/g) ?? []).map((word) =>
+    Buffer.from(word.slice(2), "hex").toString("ascii").replace(/\0+$/, ""),
+  );
 }
 
 // Solidity's bytes32("registrar"): the ASCII bytes, left aligned and right padded.
@@ -791,20 +885,34 @@ function executingCodehash(rpc, addr) {
   return keccakHex(cast(["code", target, "--rpc-url", rpc]));
 }
 
-// Which key holds which contract is asserted at deploy time by
-// `WireDeployments._verifyDeployment`. This checks what deploy time cannot: that the manifest
-// and the chain still agree afterwards, which a set comparison answers without repeating the
-// pairing.
+// Checks that the manifest and the chain agree after deploy time: every key resolves to the
+// address a release publishes under it (`registryFromManifest`), and every manifest address is
+// held by a key or known to be unkeyed. `--manifest` points at an uncommitted manifest, such as
+// the one a CI deploy writes, and takes the chain id from its file name.
 function verify(args) {
-  const { network, rpc } = args;
-  if (!network || !rpc) fail("verify needs --network and --rpc");
+  const { rpc } = args;
+  if (!rpc || Boolean(args.network) === Boolean(args.manifest)) {
+    fail("verify needs --rpc and exactly one of --network or --manifest");
+  }
 
-  const manifests = committedManifests();
-  const entry = manifests.get(network);
-  if (!entry) {
-    fail(`no committed manifest for '${network}'; have: ${[...manifests.keys()].join(", ")}`);
+  let network;
+  let entry;
+  if (args.manifest) {
+    const path = resolve(process.cwd(), args.manifest);
+    const match = basename(path).match(/^(\d+)\.json$/);
+    if (!match || !existsSync(path)) fail(`${path} is not a <chain-id>.json manifest`);
+    network = basename(dirname(path));
+    entry = { chainId: Number(match[1]), path };
+  } else {
+    network = args.network;
+    const manifests = committedManifests();
+    entry = manifests.get(network);
+    if (!entry) {
+      fail(`no committed manifest for '${network}'; have: ${[...manifests.keys()].join(", ")}`);
+    }
   }
   const contracts = contractsFromManifest(entry.path);
+  const published = registryFromManifest(entry.path, contracts);
   const byAddress = new Map(
     Object.entries(contracts).map(([label, address]) => [address.toLowerCase(), label]),
   );
@@ -845,6 +953,7 @@ function verify(args) {
   }
 
   const resolved = new Set();
+  const resolving = new Set();
   for (const key of registryKeys()) {
     const address = cast([
       "call",
@@ -854,6 +963,7 @@ function verify(args) {
       "--rpc-url",
       rpc,
     ]);
+    if (address !== ZERO_ADDRESS) resolving.add(key);
     if (address === ZERO_ADDRESS) {
       // protocolRegistry's tolerance is transitional and lapses under --tag: passing a tag
       // asserts the network is post-declaration, so the self-key must exist there.
@@ -869,6 +979,13 @@ function verify(args) {
     const label = byAddress.get(address.toLowerCase());
     if (!label) {
       problems.push(`key '${key}' resolves to ${address}, which is not in the manifest`);
+      continue;
+    }
+    if (published[key] && published[key].toLowerCase() !== address.toLowerCase()) {
+      problems.push(
+        `key '${key}' resolves to ${address} (${label}), but releases publish ` +
+          `${published[key]} (${REGISTRY_KEY_CONTRACTS[key]}) under it`,
+      );
       continue;
     }
     if (cast(["code", address, "--rpc-url", rpc]) === "0x") {
@@ -942,6 +1059,26 @@ function verify(args) {
   }
 
 
+  // On a registry with `keys()`, the on-chain list must be exactly the keys that resolve.
+  const listed = listedKeys(rpc, registry);
+  if (listed === null) {
+    console.log("  skip keys() (this registry predates it)");
+  } else {
+    for (const key of resolving) {
+      if (!listed.includes(key)) {
+        problems.push(`key '${key}' resolves, but keys() does not list it (run initializeKeys)`);
+      }
+    }
+    for (const key of listed) {
+      if (!resolving.has(key)) {
+        problems.push(`keys() lists '${key}', which is not a DotnsConstants key that resolves`);
+      }
+    }
+    if (listed.every((key) => resolving.has(key)) && [...resolving].every((key) => listed.includes(key))) {
+      console.log(`  ok   keys() lists all ${listed.length} keys that resolve`);
+    }
+  }
+
   for (const label of UNVERIFIABLE) {
     if (contracts[label]) {
       console.log(`  skip ${label} ${contracts[label]} (constructor-deployed)`);
@@ -973,6 +1110,6 @@ else {
       "bases --out <file> | " +
       "abidiff --current <dir> [--previous <dir>] [--previous-tag <name>] [--json <file>] " +
       "[--bases <file>] | " +
-      "verify --network <folder> --rpc <url> [--tag <TAG>]",
+      "verify (--network <folder> | --manifest <path>) --rpc <url> [--tag <TAG>]",
   );
 }

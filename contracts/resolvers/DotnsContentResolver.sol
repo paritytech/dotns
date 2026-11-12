@@ -60,6 +60,10 @@ contract DotnsContentResolver is
     /// @notice Node => text key => registry record version the value was written under.
     mapping(bytes32 node => mapping(string key => uint64 version)) private textVersions;
 
+    /// @notice Node => block in which its content hash was last written.
+    /// @dev Read through the content hash's version stamp, so a cleared hash reads zero.
+    mapping(bytes32 node => uint64 blockNumber) private contenthashUpdatedAtBlocks;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -91,8 +95,10 @@ contract DotnsContentResolver is
             // An empty hash is a delete; see `setText`.
             delete contenthashes[node];
             delete contenthashVersions[node];
+            delete contenthashUpdatedAtBlocks[node];
         } else {
             contenthashes[node] = hash;
+            contenthashUpdatedAtBlocks[node] = uint64(block.number);
             if (contenthashVersions[node] != currentVersion) {
                 contenthashVersions[node] = currentVersion;
             }
@@ -104,6 +110,17 @@ contract DotnsContentResolver is
     function contenthash(bytes32 node) external view override returns (bytes memory hash) {
         if (!_isCurrent(node, contenthashVersions[node])) return "";
         return contenthashes[node];
+    }
+
+    /// @inheritdoc IDotnsContentResolver
+    function contenthashUpdatedAtBlock(bytes32 node)
+        external
+        view
+        override
+        returns (uint64 blockNumber)
+    {
+        if (!_isCurrent(node, contenthashVersions[node])) return 0;
+        return contenthashUpdatedAtBlocks[node];
     }
 
     /// @inheritdoc IDotnsContentResolver

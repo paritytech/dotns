@@ -62,6 +62,11 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @param owner The intended owner the grant was checked against.
     error NameNotGranted(string label, address owner);
 
+    /// @notice Thrown when a paid registration names a label that holds a live whitelist grant.
+    /// @dev The grantee registers it through @custom:function registerReserved.
+    /// @param label The label being registered.
+    error NameGranted(string label);
+
     /// @notice Thrown when the protocol registry has no name whitelist configured.
     error WhitelistNotConfigured();
 
@@ -114,7 +119,9 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @notice Returns whether a label is available for registration.
     /// @dev Validates the canonical DNS-label shape (otherwise @custom:reverts InvalidLabel)
     /// and rejects labels below the minimum-length policy with
-    /// @custom:reverts LabelTooShort before checking ERC721 availability on the registrar.
+    /// @custom:reverts LabelTooShort before checking ERC721 availability on the registrar. A label
+    /// that holds a live whitelist grant still reads available, though @custom:function register
+    /// refuses it with @custom:reverts NameGranted.
     function available(string calldata label) external view returns (bool isAvailable);
 
     /// @notice Computes the commitment hash for a registration.
@@ -145,7 +152,10 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @notice Registers a name after the commitment delay.
     /// @dev Validates the label shape (otherwise @custom:reverts InvalidLabel), rejects labels
     /// below the minimum length policy (@custom:reverts LabelTooShort), and ERC721 availability
-    /// (otherwise @custom:reverts NameNotAvailable), then consumes the prior commitment, which
+    /// (otherwise @custom:reverts NameNotAvailable), refuses a label holding a live grant on the
+    /// name whitelist for every caller, the grantee included, who registers it through
+    /// @custom:function registerReserved (otherwise @custom:reverts NameGranted; skipped when no
+    /// whitelist is configured), then consumes the prior commitment, which
     /// fails with @custom:reverts CommitmentNotFound when no commitment exists for the supplied
     /// registration, @custom:reverts CommitmentTooNew before `minCommitmentAge`, and
     /// @custom:reverts CommitmentTooOld past `maxCommitmentAge`, and finally resolves the
@@ -174,9 +184,9 @@ interface IDotnsRegistrarController is IDotnsController {
     /// @dev Grant-backed issuance path: skips the PoP price check and charges no deposit, but
     /// reuses the same commit-reveal pipeline so the same anti-front-running guarantees apply.
     ///
-    /// Authority is either a substrate Root dispatch or a grant naming `registration.owner` on the
-    /// name whitelist registered under `DotnsConstants.NAME_WHITELIST`; anything else
-    /// @custom:reverts NameNotGranted, and an unset registry key
+    /// Authority is either a substrate Root dispatch or a live grant naming `registration.owner`
+    /// on the name whitelist registered under `DotnsConstants.NAME_WHITELIST`; anything else,
+    /// an expired grant included, @custom:reverts NameNotGranted, and an unset registry key
     /// @custom:reverts WhitelistNotConfigured. The gate reads `registration.owner` rather than the
     /// caller, so a relayer may submit on the beneficiary's behalf: the name can only mint to the
     /// granted address, so no caller proof is needed. On the non-Root path the grant is consumed,

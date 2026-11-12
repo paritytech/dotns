@@ -376,10 +376,25 @@ jobs:
             fail "Failed - resume moved addresses"
           fi
 
+          # Releases publish each protocol registry key's address through the pairing in
+          # release-metadata.mjs. Check it against the keys this deploy set, so a pairing that
+          # disagrees with WireDeployments fails here and never reaches a release.
+          if ! bun scripts/js/release-metadata.mjs verify --manifest "$MANIFEST" \
+            --rpc http://127.0.0.1:8545 > registry-keys.log 2>&1; then
+            {
+              echo "### Registry keys do not match the published pairing"
+              echo ""
+              echo '```'
+              cat registry-keys.log
+              echo '```'
+            } > deploy-error.md
+            fail "Failed - registry keys do not match the published pairing"
+          fi
+
           # Surface the table under the passing row too, so the address set is on
           # record every run, not only on failure.
           cp table.md deploy-error.md
-          echo "result=Reproduces the expected address set; resume verified" >> "$GITHUB_OUTPUT"
+          echo "result=Reproduces the expected address set; resume and registry keys verified" >> "$GITHUB_OUTPUT"
           echo "has_details=true" >> "$GITHUB_OUTPUT"
 
       - name: Set final result
