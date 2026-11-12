@@ -285,7 +285,8 @@ interface IDotnsNameEscrow {
 
     /// @notice Returns the protocol fee balance the escrow holds.
     /// @dev Nothing credits it: it holds the transfer fees and cross-payer registration charges
-    ///      collected by earlier implementations. Nothing spends it either.
+    ///      collected by earlier implementations. Governance spends it through
+    ///      @custom:function IDotnsNameEscrowGovernance.withdrawProtocolFees.
     /// @return balance Current protocol fee balance, in wei.
     function protocolFees() external view returns (uint256 balance);
 
