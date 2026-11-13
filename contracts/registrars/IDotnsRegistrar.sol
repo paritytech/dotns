@@ -188,6 +188,8 @@ interface IDotnsRegistrar is IERC721 {
     /// @notice Returns the human-readable label a token was registered with.
     /// @dev Canonical state source for the label string; any client that holds a node or
     /// tokenId can resolve the original label in one view call without scanning registration
-    /// events. Returns the empty string when the token does not exist.
+    /// events. The label is read from the current holder's `LabelStore`, so it returns the
+    /// empty string when the token does not exist, when the escrow holds it, and while the
+    /// holder's pending claim for it is not settled.
     function labelOf(uint256 tokenId) external view returns (string memory label);
 }

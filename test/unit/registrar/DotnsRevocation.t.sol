@@ -805,10 +805,10 @@ contract DotnsRevocationTest is BaseDotns {
 
     // Interface ids
 
-    /// @notice The ids these contracts reported through ERC-165 before revocation existed. They
-    ///         are literals, not `type(I).interfaceId`, so a selector added to one of these
-    ///         interfaces fails here instead of moving the expected value along with it.
-    bytes4 internal constant ESCROW_ID = 0x8c31e16c;
+    /// @notice The ids these contracts report through ERC-165. They are literals, not
+    ///         `type(I).interfaceId`, so a selector added to one of these interfaces fails here
+    ///         instead of moving the expected value along with it.
+    bytes4 internal constant ESCROW_ID = 0xa69e509c;
     bytes4 internal constant POP_RESOLVER_ID = 0x1e0c0fee;
     bytes4 internal constant POP_CONTROLLER_ID = 0x5453fcd0;
     bytes4 internal constant POP_CONTROLLER_LEGACY_ID = 0x86d43965;

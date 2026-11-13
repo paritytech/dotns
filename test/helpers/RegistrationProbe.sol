@@ -5,8 +5,8 @@ import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Recei
 
 /// @title RegistrationProbe
 /// @notice ERC721 receiver that snapshots controller-side state from inside
-///         `onERC721Received` so reclaim-callback tests can assert the
-///         registry is wired to the new owner before custody moves.
+///         `onERC721Received`, so a test can tell whether a transfer made the callback and what
+///         state it saw.
 contract RegistrationProbe is IERC721Receiver {
     /// @notice Forward registry the probe queries during the callback.
     address public registry;
