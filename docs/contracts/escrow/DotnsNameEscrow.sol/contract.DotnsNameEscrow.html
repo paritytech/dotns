@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/c6c86316d138e4880c1ed48feaf3ff26c1dd798d/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b42b4c3b176e8b735491b14605b29e9d3faea4ed/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a>, <a href="/contracts/escrow/IDotnsNameEscrowRevocation.sol/interface.IDotnsNameEscrowRevocation.html">IDotnsNameEscrowRevocation</a></p>
 <p><strong>Title:</strong>
@@ -262,7 +262,8 @@ per-asset reserve.</p>
 <p>Per-recipient isolation ensures a failing or reentrant receiver cannot block other
 users' withdrawals. Used as the fallback path for registration overpayments whose
 direct push back to <code>msg.sender</code> failed (because the caller is a contract that
-rejects incoming value).</p>
+rejects incoming value); such a contract collects the balance through
+<code>claimWithdrawalTo</code>, naming an address that accepts it.</p>
 <pre><code class="language-solidity">mapping(address recipient =&gt; uint256 amount) private _pendingWithdrawals
 </code></pre>
 <h3 id="_refundentries"><a class="header" href="#_refundentries">_refundEntries</a></h3>
@@ -412,7 +413,9 @@ function: _updateCooldown.</p>
 </tbody></table>
 </div>
 <h3 id="reserves"><a class="header" href="#reserves">reserves</a></h3>
-<p>Returns total amount of assets liabilities reserved for withdrawals.</p>
+<p>Returns the amount of <code>asset</code> held as deposits in release positions.</p>
+<p>A deposit leaves this total once it is credited to the pull-payment ledger, so the
+balances @custom:function claimWithdrawal pays out are not part of it.</p>
 <pre><code class="language-solidity">function reserves(address asset) external view returns (uint256 amount);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -456,12 +459,14 @@ Emits @custom:emits NativeDepositRecorded once the deposit is booked.</p>
 </code></pre>
 <h3 id="creditoverpayment"><a class="header" href="#creditoverpayment">creditOverpayment</a></h3>
 <p>Credits <code>msg.value</code> to <code>recipient</code>'s pull-payment ledger so the caller can later
-pull the balance with @custom:func claimWithdrawal.</p>
+pull the balance with @custom:func claimWithdrawal, or with</p>
 <p>Only the configured controller may call this, otherwise @custom:reverts NotController.
 <code>recipient</code> must be non-zero (@custom:reverts InvalidRecipient) and <code>msg.value</code> must
 be non-zero (@custom:reverts InvalidAmount). Used by the registrar controller to
 refund overpayment without pushing native value into a potentially reverting
 contract receiver. Emits @custom:emits OverpaymentRefunded once the credit lands.</p>
+<p><strong>Note:</strong>
+func: claimWithdrawalTo when it rejects incoming value.</p>
 <pre><code class="language-solidity">function creditOverpayment(address recipient) external payable override onlyController;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -593,6 +598,43 @@ reverts: NoPendingWithdrawal; a failing native transfer triggers</p>
 <tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native amount transferred to the caller.</td></tr>
 </tbody></table>
 </div>
+<h3 id="claimwithdrawalto"><a class="header" href="#claimwithdrawalto">claimWithdrawalTo</a></h3>
+<p>Pulls the caller's accumulated pending refund balance and sends it to <code>recipient</code>.</p>
+<p>The same as @custom:function claimWithdrawal, except where the value goes. It is how a
+contract that rejects incoming value collects a balance credited to it, such as a
+registration overpayment refund. <code>recipient</code> must be non-zero, otherwise</p>
+<p><strong>Note:</strong>
+reverts: InvalidRecipient. Emits @custom:emits WithdrawalClaimed for the caller.</p>
+<pre><code class="language-solidity">function claimWithdrawalTo(address recipient)
+    external
+    override
+    nonReentrant
+    returns (uint256 amount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address the balance is sent to.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native amount transferred to <code>recipient</code>.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_claimwithdrawal"><a class="header" href="#_claimwithdrawal">_claimWithdrawal</a></h3>
+<p>Pays the caller's whole pending balance to <code>recipient</code>.</p>
+<pre><code class="language-solidity">function _claimWithdrawal(address recipient) internal returns (uint256 amount);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>recipient</code></td><td><code>address</code></td><td>Address the balance is sent to.</td></tr>
+</tbody></table>
+</div>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>amount</code></td><td><code>uint256</code></td><td>Native amount sent.</td></tr>
+</tbody></table>
+</div>
 <h3 id="pendingwithdrawal"><a class="header" href="#pendingwithdrawal">pendingWithdrawal</a></h3>
 <p>Returns the pending refund balance owed to <code>recipient</code>.</p>
 <pre><code class="language-solidity">function pendingWithdrawal(address recipient) external view override returns (uint256 amount);
@@ -694,7 +736,7 @@ enumeration array.</p>
 </code></pre>
 <h3 id="reclaim"><a class="header" href="#reclaim">reclaim</a></h3>
 <p>Transfers a released token whose redeem window has elapsed to a new owner.</p>
-<p>Hands the NFT back to the controller for re-registration. Only the configured
+<p>Moves the NFT from custody straight to <code>newOwner</code>. Only the configured
 controller may call this, otherwise @custom:reverts NotController, and the position
 must be released with <code>redeemableUntil</code> reached, otherwise @custom:reverts
 NotReclaimable. Emits @custom:emits NameReclaimed once custody is transferred.

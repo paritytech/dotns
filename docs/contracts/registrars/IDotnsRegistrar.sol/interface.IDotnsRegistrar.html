@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrar"><a class="header" href="#idotnsregistrar">IDotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/c6c86316d138e4880c1ed48feaf3ff26c1dd798d/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/b42b4c3b176e8b735491b14605b29e9d3faea4ed/contracts/registrars/IDotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 IERC721</p>
 <p><strong>Title:</strong>
@@ -359,7 +359,9 @@ function: register.</p>
 <p>Returns the human-readable label a token was registered with.</p>
 <p>Canonical state source for the label string; any client that holds a node or
 tokenId can resolve the original label in one view call without scanning registration
-events. Returns the empty string when the token does not exist.</p>
+events. The label is read from the current holder's <code>LabelStore</code>, so it returns the
+empty string when the token does not exist, when the escrow holds it, and while the
+holder's pending claim for it is not settled.</p>
 <pre><code class="language-solidity">function labelOf(uint256 tokenId) external view returns (string memory label);
 </code></pre>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
