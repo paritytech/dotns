@@ -14,12 +14,14 @@ import {
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IDotnsNameEscrow} from "./IDotnsNameEscrow.sol";
 import {IDotnsNameEscrowRevocation} from "./IDotnsNameEscrowRevocation.sol";
+import {IDotnsNameEscrowGovernance} from "./IDotnsNameEscrowGovernance.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
 import {IDotnsRegistry} from "../registry/IDotnsRegistry.sol";
 import {IDotnsResolver} from "../resolvers/IDotnsResolver.sol";
 import {IDotnsContentResolver} from "../resolvers/IDotnsContentResolver.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {DotnsConstants} from "../utils/DotnsConstants.sol";
+import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title dotNS Name Escrow
 /// @notice Holds refundable deposits for registered names and manages the release/reclaim
@@ -32,7 +34,8 @@ contract DotnsNameEscrow is
     ERC165Upgradeable,
     IERC721Receiver,
     IDotnsNameEscrow,
-    IDotnsNameEscrowRevocation
+    IDotnsNameEscrowRevocation,
+    IDotnsNameEscrowGovernance
 {
     /// @notice Maximum page size for releasedTokens pagination.
     uint256 public constant MAX_RELEASED_PAGE_SIZE = 200;
@@ -86,8 +89,8 @@ contract DotnsNameEscrow is
 
     /// @notice Protocol fee balance held by the escrow.
     /// @dev Holds the transfer fees and cross-payer registration charges collected by earlier
-    ///      implementations. Nothing credits or debits it, and refunds draw solely on the
-    ///      per-asset reserve.
+    ///      implementations. Nothing credits it, only governance spends it through
+    ///      `withdrawProtocolFees`, and refunds draw solely on the per-asset reserve.
     uint256 public protocolFees;
 
     /// @notice Pull-payment ledger storing each recipient's claimable refund balance.
@@ -699,6 +702,23 @@ contract DotnsNameEscrow is
         emit PositionRevoked(tokenId, recipient);
     }
 
+    /// @inheritdoc IDotnsNameEscrowGovernance
+    /// @dev Reads no `msg.sender`: a Root origin has no account behind it, so reading it traps.
+    function withdrawProtocolFees(address to, uint256 amount) external override nonReentrant {
+        require(SystemUtils.callerIsRoot(), NotRoot());
+        require(to != address(0), InvalidRecipient());
+        require(amount != 0, InvalidAmount());
+        uint256 available = protocolFees;
+        require(amount <= available, ProtocolFeesExceeded(amount, available));
+
+        protocolFees = available - amount;
+
+        (bool ok,) = payable(to).call{value: amount}("");
+        require(ok, ProtocolFeesTransferFailed(to));
+
+        emit ProtocolFeesWithdrawn(to, amount);
+    }
+
     /// @inheritdoc IDotnsNameEscrow
     /// @dev `public` rather than `external` so `reclaim` can gate on it without a self-call, which
     ///      is what keeps the condition in one place instead of two.
@@ -777,6 +797,7 @@ contract DotnsNameEscrow is
     function supportsInterface(bytes4 interfaceId) public view override returns (bool supported) {
         supported = interfaceId == type(IDotnsNameEscrow).interfaceId
             || interfaceId == type(IDotnsNameEscrowRevocation).interfaceId
+            || interfaceId == type(IDotnsNameEscrowGovernance).interfaceId
             || interfaceId == type(IERC721Receiver).interfaceId
             || super.supportsInterface(interfaceId);
     }

@@ -4,6 +4,7 @@ pragma solidity ^0.8.34;
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 import {IDotnsNameWhitelist} from "../../../contracts/whitelist/IDotnsNameWhitelist.sol";
+import {IDotnsNameEscrowGovernance} from "../../../contracts/escrow/IDotnsNameEscrowGovernance.sol";
 import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 import {IDotnsRegistrar} from "../../../contracts/registrars/IDotnsRegistrar.sol";
 import {IDotnsRegistry} from "../../../contracts/registry/IDotnsRegistry.sol";
@@ -118,6 +119,16 @@ contract RootGateTests is BaseDotns {
         reached.forward(
             address(dotnsPopController),
             abi.encodeCall(IDotnsPopGovernance.evictReservations, ("alpha"))
+        );
+    }
+
+    function test_revert_escrow_gate_refuses_a_contract_root_reached() public {
+        SYSTEM.setRootTarget(address(reached));
+
+        vm.expectRevert(IDotnsNameEscrowGovernance.NotRoot.selector);
+        reached.forward(
+            address(dotnsNameEscrow),
+            abi.encodeCall(IDotnsNameEscrowGovernance.withdrawProtocolFees, (ed, 1))
         );
     }
 
