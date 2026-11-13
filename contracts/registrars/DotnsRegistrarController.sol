@@ -253,7 +253,7 @@ contract DotnsRegistrarController is
         // origin, which has no account, so no branch may read `msg.sender`: the grant is checked
         // against `registration.owner`, the commitment is keyed on its own hash, and the mint
         // targets the owner.
-        bool isRoot = SystemUtils.originIsRoot();
+        bool isRoot = SystemUtils.callerIsRoot();
         IDotnsNameWhitelist whitelist;
         if (!isRoot) {
             whitelist = _nameWhitelist();

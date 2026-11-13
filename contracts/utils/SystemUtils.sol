@@ -11,14 +11,15 @@ import {DotnsConstants} from "./DotnsConstants.sol";
 ///      address and interface are wired in one place rather than duplicated per consumer.
 /// @custom:security-contact admin@parity.io
 library SystemUtils {
-    /// @notice Returns whether the transaction-level origin is substrate Root.
-    /// @dev Reads the stack origin through `ISystem.originIsRoot`, which holds through a UUPS
-    ///      proxy's delegatecall frame where `callerIsRoot` returns false, and returns false
-    ///      rather than reverting on a non-Root origin. A Root origin has no account behind it,
-    ///      so a function gated on this must not read `msg.sender` in the frame Root calls:
-    ///      reading it traps. Calls it makes are fine, because they see a contract as caller.
-    /// @return root True when the transaction origin is Root.
-    function originIsRoot() internal view returns (bool root) {
-        return ISystem(DotnsConstants.REVIVE_SYSTEM).originIsRoot();
+    /// @notice Returns whether substrate Root called this contract directly.
+    /// @dev Reads `ISystem.callerIsRoot`, which is true only in the contract a Root dispatch
+    ///      targets, including behind its UUPS proxy, and false in any contract that contract
+    ///      calls. A contract reached later in the same Root transaction therefore cannot pass
+    ///      the check. A Root origin has no account behind it, so a function gated on this must
+    ///      not read `msg.sender` in the frame Root calls: reading it traps. Calls it makes are
+    ///      fine, because they see a contract as caller.
+    /// @return root True when the immediate caller is Root.
+    function callerIsRoot() internal view returns (bool root) {
+        return ISystem(DotnsConstants.REVIVE_SYSTEM).callerIsRoot();
     }
 }

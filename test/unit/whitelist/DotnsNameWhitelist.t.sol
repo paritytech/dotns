@@ -40,8 +40,8 @@ contract DotnsNameWhitelistTests is BaseDotns {
         vm.stopPrank();
 
         // The whitelist's admin surface is Root-only, so the suite runs under a Root origin and
-        // the unauthorised-caller tests flip it back with `_mockOriginIsRoot(false)`.
-        _mockOriginIsRoot(true);
+        // the unauthorised-caller tests flip it back with `_mockCallerIsRoot(false)`.
+        _mockCallerIsRoot(true);
         whitelist.setWindow(0, 30 days);
 
         vm.label(address(whitelist), "DotnsNameWhitelist");
@@ -176,7 +176,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
 
     function test_accept_reverts_for_a_signed_caller() public {
         _request(ed, BASE_LABEL_A);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         vm.prank(tiago);
         whitelist.accept(BASE_LABEL_A, ed);
@@ -237,7 +237,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
     /// method that later lost its gate, which is how the four spot checks below left `reject`,
     /// `grantNames`, `setWindow` and two caps uncovered.
     function test_every_admin_entry_point_requires_root() public {
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         string[] memory batch = new string[](1);
         batch[0] = BASE_LABEL_B;
@@ -343,7 +343,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
     /// @dev Not even the owner revokes: the admin surface is Root-only.
     function test_revokeName_rejects_the_owner() public {
         _grant(ed, BASE_LABEL_A);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         whitelist.revokeName(BASE_LABEL_A);
     }
@@ -413,7 +413,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
     }
 
     function test_setReserved_reverts_for_a_signed_caller() public {
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         vm.prank(tiago);
         whitelist.setReserved(BASE_LABEL_A, true);
@@ -604,21 +604,21 @@ contract DotnsNameWhitelistTests is BaseDotns {
 
     /// @dev Caps are configuration, and configuration is Root-only too: the owner cannot retune.
     function test_setMaxClaimants_reverts_for_a_signed_caller() public {
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
         whitelist.setMaxClaimants(10);
     }
 
     function test_governance_root_grants_from_any_caller() public {
         // Root has no address, so the gate admits the call regardless of who submits it.
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.prank(leonardo);
         whitelist.grantName(BASE_LABEL_A, ed);
         assertEq(whitelist.granteeOf(BASE_LABEL_A), ed);
     }
 
     function test_governance_root_reserves_from_any_caller() public {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.prank(leonardo);
         whitelist.setReserved(BASE_LABEL_A, true);
         assertTrue(whitelist.isReserved(BASE_LABEL_A));
@@ -626,7 +626,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
 
     /// @dev Configuration is Root-only as well, so a referendum retunes the caps.
     function test_governance_root_sets_a_cap_from_any_caller() public {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.prank(leonardo);
         whitelist.setMaxClaimants(7);
         assertEq(whitelist.maxClaimants(), 7);

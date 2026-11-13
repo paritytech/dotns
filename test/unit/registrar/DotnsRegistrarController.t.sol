@@ -453,9 +453,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         address nameOwner = ed;
 
         _grantName(nameLabel, nameOwner);
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         dotnsNameWhitelist.revokeName(nameLabel);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         assertFalse(dotnsNameWhitelist.isGrantedTo(nameLabel, nameOwner));
 
@@ -971,9 +971,9 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         // survive; an unrelated label could not detect consumption of the one being minted.
         _grantName(nameLabel, ed);
 
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         _revealReserved(nameLabel, ed, tiago);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(nameLabel)), ed);
         assertTrue(
@@ -1071,10 +1071,10 @@ contract DotnsRegistrarControllerTest is BaseDotns {
 
         IDotnsRegistrarController.Registration memory registration =
             _commitReserved(nameLabel, ed, ed);
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         vm.prank(ed);
         dotnsRegistrarController.registerReserved(registration);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(nameLabel)), ed);
     }

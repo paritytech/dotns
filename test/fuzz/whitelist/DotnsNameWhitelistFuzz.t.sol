@@ -32,7 +32,7 @@ contract DotnsNameWhitelistFuzz is BaseDotns {
         // runs under a Root origin throughout.
         // The suite calls governance entry points directly, so it runs under a Root origin
         // throughout rather than mocking per call.
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         whitelist.setWindow(0, 365 days);
     }
 

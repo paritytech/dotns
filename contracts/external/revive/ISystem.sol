@@ -10,13 +10,9 @@ pragma solidity ^0.8.34;
 ///      rather than mirrored wholesale, so the audit surface stays small
 ///      and any upstream change is a deliberate review event.
 interface ISystem {
-    /// Returning true iff the immediate caller's substrate origin is `Root`.
-    /// Reverts on a `RuntimeOrigin::Signed(_)` or non-Root origin.
+    /// Returns true iff the calling contract was called directly by a `Root` origin.
+    /// @dev Delegate calls are skipped, so it holds in a UUPS implementation behind the proxy
+    ///      Root called. Returns false for a signed origin and in any contract reached through
+    ///      another contract.
     function callerIsRoot() external view returns (bool);
-
-    /// Returning true iff the transaction-level substrate origin is `Root`.
-    /// @dev Reads the stack origin rather than the immediate caller, so it holds through a UUPS
-    ///      proxy's delegatecall frame where `callerIsRoot` returns false. Returns false, rather
-    ///      than reverting, on a non-Root origin.
-    function originIsRoot() external view returns (bool);
 }
