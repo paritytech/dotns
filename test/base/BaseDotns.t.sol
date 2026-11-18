@@ -386,27 +386,27 @@ abstract contract BaseDotns is Test {
         // reads it (`DotnsNameWhitelist.onlyGovernance`, `DotnsRegistrarController`'s reserved
         // path), and there is no code at the precompile address under forge, so an unmocked read
         // decodes empty returndata and reverts. Tests exercising the Root branch override with
-        // `_mockOriginIsRoot(true)`.
-        _mockOriginIsRoot(false);
+        // `_mockCallerIsRoot(true)`.
+        _mockCallerIsRoot(false);
     }
 
-    /// @notice Mocks revive's System precompile originIsRoot result.
-    /// @param returnValue Value to return from `originIsRoot`.
-    function _mockOriginIsRoot(bool returnValue) internal {
+    /// @notice Mocks revive's System precompile callerIsRoot result.
+    /// @param returnValue Value to return from `callerIsRoot`.
+    function _mockCallerIsRoot(bool returnValue) internal {
         vm.mockCall(
             DotnsConstants.REVIVE_SYSTEM,
-            abi.encodeWithSelector(ISystem.originIsRoot.selector),
+            abi.encodeWithSelector(ISystem.callerIsRoot.selector),
             abi.encode(returnValue)
         );
     }
 
     /// @notice Toggles the short-name market as a substrate Root origin.
-    /// @dev `setShortNamesEnabled` is Root-gated, so mock the System precompile's `originIsRoot`
+    /// @dev `setShortNamesEnabled` is Root-gated, so mock the System precompile's `callerIsRoot`
     ///      true for the call, then restore false so the default test origin stays non-Root.
     function _setShortNames(bool enabled) internal {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         popRules.setShortNamesEnabled(enabled);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
     /// @notice Computes the namehash of `parent` and `labelhash`.
@@ -523,15 +523,15 @@ abstract contract BaseDotns is Test {
     }
 
     /// @notice Grants `label` to `user` on the name whitelist under a mocked Root origin.
-    /// @dev The whitelist's admin surface is Root-only, so this mocks `originIsRoot` for the call
+    /// @dev The whitelist's admin surface is Root-only, so this mocks `callerIsRoot` for the call
     ///      and restores the default afterwards. The reserved registration path requires a grant
     ///      naming the intended owner, so this is the setup step every `registerReserved` test
-    ///      needs. Restoring matters: `registerReserved` reads `originIsRoot` too, and a sticky
+    ///      needs. Restoring matters: `registerReserved` reads `callerIsRoot` too, and a sticky
     ///      `true` would put the registration itself on the Root branch.
     function _grantName(string memory label, address user) internal {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         dotnsNameWhitelist.grantName(label, user);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
     /// @notice Drives a PoP reservation under a Root origin and settles the resulting
@@ -626,14 +626,14 @@ abstract contract BaseDotns is Test {
     /// @dev Reverts with the inner error data when the call fails, so
     ///      `vm.expectRevert` assertions remain meaningful at the test level.
     function _dispatchFromRoot(bytes memory payload) internal returns (bytes memory ret) {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
 
         (bool ok, bytes memory data) = address(dotnsPopController).call(payload);
         // Restore the default before unwinding, on both the success and revert paths.
-        // `DotnsRegistrarController.registerReserved` reads `originIsRoot` too, so a sticky
+        // `DotnsRegistrarController.registerReserved` reads `callerIsRoot` too, so a sticky
         // `true` here would silently put a later reserved registration on the Root branch,
         // skipping the grant check and the consume.
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         if (!ok) {
             assembly {
                 revert(add(data, 32), mload(data))

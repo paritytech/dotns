@@ -1362,19 +1362,15 @@ contract DotnsPopController is
     }
 
     /// @notice Internal check enforcing a Root origin.
-    /// @dev Authorises a call when @custom:function SystemUtils.originIsRoot is true, and
+    /// @dev Authorises a call when @custom:function SystemUtils.callerIsRoot is true, and
     ///      reverts with NotRoot otherwise. `msg.sender` is deliberately not consulted: a
     ///      Root origin has no account behind it, so reading `msg.sender` traps. That holds
     ///      for this frame and any delegatecall sharing it; a nested call sees the calling
-    ///      contract as its sender and reads normally.
-    ///
-    ///      The check also holds for the whole Root transaction rather than the entry frame
-    ///      alone, so nothing reachable from an onlyRoot entrypoint may call a
-    ///      user-controlled address: such a callee could re-enter a gated function and still
-    ///      pass. Every call out of this contract goes to a protocol contract resolved
-    ///      through the registry.
+    ///      contract as its sender and reads normally. The check passes only when Root called
+    ///      this controller directly, so a contract reached later in the same Root transaction
+    ///      cannot re-enter a gated function.
     function _onlyRoot() internal view {
-        require(SystemUtils.originIsRoot(), NotRoot());
+        require(SystemUtils.callerIsRoot(), NotRoot());
     }
 
     /// @inheritdoc UUPSUpgradeable

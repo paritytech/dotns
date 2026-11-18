@@ -71,7 +71,7 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_issueDeviceNameWithReservation_reverts_when_origin_is_not_root() public {
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.issueDeviceNameWithReservation(
             IDotnsPopController.DeviceNameIssuanceWithReservation({
@@ -233,7 +233,7 @@ contract DotnsPopControllerTests is BaseDotns {
     function test_issuePersonhoodName_reverts_when_origin_is_not_root() public {
         IDotnsPopController.Link memory link = _linkFresh(_validChatKey(0xaa));
 
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.issuePersonhoodName(
             IDotnsPopController.PersonhoodNameIssuance({
@@ -961,7 +961,7 @@ contract DotnsPopControllerTests is BaseDotns {
     function test_registered_controller_without_root_origin_cannot_enter_pop_flow() public {
         // The public commit-reveal controller is already a registered controller.
         // Even from that origin, the Root-gate must reject the call.
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         vm.prank(address(dotnsRegistrarController));
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.issueDeviceNameWithReservation(
@@ -1366,7 +1366,7 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_issueDeviceName_reverts_when_origin_is_not_root() public {
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.issueDeviceName(
             IDotnsPopController.DeviceNameIssuance({
@@ -1419,7 +1419,7 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_reservePersonhoodName_reverts_when_origin_is_not_root() public {
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         vm.expectRevert(IDotnsPopController.NotRoot.selector);
         dotnsPopController.reservePersonhoodName(
             IDotnsPopController.PersonhoodNameReservation({user: ed, label: PERSONHOOD_LABEL_A})

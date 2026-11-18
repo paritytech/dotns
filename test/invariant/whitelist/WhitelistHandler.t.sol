@@ -142,20 +142,20 @@ contract WhitelistHandler is Test {
     /// and would revert into the catch, leaving the campaign to exercise only the permissionless
     /// entry points.
     function _asRoot() internal {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
     }
 
     /// @notice Restores the default. `DotnsRegistrarController.registerReserved` reads
-    /// `originIsRoot` too, and handler state is campaign-scoped, so a sticky `true` would put a
+    /// `callerIsRoot` too, and handler state is campaign-scoped, so a sticky `true` would put a
     /// later reserved registration on the Root branch.
     function _asSigned() internal {
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 
-    function _mockOriginIsRoot(bool returnValue) internal {
+    function _mockCallerIsRoot(bool returnValue) internal {
         vm.mockCall(
             DotnsConstants.REVIVE_SYSTEM,
-            abi.encodeWithSelector(ISystem.originIsRoot.selector),
+            abi.encodeWithSelector(ISystem.callerIsRoot.selector),
             abi.encode(returnValue)
         );
     }

@@ -490,9 +490,9 @@ contract DotnsRegistrarControllerFuzzTest is BaseDotns {
     function testFuzz_root_mints_without_a_grant(uint256 salt) public {
         string memory nameLabel = _grantLabel(salt);
 
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         _revealReserved(_reservedFor(nameLabel, ed), tiago);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(nameLabel)), ed);
     }

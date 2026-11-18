@@ -90,7 +90,7 @@ contract PopRules is
         // Opening the short-name band to the public path is a governance decision, so it is gated
         // on a substrate Root origin rather than the owner. `msg.sender` is deliberately not read:
         // a Root origin has no account behind it, so reading it would trap.
-        require(SystemUtils.originIsRoot(), NotRoot());
+        require(SystemUtils.callerIsRoot(), NotRoot());
         shortNamesEnabled = enabled;
         emit ShortNamesEnabledUpdated(enabled);
     }

@@ -634,10 +634,10 @@ contract DotnsPopControllerLegacyTests is BaseDotns {
     }
 
     function _rootRevertData(bytes memory payload) internal returns (bytes memory data) {
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         bool ok;
         (ok, data) = address(dotnsPopController).call(payload);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         assertFalse(ok, "the call reverts");
     }
 

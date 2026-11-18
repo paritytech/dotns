@@ -90,10 +90,10 @@ contract ReservedGrantHandler is Test {
         string memory label = _freshLabel();
 
         // The whitelist is Root-only. Restore the default afterwards: `registerReserved` reads
-        // `originIsRoot` too, and a sticky `true` would skip the grant check and the consume.
-        _mockOriginIsRoot(true);
+        // `callerIsRoot` too, and a sticky `true` would skip the grant check and the consume.
+        _mockCallerIsRoot(true);
         WHITELIST.grantName(label, beneficiary);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         pendingLabels.push(label);
         grantedTo[label] = beneficiary;
@@ -216,11 +216,11 @@ contract ReservedGrantHandler is Test {
         beneficiaries.push(account);
     }
 
-    /// @notice Mocks the revive `originIsRoot()` query for the next call.
-    function _mockOriginIsRoot(bool returnValue) internal {
+    /// @notice Mocks the revive `callerIsRoot()` query for the next call.
+    function _mockCallerIsRoot(bool returnValue) internal {
         vm.mockCall(
             DotnsConstants.REVIVE_SYSTEM,
-            abi.encodeWithSelector(ISystem.originIsRoot.selector),
+            abi.encodeWithSelector(ISystem.callerIsRoot.selector),
             abi.encode(returnValue)
         );
     }

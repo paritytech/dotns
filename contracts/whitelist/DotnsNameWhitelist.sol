@@ -32,7 +32,7 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 ///      no event indexing is required. A name holds at most `maxClaimants` live claims, which
 ///      bounds the loop that clears them on resolution. Resolving a name deletes its claims,
 ///      refunding their storage deposit, so only reserved or won names persist. The entire admin
-///      surface is substrate Root: `SystemUtils.originIsRoot` is true through the proxy's
+///      surface is substrate Root: `SystemUtils.callerIsRoot` is true through the proxy's
 ///      delegatecall frame, and no gate reads `msg.sender`, so Root's lack of an address is not a
 ///      problem. No signed account grants, revokes, reserves, or retunes a cap; the owner's
 ///      authority is upgrade only. The public and PoP controllers hold only the `consume` hook.
@@ -118,7 +118,7 @@ contract DotnsNameWhitelist is
 
     /// @notice Internal check enforcing the substrate Root gate.
     function _onlyGovernance() internal view {
-        require(SystemUtils.originIsRoot(), NotGovernance());
+        require(SystemUtils.callerIsRoot(), NotGovernance());
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor

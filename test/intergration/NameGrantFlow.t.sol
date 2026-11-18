@@ -137,9 +137,9 @@ contract NameGrantFlow is BaseDotns {
     ///      leaves every registration path as it was.
     function test_a_whitelist_reservation_leaves_the_other_paths_open() public {
         string memory nameLabel = "withheldname";
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         dotnsNameWhitelist.setReserved(nameLabel, true);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         _commitAndRegister(nameLabel, tiago, false);
         assertEq(IERC721(address(dotnsRegistrar)).ownerOf(_tokenIdForLabel(nameLabel)), tiago);
@@ -206,10 +206,10 @@ contract NameGrantFlow is BaseDotns {
     function test_a_whitelist_reservation_leaves_the_gateway_open() public {
         string memory issuedName = "withheldgate";
         string memory queuedName = "withheldqueue";
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         dotnsNameWhitelist.setReserved(issuedName, true);
         dotnsNameWhitelist.setReserved(queuedName, true);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         _rootIssuePersonhoodName(
             IDotnsPopController.PersonhoodNameIssuance({
@@ -494,10 +494,10 @@ contract NameGrantFlow is BaseDotns {
         (IDotnsRegistrarController.Registration memory squat, uint256 price) =
             _commitPaidRegistration(nameLabel, leonardo);
 
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         dotnsRegistrar.revoke(tokenId);
         dotnsNameWhitelist.grantName(nameLabel, ed);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         vm.expectRevert(
             abi.encodeWithSelector(IDotnsRegistrarController.NameGranted.selector, nameLabel)
@@ -520,10 +520,10 @@ contract NameGrantFlow is BaseDotns {
             })
         );
 
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         IDotnsPopGovernance(address(dotnsPopController)).revokeName(nameLabel);
         dotnsNameWhitelist.grantName(nameLabel, ed);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         vm.expectRevert(IDotnsPopController.PersonhoodNameUnavailable.selector);
         _rootIssuePersonhoodName(
@@ -545,10 +545,10 @@ contract NameGrantFlow is BaseDotns {
             IDotnsPopController.PersonhoodNameReservation({label: nameLabel, user: tiago})
         );
 
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         dotnsNameWhitelist.grantName(nameLabel, ed);
         IDotnsPopGovernance(address(dotnsPopController)).evictReservations(nameLabel);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
 
         (bool reserved,) = dotnsPopController.isReservedForClaim(nameLabel);
         assertFalse(reserved);
@@ -668,8 +668,8 @@ contract NameGrantFlow is BaseDotns {
         dotnsRegistrarController.commit(dotnsRegistrarController.makeCommitment(registration));
         vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
 
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         dotnsRegistrarController.registerReserved(registration);
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
     }
 }
