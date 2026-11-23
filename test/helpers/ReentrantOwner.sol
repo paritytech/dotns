@@ -6,8 +6,7 @@ import {IDotnsRegistrarController} from "../../contracts/registrars/IDotnsRegist
 
 /// @title ReentrantOwner
 /// @notice ERC721 receiver that re-enters `register` from inside
-///         `onERC721Received` so the transient non-reentrancy guard can be
-///         pinned down against the reclaim path's `safeTransferFrom`.
+///         `onERC721Received`, used to show the reclaim path makes no such callback.
 contract ReentrantOwner is IERC721Receiver {
     /// @notice Controller the receiver re-enters on the callback.
     IDotnsRegistrarController public immutable CONTROLLER;

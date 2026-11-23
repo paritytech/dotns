@@ -67,6 +67,11 @@ library DotnsConstants {
     ///      and callers page through larger sets with `offset`.
     uint256 internal constant MAX_PAGE_SIZE = 200;
 
+    /// @notice Shortest label, in bytes, a registration controller mints.
+    /// @dev The name whitelist applies the same floor, so a grant always names a label
+    ///      `registerReserved` can mint.
+    uint256 internal constant MIN_LABEL_LENGTH = 3;
+
     /// @notice Default per-name live-claim cap the name whitelist starts with.
     /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_CLAIMANTS_LIMIT`.
     uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 24;

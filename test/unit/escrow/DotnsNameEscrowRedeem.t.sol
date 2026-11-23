@@ -16,6 +16,9 @@ import {IPopRules} from "../../../contracts/pop/IPopRules.sol";
 ///      `withdraw`. A holder who released a name and never withdrew removed the label from
 ///      circulation permanently. For the zero-amount positions seeded by free registrations
 ///      there is nothing to withdraw, so that was the default outcome rather than an edge case.
+/// @notice A contract with no `onERC721Received`, standing in for a simple smart-contract wallet.
+contract NoTokenReceiver {}
+
 contract DotnsNameEscrowRedeemTest is BaseDotns {
     /// @notice 14-char label classifying as NoStatus, so registration seeds a funded position.
     string internal constant FUNDED_LABEL = "redeemlabela01";
@@ -208,6 +211,19 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
         assertFalse(position.claimed, "position is not marked settled by a redeem");
     }
 
+    /// @dev The mint skips the receiver hook, so a contract without one can hold a name. Redeem
+    ///      must return it the same way.
+    function test_redeem_returns_the_name_to_a_contract_without_a_receiver_hook() public {
+        address holder = address(new NoTokenReceiver());
+        uint256 tokenId = _mintWithZeroPosition(FREE_LABEL, holder);
+        _approveAndRelease(tokenId, holder);
+
+        vm.prank(holder);
+        dotnsNameEscrow.redeem(tokenId);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), holder);
+    }
+
     function test_redeem_removes_the_token_from_released_enumeration() public {
         uint256 tokenId = _registerAt(FUNDED_LABEL, ed, IPopRules.PopStatus.NoStatus);
         _approveAndRelease(tokenId, ed);
@@ -365,6 +381,18 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
             "the deposit follows the departing holder onto the pull-payment ledger"
         );
         assertEq(_positionOf(tokenId).recipient, address(0), "position cleared for re-registration");
+    }
+
+    function test_reclaim_hands_the_name_to_a_contract_without_a_receiver_hook() public {
+        uint256 tokenId = _mintWithZeroPosition(FREE_LABEL, ed);
+        _approveAndRelease(tokenId, ed);
+        vm.warp(_positionOf(tokenId).redeemableUntil);
+
+        address newOwner = address(new NoTokenReceiver());
+        vm.prank(address(dotnsRegistrarController));
+        dotnsNameEscrow.reclaim(tokenId, newOwner);
+
+        assertEq(dotnsRegistrar.ownerOf(tokenId), newOwner);
     }
 
     /// @dev Acceptance criterion: the credit has no deadline, so a holder who reappears much later
