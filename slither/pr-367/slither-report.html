@@ -8,12 +8,12 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">dotNS Slither Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-11-12 15:34 UTC | 219 findings</p>
+<p class="text-sm text-gray-500">Generated 2026-11-23 14:26 UTC | 220 findings</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">High</p><p class="text-xl font-mono font-bold text-red-400">4</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Medium</p><p class="text-xl font-mono font-bold text-yellow-400">59</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">95</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">96</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Informational</p><p class="text-xl font-mono font-bold text-gray-400">60</p></div>
 </div></div>
 <h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">High (4)</h2>
@@ -25,8 +25,8 @@
 </tr></thead><tbody>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-red-400">arbitrary-send-eth</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.withdrawProtocolFees(address,uint256) (contracts/escrow/DotnsNameEscrow.sol#686-699) sends eth to arbitr</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:686</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.withdrawProtocolFees(address,uint256) (contracts/escrow/DotnsNameEscrow.sol#707-720) sends eth to arbitr</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:707</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-red-400">arbitrary-send-eth</td>
@@ -40,8 +40,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-red-400">uninitialized-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._entriesByRecipient (contracts/escrow/DotnsNameEscrow.sol#108) is never initialized. It is used in: 	- D</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:108</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._entriesByRecipient (contracts/escrow/DotnsNameEscrow.sol#109) is never initialized. It is used in: 	- D</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:109</td>
 </tr>
 </tbody></table></div>
 <h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Medium (59)</h2>
@@ -218,6 +218,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._nodeOf(string) (contracts/whitelist/DotnsNameWhitelist.sol#613-615) ignores return value by (None,no</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:613</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
 <td class="py-2 px-3 text-gray-200">DotnsRegistrarController.register(IDotnsRegistrarController.Registration) (contracts/registrars/DotnsRegistrarController</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarController.sol:168</td>
 </tr>
@@ -308,11 +313,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._nodeOf(string) (contracts/whitelist/DotnsNameWhitelist.sol#602-604) ignores return value by (None,no</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:602</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopController._issueDeviceName(DotnsPopController.Deps,IDotnsPopController.DeviceNameIssuance,bool) (contracts/regi</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:341</td>
 </tr>
@@ -347,7 +347,7 @@
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:860</td>
 </tr>
 </tbody></table></div>
-<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Low (95)</h2>
+<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Low (96)</h2>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Check</th>
@@ -371,13 +371,18 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#804-818) has external calls inside a loop</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:804</td>
+<td class="py-2 px-3 text-gray-200">DotnsPopLens._countNames(address) (contracts/registrars/DotnsPopLens.sol#121-148) has external calls inside a loop: node</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopLens.sol:121</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsPopLens._countNames(address) (contracts/registrars/DotnsPopLens.sol#121-148) has external calls inside a loop: node</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopLens.sol:121</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#827-841) has external calls inside a loop</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:827</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#827-841) has external calls inside a loop</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:827</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
@@ -406,23 +411,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._nodeOf(string) (contracts/whitelist/DotnsNameWhitelist.sol#602-604) has external calls inside a loop</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:602</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopLens._ownedBy(bytes32,address) (contracts/registrars/DotnsPopLens.sol#213-215) has external calls inside a loop:</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopLens.sol:213</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#804-818) has external calls inside a loop</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:804</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#804-818) has external calls inside a loop</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:804</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#827-841) has external calls inside a loop</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:827</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
@@ -436,18 +431,18 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#804-818) has external calls inside a loop</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:804</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopController._settlePendingLabel(DotnsPopController.Deps,IStoreFactory,address,address,string) (contracts/registra</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:587</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#804-818) has external calls inside a loop</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:804</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#827-841) has external calls inside a loop</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:827</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#827-841) has external calls inside a loop</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:827</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
@@ -461,13 +456,18 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#804-818) has external calls inside a loop</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:804</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#827-841) has external calls inside a loop</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:827</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopLens._controller() (contracts/registrars/DotnsPopLens.sol#283-285) has external calls inside a loop: IDotnsPopCo</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopLens.sol:283</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._nodeOf(string) (contracts/whitelist/DotnsNameWhitelist.sol#613-615) has external calls inside a loop</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:613</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
@@ -506,6 +506,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#827-841) has external calls inside a loop</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:827</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
 <td class="py-2 px-3 text-gray-200">Multicall3.aggregate(Multicall3.Call[]) (contracts/utils/Multicall3.sol#42-60) has external calls inside a loop: (succes</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/utils/Multicall3.sol:42</td>
 </tr>
@@ -528,11 +533,6 @@
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopLens._controller() (contracts/registrars/DotnsPopLens.sol#283-285) has external calls inside a loop: IDotnsPopCo</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopLens.sol:283</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._clearName(uint256,bool) (contracts/escrow/DotnsNameEscrow.sol#804-818) has external calls inside a loop</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:804</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
@@ -581,11 +581,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsNameEscrow.release(uint256) (contracts/escrow/DotnsNameEscrow.sol#327-385): 	External calls: 	- regis</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:327</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._ensureDeviceContainer(DotnsPopController.Deps,bytes32) (contracts/registrars/DotnsPopC</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:1339</td>
 </tr>
@@ -593,6 +588,11 @@
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsRegistrar._revoke(uint256) (contracts/registrars/DotnsRegistrar.sol#187-205): 	External calls: 	- rec</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrar.sol:187</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsNameEscrow.release(uint256) (contracts/escrow/DotnsNameEscrow.sol#328-386): 	External calls: 	- regis</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:328</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
@@ -613,11 +613,6 @@
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._enqueueReservation(DotnsPopController.Deps,bytes32,string,address,bool) (contracts/reg</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:880</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:369</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -676,6 +671,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:369</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issueDeviceName(DotnsPopController.Deps,IDotnsPopController.DeviceNameIssuance,bool) (</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:341</td>
 </tr>
@@ -700,14 +700,9 @@
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:778</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.rebindPosition(uint256,address) (contracts/escrow/DotnsNameEscrow.sol#308-324) uses timestamp for compar</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:308</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.withdraw(uint256) (contracts/escrow/DotnsNameEscrow.sol#409-421) uses timestamp for comparisons 	Dangero</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:409</td>
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:369</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -716,8 +711,23 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.claimRefundsBatch(uint256[]) (contracts/escrow/DotnsNameEscrow.sol#511-536) uses timestamp for compariso</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:511</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.deposit(IDotnsNameEscrow.DepositParams) (contracts/escrow/DotnsNameEscrow.sol#275-298) uses timestamp fo</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:275</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.onERC721Received(address,address,uint256,bytes) (contracts/escrow/DotnsNameEscrow.sol#777-794) uses time</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:777</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.release(uint256) (contracts/escrow/DotnsNameEscrow.sol#328-386) uses timestamp for comparisons 	Dangerou</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:328</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.withdraw(uint256) (contracts/escrow/DotnsNameEscrow.sol#410-422) uses timestamp for comparisons 	Dangero</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:410</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -736,11 +746,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.deposit(IDotnsNameEscrow.DepositParams) (contracts/escrow/DotnsNameEscrow.sol#274-297) uses timestamp fo</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:274</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.revokeName(string) (contracts/whitelist/DotnsNameWhitelist.sol#282-296) uses timestamp for comparison</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:282</td>
 </tr>
@@ -751,18 +756,23 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.claimRefund(uint256) (contracts/escrow/DotnsNameEscrow.sol#509-527) uses timestamp for comparisons 	Dang</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:509</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.requestName(string,string,address) (contracts/whitelist/DotnsNameWhitelist.sol#212-240) uses timestam</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:212</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.redeem(uint256) (contracts/escrow/DotnsNameEscrow.sol#726-751) uses timestamp for comparisons 	Dangerous</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:726</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._isWindowOpen() (contracts/whitelist/DotnsNameWhitelist.sol#619-621) uses timestamp for comparisons 	</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:619</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.release(uint256) (contracts/escrow/DotnsNameEscrow.sol#327-385) uses timestamp for comparisons 	Dangerou</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:327</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.claimRefundsBatch(uint256[]) (contracts/escrow/DotnsNameEscrow.sol#530-555) uses timestamp for compariso</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:530</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -781,6 +791,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.redeem(uint256) (contracts/escrow/DotnsNameEscrow.sol#747-774) uses timestamp for comparisons 	Dangerous</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:747</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.setReserved(string,bool) (contracts/whitelist/DotnsNameWhitelist.sol#299-317) uses timestamp for comp</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:299</td>
 </tr>
@@ -796,18 +811,18 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.rebindPosition(uint256,address) (contracts/escrow/DotnsNameEscrow.sol#309-325) uses timestamp for compar</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:309</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.isReclaimable(uint256) (contracts/escrow/DotnsNameEscrow.sol#725-744) uses timestamp for comparisons 	Da</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:725</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.initializeGrantExpiry() (contracts/whitelist/DotnsNameWhitelist.sol#156-159) uses timestamp for compa</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:156</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._isWindowOpen() (contracts/whitelist/DotnsNameWhitelist.sol#608-610) uses timestamp for comparisons 	</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:608</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.isReclaimable(uint256) (contracts/escrow/DotnsNameEscrow.sol#704-723) uses timestamp for comparisons 	Da</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:704</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -818,16 +833,6 @@
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopController._advanceExpiredHead(DotnsPopController.Deps,bytes32,uint256,bool,address) (contracts/registrars/Dotns</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:988</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.claimRefund(uint256) (contracts/escrow/DotnsNameEscrow.sol#490-508) uses timestamp for comparisons 	Dang</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:490</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.onERC721Received(address,address,uint256,bytes) (contracts/escrow/DotnsNameEscrow.sol#754-771) uses time</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:754</td>
 </tr>
 </tbody></table></div>
 <h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Informational (60)</h2>
@@ -869,13 +874,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">costly-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._removeRefundEntry(uint256,address) (contracts/escrow/DotnsNameEscrow.sol#613-631) has costly operations</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:613</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._removeRefundEntry(uint256,address) (contracts/escrow/DotnsNameEscrow.sol#632-650) has costly operations</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:632</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">costly-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._removeRefundEntry(uint256,address) (contracts/escrow/DotnsNameEscrow.sol#613-631) has costly operations</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:613</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._removeRefundEntry(uint256,address) (contracts/escrow/DotnsNameEscrow.sol#632-650) has costly operations</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:632</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">cyclomatic-complexity</td>
@@ -889,18 +894,28 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
+<td class="py-2 px-3 text-gray-200">Low level call in DotnsNameEscrow.claimRefund(uint256) (contracts/escrow/DotnsNameEscrow.sol#509-527): 	- (ok,None) = ad</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:509</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
+<td class="py-2 px-3 text-gray-200">Low level call in DotnsNameEscrow._claimWithdrawal(address) (contracts/escrow/DotnsNameEscrow.sol#488-501): 	- (ok,None)</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:488</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
 <td class="py-2 px-3 text-gray-200">Low level call in Multicall3.aggregate(Multicall3.Call[]) (contracts/utils/Multicall3.sol#42-60): 	- (success,returnData</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/utils/Multicall3.sol:42</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
-<td class="py-2 px-3 text-gray-200">Low level call in Multicall3.aggregate3(Multicall3.Call3[]) (contracts/utils/Multicall3.sol#128-153): 	- (result.success</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/utils/Multicall3.sol:128</td>
+<td class="py-2 px-3 text-gray-200">Low level call in DotnsNameEscrow.withdrawProtocolFees(address,uint256) (contracts/escrow/DotnsNameEscrow.sol#707-720): </td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:707</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
-<td class="py-2 px-3 text-gray-200">Low level call in DotnsNameEscrow.claimWithdrawal() (contracts/escrow/DotnsNameEscrow.sol#469-482): 	- (ok,None) = addre</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:469</td>
+<td class="py-2 px-3 text-gray-200">Low level call in Multicall3.aggregate3(Multicall3.Call3[]) (contracts/utils/Multicall3.sol#128-153): 	- (result.success</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/utils/Multicall3.sol:128</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
@@ -914,23 +929,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
+<td class="py-2 px-3 text-gray-200">Low level call in DotnsNameEscrow.claimRefundsBatch(uint256[]) (contracts/escrow/DotnsNameEscrow.sol#530-555): 	- (ok,No</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:530</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
 <td class="py-2 px-3 text-gray-200">Low level call in DotnsRegistrarController.register(IDotnsRegistrarController.Registration) (contracts/registrars/DotnsR</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarController.sol:168</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
-<td class="py-2 px-3 text-gray-200">Low level call in DotnsNameEscrow.claimRefundsBatch(uint256[]) (contracts/escrow/DotnsNameEscrow.sol#511-536): 	- (ok,No</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:511</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
-<td class="py-2 px-3 text-gray-200">Low level call in DotnsNameEscrow.withdrawProtocolFees(address,uint256) (contracts/escrow/DotnsNameEscrow.sol#686-699): </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:686</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
-<td class="py-2 px-3 text-gray-200">Low level call in DotnsNameEscrow.claimRefund(uint256) (contracts/escrow/DotnsNameEscrow.sol#490-508): 	- (ok,None) = ad</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:490</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
@@ -939,8 +944,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
-<td class="py-2 px-3 text-gray-200">Variable DotnsNameEscrow.__gap (contracts/escrow/DotnsNameEscrow.sol#128) is not in mixedCase </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:128</td>
+<td class="py-2 px-3 text-gray-200">Variable DotnsNameEscrow.__gap (contracts/escrow/DotnsNameEscrow.sol#129) is not in mixedCase </td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:129</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">naming-convention</td>
@@ -1059,8 +1064,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.__gap (contracts/escrow/DotnsNameEscrow.sol#128) is never used in DotnsNameEscrow (contracts/escrow/Dotn</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:128</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow.__gap (contracts/escrow/DotnsNameEscrow.sol#129) is never used in DotnsNameEscrow (contracts/escrow/Dotn</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:129</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
@@ -1084,8 +1089,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._nextEntryId (contracts/escrow/DotnsNameEscrow.sol#116) is never used in DotnsNameEscrow (contracts/escr</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:116</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameEscrow._nextEntryId (contracts/escrow/DotnsNameEscrow.sol#117) is never used in DotnsNameEscrow (contracts/escr</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:117</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">unused-state</td>
