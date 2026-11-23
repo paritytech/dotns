@@ -55,8 +55,6 @@ contract BootstrapOwnerGateTests is BaseDotns {
         stranger = _createUser("stranger");
     }
 
-    // ===================== Shared owner =====================
-
     function test_every_contract_reports_the_protocol_registry_owner() public view {
         address[] memory owned = _ownedContracts();
         for (uint256 i; i < owned.length; ++i) {
@@ -99,8 +97,6 @@ contract BootstrapOwnerGateTests is BaseDotns {
         }
         assertEq(protocolRegistry.owner(), owner);
     }
-
-    // ===================== Root =====================
 
     function test_every_gated_call_passes_for_a_direct_root_dispatch() public {
         GatedCall[] memory calls = _gatedCalls();
@@ -153,8 +149,6 @@ contract BootstrapOwnerGateTests is BaseDotns {
         }
     }
 
-    // ===================== Bootstrap owner =====================
-
     function test_every_gated_call_passes_for_the_bootstrap_owner() public {
         GatedCall[] memory calls = _gatedCalls();
         for (uint256 i; i < calls.length; ++i) {
@@ -203,8 +197,6 @@ contract BootstrapOwnerGateTests is BaseDotns {
         assertEq(protocolRegistry.owner(), owner);
     }
 
-    // ===================== Strangers =====================
-
     function test_revert_every_gated_call_refuses_a_stranger() public {
         GatedCall[] memory calls = _gatedCalls();
         for (uint256 i; i < calls.length; ++i) {
@@ -219,8 +211,6 @@ contract BootstrapOwnerGateTests is BaseDotns {
         );
         protocolRegistry.renounceOwnership();
     }
-
-    // ===================== Helpers =====================
 
     /// @notice Calls `gated` as `caller` and checks that it passed the gate.
     function _assertPassesGate(GatedCall memory gated, address caller) internal {
