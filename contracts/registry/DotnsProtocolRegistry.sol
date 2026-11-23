@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {BootstrapOwnableUpgradeable} from "../utils/BootstrapOwnableUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IDotnsProtocolRegistry} from "./IDotnsProtocolRegistry.sol";
@@ -27,7 +25,7 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 contract DotnsProtocolRegistry is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
+    BootstrapOwnableUpgradeable,
     IDotnsProtocolRegistry
 {
     using StringUtils for string;
@@ -69,7 +67,7 @@ contract DotnsProtocolRegistry is
     ///      bare label without a dot (e.g. `dot`, `paseo`); it must be a single DNS label,
     ///      otherwise @custom:reverts InvalidTld. The TLD is fixed here because changing it after
     ///      names exist would reroot every node.
-    /// @param initialOwner Address that owns the contract once initialised.
+    /// @param initialOwner Bootstrap owner, which governs alongside Root until it renounces.
     /// @param tldLabel Bare TLD label, without the leading dot.
     function initialize(address initialOwner, string calldata tldLabel) external initializer {
         __Ownable_init(initialOwner);
@@ -85,7 +83,7 @@ contract DotnsProtocolRegistry is
     }
 
     /// @inheritdoc IDotnsProtocolRegistry
-    function set(bytes32 key, address addr) external override onlyOwner {
+    function set(bytes32 key, address addr) external override onlyRootOrOwner {
         require(addr != address(0), ZeroAddress());
 
         _keys.add(key);
@@ -102,7 +100,7 @@ contract DotnsProtocolRegistry is
     }
 
     /// @inheritdoc IDotnsProtocolRegistry
-    function remove(bytes32 key) external override onlyOwner {
+    function remove(bytes32 key) external override onlyRootOrOwner {
         address previousAddress = _addresses[key];
         require(previousAddress != address(0), KeyNotRegistered());
 
@@ -122,7 +120,7 @@ contract DotnsProtocolRegistry is
     }
 
     /// @inheritdoc IDotnsProtocolRegistry
-    function initializeKeys() external override reinitializer(2) onlyOwner {
+    function initializeKeys() external override reinitializer(2) onlyRootOrOwner {
         bytes32[] memory known = DotnsConstants.registryKeys();
         for (uint256 i = 0; i < known.length; ++i) {
             if (_addresses[known[i]] != address(0)) _keys.add(known[i]);
@@ -150,7 +148,7 @@ contract DotnsProtocolRegistry is
     }
 
     /// @inheritdoc IDotnsProtocolRegistry
-    function setProtocolVersion(string calldata semver) external override onlyOwner {
+    function setProtocolVersion(string calldata semver) external override onlyRootOrOwner {
         bytes calldata raw = bytes(semver);
         require(raw.length != 0 && raw[0] >= "0" && raw[0] <= "9", InvalidProtocolVersion());
         for (uint256 i = 1; i < raw.length; ++i) {
@@ -180,7 +178,7 @@ contract DotnsProtocolRegistry is
     }
 
     /// @inheritdoc IDotnsProtocolRegistry
-    function setExpectedCodehash(bytes32 key, bytes32 codehash) external override onlyOwner {
+    function setExpectedCodehash(bytes32 key, bytes32 codehash) external override onlyRootOrOwner {
         require(_addresses[key] != address(0), KeyNotRegistered());
 
         _expectedCodehash[key] = codehash;
@@ -188,5 +186,5 @@ contract DotnsProtocolRegistry is
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 }

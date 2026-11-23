@@ -33,7 +33,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
                 "DotnsNameWhitelist.sol:DotnsNameWhitelist",
                 abi.encodeCall(
                     DotnsNameWhitelist.initialize,
-                    (owner, IDotnsProtocolRegistry(address(protocolRegistry)))
+                    (IDotnsProtocolRegistry(address(protocolRegistry)))
                 )
             )
         );
@@ -498,7 +498,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
 
     function test_initialize_reverts_on_second_call() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        whitelist.initialize(owner, IDotnsProtocolRegistry(address(protocolRegistry)));
+        whitelist.initialize(IDotnsProtocolRegistry(address(protocolRegistry)));
     }
 
     function test_claims_pagination() public {
@@ -837,10 +837,11 @@ contract DotnsNameWhitelistTests is BaseDotns {
         assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), upgradedAt + 90 days);
     }
 
-    function test_initializeGrantExpiry_is_owner_only() public {
+    function test_initializeGrantExpiry_is_root_or_owner_only() public {
         bytes32 configSlot = bytes32(uint256(7));
         uint256 config = uint256(vm.load(address(whitelist), configSlot));
         vm.store(address(whitelist), configSlot, bytes32(config & type(uint128).max));
+        _mockCallerIsRoot(false);
 
         vm.expectRevert(
             abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, ed)

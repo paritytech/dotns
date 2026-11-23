@@ -59,7 +59,7 @@ contract DeployCore is BaseDeployer {
             _broadcastDeployUups(
                 owner,
                 "StoreFactory.sol:StoreFactory",
-                abi.encodeCall(StoreFactory.initialize, (owner, protocolRegistry)),
+                abi.encodeCall(StoreFactory.initialize, (protocolRegistry)),
                 "StoreFactory"
             )
         );
@@ -92,7 +92,7 @@ contract DeployCore is BaseDeployer {
             "DotnsRegistrar.sol:DotnsRegistrar",
             abi.encodeCall(
                 DotnsRegistrar.initialize,
-                (owner, "Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistry))
+                ("Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistry))
             ),
             "DotnsRegistrar"
         );
@@ -109,7 +109,7 @@ contract DeployCore is BaseDeployer {
             owner,
             "DotnsReverseResolver.sol:DotnsReverseResolver",
             abi.encodeCall(
-                DotnsReverseResolver.initialize, (owner, IDotnsProtocolRegistry(protocolRegistry))
+                DotnsReverseResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))
             ),
             "DotnsReverseResolver"
         );
@@ -125,9 +125,7 @@ contract DeployCore is BaseDeployer {
         proxy = _broadcastDeployUups(
             owner,
             "DotnsRegistry.sol:DotnsRegistry",
-            abi.encodeCall(
-                DotnsRegistry.initialize, (owner, IDotnsProtocolRegistry(protocolRegistry))
-            ),
+            abi.encodeCall(DotnsRegistry.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
             "DotnsRegistry"
         );
     }

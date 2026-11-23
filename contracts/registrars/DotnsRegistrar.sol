@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ProtocolOwnedUpgradeable} from "../utils/ProtocolOwnedUpgradeable.sol";
 import {
     ERC721Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
@@ -37,7 +35,7 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 contract DotnsRegistrar is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
+    ProtocolOwnedUpgradeable,
     ERC721Upgradeable,
     IDotnsRegistrar
 {
@@ -83,9 +81,7 @@ contract DotnsRegistrar is
     /// proxy; direct calls on the implementation revert with @custom:reverts InvalidInitialization
     /// because `_disableInitializers` runs in the constructor, and any nested call outside an
     /// active initialiser scope reverts with @custom:reverts NotInitializing.
-    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
-        address initialOwner,
         string calldata name,
         string calldata symbol,
         IDotnsProtocolRegistry registry
@@ -94,19 +90,18 @@ contract DotnsRegistrar is
         initializer
     {
         require(address(registry) != address(0), ProtocolRegistryRequired());
-        __Ownable_init(initialOwner);
         __ERC721_init(name, symbol);
         protocolRegistry = registry;
     }
 
     /// @inheritdoc IDotnsRegistrar
-    function addController(IDotnsController controller) external onlyOwner {
+    function addController(IDotnsController controller) external onlyRootOrOwner {
         controllers[controller] = true;
         emit ControllerAdded(controller);
     }
 
     /// @inheritdoc IDotnsRegistrar
-    function removeController(IDotnsController controller) external onlyOwner {
+    function removeController(IDotnsController controller) external onlyRootOrOwner {
         controllers[controller] = false;
         emit ControllerRemoved(controller);
     }
@@ -382,6 +377,11 @@ contract DotnsRegistrar is
             .writeNewLabel(owner, bytes32(tokenId), string.concat(label, protocolRegistry.tld()));
     }
 
+    /// @inheritdoc ProtocolOwnedUpgradeable
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return address(protocolRegistry);
+    }
+
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 }

@@ -8,6 +8,7 @@ import {DotnsCostModelRegistry} from "../../../contracts/pop/DotnsCostModelRegis
 import {IDotnsCostModelRegistry} from "../../../contracts/pop/IDotnsCostModelRegistry.sol";
 import {DotnsScarcityPricing} from "../../../contracts/pop/DotnsScarcityPricing.sol";
 import {IDotnsPricing} from "../../../contracts/pop/IDotnsPricing.sol";
+import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocolRegistry.sol";
 
 /// @title ZeroVersionModel
 /// @notice Minimal cost model whose version identifier is zero, used to exercise the registry's
@@ -24,18 +25,33 @@ contract ZeroVersionModel is IDotnsPricing {
 
 /// @title DotnsCostModelRegistryTests
 /// @notice Unit tests for model registration, current-version tracking, and versioned pricing.
+/// @notice Stands in for the protocol registry, which holds the bootstrap owner.
+contract OwnerHolder {
+    address public owner;
+
+    constructor(address owner_) {
+        owner = owner_;
+    }
+
+    function renounceOwnership() external {
+        owner = address(0);
+    }
+}
+
 contract DotnsCostModelRegistryTests is Test {
     uint256 internal constant BASE_FEE = 10 ether;
     uint256 internal constant FLOOR = 0.1 ether;
 
     address internal owner;
+    OwnerHolder internal holder;
     DotnsCostModelRegistry internal registry;
     DotnsScarcityPricing internal modelA;
     DotnsScarcityPricing internal modelB;
 
     function setUp() public {
         owner = makeAddr("owner");
-        registry = new DotnsCostModelRegistry(owner);
+        holder = new OwnerHolder(owner);
+        registry = new DotnsCostModelRegistry(IDotnsProtocolRegistry(address(holder)));
         modelA = new DotnsScarcityPricing(BASE_FEE, FLOOR);
         modelB = new DotnsScarcityPricing(BASE_FEE * 2, FLOOR);
 

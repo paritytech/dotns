@@ -128,7 +128,8 @@ contract DotnsDeployer is BaseDeployer {
         deployment.registry = _deployRegistry(OWNER, deployment.protocolRegistry);
         deployment.contentResolver = _deployContentResolver(OWNER, deployment.protocolRegistry);
         deployment.resolver = _deployResolver(OWNER, deployment.protocolRegistry);
-        (deployment.costModel, deployment.costModelRegistry) = _deployCostModelStack(OWNER);
+        (deployment.costModel, deployment.costModelRegistry) =
+            _deployCostModelStack(OWNER, deployment.protocolRegistry);
         deployment.popRules = _deployPopRules(OWNER, deployment.protocolRegistry);
         deployment.nameEscrow = _deployNameEscrow(OWNER, deployment.protocolRegistry);
         deployment.registrarController =
@@ -167,7 +168,7 @@ contract DotnsDeployer is BaseDeployer {
             _broadcastDeployUups(
                 owner,
                 "StoreFactory.sol:StoreFactory",
-                abi.encodeCall(StoreFactory.initialize, (owner, protocolRegistryProxy)),
+                abi.encodeCall(StoreFactory.initialize, (protocolRegistryProxy)),
                 "StoreFactory"
             )
         );
@@ -191,7 +192,7 @@ contract DotnsDeployer is BaseDeployer {
             "DotnsRegistrar.sol:DotnsRegistrar",
             abi.encodeCall(
                 DotnsRegistrar.initialize,
-                (owner, "Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistryProxy))
+                ("Dotns", "Dotns", IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsRegistrar"
         );
@@ -209,8 +210,7 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsReverseResolver.sol:DotnsReverseResolver",
             abi.encodeCall(
-                DotnsReverseResolver.initialize,
-                (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsReverseResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsReverseResolver"
         );
@@ -228,7 +228,7 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsRegistry.sol:DotnsRegistry",
             abi.encodeCall(
-                DotnsRegistry.initialize, (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsRegistry.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsRegistry"
         );
@@ -246,8 +246,7 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsContentResolver.sol:DotnsContentResolver",
             abi.encodeCall(
-                DotnsContentResolver.initialize,
-                (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsContentResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsContentResolver"
         );
@@ -265,14 +264,17 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsResolver.sol:DotnsResolver",
             abi.encodeCall(
-                DotnsResolver.initialize, (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsResolver"
         );
         dotnsResolver = DotnsResolver(proxy);
     }
 
-    function _deployCostModelStack(address owner)
+    function _deployCostModelStack(
+        address owner,
+        address protocolRegistry_
+    )
         internal
         returns (address model, address registry)
     {
@@ -285,7 +287,7 @@ contract DotnsDeployer is BaseDeployer {
         registry = _broadcastDeployCreate3(
             owner,
             "DotnsCostModelRegistry.sol:DotnsCostModelRegistry",
-            abi.encode(owner),
+            abi.encode(protocolRegistry_),
             "DotnsCostModelRegistry"
         );
 
@@ -310,9 +312,7 @@ contract DotnsDeployer is BaseDeployer {
         proxy = _broadcastDeployUups(
             owner,
             "PopRules.sol:PopRules",
-            abi.encodeCall(
-                PopRules.initialize, (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
-            ),
+            abi.encodeCall(PopRules.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))),
             "PopRules"
         );
         popRules = PopRules(proxy);
@@ -330,7 +330,7 @@ contract DotnsDeployer is BaseDeployer {
             "DotnsRegistrarController.sol:DotnsRegistrarController",
             abi.encodeCall(
                 DotnsRegistrarController.initialize,
-                (owner, IDotnsProtocolRegistry(protocolRegistryProxy), 6 seconds, 1 days)
+                (IDotnsProtocolRegistry(protocolRegistryProxy), 6 seconds, 1 days)
             ),
             "DotnsRegistrarController"
         );
@@ -350,7 +350,6 @@ contract DotnsDeployer is BaseDeployer {
             abi.encodeCall(
                 DotnsNameEscrow.initialize,
                 (
-                    owner,
                     IDotnsProtocolRegistry(protocolRegistryProxy),
                     ESCROW_COOLDOWN,
                     ESCROW_REDEEM_WINDOW
@@ -372,7 +371,7 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsPopResolver.sol:DotnsPopResolver",
             abi.encodeCall(
-                DotnsPopResolver.initialize, (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsPopResolver.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsPopResolver"
         );
@@ -391,7 +390,7 @@ contract DotnsDeployer is BaseDeployer {
             "DotnsPopController.sol:DotnsPopController",
             abi.encodeCall(
                 DotnsPopController.initialize,
-                (owner, IDotnsProtocolRegistry(protocolRegistryProxy), DEFAULT_RESERVATION_DURATION)
+                (IDotnsProtocolRegistry(protocolRegistryProxy), DEFAULT_RESERVATION_DURATION)
             ),
             "DotnsPopController"
         );
@@ -424,8 +423,7 @@ contract DotnsDeployer is BaseDeployer {
             owner,
             "DotnsNameWhitelist.sol:DotnsNameWhitelist",
             abi.encodeCall(
-                DotnsNameWhitelist.initialize,
-                (owner, IDotnsProtocolRegistry(protocolRegistryProxy))
+                DotnsNameWhitelist.initialize, (IDotnsProtocolRegistry(protocolRegistryProxy))
             ),
             "DotnsNameWhitelist"
         );

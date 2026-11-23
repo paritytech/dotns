@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ProtocolOwnedUpgradeable} from "../utils/ProtocolOwnedUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -33,7 +31,7 @@ import {StoreAuth} from "../utils/StoreAuth.sol";
 ///      proxy storage, so the factory is upgraded in place: the bindings cannot be exported, so
 ///      a replacement reached by re-pointing `STORE_FACTORY` would start with an empty directory.
 /// @custom:security-contact admin@parity.io
-contract StoreFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, IStoreFactory {
+contract StoreFactory is Initializable, UUPSUpgradeable, ProtocolOwnedUpgradeable, IStoreFactory {
     /// @notice Beacon backing every `LabelStore` proxy.
     /// @dev Public getter name is interface-constrained by @custom:contract IStoreFactory.
     address public override labelStoreBeacon;
@@ -85,12 +83,8 @@ contract StoreFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, ISt
     ///      carries no ordering dependency on a prior deploy and exposes no argument through which
     ///      a mismatched implementation could reach a beacon. `protocolRegistry_` must be
     ///      non-zero, otherwise @custom:reverts InvalidProtocolRegistry.
-    /// @param initialOwner Account that owns this factory and can upgrade it and the store
-    ///        implementations.
     /// @param protocolRegistry_ The protocol registry for writer auth on label stores.
-    function initialize(address initialOwner, address protocolRegistry_) external initializer {
-        __Ownable_init(initialOwner);
-
+    function initialize(address protocolRegistry_) external initializer {
         require(protocolRegistry_ != address(0), InvalidProtocolRegistry(protocolRegistry_));
         // Probing the registry rejects a wrong address here rather than at the first store deploy,
         // and is what catches the two address arguments being passed the wrong way round.
@@ -147,7 +141,7 @@ contract StoreFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, ISt
     function upgradeLabelStoreImplementation(address newImplementation)
         external
         override
-        onlyOwner
+        onlyRootOrOwner
     {
         require(newImplementation != address(0), InvalidImplementation(newImplementation));
         ILabelStore(newImplementation).protocolRegistry();
@@ -196,7 +190,11 @@ contract StoreFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, ISt
     }
 
     /// @inheritdoc IStoreFactory
-    function upgradeUserStoreImplementation(address newImplementation) external override onlyOwner {
+    function upgradeUserStoreImplementation(address newImplementation)
+        external
+        override
+        onlyRootOrOwner
+    {
         require(newImplementation != address(0), InvalidImplementation(newImplementation));
         IUserStore(newImplementation).protocolRegistry();
         UpgradeableBeacon(userStoreBeacon).upgradeTo(newImplementation);
@@ -214,8 +212,13 @@ contract StoreFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, ISt
         versionString = IDotnsProtocolRegistry(protocolRegistry).protocolVersion();
     }
 
+    /// @inheritdoc ProtocolOwnedUpgradeable
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return protocolRegistry;
+    }
+
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 
     /// @notice Internal authorisation check deferred from the `onlyOwnerOrProtocol` modifier.
     function _onlyOwnerOrProtocol() internal view {

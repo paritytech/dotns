@@ -22,4 +22,17 @@ library SystemUtils {
     function callerIsRoot() internal view returns (bool root) {
         return ISystem(DotnsConstants.REVIVE_SYSTEM).callerIsRoot();
     }
+
+    /// @notice Returns whether substrate Root called this contract directly, and false when the
+    ///         System precompile does not answer.
+    /// @dev Same answer as @custom:function callerIsRoot on a chain with the precompile. Where the
+    ///      precompile is absent, such as the local simulation of a deployment script, the call
+    ///      fails and this returns false. A false answer only ever sends a gate to its stricter
+    ///      branch, so a failing call cannot grant Root.
+    /// @return root True when the precompile answers that the immediate caller is Root.
+    function tryCallerIsRoot() internal view returns (bool root) {
+        (bool ok, bytes memory ret) =
+            DotnsConstants.REVIVE_SYSTEM.staticcall(abi.encodeCall(ISystem.callerIsRoot, ()));
+        return ok && ret.length == 32 && abi.decode(ret, (bool));
+    }
 }

@@ -101,7 +101,7 @@ interface IStoreFactory {
         returns (address[] memory stores);
 
     /// @notice Upgrades the `LabelStore` implementation for every existing and future proxy.
-    /// @dev Callable by the factory owner only, otherwise
+    /// @dev Callable by Root or the bootstrap owner only, otherwise
     ///      @custom:reverts OwnableUnauthorizedAccount. `newImplementation` must be non-zero,
     ///      otherwise @custom:reverts InvalidImplementation. The candidate is sentinel-probed by
     ///      calling `ILabelStore.protocolRegistry` on it before the beacon is rotated; if the
@@ -146,7 +146,7 @@ interface IStoreFactory {
         returns (address[] memory stores);
 
     /// @notice Upgrades the `UserStore` implementation for every existing and future proxy.
-    /// @dev Callable by the factory owner only, otherwise
+    /// @dev Callable by Root or the bootstrap owner only, otherwise
     ///      @custom:reverts OwnableUnauthorizedAccount. `newImplementation` must be non-zero,
     ///      otherwise @custom:reverts InvalidImplementation. The candidate is sentinel-probed by
     ///      calling `IUserStore.protocolRegistry` on it before the beacon is rotated; if the

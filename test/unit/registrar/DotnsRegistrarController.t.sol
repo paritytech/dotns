@@ -24,7 +24,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         DotnsRegistrarController impl = new DotnsRegistrarController();
         bytes memory initData = abi.encodeCall(
             DotnsRegistrarController.initialize,
-            (owner, IDotnsProtocolRegistry(address(protocolRegistry)), 0, 1 days)
+            (IDotnsProtocolRegistry(address(protocolRegistry)), 0, 1 days)
         );
         vm.expectRevert(IDotnsRegistrarController.MinCommitmentAgeZero.selector);
         new ERC1967Proxy(address(impl), initData);
@@ -34,7 +34,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         DotnsRegistrarController impl = new DotnsRegistrarController();
         bytes memory initData = abi.encodeCall(
             DotnsRegistrarController.initialize,
-            (owner, IDotnsProtocolRegistry(address(protocolRegistry)), 10 seconds, 10 seconds)
+            (IDotnsProtocolRegistry(address(protocolRegistry)), 10 seconds, 10 seconds)
         );
         vm.expectRevert(IDotnsRegistrarController.MaxCommitmentAgeTooLow.selector);
         new ERC1967Proxy(address(impl), initData);
@@ -45,7 +45,7 @@ contract DotnsRegistrarControllerTest is BaseDotns {
         DotnsRegistrarController impl = new DotnsRegistrarController();
         bytes memory initData = abi.encodeCall(
             DotnsRegistrarController.initialize,
-            (owner, IDotnsProtocolRegistry(address(protocolRegistry)), 6 seconds, ceiling + 1)
+            (IDotnsProtocolRegistry(address(protocolRegistry)), 6 seconds, ceiling + 1)
         );
         vm.expectRevert(IDotnsRegistrarController.MaxCommitmentAgeTooHigh.selector);
         new ERC1967Proxy(address(impl), initData);

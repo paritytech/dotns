@@ -178,7 +178,7 @@ contract StoreBeaconVerificationTests is Test {
             address(
                 new ERC1967Proxy(
                     address(new StoreFactory()),
-                    abi.encodeCall(StoreFactory.initialize, (owner, foreignRegistry))
+                    abi.encodeCall(StoreFactory.initialize, (foreignRegistry))
                 )
             )
         );
@@ -196,8 +196,7 @@ contract StoreBeaconVerificationTests is Test {
         factory = StoreFactory(
             address(
                 new ERC1967Proxy(
-                    address(new StoreFactory()),
-                    abi.encodeCall(StoreFactory.initialize, (owner, registry))
+                    address(new StoreFactory()), abi.encodeCall(StoreFactory.initialize, (registry))
                 )
             )
         );

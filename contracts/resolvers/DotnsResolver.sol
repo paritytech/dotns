@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ProtocolOwnedUpgradeable} from "../utils/ProtocolOwnedUpgradeable.sol";
 import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
@@ -29,7 +27,7 @@ import {DotnsConstants} from "../utils/DotnsConstants.sol";
 contract DotnsResolver is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
+    ProtocolOwnedUpgradeable,
     ERC165Upgradeable,
     IDotnsResolver
 {
@@ -59,16 +57,8 @@ contract DotnsResolver is
     ///      @custom:reverts InvalidInitialization. Emits @custom:emits OwnershipTransferred when
     ///      `msg.sender` is recorded as the initial owner and @custom:emits Initialized once
     ///      setup completes.
-    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(
-        address initialOwner,
-        IDotnsProtocolRegistry registry
-    )
-        external
-        initializer
-    {
-        __Ownable_init(initialOwner);
+    function initialize(IDotnsProtocolRegistry registry) external initializer {
         __ERC165_init();
         protocolRegistry = registry;
     }
@@ -128,6 +118,12 @@ contract DotnsResolver is
     function version() external view virtual returns (string memory versionString) {
         versionString = protocolRegistry.protocolVersion();
     }
+
+    /// @inheritdoc ProtocolOwnedUpgradeable
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return address(protocolRegistry);
+    }
+
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 }

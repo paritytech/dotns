@@ -456,7 +456,7 @@ contract DeterministicDeploymentTest is Test {
         addr.storeFactory = deployer.deployUups(
             owner,
             "StoreFactory.sol:StoreFactory",
-            abi.encodeCall(StoreFactory.initialize, (owner, addr.protocolRegistry)),
+            abi.encodeCall(StoreFactory.initialize, (addr.protocolRegistry)),
             "StoreFactory"
         );
 
@@ -465,21 +465,21 @@ contract DeterministicDeploymentTest is Test {
         addr.registrar = deployer.deployUups(
             owner,
             "DotnsRegistrar.sol:DotnsRegistrar",
-            abi.encodeCall(DotnsRegistrar.initialize, (owner, "Dotns", "Dotns", registry)),
+            abi.encodeCall(DotnsRegistrar.initialize, ("Dotns", "Dotns", registry)),
             "DotnsRegistrar"
         );
 
         addr.reverseResolver = deployer.deployUups(
             owner,
             "DotnsReverseResolver.sol:DotnsReverseResolver",
-            abi.encodeCall(DotnsReverseResolver.initialize, (owner, registry)),
+            abi.encodeCall(DotnsReverseResolver.initialize, (registry)),
             "DotnsReverseResolver"
         );
 
         addr.registry = deployer.deployUups(
             owner,
             "DotnsRegistry.sol:DotnsRegistry",
-            abi.encodeCall(DotnsRegistry.initialize, (owner, registry)),
+            abi.encodeCall(DotnsRegistry.initialize, (registry)),
             "DotnsRegistry"
         );
 

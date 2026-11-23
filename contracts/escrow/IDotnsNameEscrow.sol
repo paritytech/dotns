@@ -406,8 +406,9 @@ interface IDotnsNameEscrow {
     function redeem(uint256 tokenId) external;
 
     /// @notice Updates the cooldown duration for future releases.
-    /// @dev Owner-only. Affects only releases recorded after this call; positions already released
-    ///      keep the `withdrawAvailableAt` snapshot taken at their release time. `newCooldown`
+    /// @dev Root or the bootstrap owner. Affects only releases recorded after this call; positions
+    /// already released keep the `withdrawAvailableAt` snapshot taken at their release time.
+    /// `newCooldown`
     ///      must be non-zero, otherwise @custom:reverts InvalidCooldown, and must not exceed the
     ///      contract's `MAX_COOLDOWN` upper bound, otherwise @custom:reverts CooldownTooLong; the
     ///      bound keeps the release-to-reclaim window short and protects the `uint64` cast in
@@ -416,11 +417,12 @@ interface IDotnsNameEscrow {
     function updateCooldown(uint256 newCooldown) external;
 
     /// @notice Updates the redeem window for future releases.
-    /// @dev Owner-only. Affects only releases recorded after this call; positions already released
-    ///      keep the `redeemableUntil` snapshot taken at their release time. `newRedeemWindow` must
+    /// @dev Root or the bootstrap owner. Affects only releases recorded after this call; positions
+    /// already released keep the `redeemableUntil` snapshot taken at their release time.
+    /// `newRedeemWindow` must
     ///      fall within `MIN_REDEEM_WINDOW` and `MAX_REDEEM_WINDOW` inclusive, otherwise
     ///      @custom:reverts RedeemWindowTooShort or @custom:reverts RedeemWindowTooLong. The floor
-    ///      keeps the window long enough to be worth having, so no setting the owner can choose
+    ///      keeps the window long enough to be worth having, so no setting governance can choose
     ///      leaves a holder without a usable chance to recover an accidental release; the ceiling
     ///      limits how long a released name can be held out of circulation and protects the
     ///      `uint64` cast in release from truncation. Emits @custom:emits RedeemWindowUpdated with

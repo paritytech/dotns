@@ -30,7 +30,7 @@ contract DeployRecords is BaseDeployer {
 
         _deployResolver(owner, protocolRegistry);
         _deployContentResolver(owner, protocolRegistry);
-        _deployCostModelStack(owner);
+        _deployCostModelStack(owner, protocolRegistry);
         _deployPopRules(owner, protocolRegistry);
 
         saveDeployments();
@@ -48,9 +48,7 @@ contract DeployRecords is BaseDeployer {
         proxy = _broadcastDeployUups(
             owner,
             "DotnsResolver.sol:DotnsResolver",
-            abi.encodeCall(
-                DotnsResolver.initialize, (owner, IDotnsProtocolRegistry(protocolRegistry))
-            ),
+            abi.encodeCall(DotnsResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
             "DotnsResolver"
         );
     }
@@ -66,7 +64,7 @@ contract DeployRecords is BaseDeployer {
             owner,
             "DotnsContentResolver.sol:DotnsContentResolver",
             abi.encodeCall(
-                DotnsContentResolver.initialize, (owner, IDotnsProtocolRegistry(protocolRegistry))
+                DotnsContentResolver.initialize, (IDotnsProtocolRegistry(protocolRegistry))
             ),
             "DotnsContentResolver"
         );
@@ -77,7 +75,13 @@ contract DeployRecords is BaseDeployer {
     /// @dev The `COST_MODEL` protocol-registry key points at the registry, not the model; the wire
     ///      stage sets that key. The flat model prices every admitted name at `BASE_DEPOSIT`;
     ///      `DotnsScarcityPricing` is held as a later candidate and is not registered here.
-    function _deployCostModelStack(address owner) internal returns (address registry) {
+    function _deployCostModelStack(
+        address owner,
+        address protocolRegistry
+    )
+        internal
+        returns (address registry)
+    {
         address model = _broadcastDeployCreate3(
             owner,
             "DotnsFlatPricing.sol:DotnsFlatPricing",
@@ -87,7 +91,7 @@ contract DeployRecords is BaseDeployer {
         registry = _broadcastDeployCreate3(
             owner,
             "DotnsCostModelRegistry.sol:DotnsCostModelRegistry",
-            abi.encode(owner),
+            abi.encode(protocolRegistry),
             "DotnsCostModelRegistry"
         );
 
@@ -112,7 +116,7 @@ contract DeployRecords is BaseDeployer {
         proxy = _broadcastDeployUups(
             owner,
             "PopRules.sol:PopRules",
-            abi.encodeCall(PopRules.initialize, (owner, IDotnsProtocolRegistry(protocolRegistry))),
+            abi.encodeCall(PopRules.initialize, (IDotnsProtocolRegistry(protocolRegistry))),
             "PopRules"
         );
     }

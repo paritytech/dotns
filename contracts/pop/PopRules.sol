@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ProtocolOwnedUpgradeable} from "../utils/ProtocolOwnedUpgradeable.sol";
 import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
@@ -40,7 +38,7 @@ import {IPersonhood} from "../external/personhood/IPersonhood.sol";
 contract PopRules is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
+    ProtocolOwnedUpgradeable,
     ERC165Upgradeable,
     IPopRules
 {
@@ -77,10 +75,8 @@ contract PopRules is
     /// @dev Runs once behind the proxy; subsequent calls trigger @custom:reverts
     ///      InvalidInitialization via the `initializer` modifier. Amounts come from the cost model
     ///      registered under `DotnsConstants.COST_MODEL`, so no price is seeded here.
-    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(address initialOwner, IDotnsProtocolRegistry registry) public initializer {
-        __Ownable_init(initialOwner);
+    function initialize(IDotnsProtocolRegistry registry) public initializer {
         __ERC165_init();
         protocolRegistry = registry;
     }
@@ -472,8 +468,13 @@ contract PopRules is
         return interfaceId == type(IPopRules).interfaceId || super.supportsInterface(interfaceId);
     }
 
+    /// @inheritdoc ProtocolOwnedUpgradeable
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return address(protocolRegistry);
+    }
+
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 
     /// @notice Returns the release this network declares it runs, read live from the protocol
     ///         registry so every dotNS contract reports one synchronised value.

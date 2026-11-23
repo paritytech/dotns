@@ -32,9 +32,7 @@ contract StoreFactoryTests is BaseDotns {
         vm.expectRevert(
             abi.encodeWithSelector(IStoreFactory.InvalidProtocolRegistry.selector, address(0))
         );
-        new ERC1967Proxy(
-            implementation, abi.encodeCall(StoreFactory.initialize, (owner, address(0)))
-        );
+        new ERC1967Proxy(implementation, abi.encodeCall(StoreFactory.initialize, (address(0))));
     }
 
     function test_initialize_deploys_both_beacons_and_implementations() public {
@@ -57,7 +55,7 @@ contract StoreFactoryTests is BaseDotns {
     function test_initialize_reverts_on_second_call() public {
         StoreFactory fresh = _freshFactory();
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        fresh.initialize(owner, address(protocolRegistry));
+        fresh.initialize(address(protocolRegistry));
     }
 
     /// @notice The implementation is inert: its initialisers are disabled at construction, so a
@@ -65,7 +63,7 @@ contract StoreFactoryTests is BaseDotns {
     function test_implementation_cannot_be_initialised_directly() public {
         StoreFactory implementation = new StoreFactory();
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        implementation.initialize(owner, address(protocolRegistry));
+        implementation.initialize(address(protocolRegistry));
     }
 
     /// @notice The factory is upgraded in place, and only by its owner, carrying its bindings
@@ -106,7 +104,7 @@ contract StoreFactoryTests is BaseDotns {
             address(
                 new ERC1967Proxy(
                     address(new StoreFactory()),
-                    abi.encodeCall(StoreFactory.initialize, (owner, address(protocolRegistry)))
+                    abi.encodeCall(StoreFactory.initialize, (address(protocolRegistry)))
                 )
             )
         );
