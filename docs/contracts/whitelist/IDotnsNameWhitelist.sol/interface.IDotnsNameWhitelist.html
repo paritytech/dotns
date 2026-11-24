@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnamewhitelist"><a class="header" href="#idotnsnamewhitelist">IDotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b42b4c3b176e8b735491b14605b29e9d3faea4ed/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/76551286806f95d63454ed4b9bf538a090cdd039/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsNameWhitelist</p>
 <p>Interface for the pre-launch name whitelist. A name is Open until governance either
@@ -192,7 +192,7 @@ mismatched hash. Claims are keyed by the beneficiary <code>user</code>, not the 
 relayer or a cross-chain sovereign account can submit a claim on a user's behalf and the
 name still binds to that user. All state is on-chain and queryable through views; no event
 indexing is required. The entire admin surface is substrate Root: the gates check
-<code>originIsRoot</code> and read no <code>msg.sender</code>, so Root's lack of an address is not a problem, and
+<code>callerIsRoot</code> and read no <code>msg.sender</code>, so Root's lack of an address is not a problem, and
 no signed account grants, revokes, reserves, or retunes a cap. The controllers hold only
 the <code>consume</code> hook.</p>
 <p><strong>Note:</strong>

@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnamewhitelist"><a class="header" href="#dotnsnamewhitelist">DotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b42b4c3b176e8b735491b14605b29e9d3faea4ed/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/76551286806f95d63454ed4b9bf538a090cdd039/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></p>
 <p><strong>Title:</strong>
@@ -197,7 +197,7 @@ behalf and the name binds to that user. All state is on-chain and queryable thro
 no event indexing is required. A name holds at most <code>maxClaimants</code> live claims, which
 bounds the loop that clears them on resolution. Resolving a name deletes its claims,
 refunding their storage deposit, so only reserved or won names persist. The entire admin
-surface is substrate Root: <code>SystemUtils.originIsRoot</code> is true through the proxy's
+surface is substrate Root: <code>SystemUtils.callerIsRoot</code> is true through the proxy's
 delegatecall frame, and no gate reads <code>msg.sender</code>, so Root's lack of an address is not a
 problem. No signed account grants, revokes, reserves, or retunes a cap; the owner's
 authority is upgrade only. The public and PoP controllers hold only the <code>consume</code> hook.

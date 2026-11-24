@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="systemutils"><a class="header" href="#systemutils">SystemUtils</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b42b4c3b176e8b735491b14605b29e9d3faea4ed/contracts/utils/SystemUtils.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/76551286806f95d63454ed4b9bf538a090cdd039/contracts/utils/SystemUtils.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 SystemUtils</p>
 <p>Shared access to revive's System precompile for dotNS contracts.</p>
@@ -189,18 +189,19 @@ address and interface are wired in one place rather than duplicated per consumer
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
-<h3 id="originisroot"><a class="header" href="#originisroot">originIsRoot</a></h3>
-<p>Returns whether the transaction-level origin is substrate Root.</p>
-<p>Reads the stack origin through <code>ISystem.originIsRoot</code>, which holds through a UUPS
-proxy's delegatecall frame where <code>callerIsRoot</code> returns false, and returns false
-rather than reverting on a non-Root origin. A Root origin has no account behind it,
-so a function gated on this must not read <code>msg.sender</code> in the frame Root calls:
-reading it traps. Calls it makes are fine, because they see a contract as caller.</p>
-<pre><code class="language-solidity">function originIsRoot() internal view returns (bool root);
+<h3 id="callerisroot"><a class="header" href="#callerisroot">callerIsRoot</a></h3>
+<p>Returns whether substrate Root called this contract directly.</p>
+<p>Reads <code>ISystem.callerIsRoot</code>, which is true only in the contract a Root dispatch
+targets, including behind its UUPS proxy, and false in any contract that contract
+calls. A contract reached later in the same Root transaction therefore cannot pass
+the check. A Root origin has no account behind it, so a function gated on this must
+not read <code>msg.sender</code> in the frame Root calls: reading it traps. Calls it makes are
+fine, because they see a contract as caller.</p>
+<pre><code class="language-solidity">function callerIsRoot() internal view returns (bool root);
 </code></pre>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>root</code></td><td><code>bool</code></td><td>True when the transaction origin is Root.</td></tr>
+<tr><td><code>root</code></td><td><code>bool</code></td><td>True when the immediate caller is Root.</td></tr>
 </tbody></table>
 </div>
                     </main>

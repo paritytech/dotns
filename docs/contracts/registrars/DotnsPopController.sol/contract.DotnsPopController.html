@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b42b4c3b176e8b735491b14605b29e9d3faea4ed/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/76551286806f95d63454ed4b9bf538a090cdd039/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a>, <a href="/contracts/registrars/IDotnsPopControllerLegacy.sol/interface.IDotnsPopControllerLegacy.html">IDotnsPopControllerLegacy</a>, <a href="/contracts/registrars/IDotnsPopGovernance.sol/interface.IDotnsPopGovernance.html">IDotnsPopGovernance</a></p>
 <p><strong>Title:</strong>
@@ -1419,16 +1419,13 @@ call; this contract stamped it, so PopRules' ownership gate admits the move.</p>
 </code></pre>
 <h3 id="_onlyroot"><a class="header" href="#_onlyroot">_onlyRoot</a></h3>
 <p>Internal check enforcing a Root origin.</p>
-<p>Authorises a call when @custom:function SystemUtils.originIsRoot is true, and
+<p>Authorises a call when @custom:function SystemUtils.callerIsRoot is true, and
 reverts with NotRoot otherwise. <code>msg.sender</code> is deliberately not consulted: a
 Root origin has no account behind it, so reading <code>msg.sender</code> traps. That holds
 for this frame and any delegatecall sharing it; a nested call sees the calling
-contract as its sender and reads normally.
-The check also holds for the whole Root transaction rather than the entry frame
-alone, so nothing reachable from an onlyRoot entrypoint may call a
-user-controlled address: such a callee could re-enter a gated function and still
-pass. Every call out of this contract goes to a protocol contract resolved
-through the registry.</p>
+contract as its sender and reads normally. The check passes only when Root called
+this controller directly, so a contract reached later in the same Root transaction
+cannot re-enter a gated function.</p>
 <pre><code class="language-solidity">function _onlyRoot() internal view;
 </code></pre>
 <h3 id="_authorizeupgrade"><a class="header" href="#_authorizeupgrade">_authorizeUpgrade</a></h3>

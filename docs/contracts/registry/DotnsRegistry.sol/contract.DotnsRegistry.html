@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistry"><a class="header" href="#dotnsregistry">DotnsRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b42b4c3b176e8b735491b14605b29e9d3faea4ed/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/76551286806f95d63454ed4b9bf538a090cdd039/contracts/registry/DotnsRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, <a href="/contracts/registry/IDotnsRegistry.sol/interface.IDotnsRegistry.html">IDotnsRegistry</a></p>
 <p><strong>Title:</strong>
@@ -465,7 +465,7 @@ than deferring to the burned token. Emits @custom:emits RecordsCleared,</p>
 <h3 id="revokesubname"><a class="header" href="#revokesubname">revokeSubname</a></h3>
 <p>Deletes one subname of <code>parentNode</code>, together with its records and every subname
 beneath it, on governance's authority rather than the parent's.</p>
-<p>Reads no <code>msg.sender</code> (see SystemUtils.originIsRoot).</p>
+<p>Reads no <code>msg.sender</code> (see SystemUtils.callerIsRoot).</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
@@ -685,7 +685,7 @@ trailing dot, and the count is one more than the number of dots.</p>
 <p>Deletes one subname of <code>parentNode</code>, its records and every subname beneath it.</p>
 <p>Shared by @custom:function deleteSubname and @custom:function revokeSubname, which
 differ only in who may call them. Reads no <code>msg.sender</code>, so it also runs under a Root
-origin (see SystemUtils.originIsRoot).</p>
+origin (see SystemUtils.callerIsRoot).</p>
 <pre><code class="language-solidity">function _deleteSubname(bytes32 parentNode, bytes32 labelhash) internal;
 </code></pre>
 <p><strong>Parameters</strong></p>

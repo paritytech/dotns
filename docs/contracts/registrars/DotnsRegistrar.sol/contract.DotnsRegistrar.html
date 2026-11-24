@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsregistrar"><a class="header" href="#dotnsregistrar">DotnsRegistrar</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b42b4c3b176e8b735491b14605b29e9d3faea4ed/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/76551286806f95d63454ed4b9bf538a090cdd039/contracts/registrars/DotnsRegistrar.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, OwnableUpgradeable, ERC721Upgradeable, <a href="/contracts/registrars/IDotnsRegistrar.sol/interface.IDotnsRegistrar.html">IDotnsRegistrar</a></p>
 <p><strong>Title:</strong>
@@ -323,7 +323,7 @@ mint an unlocked one. Public registrations from any other controller stay transf
 <h3 id="revoke"><a class="header" href="#revoke">revoke</a></h3>
 <p>Revokes a name: clears it, settles its escrow position, and burns the token so the
 name can be registered again.</p>
-<p>Reads no <code>msg.sender</code> (see SystemUtils.originIsRoot). The burn branch of <code>_update</code>
+<p>Reads no <code>msg.sender</code> (see SystemUtils.callerIsRoot). The burn branch of <code>_update</code>
 returns before the transfer gate, which does read it.</p>
 <p><strong>Notes:</strong></p>
 <ul>

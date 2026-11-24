@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="isystem"><a class="header" href="#isystem">ISystem</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/b42b4c3b176e8b735491b14605b29e9d3faea4ed/contracts/external/revive/ISystem.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/76551286806f95d63454ed4b9bf538a090cdd039/contracts/external/revive/ISystem.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 ISystem</p>
 <p>Minimal subset of revive's System precompile, vendored from
@@ -192,16 +192,11 @@ rather than mirrored wholesale, so the audit surface stays small
 and any upstream change is a deliberate review event.</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="callerisroot"><a class="header" href="#callerisroot">callerIsRoot</a></h3>
-<p>Returning true iff the immediate caller's substrate origin is <code>Root</code>.
-Reverts on a <code>RuntimeOrigin::Signed(_)</code> or non-Root origin.</p>
+<p>Returns true iff the calling contract was called directly by a <code>Root</code> origin.</p>
+<p>Delegate calls are skipped, so it holds in a UUPS implementation behind the proxy
+Root called. Returns false for a signed origin and in any contract reached through
+another contract.</p>
 <pre><code class="language-solidity">function callerIsRoot() external view returns (bool);
-</code></pre>
-<h3 id="originisroot"><a class="header" href="#originisroot">originIsRoot</a></h3>
-<p>Returning true iff the transaction-level substrate origin is <code>Root</code>.</p>
-<p>Reads the stack origin rather than the immediate caller, so it holds through a UUPS
-proxy's delegatecall frame where <code>callerIsRoot</code> returns false. Returns false, rather
-than reverting, on a non-Root origin.</p>
-<pre><code class="language-solidity">function originIsRoot() external view returns (bool);
 </code></pre>
 
                     </main>
