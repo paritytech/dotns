@@ -417,10 +417,10 @@ contract EscrowHandler is Test {
         // Restore the default origin on both paths before unwinding. A revert does not undo a
         // mock, and a sticky Root origin would put a later reserved registration on its Root
         // branch.
-        _mockOriginIsRoot(true);
+        _mockCallerIsRoot(true);
         (bool ok, bytes memory err) =
             address(registrar).call(abi.encodeCall(registrar.revoke, (tokenId)));
-        _mockOriginIsRoot(false);
+        _mockCallerIsRoot(false);
         if (!ok) {
             assembly {
                 revert(add(err, 32), mload(err))
@@ -434,11 +434,11 @@ contract EscrowHandler is Test {
         ghost_pendingCredits += outstanding;
     }
 
-    /// @notice Mocks the revive `originIsRoot()` query to return `returnValue`.
-    function _mockOriginIsRoot(bool returnValue) internal {
+    /// @notice Mocks the revive `callerIsRoot()` query to return `returnValue`.
+    function _mockCallerIsRoot(bool returnValue) internal {
         vm.mockCall(
             DotnsConstants.REVIVE_SYSTEM,
-            abi.encodeWithSelector(ISystem.originIsRoot.selector),
+            abi.encodeWithSelector(ISystem.callerIsRoot.selector),
             abi.encode(returnValue)
         );
     }

@@ -161,10 +161,10 @@ contract DotnsRegistrar is
     }
 
     /// @inheritdoc IDotnsRegistrar
-    /// @dev Reads no `msg.sender` (see SystemUtils.originIsRoot). The burn branch of `_update`
+    /// @dev Reads no `msg.sender` (see SystemUtils.callerIsRoot). The burn branch of `_update`
     /// returns before the transfer gate, which does read it.
     function revoke(uint256 tokenId) external override {
-        require(SystemUtils.originIsRoot(), NotRoot());
+        require(SystemUtils.callerIsRoot(), NotRoot());
         require(!_soulbound[tokenId], NameSoulbound(tokenId));
         _revoke(tokenId);
     }
@@ -264,7 +264,7 @@ contract DotnsRegistrar is
 
         // A burn is reachable only from `_revoke`, which has already settled the escrow position
         // and the registry record. Nothing is mirrored for a name that stops existing, and nothing
-        // below may run, because it reads `msg.sender` (see SystemUtils.originIsRoot).
+        // below may run, because it reads `msg.sender` (see SystemUtils.callerIsRoot).
         if (to == address(0)) return from;
 
         // Soulbound names are non-transferable, including a move to the sender's own address. It
