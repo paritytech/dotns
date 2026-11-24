@@ -43,6 +43,7 @@ IDotnsResolver
 IPopRules
 IDotnsProtocolRegistry
 IDotnsNameEscrow
+IDotnsNameEscrowGovernance
 IDotnsNameEscrowRevocation
 IDotnsPopController
 IDotnsPopControllerLegacy
