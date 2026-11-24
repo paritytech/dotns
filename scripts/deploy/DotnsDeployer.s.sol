@@ -460,7 +460,7 @@ contract DotnsDeployer is BaseDeployer {
     }
 
     function _verifyDeployment(Deployment memory deployment, address expectedOwner) internal view {
-        _verifyOwnership(deployment, expectedOwner);
+        _verifyOwnership(expectedOwner);
         _verifyRegistryKeys(deployment, expectedOwner);
         _verifyRegistryPointers(deployment);
         _verifyControllerAuthorisation(deployment);
@@ -476,47 +476,11 @@ contract DotnsDeployer is BaseDeployer {
         console.log("=== Deployment verification complete ===");
     }
 
-    function _verifyOwnership(Deployment memory deployment, address expectedOwner) internal view {
-        _assertOwner(
-            DotnsRegistrar(deployment.registrar).owner(), expectedOwner, "Registrar: wrong owner"
-        );
-        _assertOwner(
-            DotnsRegistrarController(deployment.registrarController).owner(),
-            expectedOwner,
-            "Controller: wrong owner"
-        );
-        _assertOwner(
-            DotnsRegistry(deployment.registry).owner(), expectedOwner, "Registry: wrong owner"
-        );
-        _assertOwner(
-            DotnsReverseResolver(deployment.reverseResolver).owner(),
-            expectedOwner,
-            "ReverseResolver: wrong owner"
-        );
-        _assertOwner(
-            DotnsResolver(deployment.resolver).owner(), expectedOwner, "Resolver: wrong owner"
-        );
-        _assertOwner(
-            DotnsContentResolver(deployment.contentResolver).owner(),
-            expectedOwner,
-            "ContentResolver: wrong owner"
-        );
-        _assertOwner(PopRules(deployment.popRules).owner(), expectedOwner, "PopRules: wrong owner");
-        _assertOwner(
-            DotnsNameEscrow(payable(deployment.nameEscrow)).owner(),
-            expectedOwner,
-            "NameEscrow: wrong owner"
-        );
-        _assertOwner(
-            DotnsPopController(deployment.popController).owner(),
-            expectedOwner,
-            "PopController: wrong owner"
-        );
-        _assertOwner(
-            DotnsPopResolver(deployment.popResolver).owner(),
-            expectedOwner,
-            "PopResolver: wrong owner"
-        );
+    function _verifyOwnership(address expectedOwner) internal view {
+        // Every other contract reads its bootstrap owner from the protocol registry it was
+        // initialised with, so its `owner()` proves nothing on its own: a proxy bound to a foreign
+        // registry reports whatever that registry answers. The registry's owner here, and each
+        // pointer in `_verifyRegistryPointers`, bind the deployment to `expectedOwner`.
         _assertOwner(protocolRegistry.owner(), expectedOwner, "ProtocolRegistry: wrong owner");
     }
 
@@ -611,6 +575,11 @@ contract DotnsDeployer is BaseDeployer {
             address(DotnsNameWhitelist(deployment.nameWhitelist).protocolRegistry()),
             expected,
             "NameWhitelist: not wired"
+        );
+        _assertPointer(
+            address(DotnsCostModelRegistry(deployment.costModelRegistry).protocolRegistry()),
+            expected,
+            "CostModelRegistry: not wired"
         );
         // StoreFactory's pointer is asserted in `_verifyStoreImplementations`, with the rest of
         // what has to be read out of its proxy storage.
