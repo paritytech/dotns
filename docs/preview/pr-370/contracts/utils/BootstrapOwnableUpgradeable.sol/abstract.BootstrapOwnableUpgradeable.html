@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="bootstrapownableupgradeable"><a class="header" href="#bootstrapownableupgradeable">BootstrapOwnableUpgradeable</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/bef91a6fddc7a52b74cb61a9fb3f95f7dd48f996/contracts/utils/BootstrapOwnableUpgradeable.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c7a60789f3166ae2cda90394e7e96aadf49ba426/contracts/utils/BootstrapOwnableUpgradeable.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 OwnableUpgradeable</p>
 <p><strong>Title:</strong>
@@ -189,8 +189,10 @@ BootstrapOwnableUpgradeable</p>
 owner while one is set.</p>
 <p>The owner exists only to configure a fresh deployment. Ownership cannot move to another
 account: the only transition is @custom:function renounceOwnership, after which Root is
-the only governance. Root can also renounce, so governance can remove a bootstrap owner
-that never renounced. <code>DotnsProtocolRegistry</code> holds the one bootstrap owner of a
+the only governance. Only Root can renounce: a Root call passes the gate behind a proxy
+only on a runtime where <code>callerIsRoot</code> works there, so the renounce proves that Root can
+still govern after it. An owner renouncing on a runtime without that would leave no
+account able to upgrade. <code>DotnsProtocolRegistry</code> holds the one bootstrap owner of a
 deployment. Every other dotNS contract reads it from there through</p>
 <p><strong>Notes:</strong></p>
 <ul>
@@ -222,9 +224,13 @@ slot.</p>
 </code></pre>
 <h3 id="renounceownership"><a class="header" href="#renounceownership">renounceOwnership</a></h3>
 <p>Removes the bootstrap owner, leaving Root as the only governance.</p>
-<p>Root or the owner, otherwise @custom:reverts OwnableUnauthorizedAccount.
-Irreversible: no function sets an owner again.</p>
-<pre><code class="language-solidity">function renounceOwnership() public override onlyRootOrOwner;
+<p>Root only, otherwise @custom:reverts RenounceRequiresRoot. Irreversible: no function
+sets an owner again.</p>
+<pre><code class="language-solidity">function renounceOwnership() public virtual override onlyRoot;
+</code></pre>
+<h3 id="onlyroot"><a class="header" href="#onlyroot">onlyRoot</a></h3>
+<p>Restricts a call to a direct Root dispatch.</p>
+<pre><code class="language-solidity">modifier onlyRoot() ;
 </code></pre>
 <h3 id="_checkrootorowner"><a class="header" href="#_checkrootorowner">_checkRootOrOwner</a></h3>
 <p>Internal check behind @custom:modifier onlyRootOrOwner.</p>
@@ -236,6 +242,10 @@ Once the owner is renounced, <code>owner()</code> is zero and no account passes.
 <h3 id="ownershiptransferdisabled"><a class="header" href="#ownershiptransferdisabled">OwnershipTransferDisabled</a></h3>
 <p>Thrown by @custom:function transferOwnership, which is disabled.</p>
 <pre><code class="language-solidity">error OwnershipTransferDisabled();
+</code></pre>
+<h3 id="renouncerequiresroot"><a class="header" href="#renouncerequiresroot">RenounceRequiresRoot</a></h3>
+<p>Thrown by @custom:function renounceOwnership when the caller is not Root.</p>
+<pre><code class="language-solidity">error RenounceRequiresRoot();
 </code></pre>
 
                     </main>

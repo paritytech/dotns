@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsprotocolregistry"><a class="header" href="#idotnsprotocolregistry">IDotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/bef91a6fddc7a52b74cb61a9fb3f95f7dd48f996/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/c7a60789f3166ae2cda90394e7e96aadf49ba426/contracts/registry/IDotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsProtocolRegistry</p>
 <p><strong>Author:</strong>
@@ -364,7 +364,18 @@ emits: ExpectedCodehashSet.</p>
 <p>Thrown when a declared protocol version is empty or does not start with a digit.</p>
 <pre><code class="language-solidity">error InvalidProtocolVersion();
 </code></pre>
-
+<h3 id="ownerstillset"><a class="header" href="#ownerstillset">OwnerStillSet</a></h3>
+<p>Thrown by <code>renounceOwnership</code> when a registered contract still answers a non-zero
+<code>owner()</code> after the bootstrap owner is cleared.</p>
+<pre><code class="language-solidity">error OwnerStillSet(bytes32 key, address target, address owner);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>key</code></td><td><code>bytes32</code></td><td>Registry key of the contract.</td></tr>
+<tr><td><code>target</code></td><td><code>address</code></td><td>The contract.</td></tr>
+<tr><td><code>owner</code></td><td><code>address</code></td><td>The owner it still reports.</td></tr>
+</tbody></table>
+</div>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
