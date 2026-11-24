@@ -67,7 +67,7 @@ contract DotnsProtocolRegistry is
     ///      bare label without a dot (e.g. `dot`, `paseo`); it must be a single DNS label,
     ///      otherwise @custom:reverts InvalidTld. The TLD is fixed here because changing it after
     ///      names exist would reroot every node.
-    /// @param initialOwner Bootstrap owner, which governs alongside Root until it renounces.
+    /// @param initialOwner Bootstrap owner, which governs alongside Root until Root renounces it.
     /// @param tldLabel Bare TLD label, without the leading dot.
     function initialize(address initialOwner, string calldata tldLabel) external initializer {
         __Ownable_init(initialOwner);
