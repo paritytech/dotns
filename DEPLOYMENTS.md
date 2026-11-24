@@ -301,7 +301,7 @@ Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label 
 
 That is the point of the design. As a security measure, no single key can grant a name; a grant costs a referendum, or on a test network a sudo-dispatched Root call.
 
-Two bootstrap-owner routes reach the same outcome while the owner holds the role. `DotnsProtocolRegistry.set` is `onlyRootOrOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. The same key gates the other paths too: `register` and gateway personhood issuance read it to keep granted names for their grantees, so a whitelist that reverts, or reports a grantee for every name, blocks both. `DotnsRegistrar.addController` is `onlyRootOrOwner`, and a controller can mint any available name directly, without the whitelist at all. Both routes close when the owner renounces on `DotnsProtocolRegistry`, after which only Root reaches them.
+Two bootstrap-owner routes reach the same outcome while the owner holds the role. `DotnsProtocolRegistry.set` is `onlyRootOrOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. The same key gates the other paths too: `register` and gateway personhood issuance read it to keep granted names for their grantees, so a whitelist that reverts, or reports a grantee for every name, blocks both. `DotnsRegistrar.addController` is `onlyRootOrOwner`, and a controller can mint any available name directly, without the whitelist at all. Both routes close when Root renounces the bootstrap owner on `DotnsProtocolRegistry`, after which only Root reaches them.
 
 The controller carries no roles either. It reads grants and consumes them, so `setRole` on the controller reverts with `UnsupportedRole`.
 
@@ -314,6 +314,8 @@ Root origin
   └─ Revive.call { dest: <DotnsNameWhitelist H160>, value: 0, data: <EVM calldata> }
        └─ grantName(string,address)
 ```
+
+`Revive.call` must target the dotNS contract itself. Every Root gate checks that Root called that contract directly, so a Root call relayed through another contract, such as `Multicall3` or a batching helper, reaches the gate with the relay as caller and is refused.
 
 `cast` can be used for the innermost layer to encode `data`:
 
@@ -389,7 +391,7 @@ The reference copies are throwaway and are deployed with broadcasting paused, so
 
 That second step is what rejects a genuine artefact deployed against someone else's constructor arguments: a real `DotnsPopLens` pointed at an attacker's protocol registry has the right length and shape, and differs only in the values its constructor wrote.
 
-**What the bytecode check cannot cover.** Immutables whose values are address-derived are indistinguishable between an honest deploy and any other, because they legitimately differ every time. Only `UUPSUpgradeable.__self` is in that class now, and every UUPS implementation carries it, so the masking handles it uniformly. `StoreFactory` used to be the case that mattered, because it minted its own beacons into immutables; behind a proxy it holds the beacons and `protocolRegistry` in storage and carries no immutables of its own, so its implementation compares exactly. Immutables set from a constructor argument stay inside the comparison, which is what rejects an artefact built against someone else's addresses: `DotnsPopLens.protocolRegistry` and `DotnsFlatPricing.deposit` are the two that remain. An owner is never covered here, since `Ownable` keeps it in storage rather than runtime code; the wire stage's `owner()` assertions cover it instead.
+**What the bytecode check cannot cover.** Immutables whose values are address-derived are indistinguishable between an honest deploy and any other, because they legitimately differ every time. Only `UUPSUpgradeable.__self` is in that class now, and every UUPS implementation carries it, so the masking handles it uniformly. `StoreFactory` used to be the case that mattered, because it minted its own beacons into immutables; behind a proxy it holds the beacons and `protocolRegistry` in storage and carries no immutables of its own, so its implementation compares exactly. Immutables set from a constructor argument stay inside the comparison, which is what rejects an artefact built against someone else's addresses: `DotnsPopLens.protocolRegistry` and `DotnsFlatPricing.deposit` are the two that remain. Proxy storage is never covered here, since it is not runtime code: that includes the protocol registry's owner and each contract's `protocolRegistry` pointer. Every contract reads its bootstrap owner through that pointer, so a genuine proxy initialised against someone else's registry would report any owner that registry chooses. The pipeline therefore adopts an existing proxy only when `DOTNS_RESUME=true` marks the run as a resume, and the wire stage asserts the protocol registry's owner and that every contract points at this deployment's protocol registry.
 
 The beacons are checked separately. The verification stage asserts that each beacon's code is the `UpgradeableBeacon` artefact, that the factory owns it, and that its implementation is the `LabelStore` or `UserStore` artefact this release builds. None of the three contracts carries immutables, so each comparison is exact.
 

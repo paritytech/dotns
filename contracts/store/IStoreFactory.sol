@@ -65,7 +65,7 @@ interface IStoreFactory {
     function protocolRegistry() external view returns (address registry);
 
     /// @notice Deploys a `LabelStore` beacon-proxy bound to `user`.
-    /// @dev Callable by the factory owner or a component named in
+    /// @dev Callable by Root, the bootstrap owner or a component named in
     ///      @custom:function StoreAuth.isStoreWriter; any other caller
     ///      @custom:reverts NotAuthorised. `user` must be non-zero,
     ///      otherwise @custom:reverts InvalidUser. The user must not already have a

@@ -73,6 +73,7 @@ contract DotnsPopResolver is
     /// @param registry Protocol-level address registry used for writer resolution.
     function initialize(IDotnsProtocolRegistry registry) external initializer {
         __ERC165_init();
+        _requireProtocolRegistry(address(registry));
         protocolRegistry = registry;
     }
 

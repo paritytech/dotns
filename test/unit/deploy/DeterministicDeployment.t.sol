@@ -394,14 +394,32 @@ contract DeterministicDeploymentTest is Test {
             initData,
             "DotnsProtocolRegistry"
         );
+        // CREATE3 is permissionless, so a proxy already at the address may not be this
+        // deployment's: without an explicit resume the run refuses to adopt it. Both halves stay
+        // in one test because `vm.setEnv` is process-wide and tests run in parallel.
+        vm.expectRevert(
+            bytes(
+                "DotnsProtocolRegistry: proxy already deployed. Set DOTNS_RESUME=true to adopt it "
+                "when resuming this deployment, or bump DOTNS_SALT_VERSION."
+            )
+        );
+        deployer.deployUups(
+            owner,
+            "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
+            initData,
+            "DotnsProtocolRegistry"
+        );
+
         // A resumed run adopts the proxy and must NOT call initialize again, which
         // would revert on an already-initialised proxy.
+        vm.setEnv("DOTNS_RESUME", "true");
         address second = deployer.deployUups(
             owner,
             "DotnsProtocolRegistry.sol:DotnsProtocolRegistry",
             initData,
             "DotnsProtocolRegistry"
         );
+        vm.setEnv("DOTNS_RESUME", "false");
         assertEq(second, first, "re-run adopts the existing proxy");
         assertEq(DotnsProtocolRegistry(second).owner(), owner, "proxy stays initialised");
     }

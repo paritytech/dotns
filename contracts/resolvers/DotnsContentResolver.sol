@@ -75,6 +75,7 @@ contract DotnsContentResolver is
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
     function initialize(IDotnsProtocolRegistry registry) external initializer {
         __ERC165_init();
+        _requireProtocolRegistry(address(registry));
         protocolRegistry = registry;
     }
 

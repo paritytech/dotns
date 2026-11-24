@@ -104,6 +104,7 @@ contract DotnsRegistrarController is
         require(maxAge > minAge, MaxCommitmentAgeTooLow());
         require(maxAge <= MAX_ALLOWED_COMMITMENT_AGE, MaxCommitmentAgeTooHigh());
 
+        _requireProtocolRegistry(address(registry));
         protocolRegistry = registry;
 
         minCommitmentAge = minAge;

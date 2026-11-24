@@ -299,9 +299,24 @@ abstract contract BaseDeployer is Script {
         // between deployment and initialisation for a third party to claim ownership.
         if (proxyExisted && initialiserCalldata.length != 0) {
             // The proxy keeps the configuration its first deploy set, so every
-            // initialiser argument computed for this run is discarded. Values
-            // without a setter (such as the TLD) cannot be corrected afterwards,
-            // so surface it rather than reporting success.
+            // initialiser argument computed for this run is discarded. CREATE3 is
+            // permissionless, so the proxy may also belong to someone else: a
+            // third party can deploy the genuine implementation at this address
+            // with its own initialiser arguments, such as a foreign protocol
+            // registry. Adopting needs an explicit DOTNS_RESUME=true, and
+            // WireDeployments then checks every registry pointer.
+            if (!vm.envOr("DOTNS_RESUME", false)) {
+                // Foundry keeps a broadcast open across a revert, so close it first.
+                _activeBroadcaster = address(0);
+                vm.stopBroadcast();
+                revert(
+                    string.concat(
+                        label,
+                        ": proxy already deployed. Set DOTNS_RESUME=true to adopt it when resuming ",
+                        "this deployment, or bump DOTNS_SALT_VERSION."
+                    )
+                );
+            }
             console.log("WARNING: adopted existing proxy, initialiser skipped for", label);
             console.log("         on-chain configuration may differ from this run's inputs");
         }

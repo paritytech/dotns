@@ -16,6 +16,7 @@ import {LabelStore} from "./LabelStore.sol";
 import {UserStore} from "./UserStore.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 import {StoreAuth} from "../utils/StoreAuth.sol";
+import {SystemUtils} from "../utils/SystemUtils.sol";
 
 /// @title StoreFactory
 /// @notice Factory for the two per-user dotNS store types, sharing one factory contract and two
@@ -59,7 +60,7 @@ contract StoreFactory is Initializable, UUPSUpgradeable, ProtocolOwnedUpgradeabl
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
     uint256[50] private __gap;
 
-    /// @notice Restricts `deployLabelStoreFor` to the owner or a component named in
+    /// @notice Restricts `deployLabelStoreFor` to Root, the bootstrap owner or a component named in
     /// @custom:function StoreAuth.isStoreWriter.
     modifier onlyOwnerOrProtocol() {
         _onlyOwnerOrProtocol();
@@ -221,7 +222,9 @@ contract StoreFactory is Initializable, UUPSUpgradeable, ProtocolOwnedUpgradeabl
     function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 
     /// @notice Internal authorisation check deferred from the `onlyOwnerOrProtocol` modifier.
+    /// @dev Checks Root first, so a Root dispatch never reads `msg.sender`.
     function _onlyOwnerOrProtocol() internal view {
+        if (SystemUtils.tryCallerIsRoot()) return;
         if (msg.sender == owner()) return;
         require(StoreAuth.isStoreWriter(protocolRegistry, msg.sender), NotAuthorised(msg.sender));
     }

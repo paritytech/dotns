@@ -8,6 +8,8 @@ import {
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {BaseDotns} from "../../base/BaseDotns.t.sol";
 import {CallerAwareSystem, RootReachedContract} from "./RootGate.t.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
@@ -24,6 +26,66 @@ import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocol
 import {IStoreFactory} from "../../../contracts/store/IStoreFactory.sol";
 import {LabelStore} from "../../../contracts/store/LabelStore.sol";
 import {UserStore} from "../../../contracts/store/UserStore.sol";
+import {StoreFactory} from "../../../contracts/store/StoreFactory.sol";
+import {PopRules} from "../../../contracts/pop/PopRules.sol";
+import {DotnsPopController} from "../../../contracts/registrars/DotnsPopController.sol";
+import {DotnsRegistrarController} from "../../../contracts/registrars/DotnsRegistrarController.sol";
+import {DotnsContentResolver} from "../../../contracts/resolvers/DotnsContentResolver.sol";
+import {DotnsPopResolver} from "../../../contracts/resolvers/DotnsPopResolver.sol";
+import {DotnsResolver} from "../../../contracts/resolvers/DotnsResolver.sol";
+import {DotnsReverseResolver} from "../../../contracts/resolvers/DotnsReverseResolver.sol";
+import {DotnsNameWhitelist} from "../../../contracts/whitelist/DotnsNameWhitelist.sol";
+
+/// @notice An implementation as it was before the shared owner: its owner sits in its own
+///         `OwnableUpgradeable` slot and authorises its upgrades.
+contract LegacyOwnedImplementation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+    IDotnsProtocolRegistry public protocolRegistry;
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address initialOwner,
+        IDotnsProtocolRegistry registry
+    )
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
+        protocolRegistry = registry;
+    }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+}
+
+/// @notice The same contract after the migration: same layout, owner read from the registry.
+contract MigratedImplementation is Initializable, UUPSUpgradeable, ProtocolOwnedUpgradeable {
+    IDotnsProtocolRegistry public protocolRegistry;
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return address(protocolRegistry);
+    }
+
+    function _authorizeUpgrade(address) internal override onlyRootOrOwner {}
+}
+
+/// @notice A superseded cost model registry with a plain owner of its own.
+contract LegacyCostModelRegistry is Ownable {
+    constructor(address owner_) Ownable(owner_) {}
+}
+
+contract NoOwnerContract {}
+
+contract RevertingOwnerContract {
+    function owner() external pure returns (address) {
+        revert("no owner");
+    }
+}
 
 /// @notice Every function behind the bootstrap owner gate, including the upgrade of every proxy,
 ///         accepts a direct Root dispatch and the owner while one is set, and refuses everyone
@@ -40,6 +102,8 @@ contract BootstrapOwnerGateTests is BaseDotns {
 
     CallerAwareSystem private constant SYSTEM = CallerAwareSystem(DotnsConstants.REVIVE_SYSTEM);
     bytes32 private constant TEST_KEY = bytes32("bootstrapGateTest");
+    /// @dev Slot of the length of `DotnsProtocolRegistry._keys`.
+    bytes32 private constant KEYS_LENGTH_SLOT = bytes32(uint256(6));
     /// @dev ERC-7201 slot of `OwnableUpgradeable`'s owner.
     bytes32 private constant OWNABLE_STORAGE =
         0x9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c199300;
@@ -63,8 +127,7 @@ contract BootstrapOwnerGateTests is BaseDotns {
     }
 
     function test_one_renounce_on_the_protocol_registry_ends_the_bootstrap_everywhere() public {
-        vm.prank(owner);
-        protocolRegistry.renounceOwnership();
+        _renounce();
 
         address[] memory owned = _ownedContracts();
         for (uint256 i; i < owned.length; ++i) {
@@ -88,12 +151,14 @@ contract BootstrapOwnerGateTests is BaseDotns {
         address[] memory proxies = _followers();
         for (uint256 i; i < proxies.length; ++i) {
             vm.prank(owner);
-            vm.expectRevert(ProtocolOwnedUpgradeable.OwnershipHeldByProtocolRegistry.selector);
-            OwnableUpgradeable(proxies[i]).renounceOwnership();
+            (bool renounced,) =
+                proxies[i].call(abi.encodeCall(OwnableUpgradeable.renounceOwnership, ()));
+            assertFalse(renounced, vm.toString(proxies[i]));
 
             vm.prank(owner);
-            vm.expectRevert(ProtocolOwnedUpgradeable.OwnershipTransferDisabled.selector);
-            OwnableUpgradeable(proxies[i]).transferOwnership(stranger);
+            (bool transferred,) =
+                proxies[i].call(abi.encodeCall(OwnableUpgradeable.transferOwnership, (stranger)));
+            assertFalse(transferred, vm.toString(proxies[i]));
         }
         assertEq(protocolRegistry.owner(), owner);
     }
@@ -102,7 +167,7 @@ contract BootstrapOwnerGateTests is BaseDotns {
         GatedCall[] memory calls = _gatedCalls();
         for (uint256 i; i < calls.length; ++i) {
             SYSTEM.setRootTarget(calls[i].target);
-            _assertPassesGate(calls[i], address(this));
+            _assertPassesGate(calls[i], stranger);
         }
     }
 
@@ -129,11 +194,7 @@ contract BootstrapOwnerGateTests is BaseDotns {
 
     function test_revert_root_reached_contract_cannot_renounce() public {
         SYSTEM.setRootTarget(address(reached));
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector, address(reached)
-            )
-        );
+        vm.expectRevert(BootstrapOwnableUpgradeable.RenounceRequiresRoot.selector);
         reached.forward(
             address(protocolRegistry), abi.encodeCall(OwnableUpgradeable.renounceOwnership, ())
         );
@@ -145,7 +206,7 @@ contract BootstrapOwnerGateTests is BaseDotns {
         GatedCall[] memory calls = _gatedCalls();
         for (uint256 i; i < calls.length; ++i) {
             SYSTEM.setRootTarget(calls[i].target);
-            _assertPassesGate(calls[i], address(this));
+            _assertPassesGate(calls[i], stranger);
         }
     }
 
@@ -153,6 +214,12 @@ contract BootstrapOwnerGateTests is BaseDotns {
         GatedCall[] memory calls = _gatedCalls();
         for (uint256 i; i < calls.length; ++i) {
             _assertPassesGate(calls[i], owner);
+        }
+        // No gated call moves the registry a follower reads its owner from.
+        address[] memory owned = _ownedContracts();
+        for (uint256 i; i < owned.length; ++i) {
+            if (owned[i] == address(protocolRegistry)) continue;
+            assertEq(OwnableUpgradeable(owned[i]).owner(), owner, vm.toString(owned[i]));
         }
     }
 
@@ -164,8 +231,7 @@ contract BootstrapOwnerGateTests is BaseDotns {
         }
     }
 
-    /// @notice The handover: every follower upgrades while the owner is set, then the protocol
-    ///         registry upgrades and renounces in one call.
+    /// @notice The handover: every proxy upgrades while the owner is set, then Root renounces.
     function test_handover_upgrades_everything_then_renounces_in_one_call() public {
         address[] memory proxies = _followers();
         for (uint256 i; i < proxies.length; ++i) {
@@ -174,10 +240,8 @@ contract BootstrapOwnerGateTests is BaseDotns {
         }
         vm.prank(owner);
         UUPSUpgradeable(address(protocolRegistry))
-            .upgradeToAndCall(
-                _implementationOf(address(protocolRegistry)),
-                abi.encodeCall(OwnableUpgradeable.renounceOwnership, ())
-            );
+            .upgradeToAndCall(_implementationOf(address(protocolRegistry)), "");
+        _renounce();
 
         address[] memory owned = _ownedContracts();
         for (uint256 i; i < owned.length; ++i) {
@@ -204,12 +268,189 @@ contract BootstrapOwnerGateTests is BaseDotns {
         }
     }
 
-    function test_revert_renounceOwnership_refuses_a_stranger() public {
+    function test_revert_renounceOwnership_refuses_everyone_but_root() public {
+        vm.prank(stranger);
+        vm.expectRevert(BootstrapOwnableUpgradeable.RenounceRequiresRoot.selector);
+        protocolRegistry.renounceOwnership();
+
+        // The owner cannot renounce: on a runtime where Root cannot pass the gate behind a proxy,
+        // an owner renounce would leave no account able to upgrade.
+        vm.prank(owner);
+        vm.expectRevert(BootstrapOwnableUpgradeable.RenounceRequiresRoot.selector);
+        protocolRegistry.renounceOwnership();
+
+        assertEq(protocolRegistry.owner(), owner);
+    }
+
+    function test_revert_renounce_fails_on_a_runtime_where_root_cannot_pass_behind_a_proxy()
+        public
+    {
+        // Without the runtime fix, `callerIsRoot` is false behind a proxy: model it by letting the
+        // precompile answer true for no contract.
+        SYSTEM.setRootTarget(address(0));
+        vm.expectRevert(BootstrapOwnableUpgradeable.RenounceRequiresRoot.selector);
+        protocolRegistry.renounceOwnership();
+        assertEq(protocolRegistry.owner(), owner);
+    }
+
+    function test_revert_renounce_checks_known_keys_when_the_key_list_is_empty() public {
+        address legacy = _deployLegacyFollower();
+        vm.prank(owner);
+        protocolRegistry.set(DotnsConstants.RESOLVER, legacy);
+        // A registry upgraded from a release without the key list starts with it empty until
+        // `initializeKeys` runs. The known keys still cover it.
+        vm.store(address(protocolRegistry), KEYS_LENGTH_SLOT, bytes32(0));
+        assertEq(protocolRegistry.keys().length, 0);
+
+        SYSTEM.setRootTarget(address(protocolRegistry));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsProtocolRegistry.OwnerStillSet.selector,
+                DotnsConstants.RESOLVER,
+                legacy,
+                owner
+            )
+        );
+        protocolRegistry.renounceOwnership();
+    }
+
+    function test_revert_renounce_fails_while_a_registered_contract_keeps_its_own_owner() public {
+        address legacy = _deployLegacyFollower();
+        vm.prank(owner);
+        protocolRegistry.set(TEST_KEY, legacy);
+
+        SYSTEM.setRootTarget(address(protocolRegistry));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsProtocolRegistry.OwnerStillSet.selector, TEST_KEY, legacy, owner
+            )
+        );
+        protocolRegistry.renounceOwnership();
+
+        assertEq(protocolRegistry.owner(), owner);
+    }
+
+    function test_revert_renounce_fails_while_a_superseded_cost_model_registry_is_registered()
+        public
+    {
+        address legacy = address(new LegacyCostModelRegistry(owner));
+        vm.prank(owner);
+        protocolRegistry.set(DotnsConstants.COST_MODEL, legacy);
+
+        SYSTEM.setRootTarget(address(protocolRegistry));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsProtocolRegistry.OwnerStillSet.selector,
+                DotnsConstants.COST_MODEL,
+                legacy,
+                owner
+            )
+        );
+        protocolRegistry.renounceOwnership();
+        SYSTEM.setRootTarget(address(0));
+
+        vm.prank(owner);
+        protocolRegistry.set(DotnsConstants.COST_MODEL, address(costModelRegistry));
+        _renounce();
+        assertEq(costModelRegistry.owner(), address(0));
+    }
+
+    function test_renounce_skips_registered_contracts_without_an_owner() public {
+        vm.startPrank(owner);
+        protocolRegistry.set(TEST_KEY, address(new NoOwnerContract()));
+        protocolRegistry.set(bytes32("revertingOwner"), address(new RevertingOwnerContract()));
+        vm.stopPrank();
+        _renounce();
+
+        assertEq(protocolRegistry.owner(), address(0));
+    }
+
+    /// @notice The live migration: the old code authorises the upgrade through its own owner, the
+    ///         new code reads the registry's owner, and the renounce then ends it.
+    function test_migration_from_a_legacy_owner_to_the_shared_owner() public {
+        address follower = _deployLegacyFollower();
+        vm.prank(owner);
+        protocolRegistry.set(TEST_KEY, follower);
+
+        address migrated = address(new MigratedImplementation());
         vm.prank(stranger);
         vm.expectRevert(
             abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, stranger)
         );
-        protocolRegistry.renounceOwnership();
+        UUPSUpgradeable(follower).upgradeToAndCall(migrated, "");
+
+        vm.prank(owner);
+        UUPSUpgradeable(follower).upgradeToAndCall(migrated, "");
+        assertEq(MigratedImplementation(follower).owner(), owner);
+        // The old slot keeps the old owner as dead storage.
+        assertEq(address(uint160(uint256(vm.load(follower, OWNABLE_STORAGE)))), owner);
+
+        _renounce();
+        assertEq(MigratedImplementation(follower).owner(), address(0));
+
+        address next = address(new MigratedImplementation());
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProtocolOwnedUpgradeable.OwnableUnauthorizedAccount.selector, owner
+            )
+        );
+        UUPSUpgradeable(follower).upgradeToAndCall(next, "");
+
+        SYSTEM.setRootTarget(follower);
+        vm.prank(stranger);
+        UUPSUpgradeable(follower).upgradeToAndCall(next, "");
+        assertEq(_implementationOf(follower), next);
+    }
+
+    function test_deployLabelStoreFor_accepts_root_and_the_bootstrap_owner_only() public {
+        address alice = _createUser("labelStoreAlice");
+        address bob = _createUser("labelStoreBob");
+
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(IStoreFactory.NotAuthorised.selector, stranger));
+        storeFactory.deployLabelStoreFor(alice);
+
+        vm.prank(owner);
+        storeFactory.deployLabelStoreFor(alice);
+
+        _renounce();
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(IStoreFactory.NotAuthorised.selector, owner));
+        storeFactory.deployLabelStoreFor(bob);
+
+        SYSTEM.setRootTarget(address(storeFactory));
+        vm.prank(stranger);
+        storeFactory.deployLabelStoreFor(bob);
+        assertTrue(storeFactory.getLabelStore(bob) != address(0));
+    }
+
+    function test_revert_initialisers_refuse_a_zero_protocol_registry() public {
+        IDotnsProtocolRegistry zero = IDotnsProtocolRegistry(address(0));
+        address[8] memory implementations = [
+            address(new PopRules()),
+            address(new DotnsPopController()),
+            address(new DotnsRegistrarController()),
+            address(new DotnsContentResolver()),
+            address(new DotnsPopResolver()),
+            address(new DotnsResolver()),
+            address(new DotnsReverseResolver()),
+            address(new DotnsNameWhitelist())
+        ];
+        bytes[8] memory inits = [
+            abi.encodeCall(PopRules.initialize, (zero)),
+            abi.encodeCall(DotnsPopController.initialize, (zero, DEFAULT_RESERVATION_DURATION)),
+            abi.encodeCall(DotnsRegistrarController.initialize, (zero, 6 seconds, 1 days)),
+            abi.encodeCall(DotnsContentResolver.initialize, (zero)),
+            abi.encodeCall(DotnsPopResolver.initialize, (zero)),
+            abi.encodeCall(DotnsResolver.initialize, (zero)),
+            abi.encodeCall(DotnsReverseResolver.initialize, (zero)),
+            abi.encodeCall(DotnsNameWhitelist.initialize, (zero))
+        ];
+        for (uint256 i; i < implementations.length; ++i) {
+            vm.expectRevert(ProtocolOwnedUpgradeable.ZeroProtocolRegistry.selector);
+            new ERC1967Proxy(implementations[i], inits[i]);
+        }
     }
 
     /// @notice Calls `gated` as `caller` and checks that it passed the gate.
@@ -236,9 +477,23 @@ contract BootstrapOwnerGateTests is BaseDotns {
         );
     }
 
+    function _deployLegacyFollower() internal returns (address follower) {
+        follower = address(
+            new ERC1967Proxy(
+                address(new LegacyOwnedImplementation()),
+                abi.encodeCall(
+                    LegacyOwnedImplementation.initialize,
+                    (owner, IDotnsProtocolRegistry(address(protocolRegistry)))
+                )
+            )
+        );
+    }
+
+    /// @notice Renounces as Root, the only party that can.
     function _renounce() internal {
-        vm.prank(owner);
+        SYSTEM.setRootTarget(address(protocolRegistry));
         protocolRegistry.renounceOwnership();
+        SYSTEM.setRootTarget(address(0));
     }
 
     function _implementationOf(address proxy) internal view returns (address implementation) {

@@ -35,6 +35,13 @@ interface IDotnsProtocolRegistry {
     /// @notice Thrown when a declared protocol version is empty or does not start with a digit.
     error InvalidProtocolVersion();
 
+    /// @notice Thrown by `renounceOwnership` when a registered contract still answers a non-zero
+    ///         `owner()` after the bootstrap owner is cleared.
+    /// @param key Registry key of the contract.
+    /// @param target The contract.
+    /// @param owner The owner it still reports.
+    error OwnerStillSet(bytes32 key, address target, address owner);
+
     /// @notice Returns the address stored for a given key.
     /// @dev Returns `address(0)` when the key is unset; callers must validate when non-zero is
     ///      required.

@@ -227,6 +227,7 @@ contract DotnsPopController is
             ReservationDurationTooHigh(reservationDuration_)
         );
         __ERC165_init();
+        _requireProtocolRegistry(address(registry));
         protocolRegistry = registry;
         reservationDuration = reservationDuration_;
         emit ReservationDurationSet(reservationDuration_);

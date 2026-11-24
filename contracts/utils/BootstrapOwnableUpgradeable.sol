@@ -12,8 +12,10 @@ import {SystemUtils} from "./SystemUtils.sol";
 ///         owner while one is set.
 /// @dev The owner exists only to configure a fresh deployment. Ownership cannot move to another
 ///      account: the only transition is @custom:function renounceOwnership, after which Root is
-///      the only governance. Root can also renounce, so governance can remove a bootstrap owner
-///      that never renounced. `DotnsProtocolRegistry` holds the one bootstrap owner of a
+///      the only governance. Only Root can renounce: a Root call passes the gate behind a proxy
+///      only on a runtime where `callerIsRoot` works there, so the renounce proves that Root can
+///      still govern after it. An owner renouncing on a runtime without that would leave no
+///      account able to upgrade. `DotnsProtocolRegistry` holds the one bootstrap owner of a
 ///      deployment. Every other dotNS contract reads it from there through
 ///      @custom:contract ProtocolOwnedUpgradeable, so one renounce ends the bootstrap everywhere.
 ///
@@ -32,6 +34,9 @@ abstract contract BootstrapOwnableUpgradeable is OwnableUpgradeable {
     /// @notice Thrown by @custom:function transferOwnership, which is disabled.
     error OwnershipTransferDisabled();
 
+    /// @notice Thrown by @custom:function renounceOwnership when the caller is not Root.
+    error RenounceRequiresRoot();
+
     /// @notice Restricts a call to Root, or to the owner while one is set.
     modifier onlyRootOrOwner() {
         _checkRootOrOwner();
@@ -45,10 +50,16 @@ abstract contract BootstrapOwnableUpgradeable is OwnableUpgradeable {
     }
 
     /// @notice Removes the bootstrap owner, leaving Root as the only governance.
-    /// @dev Root or the owner, otherwise @custom:reverts OwnableUnauthorizedAccount.
-    ///      Irreversible: no function sets an owner again.
-    function renounceOwnership() public override onlyRootOrOwner {
+    /// @dev Root only, otherwise @custom:reverts RenounceRequiresRoot. Irreversible: no function
+    ///      sets an owner again.
+    function renounceOwnership() public virtual override onlyRoot {
         _transferOwnership(address(0));
+    }
+
+    /// @notice Restricts a call to a direct Root dispatch.
+    modifier onlyRoot() {
+        require(SystemUtils.tryCallerIsRoot(), RenounceRequiresRoot());
+        _;
     }
 
     /// @notice Internal check behind @custom:modifier onlyRootOrOwner.

@@ -12,9 +12,9 @@ import {SystemUtils} from "./SystemUtils.sol";
 ///         its `DotnsProtocolRegistry`: substrate Root, or that owner while one is set.
 /// @dev @custom:function owner returns the protocol registry's owner, so every contract of a
 ///      deployment shares one bootstrap owner, and renouncing it on the registry leaves Root as
-///      the only governance of all of them in the same transaction. This contract keeps no owner
-///      and adds no storage: @custom:function transferOwnership and
-///      @custom:function renounceOwnership revert. The protocol registry address must be fixed at
+///      the only governance of all of them in the same transaction. This contract keeps no owner,
+///      adds no storage and has no `transferOwnership` or `renounceOwnership`: the bootstrap owner
+///      is renounced on the protocol registry. The protocol registry address must be fixed at
 ///      initialisation, because whoever controls it controls this gate.
 ///
 ///      The gate follows @custom:contract BootstrapOwnableUpgradeable: it checks Root first,
@@ -23,18 +23,16 @@ import {SystemUtils} from "./SystemUtils.sol";
 ///      passes only when it called this contract directly.
 ///
 ///      A contract that inherited `OwnableUpgradeable` can switch to this base: the old owner sits
-///      in ERC-7201 namespaced storage, so no slot moves, and nothing reads it afterwards.
+///      in ERC-7201 namespaced storage, so no slot moves, and nothing reads it afterwards. That
+///      slot still holds the old owner, so an implementation must never inherit
+///      `OwnableUpgradeable` again: it would read the old owner back.
 abstract contract ProtocolOwnedUpgradeable {
     /// @notice Thrown when the caller is neither Root nor the bootstrap owner.
     /// @param account The caller.
     error OwnableUnauthorizedAccount(address account);
 
-    /// @notice Thrown by @custom:function transferOwnership, which is disabled.
-    error OwnershipTransferDisabled();
-
-    /// @notice Thrown by @custom:function renounceOwnership: the protocol registry holds the
-    ///         bootstrap owner.
-    error OwnershipHeldByProtocolRegistry();
+    /// @notice Thrown by an initialiser given a zero protocol registry.
+    error ZeroProtocolRegistry();
 
     /// @notice Restricts a call to Root, or to the bootstrap owner while one is set.
     modifier onlyRootOrOwner() {
@@ -48,18 +46,6 @@ abstract contract ProtocolOwnedUpgradeable {
         return OwnableUpgradeable(_protocolRegistryAddress()).owner();
     }
 
-    /// @notice Disabled: the protocol registry holds the bootstrap owner.
-    /// @dev Always @custom:reverts OwnershipTransferDisabled.
-    function transferOwnership(address) public pure {
-        revert OwnershipTransferDisabled();
-    }
-
-    /// @notice Disabled: renounce the bootstrap owner on the protocol registry.
-    /// @dev Always @custom:reverts OwnershipHeldByProtocolRegistry.
-    function renounceOwnership() public pure {
-        revert OwnershipHeldByProtocolRegistry();
-    }
-
     /// @notice Internal check behind @custom:modifier onlyRootOrOwner.
     /// @dev Reverts with OwnableUnauthorizedAccount when the caller is neither Root nor the owner.
     ///      Once the owner is renounced, @custom:function owner is zero and no account passes.
@@ -67,6 +53,14 @@ abstract contract ProtocolOwnedUpgradeable {
         if (!SystemUtils.tryCallerIsRoot()) {
             require(msg.sender == owner(), OwnableUnauthorizedAccount(msg.sender));
         }
+    }
+
+    /// @notice Reverts with ZeroProtocolRegistry for a zero protocol registry.
+    /// @dev Initialisers call it before storing the registry: a follower bound to no registry
+    ///      would have no bootstrap owner.
+    /// @param registry Protocol registry an initialiser received.
+    function _requireProtocolRegistry(address registry) internal pure {
+        require(registry != address(0), ZeroProtocolRegistry());
     }
 
     /// @notice Returns the protocol registry that holds the bootstrap owner.

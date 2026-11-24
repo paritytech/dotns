@@ -132,6 +132,7 @@ contract DotnsNameWhitelist is
     /// @param registry Protocol registry all dotNS contracts resolve through.
     function initialize(IDotnsProtocolRegistry registry) external initializer {
         __ERC165_init();
+        _requireProtocolRegistry(address(registry));
         protocolRegistry = registry;
         maxClaimants = DotnsConstants.WHITELIST_DEFAULT_MAX_CLAIMANTS;
         maxGrantBatch = DotnsConstants.WHITELIST_DEFAULT_MAX_GRANT_BATCH;

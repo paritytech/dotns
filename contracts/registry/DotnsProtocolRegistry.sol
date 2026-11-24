@@ -185,6 +185,41 @@ contract DotnsProtocolRegistry is
         emit ExpectedCodehashSet(key, codehash);
     }
 
+    /// @notice Removes the bootstrap owner of the whole deployment, leaving Root as the only
+    ///         governance of every dotNS contract.
+    /// @dev Root only, otherwise @custom:reverts RenounceRequiresRoot: a Root call passes the gate
+    ///      behind this proxy only on a runtime where Root can govern dotNS. Clears the owner,
+    ///      then requires every contract under a known key (`DotnsConstants.registryKeys`) or a
+    ///      registered key that answers `owner()` to answer zero, otherwise
+    ///      @custom:reverts OwnerStillSet. A contract that reads its owner from this registry
+    ///      passes. A contract still running code with an owner of its own, such as a proxy not
+    ///      yet upgraded or a superseded cost model registry left under its key, fails the
+    ///      renounce. A contract with no `owner()` is skipped. Reads no `msg.sender`.
+    function renounceOwnership() public override onlyRoot {
+        _transferOwnership(address(0));
+        bytes32[] memory known = DotnsConstants.registryKeys();
+        for (uint256 i; i < known.length; ++i) {
+            _requireNoOwner(known[i]);
+        }
+        uint256 count = _keys.length();
+        for (uint256 i; i < count; ++i) {
+            _requireNoOwner(_keys.at(i));
+        }
+    }
+
+    /// @notice Reverts with OwnerStillSet when the contract under `key` answers a non-zero
+    ///         `owner()`.
+    /// @dev Skips an unset key and a contract whose `owner()` reverts or answers malformed data.
+    /// @param key Registry key to check.
+    function _requireNoOwner(bytes32 key) private view {
+        address target = _addresses[key];
+        if (target == address(0)) return;
+        (bool ok, bytes memory ret) = target.staticcall(abi.encodeWithSelector(this.owner.selector));
+        if (!ok || ret.length != 32) return;
+        address targetOwner = abi.decode(ret, (address));
+        require(targetOwner == address(0), OwnerStillSet(key, target, targetOwner));
+    }
+
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 }
