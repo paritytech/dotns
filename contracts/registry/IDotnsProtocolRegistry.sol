@@ -49,7 +49,7 @@ interface IDotnsProtocolRegistry {
 
     /// @notice Sets or updates the address for a given key.
     /// @dev Root or the bootstrap owner, otherwise @custom:reverts OwnableUnauthorizedAccount.
-    /// `addr` must be non-zero, otherwise @custom:reverts ZeroAddress. Idempotent when the new
+    ///      `addr` must be non-zero, otherwise @custom:reverts ZeroAddress. Idempotent when the new
     ///      value matches the stored one (no event emitted in that case). Maintains a
     ///      per-address refcount so the same contract can occupy multiple keys without losing
     ///      its registered status until every key is rewired. Lists `key` in
@@ -59,7 +59,8 @@ interface IDotnsProtocolRegistry {
 
     /// @notice Clears the address stored for a given key.
     /// @dev Root or the bootstrap owner, otherwise @custom:reverts OwnableUnauthorizedAccount. The
-    /// key must hold an address, otherwise @custom:reverts KeyNotRegistered. Decrements the removed
+    ///      key must hold an address, otherwise @custom:reverts KeyNotRegistered. Decrements the
+    ///      removed
     ///      address's refcount, so a contract still reachable under another key keeps its
     ///      registered status. Exists because the registry is a discovery directory that would
     ///      otherwise only ever grow: a contract retired from the protocol, or one published for
@@ -115,7 +116,8 @@ interface IDotnsProtocolRegistry {
 
     /// @notice Declares the release tag this network runs.
     /// @dev Root or the bootstrap owner, otherwise @custom:reverts OwnableUnauthorizedAccount.
-    /// `semver` must be non-empty, start with an ASCII digit, and contain only alphanumerics, dots,
+    ///      `semver` must be non-empty, start with an ASCII digit, and contain only alphanumerics,
+    ///      dots,
     ///      and hyphens, otherwise @custom:reverts InvalidProtocolVersion. That admits semver
     ///      core and pre-release identifiers (`0.8.0`, `0.8.0-rc.1`) while rejecting the two
     ///      values consumers cannot parse and compare: a leading `v` and `+` build metadata.
@@ -135,7 +137,7 @@ interface IDotnsProtocolRegistry {
 
     /// @notice Declares the codehash of the code that executes for `key`.
     /// @dev Root or the bootstrap owner, otherwise @custom:reverts OwnableUnauthorizedAccount. The
-    /// key must currently be registered, otherwise @custom:reverts KeyNotRegistered; a
+    ///      key must currently be registered, otherwise @custom:reverts KeyNotRegistered; a
     ///      removal clears the declaration, so an unregistered key never carries a stale
     ///      claim. `bytes32(0)` is allowed as an explicit reset to "undeclared". Kept separate
     ///      from @custom:function set so the write API stays minimal: the deploy tooling pairs

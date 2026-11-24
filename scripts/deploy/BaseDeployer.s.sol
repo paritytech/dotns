@@ -195,10 +195,10 @@ abstract contract BaseDeployer is Script {
     ///      `implementation()` the way this stage wanted at verification time; a bespoke contract
     ///      can do that and return something else afterwards. `UpgradeableBeacon` carries no
     ///      immutables, so its code compares exactly and the topology cannot be faked.
-    /// @dev Beacon ownership is asserted too. `upgradeLabelStoreImplementation` is `onlyOwner` on
-    ///      the factory and the beacons are constructed as owned by it, so a beacon owned by
-    ///      anything else leaves every store on the network following an implementation the
-    ///      verified owner can never rotate.
+    /// @dev Beacon ownership is asserted too. `upgradeLabelStoreImplementation` is
+    ///      `onlyRootOrOwner` on the factory and the beacons are constructed as owned by it, so a
+    ///      beacon owned by anything else leaves every store on the network following an
+    ///      implementation that governance can never rotate.
     /// @param storeFactory The deployed store factory.
     /// @param protocolRegistry The protocol registry this run wired, which the factory must
     ///        already point at.

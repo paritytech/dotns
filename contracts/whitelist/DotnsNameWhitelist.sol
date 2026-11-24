@@ -97,9 +97,9 @@ contract DotnsNameWhitelist is
     /// @notice Restricts a call to a substrate Root dispatch.
     /// @dev The whole admin surface is governance-only: no key grants, revokes, reserves, or
     ///      retunes a cap. The bootstrap owner configures and upgrades until it renounces and never
-    /// allocates, so no signed account can hand out a name. `msg.sender` is never read here, which
-    /// is also what
-    ///      keeps every gated entry point callable under a Root origin, since Root has no account.
+    ///      allocates, so no signed account can hand out a name. `msg.sender` is never read here,
+    ///      which is also what keeps every gated entry point callable under a Root origin, since
+    ///      Root has no account.
     modifier onlyGovernance() {
         _onlyGovernance();
         _;

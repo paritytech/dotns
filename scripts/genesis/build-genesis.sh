@@ -106,7 +106,7 @@ MSG
 fi
 
 DEPLOYER_ADDR="$(cast wallet address --private-key "$ADMIN_KEY")"
-echo "Contract owner:      $DEPLOYER_ADDR"
+echo "Bootstrap owner:     $DEPLOYER_ADDR"
 echo "TLD:                 .$DOTNS_TLD"
 echo ""
 

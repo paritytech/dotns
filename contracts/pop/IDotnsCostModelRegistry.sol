@@ -42,17 +42,16 @@ interface IDotnsCostModelRegistry {
 
     /// @notice Registers a model and makes it current.
     /// @dev Root or the bootstrap owner. Keys the model by its own `version`, so a version can be
-    /// registered once; a repeat triggers @custom:reverts AlreadyRegistered. Moves the current
-    /// pointer to the
-    ///      new version and emits @custom:emits CostModelRegistered.
+    ///      registered once; a repeat triggers @custom:reverts AlreadyRegistered. Moves the current
+    ///      pointer to the new version and emits @custom:emits CostModelRegistered.
     /// @param model The cost model to register.
     function register(IDotnsPricing model) external;
 
     /// @notice Points the current version at an already-registered model.
     /// @dev Root or the bootstrap owner. Reverts to a previously registered version without
-    /// redeploying it, so governance can roll fresh pricing back to an earlier curve.
-    /// @custom:reverts
-    ///      UnknownVersion when no model is registered for `version`. Emits @custom:emits
+    ///      redeploying it, so governance can roll fresh pricing back to an earlier curve.
+    ///      @custom:reverts UnknownVersion when no model is registered for `version`. Emits
+    ///      @custom:emits
     ///      CurrentModelSet.
     /// @param version The already-registered version to make current.
     function setCurrentVersion(uint256 version) external;

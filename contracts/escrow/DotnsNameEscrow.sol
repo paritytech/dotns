@@ -387,9 +387,9 @@ contract DotnsNameEscrow is
     ///      Meant to run as the post-upgrade call of `upgradeToAndCall`, so nothing can be
     ///      redeemed or reclaimed between the upgrade and the clear. A deployment that never held
     ///      such names never needs it. Root or the bootstrap owner (otherwise @custom:reverts
-    /// OwnableUnauthorizedAccount) and callable once per proxy (@custom:reverts
-    /// InvalidInitialization on a second call); it
-    ///      takes initializer version 2, so a later upgrade that needs a reinitializer starts at 3.
+    ///      OwnableUnauthorizedAccount) and callable once per proxy (@custom:reverts
+    ///      InvalidInitialization on a second call); it takes initializer version 2, so a later
+    ///      upgrade that needs a reinitializer starts at 3.
     ///      It clears lazily only and deletes no record outright: deleting would release the
     ///      storage deposit the holders paid to the signer of this call instead. Walks every name
     ///      in custody in one call, so check @custom:function releasedTokenCount before relying on

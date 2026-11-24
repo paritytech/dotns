@@ -413,7 +413,7 @@ bun run deploy:all
 
 It runs `deploy:factory` (from the dedicated `dotns-factory` key, which asserts nonce 0 and lands the factory at its deterministic address), then runs the pipeline with `CREATE3_FACTORY` set to that address so `DeployCore` reuses it. On every fresh chain this reproduces the same address set.
 
-The whole pipeline is idempotent, so a re-run resumes an interrupted deploy. Each stage adopts any contract already present at its deterministic address and skips re-initialising an adopted proxy, so rerunning the same command deploys only what is missing and leaves everything already deployed untouched. This is the recovery path when the adapter stalls a transaction part way through.
+The whole pipeline is idempotent, so a re-run resumes an interrupted deploy. Rerun the same command with `DOTNS_RESUME=true`: each stage adopts any contract already present at its deterministic address and skips re-initialising an adopted proxy, so the rerun deploys only what is missing and leaves everything already deployed untouched. Without `DOTNS_RESUME=true`, a stage that finds a proxy already at its address aborts. This is the recovery path when the adapter stalls a transaction part way through.
 
 Idempotent is not the same as always succeeding. Both adoption and the final verification compare what is on chain against the artefacts of the release being run, so a chain that has moved away from them fails rather than reporting a clean no-op. Rotating a store implementation through `StoreFactory.upgradeLabelStoreImplementation` is the case to expect: verification then fails on the beacon implementation until the release being run is the one that was rotated to. Re-running a stage against a chain that is ahead of, or diverged from, the checked-out release is therefore not a safe no-op.
 
@@ -468,11 +468,11 @@ If the adapter is not responding, confirm Docker is running and that port 8545 i
 
 If the deploy script says PRIVATE_KEY is required, the configured ACCOUNT_NAME has not yet been imported into the Foundry keystore. Populate .env once, or provide PRIVATE_KEY and ACCOUNT_PASSWORD through the shell environment.
 
-If the deploy script fails after importing the key, .env is intentionally left in place. Correct the failed field or network issue and rerun the same command.
+If the deploy script fails after importing the key, .env is intentionally left in place. Correct the failed field or network issue and rerun the same command, with `DOTNS_RESUME=true` if a stage had already deployed contracts.
 
 If the deploy script succeeds, .env should be gone. Future runs should use the keystore account and should not require the deployer private key.
 
-If a stage fails part way through, rerun the same command. Each stage adopts any contract already at its deterministic address and skips re-initialising an adopted proxy, so the rerun resumes from where it stopped and deploys only what is missing. Later stages read the deployment manifest for wire-up, so if you edit the manifest by hand keep it consistent with what is actually on chain, or the wire-up can fail.
+If a stage fails part way through, rerun the same command with `DOTNS_RESUME=true`. Each stage adopts any contract already at its deterministic address and skips re-initialising an adopted proxy, so the rerun resumes from where it stopped and deploys only what is missing. Later stages read the deployment manifest for wire-up, so if you edit the manifest by hand keep it consistent with what is actually on chain, or the wire-up can fail.
 
 A failure naming a beacon implementation or an unexpected occupant usually means the chain and the checked-out release disagree rather than that anything is wrong on chain. Check out the release the chain is actually running before rerunning.
 
