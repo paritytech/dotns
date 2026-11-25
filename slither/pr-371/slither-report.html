@@ -8,12 +8,12 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">dotNS Slither Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-11-25 10:27 UTC | 232 findings</p>
+<p class="text-sm text-gray-500">Generated 2026-11-25 12:57 UTC | 231 findings</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">High</p><p class="text-xl font-mono font-bold text-red-400">4</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Medium</p><p class="text-xl font-mono font-bold text-yellow-400">59</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">105</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">104</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Informational</p><p class="text-xl font-mono font-bold text-gray-400">63</p></div>
 </div></div>
 <h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">High (4)</h2>
@@ -58,8 +58,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">incorrect-equality</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._expiryOf(IDotnsNameWhitelist.NameRecord) (contracts/whitelist/DotnsNameWhitelist.sol#564-569) uses a</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:564</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._expiryOf(IDotnsNameWhitelist.NameRecord) (contracts/whitelist/DotnsNameWhitelist.sol#569-574) uses a</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:569</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
@@ -218,11 +218,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.requestName(string,string,address) (contracts/whitelist/DotnsNameWhitelist.sol#223-251) ignores retur</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:223</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopController._settlePending(address,uint256) (contracts/registrars/DotnsPopController.sol#547-577) ignores return </td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:547</td>
 </tr>
@@ -230,6 +225,11 @@
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/registrars/DotnsPopC</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.requestName(string,string,address) (contracts/whitelist/DotnsNameWhitelist.sol#226-254) ignores retur</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:226</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
@@ -263,13 +263,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._clearClaimants(bytes32,address,string) (contracts/whitelist/DotnsNameWhitelist.sol#589-599) ignores </td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:589</td>
+<td class="py-2 px-3 text-gray-200">DotnsProtocolRegistry.remove(bytes32) (contracts/registry/DotnsProtocolRegistry.sol#103-115) ignores return value by _ke</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistry.sol:103</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsProtocolRegistry.remove(bytes32) (contracts/registry/DotnsProtocolRegistry.sol#103-115) ignores return value by _ke</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistry.sol:103</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._nodeOf(string) (contracts/whitelist/DotnsNameWhitelist.sol#641-643) ignores return value by (None,no</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:641</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
@@ -283,23 +283,18 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._deactivate(bytes32) (contracts/whitelist/DotnsNameWhitelist.sol#614-620) ignores return value by _ac</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:614</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
 <td class="py-2 px-3 text-gray-200">DotnsRegistrarController._clearStaleReservation(IPopRules,address,uint256,string) (contracts/registrars/DotnsRegistrarCo</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsRegistrarController.sol:442</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._nodeOf(string) (contracts/whitelist/DotnsNameWhitelist.sol#636-638) ignores return value by (None,no</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:636</td>
+<td class="py-2 px-3 text-gray-200">DotnsRegistry._writeSubnodeToStore(address,bytes32,string) (contracts/registry/DotnsRegistry.sol#359-368) ignores return</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistry.sol:359</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsRegistry._writeSubnodeToStore(address,bytes32,string) (contracts/registry/DotnsRegistry.sol#359-368) ignores return</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistry.sol:359</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._activate(bytes32,string) (contracts/whitelist/DotnsNameWhitelist.sol#609-615) ignores return value b</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:609</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
@@ -313,8 +308,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.reject(string,address) (contracts/whitelist/DotnsNameWhitelist.sol#262-277) ignores return value by _</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:262</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.reject(string,address) (contracts/whitelist/DotnsNameWhitelist.sol#265-280) ignores return value by _</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:265</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
@@ -333,8 +328,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._activate(bytes32,string) (contracts/whitelist/DotnsNameWhitelist.sol#604-610) ignores return value b</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:604</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._clearClaimants(bytes32,address,string) (contracts/whitelist/DotnsNameWhitelist.sol#594-604) ignores </td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:594</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
@@ -346,8 +341,13 @@
 <td class="py-2 px-3 text-gray-200">DotnsPopController._issueDeviceName(DotnsPopController.Deps,IDotnsPopController.DeviceNameIssuance,bool) (contracts/regi</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:337</td>
 </tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-yellow-400">unused-return</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._deactivate(bytes32) (contracts/whitelist/DotnsNameWhitelist.sol#619-625) ignores return value by _ac</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:619</td>
+</tr>
 </tbody></table></div>
-<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Low (105)</h2>
+<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Low (104)</h2>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Check</th>
@@ -441,6 +441,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._nodeOf(string) (contracts/whitelist/DotnsNameWhitelist.sol#641-643) has external calls inside a loop</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:641</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
 <td class="py-2 px-3 text-gray-200">Multicall3.tryAggregate(bool,Multicall3.Call[]) (contracts/utils/Multicall3.sol#67-89) has external calls inside a loop:</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/utils/Multicall3.sol:67</td>
 </tr>
@@ -528,11 +533,6 @@
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopLens._belongsToListing(string) (contracts/registrars/DotnsPopLens.sol#111-114) has external calls inside a loop:</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopLens.sol:111</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._nodeOf(string) (contracts/whitelist/DotnsNameWhitelist.sol#636-638) has external calls inside a loop</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:636</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
@@ -641,6 +641,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in StoreFactory.upgradeUserStoreImplementation(address) (contracts/store/StoreFactory.sol#194-203): 	External</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/store/StoreFactory.sol:194</td>
 </tr>
@@ -666,11 +671,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issueDeviceNameWithReservation(IDotnsPopController.DeviceNameIssuanceWithReservation,b</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:303</td>
 </tr>
@@ -693,11 +693,6 @@
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._dropReservation(DotnsPopController.Deps,address,IDotnsPopController.UserReservation,ui</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:1042</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -736,6 +731,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.consume(string,address) (contracts/whitelist/DotnsNameWhitelist.sol#334-346) uses timestamp for compa</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:334</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">DotnsNameEscrow.claimRefund(uint256) (contracts/escrow/DotnsNameEscrow.sol#505-523) uses timestamp for comparisons 	Dang</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:505</td>
 </tr>
@@ -751,16 +751,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.revokeName(string) (contracts/whitelist/DotnsNameWhitelist.sol#293-307) uses timestamp for comparison</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:293</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.requestName(string,string,address) (contracts/whitelist/DotnsNameWhitelist.sol#223-251) uses timestam</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:223</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">PopRules._writeReservation(string,address) (contracts/pop/PopRules.sol#613-634) uses timestamp for comparisons 	Dangerou</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/pop/PopRules.sol:613</td>
 </tr>
@@ -771,8 +761,23 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._windowLive() (contracts/whitelist/DotnsNameWhitelist.sol#642-644) uses timestamp for comparisons 	Da</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:642</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.setReserved(string,bool) (contracts/whitelist/DotnsNameWhitelist.sol#313-331) uses timestamp for comp</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:313</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._statusOf(IDotnsNameWhitelist.NameRecord) (contracts/whitelist/DotnsNameWhitelist.sol#554-559) uses t</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:554</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.setWindow(uint64,uint64) (contracts/whitelist/DotnsNameWhitelist.sol#349-369) uses timestamp for comp</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:349</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.revokeName(string) (contracts/whitelist/DotnsNameWhitelist.sol#296-310) uses timestamp for comparison</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:296</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -781,8 +786,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.setReserved(string,bool) (contracts/whitelist/DotnsNameWhitelist.sol#310-328) uses timestamp for comp</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:310</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._isWindowOpen() (contracts/whitelist/DotnsNameWhitelist.sol#653-655) uses timestamp for comparisons 	</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:653</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._grant(string,address) (contracts/whitelist/DotnsNameWhitelist.sol#519-526) uses timestamp for compar</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:519</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -798,11 +808,6 @@
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
 <td class="py-2 px-3 text-gray-200">DotnsNameEscrow.claimRefundsBatch(uint256[]) (contracts/escrow/DotnsNameEscrow.sol#526-551) uses timestamp for compariso</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:526</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.consume(string,address) (contracts/whitelist/DotnsNameWhitelist.sol#331-343) uses timestamp for compa</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:331</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -826,8 +831,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._isWindowOpen() (contracts/whitelist/DotnsNameWhitelist.sol#648-650) uses timestamp for comparisons 	</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:648</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.requestName(string,string,address) (contracts/whitelist/DotnsNameWhitelist.sol#226-254) uses timestam</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:226</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -836,13 +841,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist.setWindow(uint64,uint64) (contracts/whitelist/DotnsNameWhitelist.sol#346-366) uses timestamp for comp</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:346</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._expiryOf(IDotnsNameWhitelist.NameRecord) (contracts/whitelist/DotnsNameWhitelist.sol#564-569) uses t</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:564</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._expiryOf(IDotnsNameWhitelist.NameRecord) (contracts/whitelist/DotnsNameWhitelist.sol#569-574) uses t</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:569</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -856,13 +856,8 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._grant(string,address) (contracts/whitelist/DotnsNameWhitelist.sol#516-523) uses timestamp for compar</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:516</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
-<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._statusOf(IDotnsNameWhitelist.NameRecord) (contracts/whitelist/DotnsNameWhitelist.sol#549-554) uses t</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:549</td>
+<td class="py-2 px-3 text-gray-200">DotnsNameWhitelist._windowLive() (contracts/whitelist/DotnsNameWhitelist.sol#647-649) uses timestamp for comparisons 	Da</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/whitelist/DotnsNameWhitelist.sol:647</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
