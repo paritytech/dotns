@@ -406,8 +406,10 @@ interface IDotnsNameEscrow {
     function redeem(uint256 tokenId) external;
 
     /// @notice Updates the cooldown duration for future releases.
-    /// @dev Root or the bootstrap owner. Affects only releases recorded after this call; positions
-    ///      already released keep the `withdrawAvailableAt` snapshot taken at their release time.
+    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer.
+    ///      Affects only releases recorded after this call, so either direction is safe:
+    ///      positions already released keep the `withdrawAvailableAt` snapshot taken at their
+    ///      release time.
     ///      `newCooldown` must be non-zero, otherwise @custom:reverts InvalidCooldown, and must not
     ///      exceed the
     ///      contract's `MAX_COOLDOWN` upper bound, otherwise @custom:reverts CooldownTooLong; the
@@ -417,8 +419,10 @@ interface IDotnsNameEscrow {
     function updateCooldown(uint256 newCooldown) external;
 
     /// @notice Updates the redeem window for future releases.
-    /// @dev Root or the bootstrap owner. Affects only releases recorded after this call; positions
-    ///      already released keep the `redeemableUntil` snapshot taken at their release time.
+    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer.
+    ///      Affects only releases recorded after this call, so either direction is safe:
+    ///      positions already released keep the `redeemableUntil` snapshot taken at their release
+    ///      time.
     ///      `newRedeemWindow` must fall within `MIN_REDEEM_WINDOW` and `MAX_REDEEM_WINDOW`
     ///      inclusive, otherwise
     ///      @custom:reverts RedeemWindowTooShort or @custom:reverts RedeemWindowTooLong. The floor

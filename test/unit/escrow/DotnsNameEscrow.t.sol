@@ -352,10 +352,11 @@ contract DotnsNameEscrowTest is BaseDotns {
     function test_update_cooldown() public {
         uint256 newCooldown = 30 minutes;
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         vm.expectEmit(true, true, false, false);
         emit IDotnsNameEscrow.CooldownUpdated(ESCROW_COOLDOWN, newCooldown);
         dotnsNameEscrow.updateCooldown(newCooldown);
+        _mockCallerIsRoot(false);
 
         assertEq(dotnsNameEscrow.cooldown(), newCooldown, "cooldown should be updated");
     }

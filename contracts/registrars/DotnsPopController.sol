@@ -91,8 +91,8 @@ contract DotnsPopController is
     uint16 public constant MAX_RESERVATION_QUEUE = 64;
 
     /// @notice Minimum value accepted by @custom:function setReservationDuration.
-    /// @dev Prevents owner misconfiguration from instantly expiring every live queue and
-    /// pending-claim entry. The actual production duration is governance-tuned higher.
+    /// @dev Keeps any setting Root chooses from instantly expiring every live queue entry; the
+    /// maintainer account can only raise the duration. The production duration is set higher.
     uint64 public constant MIN_RESERVATION_DURATION = 1 hours;
 
     /// @notice Maximum value accepted by @custom:function setReservationDuration.
@@ -630,7 +630,10 @@ contract DotnsPopController is
     }
 
     /// @inheritdoc IDotnsPopController
-    function setReservationDuration(uint64 duration) external override onlyRootOrOwner {
+    function setReservationDuration(uint64 duration) external override {
+        // Every queue entry expires against the current duration, so lowering it expires entries
+        // early: the maintainer can only raise it.
+        require(_checkRootOrMaintainer() || duration >= reservationDuration, MaintainerNotAllowed());
         require(duration >= MIN_RESERVATION_DURATION, ReservationDurationTooLow(duration));
         require(duration <= MAX_RESERVATION_DURATION, ReservationDurationTooHigh(duration));
         reservationDuration = duration;
@@ -1358,7 +1361,7 @@ contract DotnsPopController is
     }
 
     /// @notice Internal check enforcing a Root origin.
-    /// @dev Authorises a call when @custom:function SystemUtils.callerIsRoot is true, and
+    /// @dev Authorises a call when @custom:function SystemUtils.tryCallerIsRoot is true, and
     ///      reverts with NotRoot otherwise. `msg.sender` is deliberately not consulted: a
     ///      Root origin has no account behind it, so reading `msg.sender` traps. That holds
     ///      for this frame and any delegatecall sharing it; a nested call sees the calling
@@ -1366,7 +1369,7 @@ contract DotnsPopController is
     ///      this controller directly, so a contract reached later in the same Root transaction
     ///      cannot re-enter a gated function.
     function _onlyRoot() internal view {
-        require(SystemUtils.callerIsRoot(), NotRoot());
+        require(SystemUtils.tryCallerIsRoot(), NotRoot());
     }
 
     /// @inheritdoc ProtocolOwnedUpgradeable

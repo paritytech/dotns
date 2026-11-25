@@ -11,6 +11,7 @@ import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {ProtocolOwnedUpgradeable} from "../../../contracts/utils/ProtocolOwnedUpgradeable.sol";
 
 /// @title DotnsNameWhitelist unit tests
 /// @notice Covers claiming, competing claims and resolution, the request window, reservation, the
@@ -236,24 +237,42 @@ contract DotnsNameWhitelistTests is BaseDotns {
     /// entry point must refuse a signed origin; a per-method test set would silently miss any
     /// method that later lost its gate, which is how the four spot checks below left `reject`,
     /// `grantNames`, `setWindow` and two caps uncovered.
-    function test_every_admin_entry_point_requires_root() public {
+    function test_every_maintenance_entry_point_requires_root_or_the_maintainer() public {
+        _mockCallerIsRoot(false);
+
+        bytes[] memory calls = new bytes[](5);
+        calls[0] = abi.encodeCall(IDotnsNameWhitelist.setWindow, (0, 1 days));
+        calls[1] = abi.encodeCall(IDotnsNameWhitelist.setMaxClaimants, (4));
+        calls[2] = abi.encodeCall(IDotnsNameWhitelist.setMaxReasonBytes, (64));
+        calls[3] = abi.encodeCall(IDotnsNameWhitelist.setMaxGrantBatch, (4));
+        calls[4] = abi.encodeCall(IDotnsNameWhitelist.setGrantDuration, (7 days));
+
+        for (uint256 i = 0; i < calls.length; i++) {
+            vm.prank(ed);
+            (bool ok, bytes memory ret) = address(whitelist).call(calls[i]);
+            assertFalse(ok, "a signed caller reached a maintenance entry point");
+            assertEq(
+                ret,
+                abi.encodeWithSelector(ProtocolOwnedUpgradeable.NotRootOrMaintainer.selector, ed),
+                "maintenance gate reverted with something other than NotRootOrMaintainer"
+            );
+        }
+    }
+
+    function test_every_decision_entry_point_requires_root() public {
         _mockCallerIsRoot(false);
 
         string[] memory batch = new string[](1);
         batch[0] = BASE_LABEL_B;
 
-        bytes[] memory calls = new bytes[](11);
+        // Decisions about who holds a name are Root-only.
+        bytes[] memory calls = new bytes[](6);
         calls[0] = abi.encodeCall(IDotnsNameWhitelist.grantName, (BASE_LABEL_A, ed));
         calls[1] = abi.encodeCall(IDotnsNameWhitelist.grantNames, (batch, ed));
         calls[2] = abi.encodeCall(IDotnsNameWhitelist.accept, (BASE_LABEL_A, ed));
         calls[3] = abi.encodeCall(IDotnsNameWhitelist.reject, (BASE_LABEL_A, ed));
         calls[4] = abi.encodeCall(IDotnsNameWhitelist.revokeName, (BASE_LABEL_A));
         calls[5] = abi.encodeCall(IDotnsNameWhitelist.setReserved, (BASE_LABEL_A, true));
-        calls[6] = abi.encodeCall(IDotnsNameWhitelist.setWindow, (0, 1 days));
-        calls[7] = abi.encodeCall(IDotnsNameWhitelist.setMaxClaimants, (4));
-        calls[8] = abi.encodeCall(IDotnsNameWhitelist.setMaxReasonBytes, (64));
-        calls[9] = abi.encodeCall(IDotnsNameWhitelist.setMaxGrantBatch, (4));
-        calls[10] = abi.encodeCall(IDotnsNameWhitelist.setGrantDuration, (7 days));
 
         for (uint256 i = 0; i < calls.length; i++) {
             vm.prank(ed);
@@ -602,10 +621,15 @@ contract DotnsNameWhitelistTests is BaseDotns {
         whitelist.setMaxGrantBatch(aboveLimit);
     }
 
-    /// @dev Caps are configuration, and configuration is Root-only too: the owner cannot retune.
+    /// @dev Caps are maintenance values: Root or the maintainer account retunes them, and the
+    ///      owner cannot.
     function test_setMaxClaimants_reverts_for_a_signed_caller() public {
         _mockCallerIsRoot(false);
-        vm.expectRevert(IDotnsNameWhitelist.NotGovernance.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProtocolOwnedUpgradeable.NotRootOrMaintainer.selector, address(this)
+            )
+        );
         whitelist.setMaxClaimants(10);
     }
 
@@ -624,7 +648,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
         assertTrue(whitelist.isReserved(BASE_LABEL_A));
     }
 
-    /// @dev Configuration is Root-only as well, so a referendum retunes the caps.
+    /// @dev Root retunes the caps from any submitter, since Root has no address.
     function test_governance_root_sets_a_cap_from_any_caller() public {
         _mockCallerIsRoot(true);
         vm.prank(leonardo);
@@ -736,20 +760,25 @@ contract DotnsNameWhitelistTests is BaseDotns {
         assertTrue(whitelist.isReserved(BASE_LABEL_A));
     }
 
-    function test_setGrantDuration_applies_to_live_grants() public {
+    function test_setGrantDuration_applies_to_later_grants_only() public {
         _grant(ed, BASE_LABEL_A);
         uint64 grantedAt = uint64(block.timestamp);
+        uint64 firstExpiry = grantedAt + DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION;
 
         vm.expectEmit(false, false, false, true, address(whitelist));
         emit IDotnsNameWhitelist.GrantDurationSet(90 days);
         whitelist.setGrantDuration(90 days);
-        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), grantedAt + 90 days);
+        assertEq(
+            whitelist.grantExpiresAt(BASE_LABEL_A), firstExpiry, "a live grant keeps its expiry"
+        );
 
-        vm.warp(grantedAt + 60 days);
-        assertTrue(whitelist.isGrantedTo(BASE_LABEL_A, ed), "lengthening extends a live grant");
+        _grant(leonardo, BASE_LABEL_B);
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_B), grantedAt + 90 days, "a new grant uses it");
 
-        whitelist.setGrantDuration(30 days);
-        assertFalse(whitelist.isGrantedTo(BASE_LABEL_A, ed), "shortening can expire it at once");
+        whitelist.setGrantDuration(1 days);
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), firstExpiry, "lowering moves no grant");
+        vm.warp(firstExpiry - 1);
+        assertTrue(whitelist.isGrantedTo(BASE_LABEL_A, ed), "still bound until its own expiry");
     }
 
     function test_setGrantDuration_reverts_out_of_range() public {

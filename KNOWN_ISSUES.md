@@ -80,3 +80,13 @@ A whitelist grant keeps its name for the grantee on every path, the gateway incl
 **Workaround:** governance batches `evictReservations` with the grant, which clears the queue and frees the base name at once. Otherwise `expireReservation` clears the queue once its reservations expire. Governance can check `isReservedForClaim` before granting a name.
 
 **Resolution:** the reservation expires and is cleared, or the grant expires unspent and the user at the front can claim the name again.
+
+## 7. Raising the reservation duration can revive an expired queue head
+
+**Type:** current implementation.
+
+A reservation-queue entry expires against the current reservation duration, so a change applies to every live entry at once. The maintainer account can only raise the duration, which never expires an entry early. Raising it can still revive an entry that has already expired but that no call has cleared yet: the entry at the front of the queue reads as active again, so the user behind it waits longer, and an issuance that would have skipped the expired entry no longer does.
+
+**Workaround:** `expireReservation` clears expired entries from the front of a queue, so a queue cleared before the change keeps its order.
+
+**Resolution:** each entry records its own expiry when it joins the queue, which needs room in `DotnsPopController`.

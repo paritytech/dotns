@@ -38,13 +38,13 @@ import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 contract DotnsDeployer is BaseDeployer {
     /// @notice Default reservation duration for the freshly-deployed PoP controller.
     /// @dev Gives a device-name holder a month to reach personhood and claim the personhood
-    ///      name they reserved. The protocol owner rotates this post-deploy via
+    ///      name they reserved. Root or the maintainer account changes this post-deploy via
     ///      `DotnsPopController.setReservationDuration`.
     uint64 public constant DEFAULT_RESERVATION_DURATION = 30 days;
 
     /// @notice Default refund cooldown for the freshly-deployed name escrow.
     /// @dev Sized to the release-and-withdraw safety window, well below the escrow's
-    ///      @custom:constant MAX_COOLDOWN ceiling. The protocol owner rotates this
+    ///      @custom:constant MAX_COOLDOWN ceiling. Root or the maintainer account changes this
     ///      post-deploy via @custom:function DotnsNameEscrow.updateCooldown.
     uint256 public constant ESCROW_COOLDOWN = 15 minutes;
 
@@ -52,8 +52,8 @@ contract DotnsDeployer is BaseDeployer {
     /// @dev The period after a release in which only the previous holder may act: they alone may
     ///      `redeem` the name back, and `available` reports false so nobody wastes a commitment on
     ///      it. Once it elapses, reclaim is permissionless. Well below the escrow's
-    ///      @custom:constant MAX_REDEEM_WINDOW ceiling. The protocol owner rotates this post-deploy
-    ///      via @custom:function DotnsNameEscrow.updateRedeemWindow.
+    ///      @custom:constant MAX_REDEEM_WINDOW ceiling. Root or the maintainer account changes this
+    ///      post-deploy via @custom:function DotnsNameEscrow.updateRedeemWindow.
     uint256 public constant ESCROW_REDEEM_WINDOW = 1 days;
 
     StoreFactory public storeFactory;

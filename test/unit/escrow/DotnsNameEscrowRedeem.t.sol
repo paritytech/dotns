@@ -489,8 +489,9 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
 
         vm.expectEmit(true, true, true, true, address(dotnsNameEscrow));
         emit IDotnsNameEscrow.RedeemWindowUpdated(current, next);
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         dotnsNameEscrow.updateRedeemWindow(next);
+        _mockCallerIsRoot(false);
 
         assertEq(dotnsNameEscrow.redeemWindow(), next, "the new window is stored");
     }
@@ -498,21 +499,23 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
     function test_revert_updateRedeemWindow_on_zero() public {
         uint256 min = dotnsNameEscrow.MIN_REDEEM_WINDOW();
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         vm.expectRevert(
             abi.encodeWithSelector(IDotnsNameEscrow.RedeemWindowTooShort.selector, 0, min)
         );
         dotnsNameEscrow.updateRedeemWindow(0);
+        _mockCallerIsRoot(false);
     }
 
     function test_revert_updateRedeemWindow_below_the_floor() public {
         uint256 min = dotnsNameEscrow.MIN_REDEEM_WINDOW();
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         vm.expectRevert(
             abi.encodeWithSelector(IDotnsNameEscrow.RedeemWindowTooShort.selector, min - 1, min)
         );
         dotnsNameEscrow.updateRedeemWindow(min - 1);
+        _mockCallerIsRoot(false);
     }
 
     /// @dev Both bounds are inclusive, so the extremes must be settable rather than one-off
@@ -522,23 +525,26 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
         uint256 min = dotnsNameEscrow.MIN_REDEEM_WINDOW();
         uint256 max = dotnsNameEscrow.MAX_REDEEM_WINDOW();
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         dotnsNameEscrow.updateRedeemWindow(min);
+        _mockCallerIsRoot(false);
         assertEq(dotnsNameEscrow.redeemWindow(), min, "the floor itself is settable");
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         dotnsNameEscrow.updateRedeemWindow(max);
+        _mockCallerIsRoot(false);
         assertEq(dotnsNameEscrow.redeemWindow(), max, "the ceiling itself is settable");
     }
 
     function test_revert_updateRedeemWindow_above_the_ceiling() public {
         uint256 max = dotnsNameEscrow.MAX_REDEEM_WINDOW();
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         vm.expectRevert(
             abi.encodeWithSelector(IDotnsNameEscrow.RedeemWindowTooLong.selector, max + 1, max)
         );
         dotnsNameEscrow.updateRedeemWindow(max + 1);
+        _mockCallerIsRoot(false);
     }
 
     function test_revert_updateRedeemWindow_from_a_non_owner() public {
@@ -559,8 +565,9 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
         // the prank and the update would arrive from the test contract instead of the owner.
         uint256 max = dotnsNameEscrow.MAX_REDEEM_WINDOW();
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         dotnsNameEscrow.updateRedeemWindow(max);
+        _mockCallerIsRoot(false);
 
         assertEq(
             _positionOf(tokenId).redeemableUntil,

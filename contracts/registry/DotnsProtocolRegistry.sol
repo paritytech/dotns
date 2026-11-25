@@ -194,8 +194,15 @@ contract DotnsProtocolRegistry is
     ///      @custom:reverts OwnerStillSet. A contract that reads its owner from this registry
     ///      passes. A contract still running code with an owner of its own, such as a proxy not
     ///      yet upgraded or a superseded cost model registry left under its key, fails the
-    ///      renounce. A contract with no `owner()` is skipped. Reads no `msg.sender`.
+    ///      renounce. A contract with no `owner()` is skipped. A maintainer account that is the
+    ///      departing owner @custom:reverts MaintainerIsBootstrapOwner, so the owner cannot keep
+    ///      the maintenance setters by appointing itself. Reads no `msg.sender`.
     function renounceOwnership() public override onlyRoot {
+        address departing = owner();
+        require(
+            departing == address(0) || _addresses[DotnsConstants.MAINTAINER] != departing,
+            MaintainerIsBootstrapOwner()
+        );
         _transferOwnership(address(0));
         bytes32[] memory known = DotnsConstants.registryKeys();
         for (uint256 i; i < known.length; ++i) {

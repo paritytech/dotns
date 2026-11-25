@@ -18,9 +18,10 @@ You need:
 - **Bun** (the deploy runner is wrapped by the package manifest).
 - A **funded deployer private key** on the target chain.
 - A usable **Root dispatch path** on the target chain: sudo, or a governance track that can
-  dispatch `Revive.call`. Every admin action on `DotnsNameWhitelist` needs it, so without one
-  the deployment cannot issue or revoke a single name grant. The deploy itself does not need
-  it; operating the whitelist afterwards does.
+  dispatch `Revive.call`. Every grant decision on `DotnsNameWhitelist` needs it, and so does
+  appointing the maintainer account, so without one the deployment cannot issue or revoke a
+  single name grant. The deploy itself does not need it; operating the whitelist afterwards
+  does.
 
 Two facts about your target chain:
 
