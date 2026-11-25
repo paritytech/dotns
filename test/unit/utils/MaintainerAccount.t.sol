@@ -10,7 +10,6 @@ import {IDotnsNameEscrow} from "../../../contracts/escrow/IDotnsNameEscrow.sol";
 import {IDotnsNameWhitelist} from "../../../contracts/whitelist/IDotnsNameWhitelist.sol";
 import {IDotnsPopController} from "../../../contracts/registrars/IDotnsPopController.sol";
 import {IDotnsPopGovernance} from "../../../contracts/registrars/IDotnsPopGovernance.sol";
-import {IDotnsProtocolRegistry} from "../../../contracts/registry/IDotnsProtocolRegistry.sol";
 
 /// @notice The maintainer account tunes bounded operational values: it can move a value only in
 ///         the direction that cannot disrupt what is under way, while Root can move it either way.
@@ -356,14 +355,6 @@ contract MaintainerAccountTests is BaseDotns {
         protocolRegistry.renounceOwnership();
         assertEq(protocolRegistry.owner(), address(0));
         assertEq(protocolRegistry.get(DotnsConstants.MAINTAINER), maintainer);
-    }
-
-    function test_revert_the_owner_cannot_keep_the_setters_as_maintainer() public {
-        _setMaintainer(owner);
-        _asRoot(address(protocolRegistry));
-        vm.expectRevert(IDotnsProtocolRegistry.MaintainerIsBootstrapOwner.selector);
-        protocolRegistry.renounceOwnership();
-        assertEq(protocolRegistry.owner(), owner);
     }
 
     // Helpers

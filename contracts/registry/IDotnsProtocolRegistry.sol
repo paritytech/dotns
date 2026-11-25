@@ -42,10 +42,6 @@ interface IDotnsProtocolRegistry {
     /// @param owner The owner it still reports.
     error OwnerStillSet(bytes32 key, address target, address owner);
 
-    /// @notice Thrown by `renounceOwnership` while the maintainer account is the bootstrap owner
-    ///         it would remove.
-    error MaintainerIsBootstrapOwner();
-
     /// @notice Returns the address stored for a given key.
     /// @dev Returns `address(0)` when the key is unset; callers must validate when non-zero is
     ///      required.
