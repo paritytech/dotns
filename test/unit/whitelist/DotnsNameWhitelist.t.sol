@@ -799,17 +799,17 @@ contract DotnsNameWhitelistTests is BaseDotns {
     }
 
     /// @dev Stands in for a whitelist upgraded from a version without expiry: the grant period,
-    ///      the clock start and the grant's `grantedAt` are zeroed in storage, as they read before
-    ///      the upgrade. Such a grant must run its period from the upgrade, not from zero.
+    ///      the legacy expiry and the grant's `expiresAt` are zeroed in storage, as they read
+    ///      before the upgrade. Such a grant must run its period from the upgrade.
     function test_a_grant_made_before_expiry_runs_its_period_from_the_upgrade() public {
         _grant(ed, BASE_LABEL_A);
 
-        // Slot 7 packs the window (low 128 bits) with `grantDuration` and the clock start.
+        // Slot 7 packs the window (low 128 bits) with `grantDuration` and the legacy expiry.
         bytes32 configSlot = bytes32(uint256(7));
         uint256 config = uint256(vm.load(address(whitelist), configSlot));
         vm.store(address(whitelist), configSlot, bytes32(config & type(uint128).max));
 
-        // A record's first slot packs status (byte 0), winner (bytes 1-20) and grantedAt.
+        // A record's first slot packs status (byte 0), winner (bytes 1-20) and expiresAt.
         bytes32 recordSlot = keccak256(abi.encode(_nodeOf(BASE_LABEL_A), uint256(2)));
         uint256 record = uint256(vm.load(address(whitelist), recordSlot));
         vm.store(
@@ -839,9 +839,31 @@ contract DotnsNameWhitelistTests is BaseDotns {
         whitelist.initializeGrantExpiry();
     }
 
+    /// @dev A grant made after an upgrade and before `initializeGrantExpiry` finds no grant
+    ///      period. It takes no expiry of its own, so it binds until the call and then shares the
+    ///      legacy expiry, and never lapses at the moment it is made.
+    function test_a_grant_made_before_initializeGrantExpiry_binds_until_the_call() public {
+        bytes32 configSlot = bytes32(uint256(7));
+        uint256 config = uint256(vm.load(address(whitelist), configSlot));
+        vm.store(address(whitelist), configSlot, bytes32(config & type(uint128).max));
+
+        _grant(ed, BASE_LABEL_A);
+        vm.warp(block.timestamp + 400 days);
+        assertTrue(whitelist.isGrantedTo(BASE_LABEL_A, ed), "binds without a grant period");
+        assertEq(whitelist.grantExpiresAt(BASE_LABEL_A), type(uint64).max);
+
+        uint64 upgradedAt = uint64(block.timestamp);
+        vm.prank(owner);
+        whitelist.initializeGrantExpiry();
+        assertEq(
+            whitelist.grantExpiresAt(BASE_LABEL_A),
+            upgradedAt + DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION
+        );
+    }
+
     /// @dev Governance may set a period after an upgrade and before `initializeGrantExpiry`. The
-    ///      clock is still unset, so old grants keep binding, and the later call still starts it,
-    ///      keeping the period governance chose.
+    ///      legacy expiry is still unset, so old grants keep binding, and the later call still
+    ///      sets it, keeping the period governance chose.
     function test_an_early_setGrantDuration_keeps_old_grants_binding() public {
         _grant(ed, BASE_LABEL_A);
 

@@ -330,10 +330,12 @@ interface IDotnsNameWhitelist {
     function setMaxGrantBatch(uint16 newMax) external;
 
     /// @notice Sets the period a grant binds its name.
-    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. Bounded
-    /// by `DotnsConstants.WHITELIST_MIN_GRANT_DURATION` and
-    /// `DotnsConstants.WHITELIST_MAX_GRANT_DURATION`. The period applies to grants made after the
-    /// call; a live grant keeps the expiry it was given, so either direction is safe.
+    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. The
+    /// period applies to grants made after the call, and a live grant keeps the expiry it was
+    /// given. A shorter period would still cut the grants a pending referendum makes, so the
+    /// maintainer can only raise it, otherwise @custom:reverts MaintainerNotAllowed. Bounded by
+    /// `DotnsConstants.WHITELIST_MIN_GRANT_DURATION` and
+    /// `DotnsConstants.WHITELIST_MAX_GRANT_DURATION`.
     /// @custom:reverts GrantDurationOutOfRange when `newDuration` is out of range.
     /// @custom:emits GrantDurationSet.
     /// @param newDuration New grant period, in seconds.

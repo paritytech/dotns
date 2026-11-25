@@ -133,15 +133,22 @@ contract MaintainerAccountTests is BaseDotns {
         assertEq(dotnsPopController.reservationDuration(), current - 1);
     }
 
-    function test_the_maintainer_sets_the_grant_duration_either_way() public {
+    function test_revert_the_maintainer_cannot_lower_the_grant_duration() public {
         _setMaintainer(maintainer);
         uint64 current = dotnsNameWhitelist.grantDuration();
 
         vm.startPrank(maintainer);
-        dotnsNameWhitelist.setGrantDuration(current - 1 days);
+        vm.expectRevert(ProtocolOwnedUpgradeable.MaintainerNotAllowed.selector);
+        dotnsNameWhitelist.setGrantDuration(current - 1);
+
+        dotnsNameWhitelist.setGrantDuration(current);
         dotnsNameWhitelist.setGrantDuration(current + 1 days);
         vm.stopPrank();
         assertEq(dotnsNameWhitelist.grantDuration(), current + 1 days);
+
+        _asRoot(address(dotnsNameWhitelist));
+        dotnsNameWhitelist.setGrantDuration(DotnsConstants.WHITELIST_MIN_GRANT_DURATION);
+        assertEq(dotnsNameWhitelist.grantDuration(), DotnsConstants.WHITELIST_MIN_GRANT_DURATION);
     }
 
     /// @notice A grant keeps the expiry it was given: no later period moves it either way.
@@ -150,12 +157,13 @@ contract MaintainerAccountTests is BaseDotns {
         _rootGrant("alpha", ed);
         uint64 expiresAt = dotnsNameWhitelist.grantExpiresAt("alpha");
 
-        vm.startPrank(maintainer);
+        vm.prank(maintainer);
         dotnsNameWhitelist.setGrantDuration(DotnsConstants.WHITELIST_MAX_GRANT_DURATION);
         assertEq(dotnsNameWhitelist.grantExpiresAt("alpha"), expiresAt, "raising keeps it");
+
+        _asRoot(address(dotnsNameWhitelist));
         dotnsNameWhitelist.setGrantDuration(DotnsConstants.WHITELIST_MIN_GRANT_DURATION);
         assertEq(dotnsNameWhitelist.grantExpiresAt("alpha"), expiresAt, "lowering keeps it");
-        vm.stopPrank();
     }
 
     /// @notice A lapsed grant stays lapsed: raising the period cannot bring back its grantee.

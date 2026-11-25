@@ -343,7 +343,7 @@ A grant that has been spent or has expired reads `false`, so `isGrantedTo` also 
 
 `setWindow`, `setMaxClaimants`, `setMaxReasonBytes`, `setMaxGrantBatch` and `setGrantDuration` accept Root or the maintainer account. The deploy cannot configure them, so the values `initialize` sets are what a fresh network starts with; check the defaults in `DotnsConstants` are the ones you want at launch.
 
-The maintainer account can move a value only in the direction that cannot disrupt what is under way. It can raise `setMaxGrantBatch` but not lower it. It never opens a request window: it can only lengthen one that Root opened or scheduled, up to `WHITELIST_MAINTAINER_MAX_WINDOW` from its opening. While a window is open or scheduled it can only raise `setMaxClaimants` and `setMaxReasonBytes`. A new `setGrantDuration` applies only to grants made afterwards, so the maintainer can set it either way. Root can set any value.
+The maintainer account can move a value only in the direction that cannot disrupt what is under way. It can raise `setMaxGrantBatch` and `setGrantDuration` but not lower them. It never opens a request window: it can only lengthen one that Root opened or scheduled, up to `WHITELIST_MAINTAINER_MAX_WINDOW` from its opening. While a window is open or scheduled it can only raise `setMaxClaimants` and `setMaxReasonBytes`. Root can set any value.
 
 ## Deterministic addresses (CREATE3)
 

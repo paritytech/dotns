@@ -209,7 +209,10 @@ contract DotnsNameWhitelist is
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function setGrantDuration(uint64 newDuration) external override onlyRootOrMaintainer {
+    function setGrantDuration(uint64 newDuration) external override {
+        // A shorter period would cut the grants a pending referendum makes: the maintainer can
+        // only raise it.
+        require(_checkRootOrMaintainer() || newDuration >= grantDuration, MaintainerNotAllowed());
         require(
             newDuration >= DotnsConstants.WHITELIST_MIN_GRANT_DURATION
                 && newDuration <= DotnsConstants.WHITELIST_MAX_GRANT_DURATION,
@@ -530,7 +533,9 @@ contract DotnsNameWhitelist is
         NameRecord storage record = _names[node];
         record.status = NameStatus.Claimed;
         record.winner = winner;
-        record.expiresAt = uint64(block.timestamp) + grantDuration;
+        // Without a grant period the record takes no expiry of its own, so the grant binds until
+        // `initializeGrantExpiry` sets the shared legacy expiry.
+        record.expiresAt = grantDuration == 0 ? 0 : uint64(block.timestamp) + grantDuration;
         _activate(node, label);
         _clearClaimants(node, winner, label);
     }
