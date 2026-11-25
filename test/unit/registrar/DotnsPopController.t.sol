@@ -280,8 +280,9 @@ contract DotnsPopControllerTests is BaseDotns {
         vm.warp(block.timestamp + 2 days);
         // Governance shrinks the window to 1 day. The entry's `joinedAt` plus
         // the new duration is now in the past, so the slot is expired.
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         dotnsPopController.setReservationDuration(1 days);
+        _mockCallerIsRoot(false);
 
         (bool liveAfter,) = dotnsPopController.isReservedForClaim(PERSONHOOD_LABEL_A);
         assertFalse(liveAfter);
@@ -289,7 +290,7 @@ contract DotnsPopControllerTests is BaseDotns {
 
     function test_setReservationDuration_bounds() public {
         uint64 max = dotnsPopController.MAX_RESERVATION_DURATION();
-        vm.startPrank(owner);
+        _mockCallerIsRoot(true);
         dotnsPopController.setReservationDuration(max);
         assertEq(dotnsPopController.reservationDuration(), max);
 
@@ -304,7 +305,7 @@ contract DotnsPopControllerTests is BaseDotns {
             )
         );
         dotnsPopController.setReservationDuration(type(uint64).max);
-        vm.stopPrank();
+        _mockCallerIsRoot(false);
     }
 
     /// @notice At the longest duration, the front user's entry ends no later than the PopRules
@@ -314,8 +315,9 @@ contract DotnsPopControllerTests is BaseDotns {
         public
     {
         uint64 max = dotnsPopController.MAX_RESERVATION_DURATION();
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         dotnsPopController.setReservationDuration(max);
+        _mockCallerIsRoot(false);
         _reservePop(ed, DEVICE_LABEL_A, _validChatKey(0x01), "longnamebob");
         (, uint64 joinedAt) =
             dotnsPopController.reservationEntry(keccak256(bytes("longnamebob")), 0);
@@ -427,9 +429,9 @@ contract DotnsPopControllerTests is BaseDotns {
         }
     }
 
-    function test_setReservationDuration_reverts_for_non_owner() public {
+    function test_setReservationDuration_reverts_for_a_caller_neither_root_nor_maintainer() public {
         vm.prank(ed);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", ed));
+        vm.expectRevert(abi.encodeWithSignature("NotRootOrMaintainer(address)", ed));
         dotnsPopController.setReservationDuration(14 days);
     }
 
@@ -1615,22 +1617,24 @@ contract DotnsPopControllerTests is BaseDotns {
     }
 
     function test_revert_setReservationDuration_below_minimum() public {
-        // The setter enforces a floor so a single owner call cannot retroactively
+        // The setter enforces a floor so a single Root call cannot retroactively
         // expire every live queue and pending-claim entry.
         uint64 minDuration = dotnsPopController.MIN_RESERVATION_DURATION();
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         vm.expectRevert(
             abi.encodeWithSelector(IDotnsPopController.ReservationDurationTooLow.selector, 0)
         );
         dotnsPopController.setReservationDuration(0);
+        _mockCallerIsRoot(false);
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IDotnsPopController.ReservationDurationTooLow.selector, minDuration - 1
             )
         );
         dotnsPopController.setReservationDuration(minDuration - 1);
+        _mockCallerIsRoot(false);
     }
 
     function test_gatewayReserve_stashes_pending_claim_when_user_has_no_label_store() public {

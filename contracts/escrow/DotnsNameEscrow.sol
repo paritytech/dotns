@@ -60,7 +60,7 @@ contract DotnsNameEscrow is
     ///      offers no protection at all, and one of zero length turns every release into an
     ///      immediate hand-off to whoever is watching. The floor keeps the window long enough to
     ///      span a holder being asleep or away for a day, so the guarantee survives any setting
-    ///      the owner is able to choose.
+    ///      Root or the maintainer account can choose.
     uint256 public constant MIN_REDEEM_WINDOW = 1 days;
 
     /// @notice The protocol registry for resolving sibling contract addresses.
@@ -175,20 +175,20 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function updateCooldown(uint256 newCooldown) public override onlyRootOrOwner {
+    function updateCooldown(uint256 newCooldown) public override onlyRootOrMaintainer {
         _updateCooldown(newCooldown);
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyRootOrOwner {
+    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyRootOrMaintainer {
         _updateRedeemWindow(newRedeemWindow);
     }
 
     /// @notice Validates and seeds the cooldown, without an ownership check.
     /// @dev Split from @custom:function updateCooldown so the initialiser can seed the value:
     ///      the initialiser runs inside the proxy constructor, where the caller is the deploying
-    ///      contract, so `onlyRootOrOwner` would reject it. Every caller either is
-    ///      `onlyRootOrOwner` or runs inside `initializer`.
+    ///      contract, so `onlyRootOrMaintainer` would reject it. Every caller either is
+    ///      `onlyRootOrMaintainer` or runs inside `initializer`.
     /// @param newCooldown Delay after release before the deposit withdrawal may be credited.
     function _updateCooldown(uint256 newCooldown) private {
         require(newCooldown != 0, InvalidCooldown());

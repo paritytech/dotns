@@ -29,12 +29,14 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 ///      behalf and the name binds to that user. All state is on-chain and queryable through views;
 ///      no event indexing is required. A name holds at most `maxClaimants` live claims, which
 ///      bounds the loop that clears them on resolution. Resolving a name deletes its claims,
-///      refunding their storage deposit, so only reserved or won names persist. The entire admin
-///      surface is substrate Root: `SystemUtils.callerIsRoot` is true through the proxy's
-///      delegatecall frame, and no gate reads `msg.sender`, so Root's lack of an address is not a
-///      problem. No signed account grants, revokes, reserves, or retunes a cap; the owner's
-///      authority is upgrade only. The public and PoP controllers hold only the `consume` hook.
-///      Entries are keyed by the node under the active TLD, which the deployment holds immutable
+///      refunding their storage deposit, so only reserved or won names persist. Grants,
+///      revocations, acceptances, rejections and reservations are substrate Root only: those
+///      gates check `SystemUtils.callerIsRoot`, true through the proxy's delegatecall frame, and
+///      read no `msg.sender`. The request window and the caps are also open to the maintainer
+///      account, within the rules each setter enforces; that gate reads `msg.sender` only after
+///      the Root check fails. The owner's authority is upgrade only. The public and PoP controllers
+/// hold only the `consume` hook. Entries are keyed by the node under the active TLD, which the
+/// deployment holds immutable
 ///      for the whitelist's lifetime.
 /// @custom:security-contact admin@parity.io
 contract DotnsNameWhitelist is
@@ -51,15 +53,15 @@ contract DotnsNameWhitelist is
     /// @notice Protocol-level address registry for all dotNS contracts.
     IDotnsProtocolRegistry public protocolRegistry;
 
-    /// @notice Live-claim cap per name, tunable by governance within
+    /// @notice Live-claim cap per name, tunable by Root or the maintainer account within
     ///         `DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT`.
     uint16 public maxClaimants;
 
-    /// @notice Cap on labels per `grantNames` call, tunable by governance within
-    ///         `DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT`.
+    /// @notice Cap on labels per `grantNames` call, tunable by Root or the maintainer account
+    /// within `DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT`.
     uint16 public maxGrantBatch;
 
-    /// @notice Reason byte cap, tunable by governance within
+    /// @notice Reason byte cap, tunable by Root or the maintainer account within
     ///         `DotnsConstants.WHITELIST_MAX_REASON_LIMIT`.
     uint256 public maxReasonBytes;
 
@@ -81,22 +83,23 @@ contract DotnsNameWhitelist is
     /// @notice Timestamp requests stop being accepted.
     uint64 private _requestClose;
 
-    /// @notice Period a grant binds its name, tunable by governance within
+    /// @notice Period a grant binds its name, tunable by Root or the maintainer account within
     ///         `DotnsConstants.WHITELIST_MIN_GRANT_DURATION` and
     ///         `DotnsConstants.WHITELIST_MAX_GRANT_DURATION`.
     uint64 public grantDuration;
 
-    /// @notice Earliest timestamp a grant period runs from.
-    /// @dev Set when grant expiry is initialised. A grant recorded before then has no `grantedAt`,
-    ///      so its period runs from here.
-    uint64 private _grantClockStart;
+    /// @notice Expiry of every grant recorded before grant expiry was initialised.
+    /// @dev Fixed when grant expiry is initialised, to that moment plus the grant period then in
+    ///      force. Such a grant has no `expiresAt` of its own. Zero until then, while those grants
+    ///      keep binding.
+    uint64 private _legacyGrantExpiresAt;
 
     /// @dev Reserved storage space to allow for layout changes in the future.
     uint256[50] private __gap;
 
     /// @notice Restricts a call to a substrate Root dispatch.
-    /// @dev The whole admin surface is governance-only: no key grants, revokes, reserves, or
-    ///      retunes a cap. The bootstrap owner configures and upgrades until Root renounces it,
+    /// @dev Every decision about who holds a name is governance-only: no key grants, revokes or
+    ///      reserves. The bootstrap owner configures and upgrades until Root renounces it,
     ///      and never allocates, so no signed account can hand out a name. `msg.sender` is never
     ///      read here, which is also what keeps every gated entry point callable under a Root
     ///      origin, since Root has no account.
@@ -141,26 +144,33 @@ contract DotnsNameWhitelist is
     }
 
     /// @notice Starts grant expiry on a whitelist initialised without it.
-    /// @dev Called once by the owner through `upgradeToAndCall`, so the upgrade and the clock
-    ///      start land in one call. Starts the clock for grants made before it, which have no
-    ///      `grantedAt`, and sets the default grant period unless governance already set one. A
-    ///      whitelist whose clock already runs @custom:reverts InvalidInitialization.
+    /// @dev Called once through `upgradeToAndCall`, so the upgrade and the expiry start land in
+    ///      one call. Sets the default grant period unless governance already set one, and fixes
+    ///      the expiry of grants made before it, which have no `expiresAt`, at the period from now.
+    ///      A whitelist whose expiry already runs @custom:reverts InvalidInitialization.
     function initializeGrantExpiry() external reinitializer(2) onlyRootOrOwner {
-        require(_grantClockStart == 0, InvalidInitialization());
+        require(_legacyGrantExpiresAt == 0, InvalidInitialization());
         _initializeGrantExpiry();
     }
 
-    /// @notice Starts the grant clock, and sets the default grant period when none is set.
+    /// @notice Sets the default grant period when none is set, and fixes the expiry of grants
+    ///         recorded before grant expiry.
     function _initializeGrantExpiry() internal {
-        _grantClockStart = uint64(block.timestamp);
         if (grantDuration == 0) {
             grantDuration = DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION;
             emit GrantDurationSet(DotnsConstants.WHITELIST_DEFAULT_GRANT_DURATION);
         }
+        _legacyGrantExpiresAt = uint64(block.timestamp) + grantDuration;
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function setMaxClaimants(uint16 newMax) external override onlyGovernance {
+    function setMaxClaimants(uint16 newMax) external override {
+        // While requests are being taken, a lower cap would lock out claimants on a name another
+        // claimant just reached: the maintainer can only raise it then.
+        require(
+            _checkRootOrMaintainer() || !_windowLive() || newMax >= maxClaimants,
+            MaintainerNotAllowed()
+        );
         require(
             newMax > 0 && newMax <= DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT,
             MaxClaimantsOutOfRange()
@@ -170,7 +180,13 @@ contract DotnsNameWhitelist is
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function setMaxReasonBytes(uint256 newMax) external override onlyGovernance {
+    function setMaxReasonBytes(uint256 newMax) external override {
+        // While requests are being taken, a lower cap would cut short the reasons claimants are
+        // writing: the maintainer can only raise it then.
+        require(
+            _checkRootOrMaintainer() || !_windowLive() || newMax >= maxReasonBytes,
+            MaintainerNotAllowed()
+        );
         require(
             newMax > 0 && newMax <= DotnsConstants.WHITELIST_MAX_REASON_LIMIT,
             MaxReasonBytesOutOfRange()
@@ -180,7 +196,10 @@ contract DotnsNameWhitelist is
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function setMaxGrantBatch(uint16 newMax) external override onlyGovernance {
+    function setMaxGrantBatch(uint16 newMax) external override {
+        // The cap limits Root's own grant batches, so lowering it could fail a pending
+        // referendum: the maintainer can only raise it.
+        require(_checkRootOrMaintainer() || newMax >= maxGrantBatch, MaintainerNotAllowed());
         require(
             newMax > 0 && newMax <= DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT,
             MaxGrantBatchOutOfRange()
@@ -190,7 +209,10 @@ contract DotnsNameWhitelist is
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function setGrantDuration(uint64 newDuration) external override onlyGovernance {
+    function setGrantDuration(uint64 newDuration) external override {
+        // A shorter period would cut the grants a pending referendum makes: the maintainer can
+        // only raise it.
+        require(_checkRootOrMaintainer() || newDuration >= grantDuration, MaintainerNotAllowed());
         require(
             newDuration >= DotnsConstants.WHITELIST_MIN_GRANT_DURATION
                 && newDuration <= DotnsConstants.WHITELIST_MAX_GRANT_DURATION,
@@ -282,7 +304,7 @@ contract DotnsNameWhitelist is
         _clearClaimants(node, address(0), label);
         record.status = NameStatus.Open;
         record.winner = address(0);
-        record.grantedAt = 0;
+        record.expiresAt = 0;
         emit NameRevoked(node, winner, label);
         _deactivate(node);
     }
@@ -318,15 +340,28 @@ contract DotnsNameWhitelist is
         );
         record.status = NameStatus.Open;
         record.winner = address(0);
-        record.grantedAt = 0;
+        record.expiresAt = 0;
         emit NameConsumed(node, registrant, label);
         _deactivate(node);
     }
 
     /// @inheritdoc IDotnsNameWhitelist
-    function setWindow(uint64 startsIn, uint64 duration) external override onlyGovernance {
+    function setWindow(uint64 startsIn, uint64 duration) external override {
+        bool root = _checkRootOrMaintainer();
         require(duration > 0, BadWindow());
         uint64 openAt = uint64(block.timestamp) + startsIn;
+        if (!root) {
+            // Opening intake is Root's decision. The maintainer only lengthens a window Root
+            // opened or scheduled: it keeps its opening, and closing it early or moving it would
+            // cut off requests people planned around.
+            require(_windowLive() && startsIn == 0, MaintainerNotAllowed());
+            openAt = _requestOpen;
+            require(openAt + duration >= _requestClose, MaintainerNotAllowed());
+            require(
+                duration <= DotnsConstants.WHITELIST_MAINTAINER_MAX_WINDOW,
+                MaintainerWindowOutOfBounds()
+            );
+        }
         uint64 closeAt = openAt + duration;
         _requestOpen = openAt;
         _requestClose = closeAt;
@@ -498,7 +533,9 @@ contract DotnsNameWhitelist is
         NameRecord storage record = _names[node];
         record.status = NameStatus.Claimed;
         record.winner = winner;
-        record.grantedAt = uint64(block.timestamp);
+        // Without a grant period the record takes no expiry of its own, so the grant binds until
+        // `initializeGrantExpiry` sets the shared legacy expiry.
+        record.expiresAt = grantDuration == 0 ? 0 : uint64(block.timestamp) + grantDuration;
         _activate(node, label);
         _clearClaimants(node, winner, label);
     }
@@ -522,19 +559,18 @@ contract DotnsNameWhitelist is
     }
 
     /// @notice Returns when the grant held in `record` expires.
-    /// @dev The period runs from `grantedAt`, or from the grant clock start for a grant made
-    ///      before expiry was initialised. The clock is unset only on a whitelist upgraded
-    ///      without `initializeGrantExpiry`; every grant then keeps binding, whatever period
-    ///      governance sets in the meantime, so neither a separate upgrade call nor an early
-    ///      `setGrantDuration` can open granted names.
+    /// @dev A grant keeps the expiry fixed when it was made, so a later `setGrantDuration` never
+    ///      moves it. A grant recorded before grant expiry was initialised shares
+    ///      `_legacyGrantExpiresAt`; until that is set, on a whitelist upgraded without
+    ///      `initializeGrantExpiry`, such a grant keeps binding.
     /// @param record Stored record of a `Claimed` name.
-    /// @return expiresAt Timestamp the grant expires at; `type(uint64).max` while the clock is
-    ///         unset.
+    /// @return expiresAt Timestamp the grant expires at; `type(uint64).max` for a grant recorded
+    ///         before grant expiry while it is not yet initialised.
     function _expiryOf(NameRecord storage record) internal view returns (uint64 expiresAt) {
-        if (_grantClockStart == 0) return type(uint64).max;
-        uint64 start = record.grantedAt;
-        if (start < _grantClockStart) start = _grantClockStart;
-        return start + grantDuration;
+        expiresAt = record.expiresAt;
+        if (expiresAt != 0) return expiresAt;
+        expiresAt = _legacyGrantExpiresAt;
+        if (expiresAt == 0) return type(uint64).max;
     }
 
     /// @notice Resets an expired grant in `record` to Open and returns the resulting status.
@@ -547,7 +583,7 @@ contract DotnsNameWhitelist is
         if (status != record.status) {
             record.status = NameStatus.Open;
             record.winner = address(0);
-            record.grantedAt = 0;
+            record.expiresAt = 0;
         }
     }
 
@@ -604,6 +640,12 @@ contract DotnsNameWhitelist is
     /// @return node Namehash of the label under the active TLD.
     function _nodeOf(string calldata label) internal view returns (bytes32 node) {
         (, node) = LabelUtils.deriveNode(protocolRegistry.tldNode(), label);
+    }
+
+    /// @notice Returns whether a request window is open or scheduled.
+    /// @return live True until the current window closes.
+    function _windowLive() internal view returns (bool live) {
+        return block.timestamp < _requestClose;
     }
 
     /// @notice Returns whether the current time is within the open window.

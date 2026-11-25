@@ -43,6 +43,13 @@ const UNSET_TOLERATED = {
   protocolRegistry: "not registered on this network (predates self-registration)",
 };
 
+// Keys that hold an account, not a contract. Unset is normal: the maintainer account stays off
+// until Root sets it. When set, the address is not in the manifest and has no code or declared
+// codehash, so the forward check only records that the key resolves.
+const ACCOUNT_KEYS = {
+  maintainer: "the maintainer account",
+};
+
 // The registry is what a consumer bootstraps from; the factory is what every other address
 // derives from. A manifest without them is not publishable.
 const REQUIRED_LABELS = ["DotnsProtocolRegistry", "Create3Factory"];
@@ -70,8 +77,9 @@ const REGISTRY_KEY_CONTRACTS = {
   popLens: "DotnsPopLens",
 };
 
-// Keys that are never published, because the registry never holds them.
-const UNPUBLISHED_KEYS = ["multicall3"];
+// Keys that are never published: the registry never holds `multicall3`, and `maintainer` holds an
+// account, not a contract.
+const UNPUBLISHED_KEYS = ["multicall3", "maintainer"];
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -964,6 +972,11 @@ function verify(args) {
       rpc,
     ]);
     if (address !== ZERO_ADDRESS) resolving.add(key);
+    if (Object.hasOwn(ACCOUNT_KEYS, key)) {
+      const state = address === ZERO_ADDRESS ? "unset" : address;
+      console.log(`  skip ${key} ${state} (${ACCOUNT_KEYS[key]}, not a contract)`);
+      continue;
+    }
     if (address === ZERO_ADDRESS) {
       // protocolRegistry's tolerance is transitional and lapses under --tag: passing a tag
       // asserts the network is post-declaration, so the self-key must exist there.

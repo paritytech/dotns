@@ -17,7 +17,7 @@ import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolReg
 contract DeployPopSystem is BaseDeployer {
     /// @notice Default reservation duration for the PoP controller.
     /// @dev Gives a device-name holder a month to reach personhood and claim the personhood
-    ///      name they reserved. The owner rotates it post-deploy via
+    ///      name they reserved. Root or the maintainer account changes it post-deploy via
     ///      `DotnsPopController.setReservationDuration`.
     uint64 public constant DEFAULT_RESERVATION_DURATION = 30 days;
 

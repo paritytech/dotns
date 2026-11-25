@@ -112,16 +112,20 @@ contract DotnsNameWhitelistInvariant is BaseDotns {
 
     /// @notice A name stored as `Claimed` reads Open only once its grant period has passed.
     function invariant_a_lapsed_grant_is_past_its_expiry() public view {
-        (uint64 duration, uint64 clockStart) = _grantConfig();
+        (, uint64 legacyExpiry) = _grantConfig();
         uint256 n = handler.labelCount();
         for (uint256 i; i < n; ++i) {
             string memory label = handler.labelAt(i);
-            (IDotnsNameWhitelist.NameStatus stored, address winner, uint64 grantedAt) =
+            (IDotnsNameWhitelist.NameStatus stored, address winner, uint64 storedExpiry) =
                 _storedRecord(label);
             if (stored != IDotnsNameWhitelist.NameStatus.Claimed) continue;
 
-            uint64 start = grantedAt < clockStart ? clockStart : grantedAt;
-            bool live = block.timestamp < start + duration;
+            // A grant keeps the expiry it was given; one recorded before expiry shares the legacy
+            // expiry, and binds for good while that is unset.
+            uint64 expiry = storedExpiry != 0
+                ? storedExpiry
+                : (legacyExpiry != 0 ? legacyExpiry : type(uint64).max);
+            bool live = block.timestamp < expiry;
             assertEq(
                 whitelist.statusOf(label) == IDotnsNameWhitelist.NameStatus.Claimed,
                 live,
@@ -129,16 +133,16 @@ contract DotnsNameWhitelistInvariant is BaseDotns {
             );
             assertEq(whitelist.granteeOf(label), live ? winner : address(0));
             assertEq(whitelist.isGrantedTo(label, winner), live);
-            assertEq(whitelist.grantExpiresAt(label), live ? start + duration : 0);
+            assertEq(whitelist.grantExpiresAt(label), live ? expiry : 0);
         }
     }
 
     /// @dev Decodes the first slot of a name's record: status (byte 0), winner (bytes 1-20) and
-    ///      grantedAt (bytes 21-28). `_names` sits at slot 2.
+    ///      expiresAt (bytes 21-28). `_names` sits at slot 2.
     function _storedRecord(string memory label)
         internal
         view
-        returns (IDotnsNameWhitelist.NameStatus status, address winner, uint64 grantedAt)
+        returns (IDotnsNameWhitelist.NameStatus status, address winner, uint64 expiresAt)
     {
         uint256 word = uint256(
             vm.load(address(whitelist), keccak256(abi.encode(_nodeOf(label), uint256(2))))
@@ -149,16 +153,16 @@ contract DotnsNameWhitelistInvariant is BaseDotns {
         // forge-lint: disable-next-line(unsafe-typecast)
         winner = address(uint160(word >> 8));
         // forge-lint: disable-next-line(unsafe-typecast)
-        grantedAt = uint64(word >> 168);
+        expiresAt = uint64(word >> 168);
     }
 
     /// @dev Reads `grantDuration` and the grant clock start from slot 7, above the window.
-    function _grantConfig() internal view returns (uint64 duration, uint64 clockStart) {
+    function _grantConfig() internal view returns (uint64 duration, uint64 legacyExpiry) {
         uint256 word = uint256(vm.load(address(whitelist), bytes32(uint256(7))));
         // forge-lint: disable-next-line(unsafe-typecast)
         duration = uint64(word >> 128);
         // forge-lint: disable-next-line(unsafe-typecast)
-        clockStart = uint64(word >> 192);
+        legacyExpiry = uint64(word >> 192);
         assertEq(duration, whitelist.grantDuration(), "slot 7 layout");
     }
 }

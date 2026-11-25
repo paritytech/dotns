@@ -6,6 +6,8 @@ import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {SystemUtils} from "./SystemUtils.sol";
+import {DotnsConstants} from "./DotnsConstants.sol";
+import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
 
 /// @title ProtocolOwnedUpgradeable
 /// @notice Governance gate for an upgradeable dotNS contract whose bootstrap owner is the owner of
@@ -34,6 +36,14 @@ abstract contract ProtocolOwnedUpgradeable {
     /// @notice Thrown by an initialiser given a zero protocol registry.
     error ZeroProtocolRegistry();
 
+    /// @notice Thrown when the caller is neither Root nor the maintainer account.
+    /// @param account The caller.
+    error NotRootOrMaintainer(address account);
+
+    /// @notice Thrown when the maintainer moves a value in the direction that would disrupt what
+    ///         is already under way; only Root can.
+    error MaintainerNotAllowed();
+
     /// @notice Restricts a call to Root, or to the bootstrap owner while one is set.
     modifier onlyRootOrOwner() {
         _checkRootOrOwner();
@@ -53,6 +63,29 @@ abstract contract ProtocolOwnedUpgradeable {
         if (!SystemUtils.tryCallerIsRoot()) {
             require(msg.sender == owner(), OwnableUnauthorizedAccount(msg.sender));
         }
+    }
+
+    /// @notice Restricts a call to Root, or to the maintainer account while one is set.
+    modifier onlyRootOrMaintainer() {
+        _checkRootOrMaintainer();
+        _;
+    }
+
+    /// @notice Passes Root and the maintainer account, and reports which one called.
+    /// @dev The maintainer account is the address under `DotnsConstants.MAINTAINER` in the protocol
+    ///      registry; unset, it reads zero and no caller passes as maintainer. Checks Root first
+    ///      and reads `msg.sender` only on the maintainer branch, otherwise
+    ///      @custom:reverts NotRootOrMaintainer. A caller uses the result to hold the maintainer
+    ///      to the direction that cannot disrupt what is under way.
+    /// @return root True for Root, false for the maintainer account.
+    function _checkRootOrMaintainer() internal view returns (bool root) {
+        if (SystemUtils.tryCallerIsRoot()) return true;
+        address maintainer =
+            IDotnsProtocolRegistry(_protocolRegistryAddress()).get(DotnsConstants.MAINTAINER);
+        require(
+            maintainer != address(0) && msg.sender == maintainer, NotRootOrMaintainer(msg.sender)
+        );
+        return false;
     }
 
     /// @notice Reverts with ZeroProtocolRegistry for a zero protocol registry.

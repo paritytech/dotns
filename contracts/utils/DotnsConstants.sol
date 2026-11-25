@@ -73,11 +73,13 @@ library DotnsConstants {
     uint256 internal constant MIN_LABEL_LENGTH = 3;
 
     /// @notice Default per-name live-claim cap the name whitelist starts with.
-    /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_CLAIMANTS_LIMIT`.
+    /// @dev Root or the maintainer account retunes it on the whitelist within
+    ///      `WHITELIST_MAX_CLAIMANTS_LIMIT`.
     uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 24;
 
     /// @notice Default claim-reason byte cap the name whitelist starts with.
-    /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_REASON_LIMIT`.
+    /// @dev Root or the maintainer account retunes it on the whitelist within
+    ///      `WHITELIST_MAX_REASON_LIMIT`.
     uint256 internal constant WHITELIST_DEFAULT_MAX_REASON_BYTES = 256;
 
     /// @notice Upper bound on the whitelist live-claim cap.
@@ -90,7 +92,8 @@ library DotnsConstants {
     uint256 internal constant WHITELIST_MAX_REASON_LIMIT = 256;
 
     /// @notice Default cap on labels granted in one `grantNames` call.
-    /// @dev Governance retunes it on the whitelist within `WHITELIST_MAX_GRANT_BATCH_LIMIT`.
+    /// @dev Root or the maintainer account retunes it on the whitelist within
+    ///      `WHITELIST_MAX_GRANT_BATCH_LIMIT`.
     uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 32;
 
     /// @notice Upper bound on the `grantNames` batch cap.
@@ -100,7 +103,8 @@ library DotnsConstants {
     uint16 internal constant WHITELIST_MAX_GRANT_BATCH_LIMIT = 36;
 
     /// @notice Default period a whitelist grant binds its name before it expires.
-    /// @dev Governance retunes it on the whitelist within `WHITELIST_MIN_GRANT_DURATION` and
+    /// @dev Root or the maintainer account retunes it on the whitelist within
+    ///      `WHITELIST_MIN_GRANT_DURATION` and
     ///      `WHITELIST_MAX_GRANT_DURATION`.
     uint64 internal constant WHITELIST_DEFAULT_GRANT_DURATION = 30 days;
 
@@ -110,6 +114,9 @@ library DotnsConstants {
 
     /// @notice Upper bound on the whitelist grant period, so no grant binds a name for good.
     uint64 internal constant WHITELIST_MAX_GRANT_DURATION = 365 days;
+
+    /// @notice Longest the maintainer can make a request window, measured from its opening.
+    uint64 internal constant WHITELIST_MAINTAINER_MAX_WINDOW = 90 days;
 
     /// @notice Well-known key the protocol registry is registered under, itself.
     /// @dev Not for discovery: the registry is the bootstrap contract every consumer already
@@ -222,13 +229,20 @@ library DotnsConstants {
     /// forge-lint: disable-next-line(unsafe-typecast)
     bytes32 internal constant NAME_WHITELIST = bytes32("nameWhitelist");
 
+    /// @notice Well-known key for the maintainer account, which tunes bounded operational values.
+    /// @dev Role: the account the maintenance setters accept besides Root. It is an account, not a
+    ///      contract, so the release tooling publishes no contract for it. Unset, it reads zero
+    ///      and no caller passes as maintainer; Root sets and removes it.
+    /// forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 internal constant MAINTAINER = bytes32("maintainer");
+
     /// @notice Every well-known protocol registry key declared above.
     /// @dev The protocol registry seeds its key index from this list (@custom:function
     ///      IDotnsProtocolRegistry.initializeKeys). The release tooling fails when a key declared
     ///      here is missing from the list.
     /// @return keys The well-known keys, in declaration order.
     function registryKeys() internal pure returns (bytes32[] memory keys) {
-        keys = new bytes32[](17);
+        keys = new bytes32[](18);
         keys[0] = COST_MODEL;
         keys[1] = PROTOCOL_REGISTRY;
         keys[2] = REGISTRAR;
@@ -246,5 +260,6 @@ library DotnsConstants {
         keys[14] = MULTICALL3;
         keys[15] = CREATE3_FACTORY;
         keys[16] = NAME_WHITELIST;
+        keys[17] = MAINTAINER;
     }
 }

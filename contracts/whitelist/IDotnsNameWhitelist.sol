@@ -11,9 +11,10 @@ pragma solidity ^0.8.34;
 ///      mismatched hash. Claims are keyed by the beneficiary `user`, not the submitter, so a
 ///      relayer or a cross-chain sovereign account can submit a claim on a user's behalf and the
 ///      name still binds to that user. All state is on-chain and queryable through views; no event
-///      indexing is required. The entire admin surface is substrate Root: the gates check
-///      `callerIsRoot` and read no `msg.sender`, so Root's lack of an address is not a problem, and
-///      no signed account grants, revokes, reserves, or retunes a cap. The controllers hold only
+///      indexing is required. Grants, revocations, acceptances, rejections and reservations are
+///      substrate Root only: those gates check `callerIsRoot` and read no `msg.sender`, and no
+///      signed account can make them. The request window and the caps are also open to the
+///      maintainer account, within the rules each setter enforces. The controllers hold only
 ///      the `consume` hook.
 /// @custom:security-contact admin@parity.io
 interface IDotnsNameWhitelist {
@@ -67,19 +68,21 @@ interface IDotnsNameWhitelist {
     }
 
     /// @notice Stored resolved state of a name.
-    /// @dev `status`, `winner` and `grantedAt` are ordered first so the 1-byte enum, the 20-byte
+    /// @dev `status`, `winner` and `expiresAt` are ordered first so the 1-byte enum, the 20-byte
     ///      address and the 8-byte timestamp share one storage slot; the dynamic `label` is stored
     ///      separately. The stored `status` stays `Claimed` after a grant expires, until a write
     ///      on the name clears it. That clearing emits no event: indexers derive expiry from the
-    ///      grant's `NameAccepted` timestamp and the current `GrantDurationSet` value.
+    ///      grant's `NameAccepted` timestamp and the `GrantDurationSet` value in force then, or
+    /// read `grantExpiresAt`.
     /// @param status Name status; see NameStatus.
     /// @param winner Winning beneficiary when `Claimed`, otherwise the zero address.
-    /// @param grantedAt Timestamp the name became `Claimed`, zero otherwise.
+    /// @param expiresAt Timestamp the grant expires at, fixed when the name became `Claimed`; zero
+    ///        otherwise, and for a grant recorded before grant expiry was initialised.
     /// @param label Bare label, kept so reserved and claimed names are reviewable.
     struct NameRecord {
         NameStatus status;
         address winner;
-        uint64 grantedAt;
+        uint64 expiresAt;
         string label;
     }
 
@@ -179,8 +182,8 @@ interface IDotnsNameWhitelist {
     error NothingToRevoke(bytes32 node);
 
     /// @notice Thrown when a governance-gated call is not a substrate Root dispatch.
-    /// @dev The whitelist's whole admin surface is Root-only: no signed account, owner included,
-    ///      grants, revokes, reserves, or retunes a cap.
+    /// @dev Grant, revoke, accept, reject and reserve are Root-only: no signed account, owner
+    ///      included, can make them.
     error NotGovernance();
 
     /// @notice Thrown when `consume` is called by any address other than a registrar controller.
@@ -194,6 +197,10 @@ interface IDotnsNameWhitelist {
 
     /// @notice Thrown when the request window is set with a zero duration.
     error BadWindow();
+
+    /// @notice Thrown when the maintainer lengthens a window beyond
+    ///         `WHITELIST_MAINTAINER_MAX_WINDOW` from its opening.
+    error MaintainerWindowOutOfBounds();
 
     /// @notice Thrown when a claim is made outside the open window.
     error WindowClosed();
@@ -278,14 +285,22 @@ interface IDotnsNameWhitelist {
     function consume(string calldata label, address registrant) external;
 
     /// @notice Sets the request window relative to the current time.
-    /// @dev Restricted to a substrate Root dispatch. Opens at `block.timestamp + startsIn` for
-    /// `duration`. @custom:reverts BadWindow when `duration` is zero. @custom:emits WindowSet.
+    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. Opens at
+    /// `block.timestamp + startsIn` for `duration`; @custom:reverts BadWindow when `duration` is
+    /// zero. Root sets any window. The maintainer only lengthens a window that is open or
+    /// scheduled: it passes `startsIn` zero, the window keeps its opening and `duration` counts
+    /// from it. With no window open or scheduled, a non-zero `startsIn`, or a window that would
+    /// close earlier, the call @custom:reverts MaintainerNotAllowed; a window longer than
+    /// `WHITELIST_MAINTAINER_MAX_WINDOW` from its opening @custom:reverts
+    /// MaintainerWindowOutOfBounds. @custom:emits WindowSet.
     /// @param startsIn Seconds from now until requests start being accepted.
     /// @param duration Seconds the window stays open.
     function setWindow(uint64 startsIn, uint64 duration) external;
 
     /// @notice Sets the live-claim cap per name.
-    /// @dev Restricted to a substrate Root dispatch. The cap is bounded by
+    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. While a
+    /// window is open or scheduled, the maintainer can only raise it, otherwise
+    /// @custom:reverts MaintainerNotAllowed. The cap is bounded by
     /// `DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT`, which bounds the resolution clear-loop.
     /// The cap only stops new requests: a name that collected more claims under a higher cap
     /// keeps them, and governance rejects some with @custom:function reject before a
@@ -296,26 +311,33 @@ interface IDotnsNameWhitelist {
     function setMaxClaimants(uint16 newMax) external;
 
     /// @notice Sets the reason byte cap.
-    /// @dev Restricted to a substrate Root dispatch, bounded by
-    /// `DotnsConstants.WHITELIST_MAX_REASON_LIMIT`. @custom:reverts MaxReasonBytesOutOfRange when
-    /// `newMax` is zero or above the ceiling. @custom:emits MaxReasonBytesSet.
+    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. While a
+    /// window is open or scheduled, the maintainer can only raise it, otherwise
+    /// @custom:reverts MaintainerNotAllowed. Bounded by
+    /// `DotnsConstants.WHITELIST_MAX_REASON_LIMIT`; @custom:reverts MaxReasonBytesOutOfRange when
+    /// `newMax` is zero or above the ceiling.
+    /// @custom:emits MaxReasonBytesSet.
     /// @param newMax New reason byte cap.
     function setMaxReasonBytes(uint256 newMax) external;
 
     /// @notice Sets the cap on labels per `grantNames` call.
-    /// @dev Restricted to a substrate Root dispatch, bounded by
+    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. The cap
+    /// limits Root's own grant batches, so the maintainer can only raise it, otherwise
+    /// @custom:reverts MaintainerNotAllowed. Bounded by
     /// `DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT`. @custom:reverts MaxGrantBatchOutOfRange
     /// when `newMax` is zero or above the ceiling. @custom:emits MaxGrantBatchSet.
     /// @param newMax New batch cap.
     function setMaxGrantBatch(uint16 newMax) external;
 
     /// @notice Sets the period a grant binds its name.
-    /// @dev Restricted to a substrate Root dispatch, bounded by
+    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. The
+    /// period applies to grants made after the call, and a live grant keeps the expiry it was
+    /// given. A shorter period would still cut the grants a pending referendum makes, so the
+    /// maintainer can only raise it, otherwise @custom:reverts MaintainerNotAllowed. Bounded by
     /// `DotnsConstants.WHITELIST_MIN_GRANT_DURATION` and
-    /// `DotnsConstants.WHITELIST_MAX_GRANT_DURATION`. Expiry is computed on read, so the new
-    /// period applies to every live grant: lengthening it extends them and shortening it can
-    /// expire them at once. @custom:reverts GrantDurationOutOfRange when `newDuration` is out of
-    /// range. @custom:emits GrantDurationSet.
+    /// `DotnsConstants.WHITELIST_MAX_GRANT_DURATION`.
+    /// @custom:reverts GrantDurationOutOfRange when `newDuration` is out of range.
+    /// @custom:emits GrantDurationSet.
     /// @param newDuration New grant period, in seconds.
     function setGrantDuration(uint64 newDuration) external;
 

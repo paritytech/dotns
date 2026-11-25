@@ -183,21 +183,19 @@ If ACCOUNT_PASSWORD is not set and the process has a TTY, the runner prompts onc
 
 An upgrade that adds a governance-tunable storage value must seed it in the **same transaction** as the implementation swap. A bare `upgradeTo` leaves the new slot at zero, and a proxy running with an unseeded policy value is a live misconfiguration, not a pending chore.
 
-UUPS supports this directly: `upgradeToAndCall` performs the post-upgrade call as a delegatecall from the proxy context, so `msg.sender` is preserved and an `onlyRootOrOwner` setter is callable as part of the upgrade, by the bootstrap owner or by Root.
+UUPS supports this directly: `upgradeToAndCall` performs the post-upgrade call as a delegatecall from the proxy context, so `msg.sender` is preserved and an `onlyRootOrOwner` setter is callable as part of the upgrade, by the bootstrap owner or by Root. A maintenance setter (Root or the maintainer account) is callable this way only when Root dispatches the upgrade.
 
 ### DotnsNameEscrow: `redeemWindow`
 
 The escrow's redeem window is the period after a `release` in which only the previous holder may act — they alone may `redeem` the name back, and `available` reports `false` so nobody wastes a commitment on it. Once it elapses, `reclaim` is permissionless. It is a separate value from `cooldown` and defaults to `ESCROW_REDEEM_WINDOW` (1 day) on a fresh deploy.
 
-Upgrade an existing escrow proxy like this, not with a bare `upgradeTo`:
+`updateRedeemWindow` is a maintenance setter, so the bootstrap owner cannot call it. Root upgrades an existing escrow proxy with the seeding call in the same transaction, not with a bare `upgradeTo`, by dispatching `upgradeToAndCall` through `Revive.call` with this data:
 
 ```bash
 # 1 day, matching the ESCROW_REDEEM_WINDOW deploy constant
-cast send "$ESCROW_PROXY" \
-  'upgradeToAndCall(address,bytes)' \
+cast calldata 'upgradeToAndCall(address,bytes)' \
   "$NEW_IMPL" \
-  "$(cast calldata 'updateRedeemWindow(uint256)' 86400)" \
-  --account "$DEPLOYER" --rpc-url "$RPC_URL"
+  "$(cast calldata 'updateRedeemWindow(uint256)' 86400)"
 ```
 
 Verify before considering the upgrade done:
@@ -206,14 +204,9 @@ Verify before considering the upgrade done:
 cast call "$ESCROW_PROXY" 'redeemWindow()(uint256)' --rpc-url "$RPC_URL"   # expect 86400
 ```
 
-If the window is left at zero, `release` reverts with `RedeemWindowNotConfigured` for **every** name on that deployment. That is deliberate: the alternative would be stamping `redeemableUntil` at the current timestamp, which silently opens permissionless reclaim the instant a name is released and hands the name to whoever is watching. A loud failure on `release` is recoverable with one owner transaction; a silent one is not.
+If the window is left at zero, `release` reverts with `RedeemWindowNotConfigured` for **every** name on that deployment. That is deliberate: the alternative would be stamping `redeemableUntil` at the current timestamp, which silently opens permissionless reclaim the instant a name is released and hands the name to whoever is watching. A loud failure on `release` is recoverable with one Root or maintainer call; a silent one is not.
 
-To recover a proxy already upgraded without seeding, call the setter directly — no second upgrade is needed:
-
-```bash
-cast send "$ESCROW_PROXY" 'updateRedeemWindow(uint256)' 86400 \
-  --account "$DEPLOYER" --rpc-url "$RPC_URL"
-```
+To recover a proxy already upgraded without seeding, Root or the maintainer account calls `updateRedeemWindow(86400)` directly; no second upgrade is needed.
 
 Bounds: at least `MIN_REDEEM_WINDOW` (1 day) and at most `MAX_REDEEM_WINDOW` (30 days). Changing the window later affects only releases recorded after the change; positions already released keep the `redeemableUntil` snapshot taken at their release time.
 
@@ -297,7 +290,7 @@ Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label 
 
 `registerReserved` also needs `nameEscrow` registered, and reverts with `EscrowNotConfigured` without it. The mint charges nothing, but it seeds a zero-amount escrow release position so the granted name stays inside the normal release lifecycle; a name minted without one could never be released and would leave circulation permanently. For the same reason the path reclaims from escrow instead of minting when the escrow still holds the token, which is how a released reserved-tier label is granted again.
 
-**Every admin action on the whitelist is a substrate Root dispatch.** Granting, revoking, accepting, rejecting, reserving, setting the request window and retuning the caps all require it. No signed account can do any of them, the bootstrap owner included: it configures and upgrades and never allocates. A signed call reverts with `NotGovernance`. There is no operator role and no address allowlist.
+**Every decision about who holds a name is a substrate Root dispatch.** Granting, revoking, accepting, rejecting and reserving require it, and a signed call reverts with `NotGovernance`. No signed account can make them, the bootstrap owner included: it configures and upgrades and never allocates. The request window and the caps are maintenance values that Root or the maintainer account sets (see [Configuration is Root or the maintainer account](#configuration-is-root-or-the-maintainer-account)); any other caller reverts with `NotRootOrMaintainer`.
 
 That is the point of the design. As a security measure, no single key can grant a name; a grant costs a referendum, or on a test network a sudo-dispatched Root call.
 
@@ -346,9 +339,11 @@ cast call "$WHITELIST" "grantExpiresAt(string)(uint64)" "$LABEL"
 
 A grant that has been spent or has expired reads `false`, so `isGrantedTo` also distinguishes a live grant from a consumed or lapsed one. `grantExpiresAt` returns the timestamp a live grant expires at, and zero when the label holds none. `$WHITELIST` is the `DotnsNameWhitelist` address for the target network, read from the protocol registry under the `nameWhitelist` key or taken from the [deployment manifest](#addresses), never hardcoded across networks.
 
-### Configuration is Root too
+### Configuration is Root or the maintainer account
 
-`setWindow`, `setMaxClaimants`, `setMaxReasonBytes`, `setMaxGrantBatch` and `setGrantDuration` are on the same gate, so the deploy cannot configure the whitelist and the values `initialize` sets are what a fresh network starts with. Changing any of them later costs a governance action, so check the defaults in `DotnsConstants` are the ones you want at launch.
+`setWindow`, `setMaxClaimants`, `setMaxReasonBytes`, `setMaxGrantBatch` and `setGrantDuration` accept Root or the maintainer account. The deploy cannot configure them, so the values `initialize` sets are what a fresh network starts with; check the defaults in `DotnsConstants` are the ones you want at launch.
+
+The maintainer account can move a value only in the direction that cannot disrupt what is under way. It can raise `setMaxGrantBatch` and `setGrantDuration` but not lower them. It never opens a request window: it can only lengthen one that Root opened or scheduled, up to `WHITELIST_MAINTAINER_MAX_WINDOW` from its opening. While a window is open or scheduled it can only raise `setMaxClaimants` and `setMaxReasonBytes`. Root can set any value.
 
 ## Deterministic addresses (CREATE3)
 

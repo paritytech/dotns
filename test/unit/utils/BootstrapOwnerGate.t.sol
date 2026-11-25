@@ -538,7 +538,7 @@ contract BootstrapOwnerGateTests is BaseDotns {
     /// @notice Every call behind the gate, in an order that lets each one pass after the others.
     function _gatedCalls() internal returns (GatedCall[] memory calls) {
         address[] memory proxies = _proxies();
-        calls = new GatedCall[](proxies.length + 16);
+        calls = new GatedCall[](proxies.length + 13);
         uint256 n;
 
         for (uint256 i; i < proxies.length; ++i) {
@@ -552,18 +552,6 @@ contract BootstrapOwnerGateTests is BaseDotns {
             );
         }
 
-        calls[n++] = GatedCall(
-            "escrow.updateCooldown",
-            address(dotnsNameEscrow),
-            abi.encodeCall(IDotnsNameEscrow.updateCooldown, (dotnsNameEscrow.cooldown())),
-            ""
-        );
-        calls[n++] = GatedCall(
-            "escrow.updateRedeemWindow",
-            address(dotnsNameEscrow),
-            abi.encodeCall(IDotnsNameEscrow.updateRedeemWindow, (dotnsNameEscrow.redeemWindow())),
-            ""
-        );
         calls[n++] = GatedCall(
             "escrow.clearCustodyOnUpgrade",
             address(dotnsNameEscrow),
@@ -588,15 +576,6 @@ contract BootstrapOwnerGateTests is BaseDotns {
             abi.encodeWithSelector(
                 IDotnsCostModelRegistry.AlreadyRegistered.selector, registeredVersion
             )
-        );
-        calls[n++] = GatedCall(
-            "popController.setReservationDuration",
-            address(dotnsPopController),
-            abi.encodeCall(
-                IDotnsPopController.setReservationDuration,
-                (dotnsPopController.reservationDuration())
-            ),
-            ""
         );
         calls[n++] = GatedCall(
             "registrar.addController",

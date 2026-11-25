@@ -425,9 +425,12 @@ interface IDotnsPopController is IDotnsController {
         returns (bool reserved, address holder);
 
     /// @notice Updates the reservation duration used to decide when queue entries expire.
-    /// @dev Root or the bootstrap owner (otherwise @custom:reverts OwnableUnauthorizedAccount). A
-    /// duration below `MIN_RESERVATION_DURATION` @custom:reverts ReservationDurationTooLow, and one
-    /// above `MAX_RESERVATION_DURATION` @custom:reverts ReservationDurationTooHigh. Emits
+    /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. Every
+    /// queue entry expires against the current duration, so the new value applies to every live
+    /// entry; the maintainer can only raise it,
+    /// otherwise @custom:reverts MaintainerNotAllowed. A duration below `MIN_RESERVATION_DURATION`
+    /// @custom:reverts ReservationDurationTooLow, and one above `MAX_RESERVATION_DURATION`
+    /// @custom:reverts ReservationDurationTooHigh. Emits
     /// @custom:emits ReservationDurationSet on success.
     function setReservationDuration(uint64 duration) external;
 
@@ -478,8 +481,8 @@ interface IDotnsPopController is IDotnsController {
     function reservedLabelOf(bytes32 labelhash) external view returns (string memory label);
 
     /// @notice Returns the window, in seconds, after which a reservation-queue entry lapses.
-    /// @dev Governance-configurable via @custom:function setReservationDuration. Pending claims do
-    /// not lapse.
+    /// @dev Set by Root or the maintainer account via @custom:function setReservationDuration.
+    /// Pending claims do not lapse.
     /// @return duration Reservation duration in seconds.
     function reservationDuration() external view returns (uint64 duration);
 

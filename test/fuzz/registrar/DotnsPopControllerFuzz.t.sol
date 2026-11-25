@@ -126,8 +126,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
         );
         elapsed = uint64(bound(uint256(elapsed), 0, 365 days));
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         dotnsPopController.setReservationDuration(duration);
+        _mockCallerIsRoot(false);
 
         // Reserving `PERSONHOOD_LABEL_A` (Personhood classification) alongside the
         // the issuance requires ed to hold Personhood status so both `priceWithCheck`
@@ -214,8 +215,9 @@ contract DotnsPopControllerFuzz is BaseDotns {
         );
         elapsed = uint64(bound(uint256(elapsed), 0, 365 days));
 
-        vm.prank(owner);
+        _mockCallerIsRoot(true);
         dotnsPopController.setReservationDuration(duration);
+        _mockCallerIsRoot(false);
 
         _grantDevicehood(ed);
         _rootIssueDeviceName(
