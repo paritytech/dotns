@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsprotocolregistry"><a class="header" href="#dotnsprotocolregistry">DotnsProtocolRegistry</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/0fcb2c9444999d069b7f6002611941f84f244d94/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/fe822087776295f7f5ae1795e22a50d5b718daf0/contracts/registry/DotnsProtocolRegistry.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, <a href="/contracts/utils/BootstrapOwnableUpgradeable.sol/abstract.BootstrapOwnableUpgradeable.html">BootstrapOwnableUpgradeable</a>, <a href="/contracts/registry/IDotnsProtocolRegistry.sol/interface.IDotnsProtocolRegistry.html">IDotnsProtocolRegistry</a></p>
 <p><strong>Title:</strong>
@@ -407,9 +407,7 @@ registered key that answers <code>owner()</code> to answer zero, otherwise</p>
 reverts: OwnerStillSet. A contract that reads its owner from this registry
 passes. A contract still running code with an owner of its own, such as a proxy not
 yet upgraded or a superseded cost model registry left under its key, fails the
-renounce. A contract with no <code>owner()</code> is skipped. A maintainer account that is the
-departing owner @custom:reverts MaintainerIsBootstrapOwner, so the owner cannot keep
-the maintenance setters by appointing itself. Reads no <code>msg.sender</code>.</p>
+renounce. A contract with no <code>owner()</code> is skipped. Reads no <code>msg.sender</code>.</p>
 <pre><code class="language-solidity">function renounceOwnership() public override onlyRoot;
 </code></pre>
 <h3 id="_requirenoowner"><a class="header" href="#_requirenoowner">_requireNoOwner</a></h3>
