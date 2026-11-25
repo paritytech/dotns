@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ProtocolOwnedUpgradeable} from "../utils/ProtocolOwnedUpgradeable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {
     ERC165Upgradeable
@@ -29,7 +27,7 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 contract DotnsNameEscrow is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
+    ProtocolOwnedUpgradeable,
     ReentrancyGuardTransient,
     ERC165Upgradeable,
     IERC721Receiver,
@@ -156,12 +154,10 @@ contract DotnsNameEscrow is
     ///      updateRedeemWindow, which rejects any value below @custom:constant MIN_REDEEM_WINDOW
     ///      (@custom:reverts RedeemWindowTooShort) or above @custom:constant MAX_REDEEM_WINDOW
     ///      (@custom:reverts RedeemWindowTooLong), and emits @custom:emits RedeemWindowUpdated.
-    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol registry used to resolve registrar and controller addresses.
     /// @param cooldownSeconds Delay after release before the deposit withdrawal may be credited.
     /// @param redeemWindowSeconds Period after release in which only the previous holder may act.
     function initialize(
-        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint256 cooldownSeconds,
         uint256 redeemWindowSeconds
@@ -171,7 +167,6 @@ contract DotnsNameEscrow is
     {
         require(address(registry) != address(0), InvalidAsset());
 
-        __Ownable_init(initialOwner);
         __ERC165_init();
 
         protocolRegistry = registry;
@@ -180,20 +175,20 @@ contract DotnsNameEscrow is
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function updateCooldown(uint256 newCooldown) public override onlyOwner {
+    function updateCooldown(uint256 newCooldown) public override onlyRootOrOwner {
         _updateCooldown(newCooldown);
     }
 
     /// @inheritdoc IDotnsNameEscrow
-    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyOwner {
+    function updateRedeemWindow(uint256 newRedeemWindow) public override onlyRootOrOwner {
         _updateRedeemWindow(newRedeemWindow);
     }
 
     /// @notice Validates and seeds the cooldown, without an ownership check.
     /// @dev Split from @custom:function updateCooldown so the initialiser can seed the value:
-    ///      the owner is now an explicit argument rather than the caller, so `onlyOwner` would
-    ///      reject the deployer mid-initialisation. Every caller either is `onlyOwner` or runs
-    ///      inside `initializer`.
+    ///      the initialiser runs inside the proxy constructor, where the caller is the deploying
+    ///      contract, so `onlyRootOrOwner` would reject it. Every caller either is
+    ///      `onlyRootOrOwner` or runs inside `initializer`.
     /// @param newCooldown Delay after release before the deposit withdrawal may be credited.
     function _updateCooldown(uint256 newCooldown) private {
         require(newCooldown != 0, InvalidCooldown());
@@ -391,15 +386,16 @@ contract DotnsNameEscrow is
     ///      is, so a name that entered custody uncleared would otherwise leave it with its records.
     ///      Meant to run as the post-upgrade call of `upgradeToAndCall`, so nothing can be
     ///      redeemed or reclaimed between the upgrade and the clear. A deployment that never held
-    ///      such names never needs it. Owner-only (@custom:reverts OwnableUnauthorizedAccount) and
-    ///      callable once per proxy (@custom:reverts InvalidInitialization on a second call); it
-    ///      takes initializer version 2, so a later upgrade that needs a reinitializer starts at 3.
+    ///      such names never needs it. Root or the bootstrap owner (otherwise @custom:reverts
+    ///      OwnableUnauthorizedAccount) and callable once per proxy (@custom:reverts
+    ///      InvalidInitialization on a second call); it takes initializer version 2, so a later
+    ///      upgrade that needs a reinitializer starts at 3.
     ///      It clears lazily only and deletes no record outright: deleting would release the
     ///      storage deposit the holders paid to the signer of this call instead. Walks every name
     ///      in custody in one call, so check @custom:function releasedTokenCount before relying on
     ///      it. Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
     ///      through ERC-165 stays the same.
-    function clearCustodyOnUpgrade() external onlyOwner reinitializer(2) {
+    function clearCustodyOnUpgrade() external onlyRootOrOwner reinitializer(2) {
         uint256 count = _releasedTokens.length;
         for (uint256 i; i < count; ++i) {
             _clearName(_releasedTokens[i], false);
@@ -883,6 +879,11 @@ contract DotnsNameEscrow is
         delete _releasedIndexPlusOne[tokenId];
     }
 
+    /// @inheritdoc ProtocolOwnedUpgradeable
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return address(protocolRegistry);
+    }
+
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 }

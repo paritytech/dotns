@@ -165,7 +165,7 @@ interface IDotnsRegistrar is IERC721 {
     /// @notice Adds an authorised controller.
     /// @dev Typed against the baseline `IDotnsController` (not a concrete subtype) so a single
     /// authorisation surface accepts every controller flavour (commit-reveal, gateway path,
-    /// future variants) without per-flavour setters. Owner-gated (otherwise
+    /// future variants) without per-flavour setters. Root or the bootstrap owner (otherwise
     /// @custom:reverts OwnableUnauthorizedAccount); emits @custom:emits ControllerAdded on
     /// success.
     function addController(IDotnsController controller) external;
@@ -173,7 +173,7 @@ interface IDotnsRegistrar is IERC721 {
     /// @notice Removes an authorised controller.
     /// @dev Mirrors the @custom:function addController baseline-typed signature so any registered
     /// controller can
-    /// be revoked through the same entry point. Owner-gated (otherwise
+    /// be revoked through the same entry point. Root or the bootstrap owner (otherwise
     /// @custom:reverts OwnableUnauthorizedAccount); emits @custom:emits ControllerRemoved on
     /// success.
     function removeController(IDotnsController controller) external;

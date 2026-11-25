@@ -47,12 +47,7 @@ contract DeployPolicy is BaseDeployer {
             "DotnsRegistrarController.sol:DotnsRegistrarController",
             abi.encodeCall(
                 DotnsRegistrarController.initialize,
-                (
-                    owner,
-                    IDotnsProtocolRegistry(protocolRegistry),
-                    MIN_COMMITMENT_AGE,
-                    MAX_COMMITMENT_AGE
-                )
+                (IDotnsProtocolRegistry(protocolRegistry), MIN_COMMITMENT_AGE, MAX_COMMITMENT_AGE)
             ),
             "DotnsRegistrarController"
         );
@@ -71,7 +66,6 @@ contract DeployPolicy is BaseDeployer {
             abi.encodeCall(
                 DotnsNameEscrow.initialize,
                 (
-                    owner,
                     IDotnsProtocolRegistry(protocolRegistry),
                     DotnsConstants.ESCROW_COOLDOWN,
                     DotnsConstants.ESCROW_REDEEM_WINDOW
@@ -92,7 +86,7 @@ contract DeployPolicy is BaseDeployer {
             owner,
             "DotnsNameWhitelist.sol:DotnsNameWhitelist",
             abi.encodeCall(
-                DotnsNameWhitelist.initialize, (owner, IDotnsProtocolRegistry(protocolRegistry))
+                DotnsNameWhitelist.initialize, (IDotnsProtocolRegistry(protocolRegistry))
             ),
             "DotnsNameWhitelist"
         );

@@ -43,6 +43,9 @@
 #   DOTNS_RELEASE_TAG  Release the final stage declares on chain, bare semver.
 #                      Defaults to the tag the checkout sits exactly on;
 #                      required otherwise (see below).
+#   DOTNS_RESUME       Set to `true` to adopt proxies an earlier run of this
+#                      deployment already created. Without it, a proxy found
+#                      at its address aborts the stage (see below).
 #
 # Extra forge flags are forwarded verbatim to every stage, e.g.
 #   ./scripts/deploy/run.sh '--slow --timeout 1000'
@@ -64,6 +67,13 @@ set -euo pipefail
 # wrong one, which no setter can correct afterwards.
 if [ -n "${DOTNS_TLD:-}" ]; then
   export DOTNS_TLD
+fi
+
+# CREATE3 is permissionless, so a proxy already at its address may have been
+# planted by someone else. The stages refuse to adopt one unless this run is an
+# explicit resume of the same deployment.
+if [ -n "${DOTNS_RESUME:-}" ]; then
+  export DOTNS_RESUME
 fi
 
 # Release tag WireDeployments declares on the protocol registry, as bare semver

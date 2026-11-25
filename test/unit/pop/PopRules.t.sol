@@ -275,7 +275,7 @@ contract PopRulesTests is BaseDotns {
         );
         address freshPopRules = Upgrades.deployUUPSProxy(
             "PopRules.sol:PopRules",
-            abi.encodeCall(PopRules.initialize, (owner, IDotnsProtocolRegistry(freshRegistry)))
+            abi.encodeCall(PopRules.initialize, (IDotnsProtocolRegistry(freshRegistry)))
         );
         vm.stopPrank();
 

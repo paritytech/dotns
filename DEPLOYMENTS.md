@@ -183,7 +183,7 @@ If ACCOUNT_PASSWORD is not set and the process has a TTY, the runner prompts onc
 
 An upgrade that adds a governance-tunable storage value must seed it in the **same transaction** as the implementation swap. A bare `upgradeTo` leaves the new slot at zero, and a proxy running with an unseeded policy value is a live misconfiguration, not a pending chore.
 
-UUPS supports this directly: `upgradeToAndCall` performs the post-upgrade call as a delegatecall from the proxy context, so `msg.sender` is preserved and an `onlyOwner` setter is callable as part of the upgrade.
+UUPS supports this directly: `upgradeToAndCall` performs the post-upgrade call as a delegatecall from the proxy context, so `msg.sender` is preserved and an `onlyRootOrOwner` setter is callable as part of the upgrade, by the bootstrap owner or by Root.
 
 ### DotnsNameEscrow: `redeemWindow`
 
@@ -297,11 +297,11 @@ Reserved registration is gated on `DotnsNameWhitelist`. A grant binds one label 
 
 `registerReserved` also needs `nameEscrow` registered, and reverts with `EscrowNotConfigured` without it. The mint charges nothing, but it seeds a zero-amount escrow release position so the granted name stays inside the normal release lifecycle; a name minted without one could never be released and would leave circulation permanently. For the same reason the path reclaims from escrow instead of minting when the escrow still holds the token, which is how a released reserved-tier label is granted again.
 
-**Every admin action on the whitelist is a substrate Root dispatch.** Granting, revoking, accepting, rejecting, reserving, setting the request window and retuning the caps all require it. No signed account can do any of them, the contract owner included: the owner's authority is deployment and upgrade, not allocation. A signed call reverts with `NotGovernance`. There is no operator role and no address allowlist.
+**Every admin action on the whitelist is a substrate Root dispatch.** Granting, revoking, accepting, rejecting, reserving, setting the request window and retuning the caps all require it. No signed account can do any of them, the bootstrap owner included: it configures and upgrades and never allocates. A signed call reverts with `NotGovernance`. There is no operator role and no address allowlist.
 
 That is the point of the design. As a security measure, no single key can grant a name; a grant costs a referendum, or on a test network a sudo-dispatched Root call.
 
-Two owner-level routes reach the same outcome and are **not** closed by this. `DotnsProtocolRegistry.set` is `onlyOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. The same key gates the other paths too: `register` and gateway personhood issuance read it to keep granted names for their grantees, so a whitelist that reverts, or reports a grantee for every name, blocks both. `DotnsRegistrar.addController` is `onlyOwner`, and a controller can mint any available name directly, without the whitelist at all. Treat the guarantee here as covering the whitelist's own admin surface, not the protocol as a whole, until upgrade authority and deploy-time ownership are settled.
+Two bootstrap-owner routes reach the same outcome while the owner holds the role. `DotnsProtocolRegistry.set` is `onlyRootOrOwner`, so the owner can point the `nameWhitelist` key at a contract whose `isGrantedTo` returns true for everything. The same key gates the other paths too: `register` and gateway personhood issuance read it to keep granted names for their grantees, so a whitelist that reverts, or reports a grantee for every name, blocks both. `DotnsRegistrar.addController` is `onlyRootOrOwner`, and a controller can mint any available name directly, without the whitelist at all. Both routes close when Root renounces the bootstrap owner on `DotnsProtocolRegistry`, after which only Root reaches them.
 
 The controller carries no roles either. It reads grants and consumes them, so `setRole` on the controller reverts with `UnsupportedRole`.
 
@@ -314,6 +314,8 @@ Root origin
   └─ Revive.call { dest: <DotnsNameWhitelist H160>, value: 0, data: <EVM calldata> }
        └─ grantName(string,address)
 ```
+
+`Revive.call` must target the dotNS contract itself. Every Root gate checks that Root called that contract directly, so a Root call relayed through another contract, such as `Multicall3` or a batching helper, reaches the gate with the relay as caller and is refused.
 
 `cast` can be used for the innermost layer to encode `data`:
 
@@ -389,15 +391,15 @@ The reference copies are throwaway and are deployed with broadcasting paused, so
 
 That second step is what rejects a genuine artefact deployed against someone else's constructor arguments: a real `DotnsPopLens` pointed at an attacker's protocol registry has the right length and shape, and differs only in the values its constructor wrote.
 
-**What the bytecode check cannot cover.** Immutables whose values are address-derived are indistinguishable between an honest deploy and any other, because they legitimately differ every time. Only `UUPSUpgradeable.__self` is in that class now, and every UUPS implementation carries it, so the masking handles it uniformly. `StoreFactory` used to be the case that mattered, because it minted its own beacons into immutables; behind a proxy it holds the beacons and `protocolRegistry` in storage and carries no immutables of its own, so its implementation compares exactly. Immutables set from a constructor argument stay inside the comparison, which is what rejects an artefact built against someone else's addresses: `DotnsPopLens.protocolRegistry` and `DotnsFlatPricing.deposit` are the two that remain. An owner is never covered here, since `Ownable` keeps it in storage rather than runtime code; the wire stage's `owner()` assertions cover it instead.
+**What the bytecode check cannot cover.** Immutables whose values are address-derived are indistinguishable between an honest deploy and any other, because they legitimately differ every time. Only `UUPSUpgradeable.__self` is in that class now, and every UUPS implementation carries it, so the masking handles it uniformly. `StoreFactory` used to be the case that mattered, because it minted its own beacons into immutables; behind a proxy it holds the beacons and `protocolRegistry` in storage and carries no immutables of its own, so its implementation compares exactly. Immutables set from a constructor argument stay inside the comparison, which is what rejects an artefact built against someone else's addresses: `DotnsPopLens.protocolRegistry`, `DotnsFlatPricing.deposit` and `DotnsCostModelRegistry.protocolRegistry` are the ones that remain. Proxy storage is never covered here, since it is not runtime code: that includes the protocol registry's owner and each contract's `protocolRegistry` pointer. Every contract reads its bootstrap owner through that pointer, so a genuine proxy initialised against someone else's registry would report any owner that registry chooses. The pipeline therefore adopts an existing proxy only when `DOTNS_RESUME=true` marks the run as a resume, and the wire stage asserts the protocol registry's owner and that every contract points at this deployment's protocol registry.
 
 The beacons are checked separately. The verification stage asserts that each beacon's code is the `UpgradeableBeacon` artefact, that the factory owns it, and that its implementation is the `LabelStore` or `UserStore` artefact this release builds. None of the three contracts carries immutables, so each comparison is exact.
 
-The beacon's own code is pinned before the other two are read, because `owner()` and `implementation()` are views: a bespoke contract can answer them correctly once and differently afterwards. Ownership is asserted because `upgradeLabelStoreImplementation` is `onlyOwner` on the factory, so a beacon owned by anything else leaves every store on the network following an implementation the verified owner cannot rotate.
+The beacon's own code is pinned before the other two are read, because `owner()` and `implementation()` are views: a bespoke contract can answer them correctly once and differently afterwards. Ownership is asserted because `upgradeLabelStoreImplementation` is `onlyRootOrOwner` on the factory, so a beacon owned by anything else leaves every store on the network following an implementation that governance cannot rotate.
 
 **Recovering a burned address.** An occupant that fails the check cannot be evicted: CREATE3 slots are single use. Set `DOTNS_SALT_VERSION` to a value above `1` to move the whole set onto fresh addresses; the salt then gains a `:<version>` suffix. This is a recovery lever, not routine configuration, and every address moves together.
 
-**A note for anyone adding an initialiser.** Proxies are initialised inside the `ERC1967Proxy` constructor, so there is no window in which a deployed proxy is uninitialised. One consequence is easy to trip over: the owner is now an explicit argument rather than the caller, so an initialiser must not call its own `onlyOwner` setters, which would reject the deployer mid-initialisation. Because the initialiser runs during construction, such a revert surfaces as CREATE3's opaque `DeploymentFailed()` rather than the underlying error. Seed values through internal helpers instead.
+**A note for anyone adding an initialiser.** Proxies are initialised inside the `ERC1967Proxy` constructor, so there is no window in which a deployed proxy is uninitialised. One consequence is easy to trip over: the caller during initialisation is the deploying contract, so an initialiser must not call its own `onlyRootOrOwner` setters, which would reject it. Because the initialiser runs during construction, such a revert surfaces as CREATE3's opaque `DeploymentFailed()` rather than the underlying error. Seed values through internal helpers instead.
 
 ### Keeping the factory address stable across chain resets
 
@@ -411,7 +413,7 @@ bun run deploy:all
 
 It runs `deploy:factory` (from the dedicated `dotns-factory` key, which asserts nonce 0 and lands the factory at its deterministic address), then runs the pipeline with `CREATE3_FACTORY` set to that address so `DeployCore` reuses it. On every fresh chain this reproduces the same address set.
 
-The whole pipeline is idempotent, so a re-run resumes an interrupted deploy. Each stage adopts any contract already present at its deterministic address and skips re-initialising an adopted proxy, so rerunning the same command deploys only what is missing and leaves everything already deployed untouched. This is the recovery path when the adapter stalls a transaction part way through.
+The whole pipeline is idempotent, so a re-run resumes an interrupted deploy. Rerun the same command with `DOTNS_RESUME=true`: each stage adopts any contract already present at its deterministic address and skips re-initialising an adopted proxy, so the rerun deploys only what is missing and leaves everything already deployed untouched. Without `DOTNS_RESUME=true`, a stage that finds a proxy already at its address aborts. This is the recovery path when the adapter stalls a transaction part way through.
 
 Idempotent is not the same as always succeeding. Both adoption and the final verification compare what is on chain against the artefacts of the release being run, so a chain that has moved away from them fails rather than reporting a clean no-op. Rotating a store implementation through `StoreFactory.upgradeLabelStoreImplementation` is the case to expect: verification then fails on the beacon implementation until the release being run is the one that was rotated to. Re-running a stage against a chain that is ahead of, or diverged from, the checked-out release is therefore not a safe no-op.
 
@@ -466,11 +468,11 @@ If the adapter is not responding, confirm Docker is running and that port 8545 i
 
 If the deploy script says PRIVATE_KEY is required, the configured ACCOUNT_NAME has not yet been imported into the Foundry keystore. Populate .env once, or provide PRIVATE_KEY and ACCOUNT_PASSWORD through the shell environment.
 
-If the deploy script fails after importing the key, .env is intentionally left in place. Correct the failed field or network issue and rerun the same command.
+If the deploy script fails after importing the key, .env is intentionally left in place. Correct the failed field or network issue and rerun the same command, with `DOTNS_RESUME=true` if a stage had already deployed contracts.
 
 If the deploy script succeeds, .env should be gone. Future runs should use the keystore account and should not require the deployer private key.
 
-If a stage fails part way through, rerun the same command. Each stage adopts any contract already at its deterministic address and skips re-initialising an adopted proxy, so the rerun resumes from where it stopped and deploys only what is missing. Later stages read the deployment manifest for wire-up, so if you edit the manifest by hand keep it consistent with what is actually on chain, or the wire-up can fail.
+If a stage fails part way through, rerun the same command with `DOTNS_RESUME=true`. Each stage adopts any contract already at its deterministic address and skips re-initialising an adopted proxy, so the rerun resumes from where it stopped and deploys only what is missing. Later stages read the deployment manifest for wire-up, so if you edit the manifest by hand keep it consistent with what is actually on chain, or the wire-up can fail.
 
 A failure naming a beacon implementation or an unexpected occupant usually means the chain and the checked-out release disagree rather than that anything is wrong on chain. Check out the release the chain is actually running before rerunning.
 

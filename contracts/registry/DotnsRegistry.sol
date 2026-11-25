@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ProtocolOwnedUpgradeable} from "../utils/ProtocolOwnedUpgradeable.sol";
 import {IDotnsRegistry} from "./IDotnsRegistry.sol";
 import {IDotnsController} from "../registrars/IDotnsController.sol";
 import {IDotnsRegistrar} from "../registrars/IDotnsRegistrar.sol";
@@ -24,7 +22,7 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 /// @dev Tokenised second-level nodes store `owner == address(0)` as a sentinel and defer to
 ///      `IDotnsRegistrar.ownerOf`; subnodes carry an explicit owner address in `records`.
 /// @custom:security-contact admin@parity.io
-contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IDotnsRegistry {
+contract DotnsRegistry is Initializable, UUPSUpgradeable, ProtocolOwnedUpgradeable, IDotnsRegistry {
     using StoreUtils for IStoreFactory;
     using StringUtils for *;
 
@@ -89,17 +87,8 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     /// @dev Callable exactly once via `Initializable`, otherwise
     ///      @custom:reverts InvalidInitialization. `registry` must be non-zero, otherwise
     ///      @custom:reverts NotAllowed.
-    /// @param initialOwner Address that owns the contract once initialised.
     /// @param registry Protocol-level address registry used to resolve sibling contracts.
-    function initialize(
-        address initialOwner,
-        IDotnsProtocolRegistry registry
-    )
-        external
-        initializer
-    {
-        __Ownable_init(initialOwner);
-
+    function initialize(IDotnsProtocolRegistry registry) external initializer {
         require(address(registry) != address(0), NotAllowed());
         protocolRegistry = registry;
     }
@@ -569,6 +558,12 @@ contract DotnsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ID
     function version() external view virtual returns (string memory versionString) {
         versionString = protocolRegistry.protocolVersion();
     }
+
+    /// @inheritdoc ProtocolOwnedUpgradeable
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return address(protocolRegistry);
+    }
+
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 }

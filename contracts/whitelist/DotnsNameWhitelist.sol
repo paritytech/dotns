@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ProtocolOwnedUpgradeable} from "../utils/ProtocolOwnedUpgradeable.sol";
 import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
@@ -42,7 +40,7 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 contract DotnsNameWhitelist is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
+    ProtocolOwnedUpgradeable,
     ERC165Upgradeable,
     IDotnsNameWhitelist
 {
@@ -98,9 +96,10 @@ contract DotnsNameWhitelist is
 
     /// @notice Restricts a call to a substrate Root dispatch.
     /// @dev The whole admin surface is governance-only: no key grants, revokes, reserves, or
-    ///      retunes a cap. The owner's authority is deployment and upgrade, not allocation, so no
-    ///      signed account can hand out a name. `msg.sender` is never read here, which is also what
-    ///      keeps every gated entry point callable under a Root origin, since Root has no account.
+    ///      retunes a cap. The bootstrap owner configures and upgrades until Root renounces it,
+    ///      and never allocates, so no signed account can hand out a name. `msg.sender` is never
+    ///      read here, which is also what keeps every gated entry point callable under a Root
+    ///      origin, since Root has no account.
     modifier onlyGovernance() {
         _onlyGovernance();
         _;
@@ -128,19 +127,12 @@ contract DotnsNameWhitelist is
 
     /// @notice Initialises the whitelist.
     /// @dev Callable once through the UUPS proxy; direct calls on the implementation
-    ///      @custom:reverts InvalidInitialization. Sets `initialOwner` as owner and wires the
-    ///      protocol registry the node derivation reads the TLD from.
-    /// @param initialOwner Address that owns the contract once initialised.
+    ///      @custom:reverts InvalidInitialization. Wires the protocol registry, which holds
+    ///      the bootstrap owner and the TLD the node derivation reads.
     /// @param registry Protocol registry all dotNS contracts resolve through.
-    function initialize(
-        address initialOwner,
-        IDotnsProtocolRegistry registry
-    )
-        external
-        initializer
-    {
+    function initialize(IDotnsProtocolRegistry registry) external initializer {
         __ERC165_init();
-        __Ownable_init(initialOwner);
+        _requireProtocolRegistry(address(registry));
         protocolRegistry = registry;
         maxClaimants = DotnsConstants.WHITELIST_DEFAULT_MAX_CLAIMANTS;
         maxGrantBatch = DotnsConstants.WHITELIST_DEFAULT_MAX_GRANT_BATCH;
@@ -153,7 +145,7 @@ contract DotnsNameWhitelist is
     ///      start land in one call. Starts the clock for grants made before it, which have no
     ///      `grantedAt`, and sets the default grant period unless governance already set one. A
     ///      whitelist whose clock already runs @custom:reverts InvalidInitialization.
-    function initializeGrantExpiry() external reinitializer(2) onlyOwner {
+    function initializeGrantExpiry() external reinitializer(2) onlyRootOrOwner {
         require(_grantClockStart == 0, InvalidInitialization());
         _initializeGrantExpiry();
     }
@@ -620,6 +612,11 @@ contract DotnsNameWhitelist is
         return block.timestamp >= _requestOpen && block.timestamp < _requestClose;
     }
 
+    /// @inheritdoc ProtocolOwnedUpgradeable
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return address(protocolRegistry);
+    }
+
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 }

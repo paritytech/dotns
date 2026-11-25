@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ProtocolOwnedUpgradeable} from "../utils/ProtocolOwnedUpgradeable.sol";
 import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
@@ -79,7 +77,7 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 contract DotnsPopController is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
+    ProtocolOwnedUpgradeable,
     ERC165Upgradeable,
     IDotnsPopController,
     IDotnsPopControllerLegacy,
@@ -213,9 +211,7 @@ contract DotnsPopController is
     /// call outside an active initialiser scope reverts with @custom:reverts NotInitializing.
     /// Emits @custom:emits ReservationDurationSet so indexers observe the initial value
     /// through the same event the setter uses later.
-    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
-        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint64 reservationDuration_
     )
@@ -230,8 +226,8 @@ contract DotnsPopController is
             reservationDuration_ <= MAX_RESERVATION_DURATION,
             ReservationDurationTooHigh(reservationDuration_)
         );
-        __Ownable_init(initialOwner);
         __ERC165_init();
+        _requireProtocolRegistry(address(registry));
         protocolRegistry = registry;
         reservationDuration = reservationDuration_;
         emit ReservationDurationSet(reservationDuration_);
@@ -634,7 +630,7 @@ contract DotnsPopController is
     }
 
     /// @inheritdoc IDotnsPopController
-    function setReservationDuration(uint64 duration) external override onlyOwner {
+    function setReservationDuration(uint64 duration) external override onlyRootOrOwner {
         require(duration >= MIN_RESERVATION_DURATION, ReservationDurationTooLow(duration));
         require(duration <= MAX_RESERVATION_DURATION, ReservationDurationTooHigh(duration));
         reservationDuration = duration;
@@ -1373,6 +1369,11 @@ contract DotnsPopController is
         require(SystemUtils.callerIsRoot(), NotRoot());
     }
 
+    /// @inheritdoc ProtocolOwnedUpgradeable
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return address(protocolRegistry);
+    }
+
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 }

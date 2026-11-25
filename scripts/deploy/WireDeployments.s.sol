@@ -18,6 +18,7 @@ import {DotnsReverseResolver} from "../../contracts/resolvers/DotnsReverseResolv
 import {DotnsPopResolver} from "../../contracts/resolvers/DotnsPopResolver.sol";
 import {PopRules} from "../../contracts/pop/PopRules.sol";
 import {StoreFactory} from "../../contracts/store/StoreFactory.sol";
+import {DotnsCostModelRegistry} from "../../contracts/pop/DotnsCostModelRegistry.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
 
 /// @title WireDeployments
@@ -229,43 +230,65 @@ contract WireDeployments is BaseDeployer {
     }
 
     function _verifyDeployment(Addresses memory addr, address expectedOwner) internal view {
-        require(DotnsRegistrar(addr.registrar).owner() == expectedOwner, "Registrar: wrong owner");
-        require(
-            DotnsRegistrarController(addr.registrarController).owner() == expectedOwner,
-            "Controller: wrong owner"
-        );
-        require(DotnsRegistry(addr.registry).owner() == expectedOwner, "Registry: wrong owner");
-        require(
-            DotnsReverseResolver(addr.reverseResolver).owner() == expectedOwner,
-            "ReverseResolver: wrong owner"
-        );
-        require(DotnsResolver(addr.resolver).owner() == expectedOwner, "Resolver: wrong owner");
-        require(
-            DotnsContentResolver(addr.contentResolver).owner() == expectedOwner,
-            "ContentResolver: wrong owner"
-        );
-        require(PopRules(addr.popRules).owner() == expectedOwner, "PopRules: wrong owner");
-        require(
-            DotnsNameEscrow(payable(addr.nameEscrow)).owner() == expectedOwner,
-            "NameEscrow: wrong owner"
-        );
-        require(
-            DotnsNameWhitelist(addr.nameWhitelist).owner() == expectedOwner,
-            "NameWhitelist: wrong owner"
-        );
-        require(
-            DotnsPopController(addr.popController).owner() == expectedOwner,
-            "PopController: wrong owner"
-        );
-        require(
-            DotnsPopResolver(addr.popResolver).owner() == expectedOwner, "PopResolver: wrong owner"
-        );
+        // Every other contract reads its bootstrap owner from the protocol registry it was
+        // initialised with, so its `owner()` proves nothing on its own: a proxy bound to a foreign
+        // registry reports whatever that registry answers. The registry's owner and each pointer
+        // are what bind the deployment to `expectedOwner`.
         require(
             DotnsProtocolRegistry(addr.protocolRegistry).owner() == expectedOwner,
             "ProtocolRegistry: wrong owner"
         );
-        require(
-            StoreFactory(addr.storeFactory).owner() == expectedOwner, "StoreFactory: wrong owner"
+        address expected = addr.protocolRegistry;
+        _requirePointer(
+            address(DotnsRegistrar(addr.registrar).protocolRegistry()), expected, "Registrar"
+        );
+        _requirePointer(
+            address(DotnsRegistrarController(addr.registrarController).protocolRegistry()),
+            expected,
+            "Controller"
+        );
+        _requirePointer(
+            address(DotnsRegistry(addr.registry).protocolRegistry()), expected, "Registry"
+        );
+        _requirePointer(
+            address(DotnsReverseResolver(addr.reverseResolver).protocolRegistry()),
+            expected,
+            "ReverseResolver"
+        );
+        _requirePointer(
+            address(DotnsResolver(addr.resolver).protocolRegistry()), expected, "Resolver"
+        );
+        _requirePointer(
+            address(DotnsContentResolver(addr.contentResolver).protocolRegistry()),
+            expected,
+            "ContentResolver"
+        );
+        _requirePointer(address(PopRules(addr.popRules).protocolRegistry()), expected, "PopRules");
+        _requirePointer(
+            address(DotnsNameEscrow(payable(addr.nameEscrow)).protocolRegistry()),
+            expected,
+            "NameEscrow"
+        );
+        _requirePointer(
+            address(DotnsNameWhitelist(addr.nameWhitelist).protocolRegistry()),
+            expected,
+            "NameWhitelist"
+        );
+        _requirePointer(
+            address(DotnsPopController(addr.popController).protocolRegistry()),
+            expected,
+            "PopController"
+        );
+        _requirePointer(
+            address(DotnsPopResolver(addr.popResolver).protocolRegistry()), expected, "PopResolver"
+        );
+        _requirePointer(
+            StoreFactory(addr.storeFactory).protocolRegistry(), expected, "StoreFactory"
+        );
+        _requirePointer(
+            address(DotnsCostModelRegistry(addr.costModelRegistry).protocolRegistry()),
+            expected,
+            "CostModelRegistry"
         );
 
         DotnsProtocolRegistry registry = DotnsProtocolRegistry(addr.protocolRegistry);
@@ -332,5 +355,10 @@ contract WireDeployments is BaseDeployer {
         }
 
         console.log("=== Deployment verification complete ===");
+    }
+
+    /// @notice Requires a contract's protocol registry pointer to be the deployment's registry.
+    function _requirePointer(address actual, address expected, string memory label) internal pure {
+        require(actual == expected, string.concat(label, ": bound to a foreign protocol registry"));
     }
 }

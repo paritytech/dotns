@@ -22,7 +22,7 @@ contract DotnsNameWhitelistFuzz is BaseDotns {
                 "DotnsNameWhitelist.sol:DotnsNameWhitelist",
                 abi.encodeCall(
                     DotnsNameWhitelist.initialize,
-                    (owner, IDotnsProtocolRegistry(address(protocolRegistry)))
+                    (IDotnsProtocolRegistry(address(protocolRegistry)))
                 )
             )
         );

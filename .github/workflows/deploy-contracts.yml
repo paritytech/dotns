@@ -349,8 +349,9 @@ jobs:
 
           # Resume: rerun the same pinned pipeline. It must adopt every contract
           # and still land on the published set. No PRIVATE_KEY: the keystore is
-          # already imported, the real resume path a human takes.
-          if ! CREATE3_FACTORY="$PINNED_FACTORY" ./scripts/deploy/run.sh > resume.log 2>&1; then
+          # already imported, the real resume path a human takes. DOTNS_RESUME
+          # marks the run as a resume, so the stages adopt the proxies they find.
+          if ! DOTNS_RESUME=true CREATE3_FACTORY="$PINNED_FACTORY" ./scripts/deploy/run.sh > resume.log 2>&1; then
             {
               echo "### Re-run did not resume"
               echo ""

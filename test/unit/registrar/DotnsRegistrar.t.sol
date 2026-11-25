@@ -378,7 +378,7 @@ contract DotnsRegistrarTests is BaseDotns {
         // OZ InvalidInitialization
         vm.expectRevert();
         dotnsRegistrar.initialize(
-            owner, "Dotns", "Dotns", IDotnsProtocolRegistry(address(protocolRegistry))
+            "Dotns", "Dotns", IDotnsProtocolRegistry(address(protocolRegistry))
         );
     }
 

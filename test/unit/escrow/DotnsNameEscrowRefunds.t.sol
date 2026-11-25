@@ -80,7 +80,6 @@ contract DotnsNameEscrowRefundsTest is BaseDotns {
         bytes memory initData = abi.encodeCall(
             DotnsNameEscrow.initialize,
             (
-                owner,
                 IDotnsProtocolRegistry(address(protocolRegistry)),
                 DEFAULT_COOLDOWN,
                 ESCROW_REDEEM_WINDOW

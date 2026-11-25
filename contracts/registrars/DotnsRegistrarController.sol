@@ -4,9 +4,7 @@ pragma solidity ^0.8.34;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ProtocolOwnedUpgradeable} from "../utils/ProtocolOwnedUpgradeable.sol";
 import {
     ERC165Upgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
@@ -44,7 +42,7 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 contract DotnsRegistrarController is
     Initializable,
     UUPSUpgradeable,
-    OwnableUpgradeable,
+    ProtocolOwnedUpgradeable,
     ERC165Upgradeable,
     ReentrancyGuardTransient,
     IDotnsRegistrarController
@@ -92,9 +90,7 @@ contract DotnsRegistrarController is
     /// @custom:reverts MaxCommitmentAgeTooLow) and must stay within
     /// `MAX_ALLOWED_COMMITMENT_AGE` (otherwise @custom:reverts MaxCommitmentAgeTooHigh) before
     /// wiring the protocol registry.
-    /// @param initialOwner Address that owns the contract once initialised.
     function initialize(
-        address initialOwner,
         IDotnsProtocolRegistry registry,
         uint256 minAge,
         uint256 maxAge
@@ -103,12 +99,12 @@ contract DotnsRegistrarController is
         initializer
     {
         __ERC165_init();
-        __Ownable_init(initialOwner);
 
         require(minAge > 0, MinCommitmentAgeZero());
         require(maxAge > minAge, MaxCommitmentAgeTooLow());
         require(maxAge <= MAX_ALLOWED_COMMITMENT_AGE, MaxCommitmentAgeTooHigh());
 
+        _requireProtocolRegistry(address(registry));
         protocolRegistry = registry;
 
         minCommitmentAge = minAge;
@@ -539,6 +535,11 @@ contract DotnsRegistrarController is
         whitelist = IDotnsNameWhitelist(configured);
     }
 
+    /// @inheritdoc ProtocolOwnedUpgradeable
+    function _protocolRegistryAddress() internal view override returns (address registry) {
+        return address(protocolRegistry);
+    }
+
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRootOrOwner {}
 }

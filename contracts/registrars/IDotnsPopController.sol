@@ -425,9 +425,9 @@ interface IDotnsPopController is IDotnsController {
         returns (bool reserved, address holder);
 
     /// @notice Updates the reservation duration used to decide when queue entries expire.
-    /// @dev Owner-gated (otherwise @custom:reverts OwnableUnauthorizedAccount). A duration below
-    /// `MIN_RESERVATION_DURATION` @custom:reverts ReservationDurationTooLow, and one above
-    /// `MAX_RESERVATION_DURATION` @custom:reverts ReservationDurationTooHigh. Emits
+    /// @dev Root or the bootstrap owner (otherwise @custom:reverts OwnableUnauthorizedAccount). A
+    /// duration below `MIN_RESERVATION_DURATION` @custom:reverts ReservationDurationTooLow, and one
+    /// above `MAX_RESERVATION_DURATION` @custom:reverts ReservationDurationTooHigh. Emits
     /// @custom:emits ReservationDurationSet on success.
     function setReservationDuration(uint64 duration) external;
 
