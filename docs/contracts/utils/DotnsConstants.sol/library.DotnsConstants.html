@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/c811821a8e7360979fa0ec4fd87185679d4c820f/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/978022915afdc8cf6c5e9b52b02d4ad8183f8c3e/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Constants</p>
 <p>Protocol-level invariants shared across dotNS contracts.</p>
@@ -266,12 +266,14 @@ and callers page through larger sets with <code>offset</code>.</p>
 </code></pre>
 <h3 id="whitelist_default_max_claimants"><a class="header" href="#whitelist_default_max_claimants">WHITELIST_DEFAULT_MAX_CLAIMANTS</a></h3>
 <p>Default per-name live-claim cap the name whitelist starts with.</p>
-<p>Governance retunes it on the whitelist within <code>WHITELIST_MAX_CLAIMANTS_LIMIT</code>.</p>
+<p>Root or the maintainer account retunes it on the whitelist within
+<code>WHITELIST_MAX_CLAIMANTS_LIMIT</code>.</p>
 <pre><code class="language-solidity">uint16 internal constant WHITELIST_DEFAULT_MAX_CLAIMANTS = 24
 </code></pre>
 <h3 id="whitelist_default_max_reason_bytes"><a class="header" href="#whitelist_default_max_reason_bytes">WHITELIST_DEFAULT_MAX_REASON_BYTES</a></h3>
 <p>Default claim-reason byte cap the name whitelist starts with.</p>
-<p>Governance retunes it on the whitelist within <code>WHITELIST_MAX_REASON_LIMIT</code>.</p>
+<p>Root or the maintainer account retunes it on the whitelist within
+<code>WHITELIST_MAX_REASON_LIMIT</code>.</p>
 <pre><code class="language-solidity">uint256 internal constant WHITELIST_DEFAULT_MAX_REASON_BYTES = 256
 </code></pre>
 <h3 id="whitelist_max_claimants_limit"><a class="header" href="#whitelist_max_claimants_limit">WHITELIST_MAX_CLAIMANTS_LIMIT</a></h3>
@@ -287,7 +289,8 @@ carrying the longest reason. The pallet-revive benchmark checks it.</p>
 </code></pre>
 <h3 id="whitelist_default_max_grant_batch"><a class="header" href="#whitelist_default_max_grant_batch">WHITELIST_DEFAULT_MAX_GRANT_BATCH</a></h3>
 <p>Default cap on labels granted in one <code>grantNames</code> call.</p>
-<p>Governance retunes it on the whitelist within <code>WHITELIST_MAX_GRANT_BATCH_LIMIT</code>.</p>
+<p>Root or the maintainer account retunes it on the whitelist within
+<code>WHITELIST_MAX_GRANT_BATCH_LIMIT</code>.</p>
 <pre><code class="language-solidity">uint16 internal constant WHITELIST_DEFAULT_MAX_GRANT_BATCH = 32
 </code></pre>
 <h3 id="whitelist_max_grant_batch_limit"><a class="header" href="#whitelist_max_grant_batch_limit">WHITELIST_MAX_GRANT_BATCH_LIMIT</a></h3>
@@ -299,7 +302,8 @@ stores each label it grants. The pallet-revive benchmark checks it.</p>
 </code></pre>
 <h3 id="whitelist_default_grant_duration"><a class="header" href="#whitelist_default_grant_duration">WHITELIST_DEFAULT_GRANT_DURATION</a></h3>
 <p>Default period a whitelist grant binds its name before it expires.</p>
-<p>Governance retunes it on the whitelist within <code>WHITELIST_MIN_GRANT_DURATION</code> and
+<p>Root or the maintainer account retunes it on the whitelist within
+<code>WHITELIST_MIN_GRANT_DURATION</code> and
 <code>WHITELIST_MAX_GRANT_DURATION</code>.</p>
 <pre><code class="language-solidity">uint64 internal constant WHITELIST_DEFAULT_GRANT_DURATION = 30 days
 </code></pre>
@@ -311,6 +315,10 @@ register.</p>
 <h3 id="whitelist_max_grant_duration"><a class="header" href="#whitelist_max_grant_duration">WHITELIST_MAX_GRANT_DURATION</a></h3>
 <p>Upper bound on the whitelist grant period, so no grant binds a name for good.</p>
 <pre><code class="language-solidity">uint64 internal constant WHITELIST_MAX_GRANT_DURATION = 365 days
+</code></pre>
+<h3 id="whitelist_maintainer_max_window"><a class="header" href="#whitelist_maintainer_max_window">WHITELIST_MAINTAINER_MAX_WINDOW</a></h3>
+<p>Longest the maintainer can make a request window, measured from its opening.</p>
+<pre><code class="language-solidity">uint64 internal constant WHITELIST_MAINTAINER_MAX_WINDOW = 90 days
 </code></pre>
 <h3 id="protocol_registry"><a class="header" href="#protocol_registry">PROTOCOL_REGISTRY</a></h3>
 <p>Well-known key the protocol registry is registered under, itself.</p>
@@ -438,6 +446,14 @@ unless the dispatch is Root, and consuming the grant on a successful mint. The P
 controller does not consult it.
 forge-lint: disable-next-line(unsafe-typecast)</p>
 <pre><code class="language-solidity">bytes32 internal constant NAME_WHITELIST = bytes32("nameWhitelist")
+</code></pre>
+<h3 id="maintainer"><a class="header" href="#maintainer">MAINTAINER</a></h3>
+<p>Well-known key for the maintainer account, which tunes bounded operational values.</p>
+<p>Role: the account the maintenance setters accept besides Root. It is an account, not a
+contract, so the release tooling publishes no contract for it. Unset, it reads zero
+and no caller passes as maintainer; Root sets and removes it.
+forge-lint: disable-next-line(unsafe-typecast)</p>
+<pre><code class="language-solidity">bytes32 internal constant MAINTAINER = bytes32("maintainer")
 </code></pre>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="registrykeys"><a class="header" href="#registrykeys">registryKeys</a></h3>

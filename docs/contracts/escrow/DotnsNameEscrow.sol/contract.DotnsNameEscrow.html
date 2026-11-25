@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/c811821a8e7360979fa0ec4fd87185679d4c820f/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/978022915afdc8cf6c5e9b52b02d4ad8183f8c3e/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, <a href="/contracts/utils/ProtocolOwnedUpgradeable.sol/abstract.ProtocolOwnedUpgradeable.html">ProtocolOwnedUpgradeable</a>, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a>, <a href="/contracts/escrow/IDotnsNameEscrowRevocation.sol/interface.IDotnsNameEscrowRevocation.html">IDotnsNameEscrowRevocation</a>, <a href="/contracts/escrow/IDotnsNameEscrowGovernance.sol/interface.IDotnsNameEscrowGovernance.html">IDotnsNameEscrowGovernance</a></p>
 <p><strong>Title:</strong>
@@ -218,7 +218,7 @@ circulation, and keeps the cast to <code>uint64</code> in release well below sat
 offers no protection at all, and one of zero length turns every release into an
 immediate hand-off to whoever is watching. The floor keeps the window long enough to
 span a holder being asleep or away for a day, so the guarantee survives any setting
-the owner is able to choose.</p>
+Root or the maintainer account can choose.</p>
 <pre><code class="language-solidity">uint256 public constant MIN_REDEEM_WINDOW = 1 days
 </code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
@@ -343,20 +343,24 @@ updateRedeemWindow, which rejects any value below @custom:constant MIN_REDEEM_WI
 </div>
 <h3 id="updatecooldown"><a class="header" href="#updatecooldown">updateCooldown</a></h3>
 <p>Updates the cooldown duration for future releases.</p>
-<p>Root or the bootstrap owner. Affects only releases recorded after this call; positions
-already released keep the <code>withdrawAvailableAt</code> snapshot taken at their release time.
+<p>Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer.
+Affects only releases recorded after this call, so either direction is safe:
+positions already released keep the <code>withdrawAvailableAt</code> snapshot taken at their
+release time.
 <code>newCooldown</code> must be non-zero, otherwise @custom:reverts InvalidCooldown, and must not
 exceed the
 contract's <code>MAX_COOLDOWN</code> upper bound, otherwise @custom:reverts CooldownTooLong; the
 bound keeps the release-to-reclaim window short and protects the <code>uint64</code> cast in
 release from truncation. Emits @custom:emits CooldownUpdated with the prior and new
 values.</p>
-<pre><code class="language-solidity">function updateCooldown(uint256 newCooldown) public override onlyRootOrOwner;
+<pre><code class="language-solidity">function updateCooldown(uint256 newCooldown) public override onlyRootOrMaintainer;
 </code></pre>
 <h3 id="updateredeemwindow"><a class="header" href="#updateredeemwindow">updateRedeemWindow</a></h3>
 <p>Updates the redeem window for future releases.</p>
-<p>Root or the bootstrap owner. Affects only releases recorded after this call; positions
-already released keep the <code>redeemableUntil</code> snapshot taken at their release time.
+<p>Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer.
+Affects only releases recorded after this call, so either direction is safe:
+positions already released keep the <code>redeemableUntil</code> snapshot taken at their release
+time.
 <code>newRedeemWindow</code> must fall within <code>MIN_REDEEM_WINDOW</code> and <code>MAX_REDEEM_WINDOW</code>
 inclusive, otherwise</p>
 <p><strong>Note:</strong>
@@ -368,14 +372,14 @@ limits how long a released name can be held out of circulation and protects the
 the prior and new values.
 This is also the post-upgrade seeding hook: pair it with <code>upgradeToAndCall</code> so an
 upgraded proxy never runs with an unseeded window.</p>
-<pre><code class="language-solidity">function updateRedeemWindow(uint256 newRedeemWindow) public override onlyRootOrOwner;
+<pre><code class="language-solidity">function updateRedeemWindow(uint256 newRedeemWindow) public override onlyRootOrMaintainer;
 </code></pre>
 <h3 id="_updatecooldown"><a class="header" href="#_updatecooldown">_updateCooldown</a></h3>
 <p>Validates and seeds the cooldown, without an ownership check.</p>
 <p>Split from @custom:function updateCooldown so the initialiser can seed the value:
 the initialiser runs inside the proxy constructor, where the caller is the deploying
-contract, so <code>onlyRootOrOwner</code> would reject it. Every caller either is
-<code>onlyRootOrOwner</code> or runs inside <code>initializer</code>.</p>
+contract, so <code>onlyRootOrMaintainer</code> would reject it. Every caller either is
+<code>onlyRootOrMaintainer</code> or runs inside <code>initializer</code>.</p>
 <pre><code class="language-solidity">function _updateCooldown(uint256 newCooldown) private;
 </code></pre>
 <p><strong>Parameters</strong></p>

@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnamewhitelist"><a class="header" href="#dotnsnamewhitelist">DotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/c811821a8e7360979fa0ec4fd87185679d4c820f/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/978022915afdc8cf6c5e9b52b02d4ad8183f8c3e/contracts/whitelist/DotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, <a href="/contracts/utils/ProtocolOwnedUpgradeable.sol/abstract.ProtocolOwnedUpgradeable.html">ProtocolOwnedUpgradeable</a>, ERC165Upgradeable, <a href="/contracts/whitelist/IDotnsNameWhitelist.sol/interface.IDotnsNameWhitelist.html">IDotnsNameWhitelist</a></p>
 <p><strong>Title:</strong>
@@ -196,12 +196,14 @@ the submitter, so a relayer or a cross-chain sovereign account can submit on a u
 behalf and the name binds to that user. All state is on-chain and queryable through views;
 no event indexing is required. A name holds at most <code>maxClaimants</code> live claims, which
 bounds the loop that clears them on resolution. Resolving a name deletes its claims,
-refunding their storage deposit, so only reserved or won names persist. The entire admin
-surface is substrate Root: <code>SystemUtils.callerIsRoot</code> is true through the proxy's
-delegatecall frame, and no gate reads <code>msg.sender</code>, so Root's lack of an address is not a
-problem. No signed account grants, revokes, reserves, or retunes a cap; the owner's
-authority is upgrade only. The public and PoP controllers hold only the <code>consume</code> hook.
-Entries are keyed by the node under the active TLD, which the deployment holds immutable
+refunding their storage deposit, so only reserved or won names persist. Grants,
+revocations, acceptances, rejections and reservations are substrate Root only: those
+gates check <code>SystemUtils.callerIsRoot</code>, true through the proxy's delegatecall frame, and
+read no <code>msg.sender</code>. The request window and the caps are also open to the maintainer
+account, within the rules each setter enforces; that gate reads <code>msg.sender</code> only after
+the Root check fails. The owner's authority is upgrade only. The public and PoP controllers
+hold only the <code>consume</code> hook. Entries are keyed by the node under the active TLD, which the
+deployment holds immutable
 for the whitelist's lifetime.</p>
 <p><strong>Note:</strong>
 security-contact: admin@parity.io</p>
@@ -211,17 +213,17 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">IDotnsProtocolRegistry public protocolRegistry
 </code></pre>
 <h3 id="maxclaimants"><a class="header" href="#maxclaimants">maxClaimants</a></h3>
-<p>Live-claim cap per name, tunable by governance within
+<p>Live-claim cap per name, tunable by Root or the maintainer account within
 <code>DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT</code>.</p>
 <pre><code class="language-solidity">uint16 public maxClaimants
 </code></pre>
 <h3 id="maxgrantbatch"><a class="header" href="#maxgrantbatch">maxGrantBatch</a></h3>
-<p>Cap on labels per <code>grantNames</code> call, tunable by governance within
-<code>DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT</code>.</p>
+<p>Cap on labels per <code>grantNames</code> call, tunable by Root or the maintainer account
+within <code>DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT</code>.</p>
 <pre><code class="language-solidity">uint16 public maxGrantBatch
 </code></pre>
 <h3 id="maxreasonbytes"><a class="header" href="#maxreasonbytes">maxReasonBytes</a></h3>
-<p>Reason byte cap, tunable by governance within
+<p>Reason byte cap, tunable by Root or the maintainer account within
 <code>DotnsConstants.WHITELIST_MAX_REASON_LIMIT</code>.</p>
 <pre><code class="language-solidity">uint256 public maxReasonBytes
 </code></pre>
@@ -250,16 +252,17 @@ security-contact: admin@parity.io</p>
 <pre><code class="language-solidity">uint64 private _requestClose
 </code></pre>
 <h3 id="grantduration"><a class="header" href="#grantduration">grantDuration</a></h3>
-<p>Period a grant binds its name, tunable by governance within
+<p>Period a grant binds its name, tunable by Root or the maintainer account within
 <code>DotnsConstants.WHITELIST_MIN_GRANT_DURATION</code> and
 <code>DotnsConstants.WHITELIST_MAX_GRANT_DURATION</code>.</p>
 <pre><code class="language-solidity">uint64 public grantDuration
 </code></pre>
-<h3 id="_grantclockstart"><a class="header" href="#_grantclockstart">_grantClockStart</a></h3>
-<p>Earliest timestamp a grant period runs from.</p>
-<p>Set when grant expiry is initialised. A grant recorded before then has no <code>grantedAt</code>,
-so its period runs from here.</p>
-<pre><code class="language-solidity">uint64 private _grantClockStart
+<h3 id="_legacygrantexpiresat"><a class="header" href="#_legacygrantexpiresat">_legacyGrantExpiresAt</a></h3>
+<p>Expiry of every grant recorded before grant expiry was initialised.</p>
+<p>Fixed when grant expiry is initialised, to that moment plus the grant period then in
+force. Such a grant has no <code>expiresAt</code> of its own. Zero until then, while those grants
+keep binding.</p>
+<pre><code class="language-solidity">uint64 private _legacyGrantExpiresAt
 </code></pre>
 <h3 id="__gap"><a class="header" href="#__gap">__gap</a></h3>
 <p>Reserved storage space to allow for layout changes in the future.</p>
@@ -268,8 +271,8 @@ so its period runs from here.</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <h3 id="onlygovernance"><a class="header" href="#onlygovernance">onlyGovernance</a></h3>
 <p>Restricts a call to a substrate Root dispatch.</p>
-<p>The whole admin surface is governance-only: no key grants, revokes, reserves, or
-retunes a cap. The bootstrap owner configures and upgrades until Root renounces it,
+<p>Every decision about who holds a name is governance-only: no key grants, revokes or
+reserves. The bootstrap owner configures and upgrades until Root renounces it,
 and never allocates, so no signed account can hand out a name. <code>msg.sender</code> is never
 read here, which is also what keeps every gated entry point callable under a Root
 origin, since Root has no account.</p>
@@ -303,35 +306,37 @@ the bootstrap owner and the TLD the node derivation reads.</p>
 </div>
 <h3 id="initializegrantexpiry"><a class="header" href="#initializegrantexpiry">initializeGrantExpiry</a></h3>
 <p>Starts grant expiry on a whitelist initialised without it.</p>
-<p>Called once by the owner through <code>upgradeToAndCall</code>, so the upgrade and the clock
-start land in one call. Starts the clock for grants made before it, which have no
-<code>grantedAt</code>, and sets the default grant period unless governance already set one. A
-whitelist whose clock already runs @custom:reverts InvalidInitialization.</p>
+<p>Called once through <code>upgradeToAndCall</code>, so the upgrade and the expiry start land in
+one call. Sets the default grant period unless governance already set one, and fixes
+the expiry of grants made before it, which have no <code>expiresAt</code>, at the period from now.
+A whitelist whose expiry already runs @custom:reverts InvalidInitialization.</p>
 <pre><code class="language-solidity">function initializeGrantExpiry() external reinitializer(2) onlyRootOrOwner;
 </code></pre>
 <h3 id="_initializegrantexpiry"><a class="header" href="#_initializegrantexpiry">_initializeGrantExpiry</a></h3>
-<p>Starts the grant clock, and sets the default grant period when none is set.</p>
+<p>Sets the default grant period when none is set, and fixes the expiry of grants
+recorded before grant expiry.</p>
 <pre><code class="language-solidity">function _initializeGrantExpiry() internal;
 </code></pre>
 <h3 id="setmaxclaimants"><a class="header" href="#setmaxclaimants">setMaxClaimants</a></h3>
 <p>Sets the live-claim cap per name.</p>
-<p>Restricted to a substrate Root dispatch. The cap is bounded by
-<code>DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT</code>, which bounds the resolution clear-loop.
-The cap only stops new requests: a name that collected more claims under a higher cap
-keeps them, and governance rejects some with @custom:function reject before a</p>
+<p>Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. While a
+window is open or scheduled, the maintainer can only raise it, otherwise</p>
 <p><strong>Notes:</strong></p>
 <ul>
 <li>
-<p>function: grantName on it fits one call.</p>
+<p>reverts: MaintainerNotAllowed. The cap is bounded by
+<code>DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT</code>, which bounds the resolution clear-loop.
+The cap only stops new requests: a name that collected more claims under a higher cap
+keeps them, and governance rejects some with @custom:function reject before a</p>
 </li>
 <li>
-<p>reverts: MaxClaimantsOutOfRange when <code>newMax</code> is zero or above the ceiling.</p>
+<p>function: grantName on it fits one call.</p>
 </li>
 <li>
 <p>emits: MaxClaimantsSet.</p>
 </li>
 </ul>
-<pre><code class="language-solidity">function setMaxClaimants(uint16 newMax) external override onlyGovernance;
+<pre><code class="language-solidity">function setMaxClaimants(uint16 newMax) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -340,10 +345,20 @@ keeps them, and governance rejects some with @custom:function reject before a</p
 </div>
 <h3 id="setmaxreasonbytes"><a class="header" href="#setmaxreasonbytes">setMaxReasonBytes</a></h3>
 <p>Sets the reason byte cap.</p>
-<p>Restricted to a substrate Root dispatch, bounded by
-<code>DotnsConstants.WHITELIST_MAX_REASON_LIMIT</code>. @custom:reverts MaxReasonBytesOutOfRange when
-<code>newMax</code> is zero or above the ceiling. @custom:emits MaxReasonBytesSet.</p>
-<pre><code class="language-solidity">function setMaxReasonBytes(uint256 newMax) external override onlyGovernance;
+<p>Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. While a
+window is open or scheduled, the maintainer can only raise it, otherwise</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: MaintainerNotAllowed. Bounded by
+<code>DotnsConstants.WHITELIST_MAX_REASON_LIMIT</code>; @custom:reverts MaxReasonBytesOutOfRange when
+<code>newMax</code> is zero or above the ceiling.</p>
+</li>
+<li>
+<p>emits: MaxReasonBytesSet.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function setMaxReasonBytes(uint256 newMax) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -352,10 +367,13 @@ keeps them, and governance rejects some with @custom:function reject before a</p
 </div>
 <h3 id="setmaxgrantbatch"><a class="header" href="#setmaxgrantbatch">setMaxGrantBatch</a></h3>
 <p>Sets the cap on labels per <code>grantNames</code> call.</p>
-<p>Restricted to a substrate Root dispatch, bounded by
+<p>Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. The cap
+limits Root's own grant batches, so the maintainer can only raise it, otherwise</p>
+<p><strong>Note:</strong>
+reverts: MaintainerNotAllowed. Bounded by
 <code>DotnsConstants.WHITELIST_MAX_GRANT_BATCH_LIMIT</code>. @custom:reverts MaxGrantBatchOutOfRange
 when <code>newMax</code> is zero or above the ceiling. @custom:emits MaxGrantBatchSet.</p>
-<pre><code class="language-solidity">function setMaxGrantBatch(uint16 newMax) external override onlyGovernance;
+<pre><code class="language-solidity">function setMaxGrantBatch(uint16 newMax) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -364,13 +382,22 @@ when <code>newMax</code> is zero or above the ceiling. @custom:emits MaxGrantBat
 </div>
 <h3 id="setgrantduration"><a class="header" href="#setgrantduration">setGrantDuration</a></h3>
 <p>Sets the period a grant binds its name.</p>
-<p>Restricted to a substrate Root dispatch, bounded by
+<p>Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. The
+period applies to grants made after the call, and a live grant keeps the expiry it was
+given. A shorter period would still cut the grants a pending referendum makes, so the
+maintainer can only raise it, otherwise @custom:reverts MaintainerNotAllowed. Bounded by
 <code>DotnsConstants.WHITELIST_MIN_GRANT_DURATION</code> and
-<code>DotnsConstants.WHITELIST_MAX_GRANT_DURATION</code>. Expiry is computed on read, so the new
-period applies to every live grant: lengthening it extends them and shortening it can
-expire them at once. @custom:reverts GrantDurationOutOfRange when <code>newDuration</code> is out of
-range. @custom:emits GrantDurationSet.</p>
-<pre><code class="language-solidity">function setGrantDuration(uint64 newDuration) external override onlyGovernance;
+<code>DotnsConstants.WHITELIST_MAX_GRANT_DURATION</code>.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: GrantDurationOutOfRange when <code>newDuration</code> is out of range.</p>
+</li>
+<li>
+<p>emits: GrantDurationSet.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function setGrantDuration(uint64 newDuration) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -531,9 +558,15 @@ expired.</p>
 </div>
 <h3 id="setwindow"><a class="header" href="#setwindow">setWindow</a></h3>
 <p>Sets the request window relative to the current time.</p>
-<p>Restricted to a substrate Root dispatch. Opens at <code>block.timestamp + startsIn</code> for
-<code>duration</code>. @custom:reverts BadWindow when <code>duration</code> is zero. @custom:emits WindowSet.</p>
-<pre><code class="language-solidity">function setWindow(uint64 startsIn, uint64 duration) external override onlyGovernance;
+<p>Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. Opens at
+<code>block.timestamp + startsIn</code> for <code>duration</code>; @custom:reverts BadWindow when <code>duration</code> is
+zero. Root sets any window. The maintainer only lengthens a window that is open or
+scheduled: it passes <code>startsIn</code> zero, the window keeps its opening and <code>duration</code> counts
+from it. With no window open or scheduled, a non-zero <code>startsIn</code>, or a window that would
+close earlier, the call @custom:reverts MaintainerNotAllowed; a window longer than
+<code>WHITELIST_MAINTAINER_MAX_WINDOW</code> from its opening @custom:reverts
+MaintainerWindowOutOfBounds. @custom:emits WindowSet.</p>
+<pre><code class="language-solidity">function setWindow(uint64 startsIn, uint64 duration) external override;
 </code></pre>
 <p><strong>Parameters</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
@@ -819,11 +852,10 @@ with no winner.</p>
 </div>
 <h3 id="_expiryof"><a class="header" href="#_expiryof">_expiryOf</a></h3>
 <p>Returns when the grant held in <code>record</code> expires.</p>
-<p>The period runs from <code>grantedAt</code>, or from the grant clock start for a grant made
-before expiry was initialised. The clock is unset only on a whitelist upgraded
-without <code>initializeGrantExpiry</code>; every grant then keeps binding, whatever period
-governance sets in the meantime, so neither a separate upgrade call nor an early
-<code>setGrantDuration</code> can open granted names.</p>
+<p>A grant keeps the expiry fixed when it was made, so a later <code>setGrantDuration</code> never
+moves it. A grant recorded before grant expiry was initialised shares
+<code>_legacyGrantExpiresAt</code>; until that is set, on a whitelist upgraded without
+<code>initializeGrantExpiry</code>, such a grant keeps binding.</p>
 <pre><code class="language-solidity">function _expiryOf(NameRecord storage record) internal view returns (uint64 expiresAt);
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -833,7 +865,7 @@ governance sets in the meantime, so neither a separate upgrade call nor an early
 </div>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>expiresAt</code></td><td><code>uint64</code></td><td>Timestamp the grant expires at; <code>type(uint64).max</code> while the clock is unset.</td></tr>
+<tr><td><code>expiresAt</code></td><td><code>uint64</code></td><td>Timestamp the grant expires at; <code>type(uint64).max</code> for a grant recorded before grant expiry while it is not yet initialised.</td></tr>
 </tbody></table>
 </div>
 <h3 id="_clearexpiredgrant"><a class="header" href="#_clearexpiredgrant">_clearExpiredGrant</a></h3>
@@ -905,6 +937,15 @@ that can never be registered. @custom:reverts InvalidLabel otherwise.</p>
 <p><strong>Returns</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>node</code></td><td><code>bytes32</code></td><td>Namehash of the label under the active TLD.</td></tr>
+</tbody></table>
+</div>
+<h3 id="_windowlive"><a class="header" href="#_windowlive">_windowLive</a></h3>
+<p>Returns whether a request window is open or scheduled.</p>
+<pre><code class="language-solidity">function _windowLive() internal view returns (bool live);
+</code></pre>
+<p><strong>Returns</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>live</code></td><td><code>bool</code></td><td>True until the current window closes.</td></tr>
 </tbody></table>
 </div>
 <h3 id="_iswindowopen"><a class="header" href="#_iswindowopen">_isWindowOpen</a></h3>
