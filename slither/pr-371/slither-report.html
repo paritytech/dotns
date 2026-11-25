@@ -8,12 +8,12 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
 <div class="mb-8">
 <h1 class="text-2xl font-bold text-white mb-1">dotNS Slither Report</h1>
-<p class="text-sm text-gray-500">Generated 2026-11-25 10:10 UTC | 231 findings</p>
+<p class="text-sm text-gray-500">Generated 2026-11-25 10:27 UTC | 232 findings</p>
 </div>
 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-8"><div class="grid grid-cols-4 gap-6 text-center">
 <div><p class="text-sm text-gray-500 mb-1">High</p><p class="text-xl font-mono font-bold text-red-400">4</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Medium</p><p class="text-xl font-mono font-bold text-yellow-400">59</p></div>
-<div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">104</p></div>
+<div><p class="text-sm text-gray-500 mb-1">Low</p><p class="text-xl font-mono font-bold text-blue-400">105</p></div>
 <div><p class="text-sm text-gray-500 mb-1">Informational</p><p class="text-xl font-mono font-bold text-gray-400">63</p></div>
 </div></div>
 <h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">High (4)</h2>
@@ -78,11 +78,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issueDeviceNameWithReservation(IDotnsPopController.DeviceNameIssuanceWithReservation,b</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:303</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.reservePersonhoodName(IDotnsPopController.PersonhoodNameReservation) (contracts/registr</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:272</td>
 </tr>
@@ -100,6 +95,11 @@
 <td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-yellow-400">reentrancy-no-eth</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issueDeviceNameWithReservation(IDotnsPopController.DeviceNameIssuanceWithReservation,b</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:303</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-yellow-400">uninitialized-local</td>
@@ -347,7 +347,7 @@
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:337</td>
 </tr>
 </tbody></table></div>
-<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Low (104)</h2>
+<h2 class="text-lg font-semibold text-white mt-8 mb-3 border-b border-gray-800 pb-2">Low (105)</h2>
 <div class="overflow-x-auto"><table class="w-full text-sm">
 <thead><tr class="border-b border-gray-800">
 <th class="py-2 px-3 text-left font-semibold text-gray-400">Check</th>
@@ -466,6 +466,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
+<td class="py-2 px-3 text-gray-200">DotnsProtocolRegistry._requireNoOwner(bytes32) (contracts/registry/DotnsProtocolRegistry.sol#214-221) has external calls</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistry.sol:214</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopLens._controller() (contracts/registrars/DotnsPopLens.sol#283-285) has external calls inside a loop: IDotnsPopCo</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopLens.sol:283</td>
 </tr>
@@ -541,11 +546,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
-<td class="py-2 px-3 text-gray-200">DotnsProtocolRegistry._requireNoOwner(bytes32) (contracts/registry/DotnsProtocolRegistry.sol#221-228) has external calls</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistry.sol:221</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">calls-loop</td>
 <td class="py-2 px-3 text-gray-200">DotnsPopLens._controller() (contracts/registrars/DotnsPopLens.sol#283-285) has external calls inside a loop: IDotnsPopCo</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopLens.sol:283</td>
 </tr>
@@ -606,13 +606,13 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._ensureDeviceContainer(DotnsPopController.Deps,bytes32) (contracts/registrars/DotnsPopC</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:1338</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._ensureDeviceContainer(DotnsPopController.Deps,bytes32) (contracts/registrars/DotnsPopC</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:1338</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-benign</td>
@@ -646,11 +646,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.evictReservations(string) (contracts/registrars/DotnsPopController.sol#472-481): 	Exter</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:472</td>
 </tr>
@@ -661,11 +656,6 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issueDeviceNameWithReservation(IDotnsPopController.DeviceNameIssuanceWithReservation,b</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:303</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._completeGatewayRegistration(DotnsPopController.Deps,address,string,bytes32,bytes32,byt</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:777</td>
 </tr>
@@ -673,6 +663,11 @@
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issueDeviceNameWithReservation(IDotnsPopController.DeviceNameIssuanceWithReservation,b</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:303</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -686,6 +681,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issueDeviceNameWithReservation(IDotnsPopController.DeviceNameIssuanceWithReservation,b</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:303</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsRegistry.setSubnodeOwner(IDotnsRegistry.SubnodeRecord) (contracts/registry/DotnsRegistry.sol#97-171):</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsRegistry.sol:97</td>
 </tr>
@@ -693,6 +693,16 @@
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._dropReservation(DotnsPopController.Deps,address,IDotnsPopController.UserReservation,ui</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:1042</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issuePersonhoodName(IDotnsPopController.PersonhoodNameIssuance,bool) (contracts/regist</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:365</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
+<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issueDeviceName(DotnsPopController.Deps,IDotnsPopController.DeviceNameIssuance,bool) (</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:337</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
@@ -718,11 +728,6 @@
 <td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
 <td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController.revokeName(string) (contracts/registrars/DotnsPopController.sol#440-469): 	External cal</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:440</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-blue-400">reentrancy-events</td>
-<td class="py-2 px-3 text-gray-200">Reentrancy in DotnsPopController._issueDeviceName(DotnsPopController.Deps,IDotnsPopController.DeviceNameIssuance,bool) (</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registrars/DotnsPopController.sol:337</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-blue-400">timestamp</td>
@@ -934,6 +939,11 @@
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
+<td class="py-2 px-3 text-gray-200">Low level call in DotnsProtocolRegistry._requireNoOwner(bytes32) (contracts/registry/DotnsProtocolRegistry.sol#214-221):</td>
+<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistry.sol:214</td>
+</tr>
+<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+<td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
 <td class="py-2 px-3 text-gray-200">Low level call in Multicall3.aggregate(Multicall3.Call[]) (contracts/utils/Multicall3.sol#42-60): 	- (success,returnData</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/utils/Multicall3.sol:42</td>
 </tr>
@@ -981,11 +991,6 @@
 <td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
 <td class="py-2 px-3 text-gray-200">Low level call in DotnsNameEscrow.claimRefund(uint256) (contracts/escrow/DotnsNameEscrow.sol#505-523): 	- (ok,None) = ad</td>
 <td class="py-2 px-3 font-mono text-gray-500">contracts/escrow/DotnsNameEscrow.sol:505</td>
-</tr>
-<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-<td class="py-2 px-3 font-mono text-gray-400">low-level-calls</td>
-<td class="py-2 px-3 text-gray-200">Low level call in DotnsProtocolRegistry._requireNoOwner(bytes32) (contracts/registry/DotnsProtocolRegistry.sol#221-228):</td>
-<td class="py-2 px-3 font-mono text-gray-500">contracts/registry/DotnsProtocolRegistry.sol:221</td>
 </tr>
 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
 <td class="py-2 px-3 font-mono text-gray-400">missing-inheritance</td>
