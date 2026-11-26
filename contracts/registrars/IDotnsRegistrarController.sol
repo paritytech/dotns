@@ -174,8 +174,10 @@ interface IDotnsRegistrarController is IDotnsController {
     /// and rejects a total charge above the committed ceiling with @custom:reverts PriceExceedsMax
     /// before checking payment. The caller must supply at least the charge
     /// (otherwise @custom:reverts InsufficientValue); any overpayment is pushed back to
-    /// `msg.sender` inline and, on failure, credited to the escrow's pull-payment ledger so
-    /// contract receivers cannot block registration. Emits @custom:emits OverpaymentRefunded
+    /// `msg.sender` inline and, on failure, credited to `registration.owner` on the escrow's
+    /// pull-payment ledger, like the deposit, so contract receivers cannot block registration
+    /// and a forwarder such as Multicall3 never holds a claimable balance. Emits
+    /// @custom:emits OverpaymentRefunded
     /// on the inline branch, the escrow's own @custom:emits OverpaymentRefunded on the pull
     /// fallback, and @custom:emits NameRegistered on success.
     function register(Registration calldata registration) external payable;

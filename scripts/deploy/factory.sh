@@ -17,16 +17,40 @@
 # Env vars are the same as the main deploy runner (see _account.sh); ACCOUNT_NAME
 # defaults to a factory-only key so it is never the pipeline/upgrade key. Extra
 # forge flags are forwarded verbatim, e.g. ./scripts/deploy/factory.sh '--timeout 1000'.
+#
+# FACTORY_UNLOCKED_SENDER skips the keystore and sends from that address through
+# the node's unlocked accounts. It is for a local dev chain that impersonates the
+# factory deployer (anvil_impersonateAccount), so CI reproduces the canonical
+# factory address without holding the factory key. RPC_URL defaults as in
+# _account.sh.
 
 set -euo pipefail
 
-# Default to a factory-only key so it is never reused for the pipeline or
-# upgrades, which is what keeps its nonce (and therefore the factory address)
-# reproducible.
-: "${ACCOUNT_NAME:=dotns-factory}"
+if [ -n "${FACTORY_UNLOCKED_SENDER:-}" ]; then
+  : "${RPC_URL:=paseo_local}"
+  ACCOUNT_NAME="unlocked"
+  SENDER="$FACTORY_UNLOCKED_SENDER"
+  CHAIN_ID=$(cast chain-id --rpc-url "$RPC_URL")
+  # Same broadcast flags as _account.sh, with the unlocked sender in place of the
+  # keystore account.
+  FORGE_DEPLOY_ARGS=(
+    --rpc-url "$RPC_URL"
+    --unlocked
+    --sender "$SENDER"
+    --broadcast
+    --slow
+    --legacy
+    --gas-limit 1000000000
+  )
+else
+  # Default to a factory-only key so it is never reused for the pipeline or
+  # upgrades, which is what keeps its nonce (and therefore the factory address)
+  # reproducible.
+  : "${ACCOUNT_NAME:=dotns-factory}"
 
-# shellcheck source=scripts/deploy/_account.sh
-. "$(dirname "$0")/_account.sh"
+  # shellcheck source=scripts/deploy/_account.sh
+  . "$(dirname "$0")/_account.sh"
+fi
 
 # Forward every extra forge flag (word-split), not just the first token.
 extra="$*"

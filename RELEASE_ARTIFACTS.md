@@ -120,7 +120,7 @@ To check the addresses against a chain:
 bun run deployments:verify --network paseo-assethub --rpc <eth-rpc-url>
 ```
 
-It reads the well-known keys from `DotnsConstants.sol`, resolves each through the protocol registry, and checks that every resolved address is one the manifest records and has code (the `maintainer` key holds an account and is only reported), that every recorded contract is pointed at by some key. The beacons are reported as unverifiable, since nothing in the registry points at them. The `protocolRegistry` key (the registry registering itself, so its implementation has a declared codehash) is new; a network that predates it leaves the key unset, and verify skips that rather than treating it as a mismatch — except under `--tag`, which asserts a post-declaration network, so a missing self-key is an error there. That self-declared hash is sloppy-drift detection only — the declaration lives inside the contract it describes — so the trustless check against release artifacts stays off chain. `multicall3` is skipped unconditionally, for the opposite reason: it is deliberately never registered, since registry membership is a trust signal and Multicall3 is a generic call forwarder.
+It reads the well-known keys from `DotnsConstants.sol`, resolves each through the protocol registry, and checks that every resolved address is one the manifest records and has code (the `maintainer` key holds an account and is only reported), that every recorded contract is pointed at by some key. No key points at the store beacons, so it checks them through `StoreFactory`: the factory must point at the beacons the manifest records, and each must be owned by the factory; under `--tag` the beacons and the store implementations they follow must also run the checkout's build, so run `forge build` first. The `protocolRegistry` key (the registry registering itself, so its implementation has a declared codehash) is new; a network that predates it leaves the key unset, and verify skips that rather than treating it as a mismatch — except under `--tag`, which asserts a post-declaration network, so a missing self-key is an error there. That self-declared hash is sloppy-drift detection only — the declaration lives inside the contract it describes — so the trustless check against release artifacts stays off chain. `multicall3` is skipped unconditionally, for the opposite reason: it is deliberately never registered, since registry membership is a trust signal and Multicall3 is a generic call forwarder.
 
 It also checks the pairing a release publishes under `registryKeys`: each key must resolve to the address of the contract named for it, so a key that holds a different contract from the one a release names is reported. It reads a committed manifest rather than a published asset, so run it from a checkout at the tag. `--manifest <path>` in place of `--network` checks an uncommitted `<chain-id>.json` manifest, which is how the Deploy Contracts workflow checks the pairing against its fresh deploy. On a registry with `keys()`, it also checks that `keys()` lists exactly the keys that resolve; on an older registry it skips that check.
 
@@ -129,9 +129,13 @@ With `--tag vX.Y.Z` it additionally checks the chain's own declarations: `protoc
 ## Publishing
 
 Both publish workflows run in the `releases` environment, because building a genesis reads the
-key that owns every contract in it. The environment holds:
+key that owns every contract in it and the key that deploys the CREATE3 factory. The
+environment holds:
 
 - `DOTNS_ADMIN_KEY` (secret): the genesis owner's private key.
+- `FACTORY_DEPLOYER_KEY` (secret): the single-purpose key whose nonce-0 deploy fixes the
+  canonical factory address. No other workflow reads it: the Deploy Contracts workflow runs
+  pull request code, so it impersonates the factory deployer on anvil.
 - `DOTNS_ADMIN_ADDRESS` (variable): the address that key derives to. The workflow checks the
   pair right after the toolchain is installed and fails the run on a mismatch, so a mistyped
   key dies before anything is built.

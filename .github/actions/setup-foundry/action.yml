@@ -10,6 +10,6 @@ description: Installs the foundry version this repo is known to build with.
 runs:
   using: composite
   steps:
-    - uses: foundry-rs/foundry-toolchain@v1
+    - uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
       with:
         version: v1.7.1

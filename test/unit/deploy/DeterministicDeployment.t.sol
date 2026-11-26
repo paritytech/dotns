@@ -367,6 +367,42 @@ contract DeterministicDeploymentTest is Test {
         vm.setEnv("CREATE3_FACTORY", vm.toString(address(0)));
     }
 
+    /// @notice An occupant whose `UUPSUpgradeable.__self` holds another address is rejected.
+    /// @dev The byte comparison skips address-derived words, so the genuine artefact deployed
+    ///      elsewhere and copied here matches everywhere else. Its `__self` names the original
+    ///      address, which an honest deploy at this one never writes.
+    function test_an_occupant_with_a_foreign_self_address_is_rejected() public {
+        _skipUnderCoverage();
+        address elsewhere =
+            deployer.deployCreate3(owner, "StoreFactory.sol:StoreFactory", "", "Elsewhere");
+        vm.etch(deployer.predictCreate3("StoreFactory", "contract"), elsewhere.code);
+
+        _assertAdoptionRejected("StoreFactory.sol:StoreFactory", "", "StoreFactory");
+    }
+
+    /// @notice An occupant built with zeroed immutables is rejected.
+    /// @dev `vm.getDeployedCode` zeroes immutables, so a codehash fast path would match it.
+    function test_an_occupant_with_zeroed_immutables_is_rejected() public {
+        _skipUnderCoverage();
+        vm.etch(
+            deployer.predictCreate3("StoreFactory", "contract"),
+            vm.getDeployedCode("StoreFactory.sol:StoreFactory")
+        );
+
+        _assertAdoptionRejected("StoreFactory.sol:StoreFactory", "", "StoreFactory");
+    }
+
+    /// @notice A configured factory whose code is not the `Create3Factory` artefact is refused.
+    function test_adoptRevertsWhenFactoryCodeIsForeign() public {
+        DeterministicDeploymentHarness fresh = new DeterministicDeploymentHarness();
+        fresh.initManifest();
+        address impostor = address(new Squatter());
+        vm.expectRevert(
+            bytes("Create3Factory: code at factory address is not the Create3Factory artefact")
+        );
+        fresh.adoptCreate3Factory(impostor);
+    }
+
     function test_adoptRevertsWhenFactoryHasNoCode() public {
         DeterministicDeploymentHarness fresh = new DeterministicDeploymentHarness();
         fresh.initManifest();

@@ -16,6 +16,7 @@ SUBMODULES=(
   "openzeppelin-contracts-upgradeable|v5.5.0|aa677e9d28ed78fc427ec47ba2baef2030c58e7c|https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable.git"
   "openzeppelin-foundry-upgrades|v0.4.0|cbce1e00305e943aa1661d43f41e5ac72c662b07|https://github.com/OpenZeppelin/openzeppelin-foundry-upgrades.git"
   "halmos-cheatcodes|main|6da4e692c357ba6d641a2e677a28298cac9f76ab|https://github.com/a16z/halmos-cheatcodes.git"
+  "solady|v0.1.26|acd959aa4bd04720d640bf4e6a5c71037510cc4b|https://github.com/Vectorized/solady.git"
 )
 
 msg(){ printf "%s\n" "$*"; }
@@ -97,7 +98,13 @@ check_missing_files(){
   fi
 }
 
+# Opt-in: set DOTNS_INSTALL_HOOKS=1 to point git at the repo's hooks. An install
+# never rewrites the clone's git config on its own.
 install_git_hooks(){
+  if [ "${DOTNS_INSTALL_HOOKS:-}" != "1" ]; then
+    echo "Skipping git hooks (set DOTNS_INSTALL_HOOKS=1 to install them)."
+    return
+  fi
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "Installing git hooks..."
     git config core.hooksPath .githooks

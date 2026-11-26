@@ -10,6 +10,7 @@ import re
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 
 SEVERITY_ORDER = ["H", "M", "L", "GAS", "NC"]
@@ -90,8 +91,8 @@ def generate_html(findings):
 
         for finding in items:
             lines.append('<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">')
-            lines.append(f'<td class="py-2 px-3 font-mono {color}">{finding["id"]}</td>')
-            lines.append(f'<td class="py-2 px-3 text-gray-200">{finding["title"]}</td>')
+            lines.append(f'<td class="py-2 px-3 font-mono {color}">{escape(str(finding["id"]))}</td>')
+            lines.append(f'<td class="py-2 px-3 text-gray-200">{escape(finding["title"])}</td>')
             lines.append(f'<td class="py-2 px-3 font-mono text-right">{finding["instances"]}</td>')
             lines.append("</tr>")
 

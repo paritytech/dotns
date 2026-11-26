@@ -234,10 +234,7 @@ contract WireDeployments is BaseDeployer {
         // initialised with, so its `owner()` proves nothing on its own: a proxy bound to a foreign
         // registry reports whatever that registry answers. The registry's owner and each pointer
         // are what bind the deployment to `expectedOwner`.
-        require(
-            DotnsProtocolRegistry(addr.protocolRegistry).owner() == expectedOwner,
-            "ProtocolRegistry: wrong owner"
-        );
+        _requireRegistryConfig(addr.protocolRegistry, expectedOwner);
         address expected = addr.protocolRegistry;
         _requirePointer(
             address(DotnsRegistrar(addr.registrar).protocolRegistry()), expected, "Registrar"

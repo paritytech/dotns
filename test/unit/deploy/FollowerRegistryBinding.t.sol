@@ -52,6 +52,7 @@ contract FollowerRegistryBindingTests is BaseDotns {
         super.setUp();
         harness = new WireBindingHarness();
         foreign = new ForeignRegistry(owner);
+        vm.setEnv("DOTNS_TLD", TLD_LABEL);
     }
 
     function test_revert_a_follower_bound_to_a_foreign_registry_fails_verification() public {
@@ -87,6 +88,20 @@ contract FollowerRegistryBindingTests is BaseDotns {
     function test_revert_a_wrong_protocol_registry_owner_fails_verification() public {
         vm.expectRevert(bytes("ProtocolRegistry: wrong owner"));
         harness.verifyDeployment(_addresses(), makeAddr("someoneElse"));
+    }
+
+    /// @dev An adopted registry skips its initialiser, so its TLD may be someone else's choice.
+    function test_revert_a_protocol_registry_with_another_tld_fails_verification() public {
+        WireDeployments.Addresses memory addr = _addresses();
+        addr.protocolRegistry = address(
+            new ERC1967Proxy(
+                address(new DotnsProtocolRegistry()),
+                abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, "paseo"))
+            )
+        );
+
+        vm.expectRevert(bytes("ProtocolRegistry: wrong TLD"));
+        harness.verifyDeployment(addr, owner);
     }
 
     function test_revert_the_single_run_deployer_rejects_a_foreign_cost_model_registry() public {

@@ -83,9 +83,8 @@ library DotnsConstants {
     uint256 internal constant WHITELIST_DEFAULT_MAX_REASON_BYTES = 256;
 
     /// @notice Upper bound on the whitelist live-claim cap.
-    /// @dev A grant clears every claim on the name in one call, so at this bound a referendum's
-    ///      `grantName` still fits the weight one governance call can execute, with each claim
-    ///      carrying the longest reason. The pallet-revive benchmark checks it.
+    /// @dev Bounds the claims governance reviews per name. Resolving a name ends its round of
+    ///      claims in one write, so the cap does not bound the cost of a grant.
     uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 30;
 
     /// @notice Upper bound on the whitelist reason byte cap.

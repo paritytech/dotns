@@ -30,8 +30,8 @@
 # Env vars (read from `.env` if present, otherwise from the shell):
 #   ACCOUNT_NAME       Foundry keystore account passed to forge as --account.
 #                      Defaults to `dotns-deploy`.
-#   ACCOUNT_PASSWORD   Password passed to cast/forge as --password. Prompted
-#                      interactively when not set.
+#   ACCOUNT_PASSWORD   Password cast/forge read from an owner-only file.
+#                      Prompted interactively when not set.
 #   PRIVATE_KEY        Hex-encoded deployer private key, with or without 0x.
 #                      Required only when ACCOUNT_NAME has not yet been
 #                      imported into the Foundry keystore.

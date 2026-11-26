@@ -1,0 +1,14 @@
+# Keeps the commit SHAs that pin every GitHub Action current. Each update
+# arrives as a pull request, so a moved upstream tag never reaches CI unreviewed.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - "/"
+      - "/.github/actions/*"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"

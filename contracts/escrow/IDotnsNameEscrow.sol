@@ -366,7 +366,9 @@ interface IDotnsNameEscrow {
     /// @dev Moves the NFT from custody straight to `newOwner`. Only the configured
     ///      controller may call this, otherwise @custom:reverts NotController, and the position
     ///      must be released with `redeemableUntil` reached, otherwise @custom:reverts
-    ///      NotReclaimable. Emits @custom:emits NameReclaimed once custody is transferred.
+    ///      NotReclaimable. `newOwner` cannot be the escrow itself, otherwise
+    ///      @custom:reverts InvalidRecipient. Emits @custom:emits NameReclaimed once custody is
+    ///      transferred.
     ///      Reclaim does not require the deposit to have been withdrawn first. If the position
     ///      still holds value, this call settles it: the amount is debited from `tokenReserved`
     ///      (@custom:reverts InsufficientFunds if the reserve is short) and credited to the

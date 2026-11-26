@@ -12,15 +12,14 @@ services:
       RUST_LOG: "info,eth-rpc=debug,error"
       RUST_BACKTRACE: "1"
     ports:
-      - "8545:8545"
+      - "127.0.0.1:8545:8545"
     command:
       - "--node-rpc-url"
       - "wss://paseo-asset-hub-next-rpc.polkadot.io"
       - "--rpc-port"
       - "8545"
       - "--rpc-external"
-      # Container is bound to host loopback only (`8545:8545` publishes on
-      # 127.0.0.1 by default with the `host.docker.internal` network mode).
+      # The port is published on host loopback only (`127.0.0.1:8545:8545`).
       # Restrict CORS to local origins so a browser tab on a non-loopback
       # host cannot drive the local RPC. `forge` / `bun` / `cast` invoke
       # the RPC server-side and don't need CORS.

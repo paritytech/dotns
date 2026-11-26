@@ -14,6 +14,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 
 
@@ -151,7 +152,7 @@ def generate_html(files, total_line_coverage):
         func_color = coverage_color_class(file_entry["functions"])
 
         lines.append('<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">')
-        lines.append(f'<td class="py-2 px-3 font-mono text-gray-200">{file_name}</td>')
+        lines.append(f'<td class="py-2 px-3 font-mono text-gray-200">{escape(file_name)}</td>')
         lines.append(f'<td class="py-2 px-3 font-mono text-right {line_color}">{file_entry["lines"]:.1f}%</td>')
         lines.append(f'<td class="py-2 px-3 font-mono text-right {stmt_color}">{file_entry["statements"]:.1f}%</td>')
         lines.append(f'<td class="py-2 px-3 font-mono text-right {branch_color}">{file_entry["branches"]:.1f}%</td>')

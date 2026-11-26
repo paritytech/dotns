@@ -30,8 +30,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CONTRACT_LIST = join(ROOT, ".github", "abi-contracts.txt");
 const CONSTANTS_SOL = join(ROOT, "contracts", "utils", "DotnsConstants.sol");
 
-// Deployed by the StoreFactory initialiser, so no registry key points at them.
-const UNVERIFIABLE = ["LabelStoreBeacon", "UserStoreBeacon"];
+// Deployed by the StoreFactory initialiser, so no registry key points at them. `verify` checks
+// them through the factory instead (`verifyStoreBeacons`).
+const STORE_BEACONS = [
+  { label: "LabelStoreBeacon", getter: "labelStoreBeacon()(address)", implementation: "LabelStore" },
+  { label: "UserStoreBeacon", getter: "userStoreBeacon()(address)", implementation: "UserStore" },
+];
 
 // Keys the forward check tolerates as unset. Multicall3 is deliberately never registered:
 // registry membership is a trust signal other contracts read, and a generic call forwarder
@@ -893,6 +897,48 @@ function executingCodehash(rpc, addr) {
   return keccakHex(cast(["code", target, "--rpc-url", rpc]));
 }
 
+// Hash of an artefact's runtime bytecode exactly as built, the domain `eth_getCode` returns for
+// code this checkout deployed.
+function artefactRuntimeHash(name) {
+  const path = join(ROOT, "out", `${name}.sol`, `${name}.json`);
+  if (!existsSync(path)) fail(`${path} is missing; run \`forge build\` before verify --tag`);
+  return keccakHex(JSON.parse(readFileSync(path, "utf8")).deployedBytecode.object);
+}
+
+// The store beacons, checked through StoreFactory the way the deploy scripts'
+// `_verifyStoreImplementations` checks them: the factory must point at the beacons the manifest
+// records, and each beacon must be owned by the factory, so governance can rotate every store.
+// With `checkCode` (verify --tag, a checkout at the release) the beacons and the store
+// implementations they follow must also run this build's code.
+function verifyStoreBeacons(rpc, contracts, problems, checkCode) {
+  const factory = contracts.StoreFactory;
+  if (!factory) return;
+  for (const { label, getter, implementation } of STORE_BEACONS) {
+    const beacon = cast(["call", factory, getter, "--rpc-url", rpc]);
+    if (contracts[label] && contracts[label].toLowerCase() !== beacon.toLowerCase()) {
+      problems.push(`StoreFactory points ${label} at ${beacon}, but the manifest records ${contracts[label]}`);
+      continue;
+    }
+    const owner = cast(["call", beacon, "owner()(address)", "--rpc-url", rpc]);
+    if (owner.toLowerCase() !== factory.toLowerCase()) {
+      problems.push(`${label} ${beacon} is owned by ${owner}, not the StoreFactory`);
+      continue;
+    }
+    if (checkCode) {
+      if (keccakHex(cast(["code", beacon, "--rpc-url", rpc])) !== artefactRuntimeHash("UpgradeableBeacon")) {
+        problems.push(`${label} ${beacon} does not run the UpgradeableBeacon artefact`);
+        continue;
+      }
+      const target = cast(["call", beacon, "implementation()(address)", "--rpc-url", rpc]);
+      if (keccakHex(cast(["code", target, "--rpc-url", rpc])) !== artefactRuntimeHash(implementation)) {
+        problems.push(`${label} follows ${target}, which does not run the ${implementation} artefact`);
+        continue;
+      }
+    }
+    console.log(`  ok   ${label} ${beacon} (owned by the StoreFactory${checkCode ? ", code matches" : ""})`);
+  }
+}
+
 // Checks that the manifest and the chain agree after deploy time: every key resolves to the
 // address a release publishes under it (`registryFromManifest`), and every manifest address is
 // held by a key or known to be unkeyed. `--manifest` points at an uncommitted manifest, such as
@@ -1051,7 +1097,7 @@ function verify(args) {
     registry,
     contracts.Multicall3,
     contracts.DotnsFlatPricing,
-    ...UNVERIFIABLE.map((label) => contracts[label]),
+    ...STORE_BEACONS.map(({ label }) => contracts[label]),
   ]
     .filter(Boolean)
     .map((address) => address.toLowerCase());
@@ -1092,11 +1138,7 @@ function verify(args) {
     }
   }
 
-  for (const label of UNVERIFIABLE) {
-    if (contracts[label]) {
-      console.log(`  skip ${label} ${contracts[label]} (constructor-deployed)`);
-    }
-  }
+  verifyStoreBeacons(rpc, contracts, problems, Boolean(tag));
 
   if (problems.length > 0) {
     console.error(`[release-metadata] ${problems.length} problem(s) on ${network}:`);

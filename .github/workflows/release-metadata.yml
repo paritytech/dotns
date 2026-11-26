@@ -27,9 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.2.6"
           no-cache: true
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -66,11 +66,11 @@ jobs:
           fi
           if [ "$IS_DEPLOY_RECORD" = "true" ]; then
             echo "Live network manifest edited under the 'deployment-record' label:"
-            printf '  %s\n' $changed
+            printf '%s\n' "$changed" | sed 's/^/  /'
             exit 0
           fi
           echo "::error::A code pull request must not edit a live network manifest."
-          printf '  %s\n' $changed
+          printf '%s\n' "$changed" | sed 's/^/  /'
           echo "Update deployments/expected.json instead; the live file is written by a deploy."
           echo "If this pull request records a real deploy, add the 'deployment-record' label."
           exit 1

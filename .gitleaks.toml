@@ -21,8 +21,8 @@ description = "Vendored dependencies and public local-dev test keys"
 # Vendored code we do not own. lib/ holds git submodules (OpenZeppelin);
 # slither/ holds committed static-analysis snapshots that copy those submodules.
 paths = [
-  '''(^|/)lib/''',
-  '''(^|/)slither/''',
+  '''^lib/''',
+  '''^slither/''',
 ]
 
 # Deterministic Anvil/Hardhat accounts derived from the public mnemonic

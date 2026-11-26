@@ -154,6 +154,8 @@ contract DotnsDeployer is BaseDeployer {
             abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, tldLabel())),
             "DotnsProtocolRegistry"
         );
+        // An adopted registry keeps someone else's initialiser arguments; see DeployCore.
+        _requireRegistryConfig(proxy, owner);
         protocolRegistry = DotnsProtocolRegistry(proxy);
     }
 

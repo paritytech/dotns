@@ -238,7 +238,11 @@ contract DotnsRegistrarController is
             if (ok) {
                 emit OverpaymentRefunded(msg.sender, refund);
             } else {
-                IDotnsNameEscrow(payable(escrow)).creditOverpayment{value: refund}(msg.sender);
+                // Credited to the owner, like the deposit: a payer that cannot take the refund,
+                // such as a forwarder anyone can call, never holds a balance others could claim.
+                IDotnsNameEscrow(payable(escrow)).creditOverpayment{value: refund}(
+                    registration.owner
+                );
             }
         }
     }

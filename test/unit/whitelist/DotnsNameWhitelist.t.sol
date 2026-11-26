@@ -59,8 +59,8 @@ contract DotnsNameWhitelistTests is BaseDotns {
 
     function test_requestName_records_and_emits() public {
         bytes32 node = _nodeOf(BASE_LABEL_A);
-        vm.expectEmit(true, true, false, true, address(whitelist));
-        emit IDotnsNameWhitelist.NameRequested(node, ed, BASE_LABEL_A, REASON);
+        vm.expectEmit(true, true, true, true, address(whitelist));
+        emit IDotnsNameWhitelist.NameRequested(node, ed, ed, BASE_LABEL_A, REASON);
         _request(ed, BASE_LABEL_A);
 
         IDotnsNameWhitelist.Claim memory claim = whitelist.claimOf(BASE_LABEL_A, ed);
@@ -84,6 +84,10 @@ contract DotnsNameWhitelistTests is BaseDotns {
     }
 
     function test_requestName_submitter_may_differ_from_user() public {
+        vm.expectEmit(true, true, true, true, address(whitelist));
+        emit IDotnsNameWhitelist.NameRequested(
+            _nodeOf(BASE_LABEL_A), ed, tiago, BASE_LABEL_A, REASON
+        );
         vm.prank(tiago);
         whitelist.requestName(BASE_LABEL_A, REASON, ed);
         assertEq(whitelist.claimOf(BASE_LABEL_A, ed).user, ed);
@@ -141,7 +145,7 @@ contract DotnsNameWhitelistTests is BaseDotns {
         _request(ed, BASE_LABEL_A);
     }
 
-    function test_accept_picks_winner_and_rejects_losers() public {
+    function test_accept_picks_winner_and_clears_the_round() public {
         _request(ed, BASE_LABEL_A);
         vm.prank(tiago);
         whitelist.requestName(BASE_LABEL_A, "also me", tiago);
@@ -149,8 +153,8 @@ contract DotnsNameWhitelistTests is BaseDotns {
 
         vm.expectEmit(true, true, false, true, address(whitelist));
         emit IDotnsNameWhitelist.NameAccepted(node, ed, BASE_LABEL_A);
-        vm.expectEmit(true, true, false, true, address(whitelist));
-        emit IDotnsNameWhitelist.NameRejected(node, tiago, BASE_LABEL_A);
+        vm.expectEmit(true, false, false, true, address(whitelist));
+        emit IDotnsNameWhitelist.ClaimsCleared(node, BASE_LABEL_A, 0, 2);
         whitelist.accept(BASE_LABEL_A, ed);
 
         assertEq(whitelist.granteeOf(BASE_LABEL_A), ed);
@@ -233,6 +237,100 @@ contract DotnsNameWhitelistTests is BaseDotns {
         );
     }
 
+    function test_withdrawClaim_frees_a_claim_filed_in_the_callers_name() public {
+        vm.prank(tiago);
+        whitelist.requestName(BASE_LABEL_A, "not ed's words", ed);
+        bytes32 node = _nodeOf(BASE_LABEL_A);
+
+        vm.expectEmit(true, true, false, true, address(whitelist));
+        emit IDotnsNameWhitelist.ClaimWithdrawn(node, ed, BASE_LABEL_A);
+        vm.prank(ed);
+        whitelist.withdrawClaim(BASE_LABEL_A);
+
+        assertEq(whitelist.claimantCount(BASE_LABEL_A), 0);
+        assertEq(whitelist.nameCount(), 0, "an Open name with no claims leaves the active set");
+
+        _request(ed, BASE_LABEL_A);
+        assertEq(whitelist.claimOf(BASE_LABEL_A, ed).submitter, ed, "ed files their own claim");
+    }
+
+    function test_withdrawClaim_reverts_without_a_pending_claim() public {
+        vm.prank(tiago);
+        whitelist.requestName(BASE_LABEL_A, REASON, ed);
+        bytes32 node = _nodeOf(BASE_LABEL_A);
+
+        // Only the beneficiary withdraws: the submitter holds no claim of their own.
+        vm.expectRevert(
+            abi.encodeWithSelector(IDotnsNameWhitelist.NotRequested.selector, node, tiago)
+        );
+        vm.prank(tiago);
+        whitelist.withdrawClaim(BASE_LABEL_A);
+
+        _request(leonardo, BASE_LABEL_B);
+        whitelist.reject(BASE_LABEL_B, leonardo);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDotnsNameWhitelist.NotRequested.selector, _nodeOf(BASE_LABEL_B), leonardo
+            )
+        );
+        vm.prank(leonardo);
+        whitelist.withdrawClaim(BASE_LABEL_B);
+    }
+
+    /// @dev Resolution ends the round in one write, so a grant costs the same at the claim cap as
+    ///      with no claims, and a batch cannot be pushed past the governance weight limit by
+    ///      claims filed before it enacts.
+    function test_a_grant_costs_the_same_however_many_claims_the_name_holds() public {
+        whitelist.setMaxClaimants(DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT);
+        for (uint160 i = 1; i <= DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT; ++i) {
+            vm.prank(tiago);
+            whitelist.requestName(BASE_LABEL_A, _longReason(), address(uint160(0x1000) + i));
+        }
+
+        uint256 gasBefore = gasleft();
+        whitelist.grantName(BASE_LABEL_B, ed);
+        uint256 emptyCost = gasBefore - gasleft();
+
+        gasBefore = gasleft();
+        whitelist.grantName(BASE_LABEL_A, ed);
+        uint256 fullCost = gasBefore - gasleft();
+
+        assertEq(whitelist.claimantCount(BASE_LABEL_A), 0);
+        assertLt(fullCost, emptyCost + 30_000, "no write per cleared claim");
+    }
+
+    /// @dev A new round starts empty: claims of the round a grant ended stay out of every view,
+    ///      and a self-filed rejection holds only for the round it was made in.
+    function test_a_lapsed_grant_opens_a_new_round_of_claims() public {
+        _request(ed, BASE_LABEL_A);
+        whitelist.reject(BASE_LABEL_A, ed);
+        _request(tiago, BASE_LABEL_A);
+        whitelist.grantName(BASE_LABEL_A, leonardo);
+
+        vm.warp(whitelist.grantExpiresAt(BASE_LABEL_A));
+        whitelist.setWindow(0, 7 days);
+
+        assertEq(whitelist.claimantCount(BASE_LABEL_A), 0, "the earlier claims are gone");
+        assertEq(
+            uint256(whitelist.claimOf(BASE_LABEL_A, tiago).status),
+            uint256(IDotnsNameWhitelist.ClaimStatus.None)
+        );
+        _request(ed, BASE_LABEL_A);
+        assertEq(
+            uint256(whitelist.claimOf(BASE_LABEL_A, ed).status),
+            uint256(IDotnsNameWhitelist.ClaimStatus.Requested),
+            "the rejection held for its round"
+        );
+    }
+
+    function _longReason() internal pure returns (string memory reason) {
+        bytes memory raw = new bytes(DotnsConstants.WHITELIST_MAX_REASON_LIMIT);
+        for (uint256 i; i < raw.length; ++i) {
+            raw[i] = "r";
+        }
+        return string(raw);
+    }
+
     /// @dev Exhaustive over the governance surface rather than a sample. Every `onlyGovernance`
     /// entry point must refuse a signed origin; a per-method test set would silently miss any
     /// method that later lost its gate, which is how the four spot checks below left `reject`,
@@ -305,8 +403,8 @@ contract DotnsNameWhitelistTests is BaseDotns {
     function test_grantName_clears_pending_claims() public {
         _request(tiago, BASE_LABEL_A);
         bytes32 node = _nodeOf(BASE_LABEL_A);
-        vm.expectEmit(true, true, false, true, address(whitelist));
-        emit IDotnsNameWhitelist.NameRejected(node, tiago, BASE_LABEL_A);
+        vm.expectEmit(true, false, false, true, address(whitelist));
+        emit IDotnsNameWhitelist.ClaimsCleared(node, BASE_LABEL_A, 0, 1);
         whitelist.grantName(BASE_LABEL_A, ed);
         assertEq(whitelist.granteeOf(BASE_LABEL_A), ed);
         assertEq(whitelist.claimantCount(BASE_LABEL_A), 0);
@@ -412,8 +510,8 @@ contract DotnsNameWhitelistTests is BaseDotns {
     function test_setReserved_clears_pending_claims() public {
         bytes32 node = _nodeOf(BASE_LABEL_A);
         _request(ed, BASE_LABEL_A);
-        vm.expectEmit(true, true, false, true, address(whitelist));
-        emit IDotnsNameWhitelist.NameRejected(node, ed, BASE_LABEL_A);
+        vm.expectEmit(true, false, false, true, address(whitelist));
+        emit IDotnsNameWhitelist.ClaimsCleared(node, BASE_LABEL_A, 0, 1);
         whitelist.setReserved(BASE_LABEL_A, true);
 
         assertTrue(whitelist.isReserved(BASE_LABEL_A));
