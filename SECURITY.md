@@ -15,11 +15,10 @@ parties on live networks, or reused in future production contexts once published
 
 ## Static analysis
 
-The contracts are scanned on every pull request by static-analysis tools, currently Slither and
-4naly3er, with the reports published to GitHub Pages. All findings raised by these tools have been
-reviewed and are deemed false positives or accepted non-issues for this codebase. They are retained
-for transparency rather than as a list of outstanding defects, so a tool reporting a finding is not
-in itself grounds for a vulnerability report. If you believe a specific finding has genuine,
+The contracts are scanned on every pull request by Slither, with the reports published to GitHub
+Pages. All findings it has raised have been reviewed and are deemed false positives or accepted
+non-issues for this codebase. The reports are kept for transparency, as a record of reviewed
+findings, so a finding Slither reports is not in itself grounds for a vulnerability report. If you believe a specific finding has genuine,
 demonstrable impact, raise it through the disclosure process below with the evidence required under
 "What to report".
 
