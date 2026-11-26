@@ -16,7 +16,44 @@ dotNS is a naming system for Polkadot. An account can register a .dot name, rece
 
 ### System diagram
 
-![System diagram](./diagrams/system.png)
+```mermaid
+flowchart LR
+    gateway["<b>dotNS gateway pallet</b><br/>Asset Hub runtime<br/>verifies devicehood and personhood"]
+    gov["<b>Governance</b><br/>Root<br/>maintainer account<br/>bootstrap owner, until renounced"]
+    users["<b>Accounts and apps</b><br/>wallets, dApps, CLI"]
+    readers["<b>Readers</b><br/>wallets, indexers, web gateways"]
+
+    subgraph dotns["dotNS contracts"]
+        direction TB
+        reg["<b>Registration</b><br/><code>DotnsRegistrarController</code><br/><code>DotnsPopController</code>"]
+        rules["<b>Rules and pricing</b><br/><code>PopRules</code><br/><code>DotnsCostModelRegistry</code><br/><code>DotnsNameWhitelist</code>"]
+        own["<b>Ownership</b><br/><code>DotnsRegistrar</code><br/><code>DotnsRegistry</code><br/><code>DotnsNameEscrow</code>"]
+        rec["<b>Records</b><br/><code>DotnsResolver</code><br/><code>DotnsContentResolver</code><br/><code>DotnsReverseResolver</code><br/><code>DotnsPopResolver</code><br/><code>LabelStore</code><br/><code>UserStore</code>"]
+    end
+
+    gateway -- "issue and reserve device<br/>and personhood names" --> dotns
+    gov -- "grants, revocations,<br/>settings, upgrades" --> dotns
+    dotns <-- "register, request grants,<br/>transfer, subnames, records,<br/>release and redeem, upkeep" --> users
+    dotns <-- "resolve names,<br/>read state" --> readers
+
+    reg -- "check price<br/>and eligibility" --> rules
+    reg -- "mint" --> own
+    reg -- "write first records" --> rec
+
+    classDef actor fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
+    classDef runtime fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
+    classDef governance fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a
+    classDef contract fill:#ffffff,stroke:#16a34a,stroke-width:2px,color:#0f172a
+    classDef reader fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#0f172a
+    class users actor
+    class gateway runtime
+    class gov governance
+    class reg,rules,own,rec contract
+    class readers reader
+    style dotns fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#0f172a
+```
+
+Every contract finds the others through `DotnsProtocolRegistry`, the protocol's address book. Readers can batch calls through Multicall3 and read PoP data through `DotnsPopLens`.
 
 ## Actors
 
