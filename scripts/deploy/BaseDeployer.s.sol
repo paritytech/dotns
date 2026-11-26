@@ -196,7 +196,8 @@ abstract contract BaseDeployer is Script {
     ///      checks below only prove that whatever sits at those addresses answered `owner()` and
     ///      `implementation()` the way this stage wanted at verification time; a bespoke contract
     ///      can do that and return something else afterwards. `UpgradeableBeacon` carries no
-    ///      immutables, so its code compares exactly and the topology cannot be faked.
+    ///      immutables, so its code compares exactly, apart from the compiler metadata, and the
+    ///      topology cannot be faked.
     /// @dev Beacon ownership is asserted too. `upgradeLabelStoreImplementation` is
     ///      `onlyRootOrOwner` on the factory and the beacons are constructed as owned by it, so a
     ///      beacon owned by anything else leaves every store on the network following an
