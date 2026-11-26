@@ -11,6 +11,7 @@ import {Create3Factory} from "../../contracts/deploy/Create3Factory.sol";
 import {IDotnsProtocolRegistry} from "../../contracts/registry/IDotnsProtocolRegistry.sol";
 import {IStoreFactory} from "../../contracts/store/IStoreFactory.sol";
 import {DotnsConstants} from "../../contracts/utils/DotnsConstants.sol";
+import {Create3FactoryCode} from "./Create3FactoryCode.sol";
 import {DeploymentNetwork} from "./DeploymentNetwork.sol";
 
 /// @title BaseDeployer
@@ -40,9 +41,6 @@ abstract contract BaseDeployer is Script {
 
     /// @notice Artefact backing both store beacons.
     string internal constant BEACON_ARTEFACT = "UpgradeableBeacon.sol:UpgradeableBeacon";
-
-    /// @dev Artefact the configured CREATE3 factory's code must match.
-    string internal constant CREATE3_FACTORY_ARTEFACT = "Create3Factory.sol:Create3Factory";
 
     /// @notice ERC1967 implementation storage slot,
     ///         `bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)`.
@@ -382,7 +380,7 @@ abstract contract BaseDeployer is Script {
     ///         factory when one is configured.
     /// @dev Every dotNS address is a pure function of the factory address and a
     ///      stable salt, and the factory address is `keccak(deployer, nonce)`. A
-    ///      fresh `new Create3Factory()` from a key whose nonce is not fixed
+    ///      freshly minted factory from a key whose nonce is not fixed
     ///      therefore lands at a new address and shifts every downstream CREATE3
     ///      address with it, which is why a key that also runs upgrades cannot
     ///      keep addresses stable across chain resets. Deploy the factory once
@@ -424,7 +422,7 @@ abstract contract BaseDeployer is Script {
     function _bootstrapCreate3Factory(address owner) internal returns (address factory) {
         vm.startBroadcast(owner);
         _activeBroadcaster = owner;
-        factory = address(new Create3Factory());
+        factory = Create3FactoryCode.deploy();
         _activeBroadcaster = address(0);
         vm.stopBroadcast();
         console.log("WARNING: minted a nonce-derived CREATE3 factory at", factory);
@@ -441,16 +439,16 @@ abstract contract BaseDeployer is Script {
     ///         it on the manifest. Shared by the reuse and mint paths.
     /// @dev Reverts when `factory` has no code, so a mistyped or wrong-chain
     ///      `CREATE3_FACTORY` fails fast instead of producing a deploy against a
-    ///      non-existent factory, and when its code is not the `Create3Factory`
-    ///      artefact.
+    ///      non-existent factory, and when its code is not the canonical factory code in
+    ///      `Create3FactoryCode`.
     /// @param factory CREATE3 factory address to adopt for this process.
     function _adoptCreate3Factory(address factory) internal {
         require(factory.code.length != 0, "Create3Factory: no code at factory address");
         // Any contract can sit at a configured address; only the genuine factory derives the
         // addresses this pipeline predicts and deploys to.
         require(
-            factory.codehash == keccak256(vm.getDeployedCode(CREATE3_FACTORY_ARTEFACT)),
-            "Create3Factory: code at factory address is not the Create3Factory artefact"
+            factory.codehash == Create3FactoryCode.RUNTIME_CODEHASH,
+            "Create3Factory: code at factory address is not the canonical factory code"
         );
         _setCreate3Factory(factory);
         vm.label(factory, "Create3Factory");
@@ -872,8 +870,8 @@ abstract contract BaseDeployer is Script {
         }
         require(factoryAddress.code.length != 0, "Create3Factory: no code");
         require(
-            factoryAddress.codehash == keccak256(vm.getDeployedCode(CREATE3_FACTORY_ARTEFACT)),
-            "Create3Factory: not the Create3Factory artefact"
+            factoryAddress.codehash == Create3FactoryCode.RUNTIME_CODEHASH,
+            "Create3Factory: not the canonical factory code"
         );
         factory = Create3Factory(payable(factoryAddress));
     }

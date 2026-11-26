@@ -14,6 +14,8 @@ import {DotnsReverseResolver} from "../../../contracts/resolvers/DotnsReverseRes
 import {StoreFactory} from "../../../contracts/store/StoreFactory.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 
+import {Create3FactoryCode} from "../../../scripts/deploy/Create3FactoryCode.sol";
+
 import {DeterministicDeploymentHarness} from "./DeterministicDeploymentHarness.t.sol";
 
 contract DeterministicDeploymentTest is Test {
@@ -321,7 +323,7 @@ contract DeterministicDeploymentTest is Test {
 
     function test_reusedFactoryMakesAddressesDeployerIndependent() public {
         // A CREATE3 factory deployed once, independently of any pipeline run.
-        Create3Factory shared = new Create3Factory();
+        Create3Factory shared = Create3Factory(payable(Create3FactoryCode.deploy()));
 
         // Two separate deployer runs that reuse the same factory must predict
         // the same address, even though neither minted it.
@@ -352,7 +354,7 @@ contract DeterministicDeploymentTest is Test {
     }
 
     function test_ensureReusesConfiguredFactory() public {
-        Create3Factory preDeployed = new Create3Factory();
+        Create3Factory preDeployed = Create3Factory(payable(Create3FactoryCode.deploy()));
         vm.setEnv("CREATE3_FACTORY", vm.toString(address(preDeployed)));
 
         DeterministicDeploymentHarness reuse = new DeterministicDeploymentHarness();
@@ -392,13 +394,13 @@ contract DeterministicDeploymentTest is Test {
         _assertAdoptionRejected("StoreFactory.sol:StoreFactory", "", "StoreFactory");
     }
 
-    /// @notice A configured factory whose code is not the `Create3Factory` artefact is refused.
+    /// @notice A configured factory whose code is not the canonical factory code is refused.
     function test_adoptRevertsWhenFactoryCodeIsForeign() public {
         DeterministicDeploymentHarness fresh = new DeterministicDeploymentHarness();
         fresh.initManifest();
         address impostor = address(new Squatter());
         vm.expectRevert(
-            bytes("Create3Factory: code at factory address is not the Create3Factory artefact")
+            bytes("Create3Factory: code at factory address is not the canonical factory code")
         );
         fresh.adoptCreate3Factory(impostor);
     }
