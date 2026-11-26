@@ -190,7 +190,42 @@ This open source code is provided for research, experimentation, and developer e
 <p>dotNS is a naming system for Polkadot. An account can register a .dot name, receive an ERC721 token that represents ownership of that name, attach records to it (addresses, text, content hashes, chat keys), and create subnames beneath it. Two independent issuance paths coexist on the same underlying registrar: a public commit-reveal path for anyone who wants a name, and a gateway path, driven by the <a href="#dotnspopcontroller">dotNS gateway pallet</a> in the Asset Hub runtime, that issues device names and personhood names on behalf of verified users. Every piece of state the protocol surfaces is readable through public view functions on the chain itself, so a client needs only a node and a small set of well-known contract addresses to answer any question about the system.</p>
 <h2 id="diagrams"><a class="header" href="#diagrams">Diagrams</a></h2>
 <h3 id="system-diagram"><a class="header" href="#system-diagram">System diagram</a></h3>
-<p><img src="./diagrams/system.png" alt="System diagram" /></p>
+<pre><code class="language-mermaid">flowchart LR
+    gateway["&lt;b&gt;dotNS gateway pallet&lt;/b&gt;&lt;br/&gt;Asset Hub runtime&lt;br/&gt;verifies devicehood and personhood"]
+    gov["&lt;b&gt;Governance&lt;/b&gt;&lt;br/&gt;Root&lt;br/&gt;maintainer account&lt;br/&gt;bootstrap owner, until renounced"]
+    users["&lt;b&gt;Accounts and apps&lt;/b&gt;&lt;br/&gt;wallets, dApps, CLI"]
+    readers["&lt;b&gt;Readers&lt;/b&gt;&lt;br/&gt;wallets, indexers, web gateways"]
+
+    subgraph dotns["dotNS contracts"]
+        direction TB
+        reg["&lt;b&gt;Registration&lt;/b&gt;&lt;br/&gt;&lt;code&gt;DotnsRegistrarController&lt;/code&gt;&lt;br/&gt;&lt;code&gt;DotnsPopController&lt;/code&gt;"]
+        rules["&lt;b&gt;Rules and pricing&lt;/b&gt;&lt;br/&gt;&lt;code&gt;PopRules&lt;/code&gt;&lt;br/&gt;&lt;code&gt;DotnsCostModelRegistry&lt;/code&gt;&lt;br/&gt;&lt;code&gt;DotnsNameWhitelist&lt;/code&gt;"]
+        own["&lt;b&gt;Ownership&lt;/b&gt;&lt;br/&gt;&lt;code&gt;DotnsRegistrar&lt;/code&gt;&lt;br/&gt;&lt;code&gt;DotnsRegistry&lt;/code&gt;&lt;br/&gt;&lt;code&gt;DotnsNameEscrow&lt;/code&gt;"]
+        rec["&lt;b&gt;Records&lt;/b&gt;&lt;br/&gt;&lt;code&gt;DotnsResolver&lt;/code&gt;&lt;br/&gt;&lt;code&gt;DotnsContentResolver&lt;/code&gt;&lt;br/&gt;&lt;code&gt;DotnsReverseResolver&lt;/code&gt;&lt;br/&gt;&lt;code&gt;DotnsPopResolver&lt;/code&gt;&lt;br/&gt;&lt;code&gt;LabelStore&lt;/code&gt;&lt;br/&gt;&lt;code&gt;UserStore&lt;/code&gt;"]
+    end
+
+    gateway -- "issue and reserve device&lt;br/&gt;and personhood names" --&gt; dotns
+    gov -- "grants, revocations,&lt;br/&gt;settings, upgrades" --&gt; dotns
+    dotns &lt;-- "register, request grants,&lt;br/&gt;transfer, subnames, records,&lt;br/&gt;release and redeem, upkeep" --&gt; users
+    dotns &lt;-- "resolve names,&lt;br/&gt;read state" --&gt; readers
+
+    reg -- "check price&lt;br/&gt;and eligibility" --&gt; rules
+    reg -- "mint" --&gt; own
+    reg -- "write first records" --&gt; rec
+
+    classDef actor fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
+    classDef runtime fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
+    classDef governance fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a
+    classDef contract fill:#ffffff,stroke:#16a34a,stroke-width:2px,color:#0f172a
+    classDef reader fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#0f172a
+    class users actor
+    class gateway runtime
+    class gov governance
+    class reg,rules,own,rec contract
+    class readers reader
+    style dotns fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#0f172a
+</code></pre>
+<p>Every contract finds the others through <code>DotnsProtocolRegistry</code>, the protocol's address book. Readers can batch calls through Multicall3 and read PoP data through <code>DotnsPopLens</code>.</p>
 <h2 id="actors"><a class="header" href="#actors">Actors</a></h2>
 <div class="table-wrapper"><table><thead><tr><th>Actor</th><th>What they may do</th></tr></thead><tbody>
 <tr><td><strong>Anyone with an account</strong></td><td>Register an available name on the public paid path, within the bands in <a href="#who-can-register-a-name">Who can register a name</a>. Own it, transfer it, attach records, issue subnames beneath it.</td></tr>
