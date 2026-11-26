@@ -897,19 +897,32 @@ function executingCodehash(rpc, addr) {
   return keccakHex(cast(["code", target, "--rpc-url", rpc]));
 }
 
-// Hash of an artefact's runtime bytecode exactly as built, the domain `eth_getCode` returns for
-// code this checkout deployed.
-function artefactRuntimeHash(name) {
+// Whether `code`, as `eth_getCode` returns it, runs this checkout's build of artefact `name`.
+// Both sides are compared the way hash scheme 2 compares builds: the trailing metadata removed
+// and the digests inside embedded metadata zeroed. The metadata hashes the sources and the
+// compiler settings, so an edit to them, comments included, changes it without changing what
+// runs, and code an earlier build of the same logic deployed still matches. The length, the
+// metadata length and the CBOR marker are compared first, so malformed on-chain code is a
+// mismatch and never aborts the run.
+function runsBuildOf(code, name) {
   const path = join(ROOT, "out", `${name}.sol`, `${name}.json`);
   if (!existsSync(path)) fail(`${path} is missing; run \`forge build\` before verify --tag`);
-  return keccakHex(JSON.parse(readFileSync(path, "utf8")).deployedBytecode.object);
+  const built = JSON.parse(readFileSync(path, "utf8")).deployedBytecode.object.toLowerCase();
+  const deployed = code.toLowerCase();
+  if (deployed.length !== built.length || deployed.slice(-4) !== built.slice(-4)) return false;
+  const marker = deployed.length - 2 * (parseInt(built.slice(-4), 16) + 2);
+  if (marker < 2 || deployed.slice(marker, marker + 2) !== built.slice(marker, marker + 2)) {
+    return false;
+  }
+  const normalise = (hex) => zeroEmbeddedMetadataDigests(stripCborMetadata(name, hex));
+  return normalise(deployed) === normalise(built);
 }
 
 // The store beacons, checked through StoreFactory the way the deploy scripts'
 // `_verifyStoreImplementations` checks them: the factory must point at the beacons the manifest
 // records, and each beacon must be owned by the factory, so governance can rotate every store.
 // With `checkCode` (verify --tag, a checkout at the release) the beacons and the store
-// implementations they follow must also run this build's code.
+// implementations they follow must also run this build's code, apart from its metadata.
 function verifyStoreBeacons(rpc, contracts, problems, checkCode) {
   const factory = contracts.StoreFactory;
   if (!factory) return;
@@ -925,12 +938,12 @@ function verifyStoreBeacons(rpc, contracts, problems, checkCode) {
       continue;
     }
     if (checkCode) {
-      if (keccakHex(cast(["code", beacon, "--rpc-url", rpc])) !== artefactRuntimeHash("UpgradeableBeacon")) {
+      if (!runsBuildOf(cast(["code", beacon, "--rpc-url", rpc]), "UpgradeableBeacon")) {
         problems.push(`${label} ${beacon} does not run the UpgradeableBeacon artefact`);
         continue;
       }
       const target = cast(["call", beacon, "implementation()(address)", "--rpc-url", rpc]);
-      if (keccakHex(cast(["code", target, "--rpc-url", rpc])) !== artefactRuntimeHash(implementation)) {
+      if (!runsBuildOf(cast(["code", target, "--rpc-url", rpc]), implementation)) {
         problems.push(`${label} follows ${target}, which does not run the ${implementation} artefact`);
         continue;
       }

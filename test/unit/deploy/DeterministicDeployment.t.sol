@@ -405,6 +405,30 @@ contract DeterministicDeploymentTest is Test {
         fresh.adoptCreate3Factory(impostor);
     }
 
+    /// @notice Code an earlier build of the same logic deployed matches: only its metadata differs.
+    function test_runsBuildOfIgnoresTheMetadata() public {
+        _skipUnderCoverage();
+        bytes memory code = vm.getDeployedCode("UserStore.sol:UserStore");
+        address target = makeAddr("earlier-build");
+
+        // The byte before the two length bytes sits inside the metadata.
+        code[code.length - 3] = bytes1(uint8(code[code.length - 3]) ^ 0xff);
+        vm.etch(target, code);
+        assertTrue(deployer.runsBuildOf(target, "UserStore.sol:UserStore"), "metadata edit");
+
+        vm.etch(target, bytes.concat(code, hex"00"));
+        assertFalse(deployer.runsBuildOf(target, "UserStore.sol:UserStore"), "length change");
+
+        bytes memory lengthEdit = bytes.concat(code);
+        lengthEdit[code.length - 1] = bytes1(uint8(code[code.length - 1]) ^ 0x01);
+        vm.etch(target, lengthEdit);
+        assertFalse(deployer.runsBuildOf(target, "UserStore.sol:UserStore"), "length bytes edit");
+
+        code[0] = bytes1(uint8(code[0]) ^ 0xff);
+        vm.etch(target, code);
+        assertFalse(deployer.runsBuildOf(target, "UserStore.sol:UserStore"), "logic edit");
+    }
+
     function test_adoptRevertsWhenFactoryHasNoCode() public {
         DeterministicDeploymentHarness fresh = new DeterministicDeploymentHarness();
         fresh.initManifest();

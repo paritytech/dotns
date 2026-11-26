@@ -191,8 +191,8 @@ abstract contract BaseDeployer is Script {
     ///      registry pointer here, the owner in the caller's ownership assertions, and the
     ///      beacons, which the initialiser mints and a squatter therefore chooses.
     ///      `LabelStore` and `UserStore` carry no immutables, so their runtime code compares
-    ///      exactly.
-    /// @dev The beacon contracts themselves are pinned by codehash first. Without that, the
+    ///      exactly, apart from the compiler metadata (see `_runsBuildOf`).
+    /// @dev The beacon contracts themselves are pinned by their code first. Without that, the
     ///      checks below only prove that whatever sits at those addresses answered `owner()` and
     ///      `implementation()` the way this stage wanted at verification time; a bespoke contract
     ///      can do that and return something else afterwards. `UpgradeableBeacon` carries no
@@ -219,9 +219,9 @@ abstract contract BaseDeployer is Script {
         address labelBeacon = IStoreFactory(storeFactory).labelStoreBeacon();
         address userBeacon = IStoreFactory(storeFactory).userStoreBeacon();
 
-        bytes32 beaconCodehash = keccak256(vm.getDeployedCode(BEACON_ARTEFACT));
-        require(labelBeacon.codehash == beaconCodehash, "LabelStoreBeacon: unexpected beacon code");
-        require(userBeacon.codehash == beaconCodehash, "UserStoreBeacon: unexpected beacon code");
+        bytes memory beaconCode = vm.getDeployedCode(BEACON_ARTEFACT);
+        require(_runsBuildOf(labelBeacon, beaconCode), "LabelStoreBeacon: unexpected beacon code");
+        require(_runsBuildOf(userBeacon, beaconCode), "UserStoreBeacon: unexpected beacon code");
 
         require(
             UpgradeableBeacon(labelBeacon).owner() == storeFactory,
@@ -233,17 +233,51 @@ abstract contract BaseDeployer is Script {
         );
 
         require(
-            UpgradeableBeacon(labelBeacon).implementation().codehash
-                == keccak256(vm.getDeployedCode("LabelStore.sol:LabelStore")),
+            _runsBuildOf(
+                UpgradeableBeacon(labelBeacon).implementation(),
+                vm.getDeployedCode("LabelStore.sol:LabelStore")
+            ),
             "LabelStoreBeacon: unexpected implementation"
         );
         require(
-            UpgradeableBeacon(userBeacon).implementation().codehash
-                == keccak256(vm.getDeployedCode("UserStore.sol:UserStore")),
+            _runsBuildOf(
+                UpgradeableBeacon(userBeacon).implementation(),
+                vm.getDeployedCode("UserStore.sol:UserStore")
+            ),
             "UserStoreBeacon: unexpected implementation"
         );
 
         console.log("  ok  store beacons and implementations");
+    }
+
+    /// @notice Whether `target` runs `built`, an artefact's runtime code from this build, apart
+    ///         from the compiler metadata.
+    /// @dev Solidity appends CBOR metadata to the runtime code and stores its length in the last
+    ///      two bytes. The metadata hashes the sources and the compiler settings, so an edit to
+    ///      them, comments included, changes it without changing what runs, and code an earlier
+    ///      build of the same logic deployed still matches. Every byte before the metadata, the
+    ///      total length and the length bytes must be equal. For an artefact that deploys no
+    ///      other contract, nothing else carries metadata.
+    /// @param target Address whose runtime code is checked.
+    /// @param built Runtime code the target must match, from `vm.getDeployedCode`.
+    function _runsBuildOf(address target, bytes memory built) internal view returns (bool) {
+        bytes memory deployed = target.code;
+        if (deployed.length != built.length || built.length < 2) return false;
+        uint256 metadataLength = (uint256(uint8(built[built.length - 2])) << 8)
+            | uint256(uint8(built[built.length - 1]));
+        if (metadataLength + 2 > built.length) return false;
+        if (
+            deployed[built.length - 2] != built[built.length - 2]
+                || deployed[built.length - 1] != built[built.length - 1]
+        ) return false;
+        uint256 logicLength = built.length - 2 - metadataLength;
+        bytes32 deployedLogic;
+        bytes32 builtLogic;
+        assembly ("memory-safe") {
+            deployedLogic := keccak256(add(deployed, 0x20), logicLength)
+            builtLogic := keccak256(add(built, 0x20), logicLength)
+        }
+        return deployedLogic == builtLogic;
     }
 
     /// @notice Reverts unless the protocol registry at `protocolRegistry` is owned by `owner` and
