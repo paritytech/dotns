@@ -58,7 +58,12 @@ jobs:
           ref: 8a9d1ebb7d362bc94f036fa9123d0977c6cb7436
           path: .4naly3er
 
-      - run: rm -f .4naly3er/src/issues/NC/uselessOverride.ts
+      # The upstream lockfile at the pinned commit is missing entries its package.json
+      # needs, so a frozen install would refuse it. This one completes it for that
+      # commit; regenerate it whenever the pin moves.
+      - run: |
+          rm -f .4naly3er/src/issues/NC/uselessOverride.ts
+          cp .github/4naly3er/yarn.lock .4naly3er/yarn.lock
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -118,7 +123,10 @@ jobs:
         with:
           ref: ${{ github.base_ref }}
 
+      # Absent when analyze failed before producing a report; the comment still
+      # reports that result.
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
         with:
           name: 4naly3er-report
 
