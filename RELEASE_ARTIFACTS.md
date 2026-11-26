@@ -133,15 +133,16 @@ key that owns every contract in it and the key that deploys the CREATE3 factory.
 environment holds:
 
 - `DOTNS_ADMIN_KEY` (secret): the genesis owner's private key.
-- `FACTORY_DEPLOYER_KEY` (secret): the single-purpose key whose nonce-0 deploy fixes the
-  canonical factory address. No other workflow reads it: the Deploy Contracts workflow runs
-  pull request code, so it impersonates the factory deployer on anvil.
 - `DOTNS_ADMIN_ADDRESS` (variable): the address that key derives to. The workflow checks the
   pair right after the toolchain is installed and fails the run on a mismatch, so a mistyped
   key dies before anything is built.
 - Required reviewers: the dotns team. Every release run pauses for one approval.
 - Deployment refs: `v[0-9]*` tags. Both workflows run only on a tag push, so a run from any
   other ref stops at the environment gate.
+
+`FACTORY_DEPLOYER_KEY`, the single-purpose key whose nonce-0 deploy fixes the canonical factory
+address, is a repository secret. Only the two publish workflows read it: the Deploy Contracts
+workflow runs pull request code, so it impersonates the factory deployer on anvil.
 
 Creating a `v*` tag is itself restricted to the dotns team by the `release tags` ruleset, so a
 release takes two distinct human actions: cutting the tag, and approving the run it starts.

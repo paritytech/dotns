@@ -123,8 +123,8 @@ jobs:
         # Runs the production two-key `deploy:all` on a fresh anvil. Anvil
         # impersonates the factory deployer, so its nonce-0 deploy lands the
         # CREATE3 factory at the canonical PINNED_FACTORY without the factory key:
-        # this job runs pull request code, and the key stays in the releases
-        # environment. The pipeline (anvil test account 7) then deploys everything
+        # this job runs pull request code, and only the publish workflows read
+        # the key. The pipeline (anvil test account 7) then deploys everything
         # through the factory. EXPECTED_CREATE3_FACTORY aborts the run if the
         # factory lands anywhere else. This is a genuine new-chain deploy, so the
         # addresses it produces are the ones every environment gets.
