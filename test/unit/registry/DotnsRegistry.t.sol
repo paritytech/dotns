@@ -397,8 +397,41 @@ contract DotnsRegistryTests is BaseDotns {
     ///      each level spends a long label: a 255-octet parent path is accepted, and the next level
     ///      down, whose parent path is longer, is refused.
     function test_revert_subnode_owner_past_the_name_path_cap() public {
+        (bytes32 node, string memory overCap) = _chainPastTheNamePathCap();
+
+        vm.prank(ed);
+        vm.expectRevert(IDotnsRegistry.ParentLabelMismatch.selector);
+        dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: node, subLabel: "c", parentLabel: overCap, owner: ed, persist: true
+            })
+        );
+    }
+
+    /// @dev The same cap guards the resolver write: a parent path over the cap is refused even
+    ///      though its namehash matches the parent node.
+    function test_revert_subnode_resolver_past_the_name_path_cap() public {
+        (bytes32 node, string memory overCap) = _chainPastTheNamePathCap();
+
+        vm.prank(ed);
+        vm.expectRevert(IDotnsRegistry.ParentLabelMismatch.selector);
+        dotnsRegistry.setSubnodeResolver(
+            IDotnsRegistry.SubnodeResolverRecord({
+                parentNode: node,
+                subLabel: "c",
+                parentLabel: overCap,
+                resolver: makeAddr("resolver")
+            })
+        );
+    }
+
+    /// @dev Builds a chain of subnames whose deepest parent path sits exactly at the 255-octet cap,
+    ///      then one more level, owned by `ed`.
+    /// @return node The deepest name.
+    /// @return overCap Its 257-octet path, whose namehash is `node`.
+    function _chainPastTheNamePathCap() internal returns (bytes32 node, string memory overCap) {
         string memory path = "parentnode12";
-        bytes32 node = _register(path, owner, IPopRules.PopStatus.NoStatus);
+        node = _register(path, owner, IPopRules.PopStatus.NoStatus);
         address holder = owner;
 
         // 12 + 3 * 64 + 51 = 255 octets: three 63-octet levels, then one of 50.
@@ -422,15 +455,7 @@ contract DotnsRegistryTests is BaseDotns {
                 parentNode: node, subLabel: "b", parentLabel: path, owner: ed, persist: true
             })
         );
-
-        string memory overCap = string.concat("b.", path);
-        vm.prank(ed);
-        vm.expectRevert(IDotnsRegistry.ParentLabelMismatch.selector);
-        dotnsRegistry.setSubnodeOwner(
-            IDotnsRegistry.SubnodeRecord({
-                parentNode: node, subLabel: "c", parentLabel: overCap, owner: ed, persist: true
-            })
-        );
+        overCap = string.concat("b.", path);
     }
 
     function _repeat(string memory unit, uint256 count) internal pure returns (string memory out) {

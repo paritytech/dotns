@@ -392,8 +392,13 @@ contract DotnsNameEscrow is
     ///      upgrade that needs a reinitializer starts at 3.
     ///      It clears lazily only and deletes no record outright: deleting would release the
     ///      storage deposit the holders paid to the signer of this call instead. Walks every name
-    ///      in custody in one call, so check @custom:function releasedTokenCount and dry-run the
-    ///      upgrade in the block it is sent, and pass this call only when the count is non-zero.
+    ///      in custody in one call, so pass this call only when @custom:function releasedTokenCount
+    ///      is non-zero. Names released after that check lengthen the walk, and a walk too long for
+    ///      the call's weight reverts the whole upgrade. The bootstrap owner dry-runs the upgrade
+    /// in the block it is sent. Governance, whose call executes long after it is proposed, enacts
+    ///      a `utility.force_batch` of the upgrade with this call followed by the same upgrade
+    ///      without it: if the walk no longer fits, only the first fails, the upgrade still lands,
+    ///      and only the names released before it keep their records.
     ///      Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
     ///      through ERC-165 stays the same.
     function clearCustodyOnUpgrade() external onlyRootOrOwner reinitializer(2) {

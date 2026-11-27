@@ -249,8 +249,6 @@ A user who leaves a queue through the gateway, by reserving or claiming another 
 
 Every way of leaving a queue emits an event: `ReservationClaimed`, `ReservationRelinquished`, `ReservationExpired` or, when governance evicts the queue, `ReservationsEvicted`. Together with `ReservationQueued`, these let an indexer rebuild every queue. A claim or an eviction ends the reservation of everyone in the queue, so `ReservationClaimed` and `ReservationsEvicted` cover every user in it.
 
-The gateway pallet binds three deprecated entrypoints, reserveLiteName, reserveBaseName and registerBaseName, through `IDotnsPopControllerLegacy`. Each forwards to issueDeviceName, issueDeviceNameWithReservation and issuePersonhoodName respectively with the same selector it always had, and its label errors are `InvalidLiteLabel` and `InvalidBaseLabel`, the ones the pallet decodes. New integrations use the current entrypoints.
-
 #### Clearing expired reservations
 
 An expired reservation keeps its place at the front of the queue until a call clears it. Until then, the next user cannot claim the name, and the name stays blocked on the public flow.
@@ -262,7 +260,7 @@ Two calls clear a queue:
 
 Apps should therefore call `expireReservation(label)` before a gateway reservation or claim whenever the name's queue is not empty (`reservationMeta(labelhash)` reports its entries), and before a public purchase when PopRules reports the name reserved but `isReservedForClaim` returns false. The call changes nothing when no reservation has expired.
 
-A queue holds at most `MAX_RESERVATION_QUEUE` entries, counting the slots of users who left it. Clearing frees those slots only once it reaches them, so a queue can turn new reservations away until its front user claims or leaves, or their reservation expires and a call clears the queue.
+A queue holds at most `MAX_RESERVATION_QUEUE` entries. A user who leaves from the back frees their slot at once, so one account cannot fill a queue by joining and leaving it. A user who leaves from the middle leaves a slot that still counts until clearing reaches it, so a queue can turn new reservations away until its front user claims or leaves, or their reservation expires and a call clears the queue.
 
 #### Gateway call budget
 
