@@ -46,7 +46,6 @@ IDotnsNameEscrow
 IDotnsNameEscrowGovernance
 IDotnsNameEscrowRevocation
 IDotnsPopController
-IDotnsPopControllerLegacy
 IDotnsPopGovernance
 IDotnsPopResolver
 IDotnsPopResolverClearing

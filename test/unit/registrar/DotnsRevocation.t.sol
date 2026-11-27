@@ -10,9 +10,6 @@ import {
 } from "../../../contracts/registrars/IDotnsRegistrarController.sol";
 import {IDotnsNameEscrowRevocation} from "../../../contracts/escrow/IDotnsNameEscrowRevocation.sol";
 import {IDotnsPopController} from "../../../contracts/registrars/IDotnsPopController.sol";
-import {
-    IDotnsPopControllerLegacy
-} from "../../../contracts/registrars/IDotnsPopControllerLegacy.sol";
 import {IDotnsPopGovernance} from "../../../contracts/registrars/IDotnsPopGovernance.sol";
 import {IDotnsPopResolver} from "../../../contracts/resolvers/IDotnsPopResolver.sol";
 import {
@@ -811,18 +808,12 @@ contract DotnsRevocationTest is BaseDotns {
     bytes4 internal constant ESCROW_ID = 0xa69e509c;
     bytes4 internal constant POP_RESOLVER_ID = 0x1e0c0fee;
     bytes4 internal constant POP_CONTROLLER_ID = 0x5453fcd0;
-    bytes4 internal constant POP_CONTROLLER_LEGACY_ID = 0x86d43965;
 
     function test_interface_ids_are_unchanged_and_still_reported() public view {
         assertEq(type(IDotnsNameEscrow).interfaceId, ESCROW_ID, "escrow id unchanged");
         assertEq(type(IDotnsPopResolver).interfaceId, POP_RESOLVER_ID, "pop resolver id unchanged");
         assertEq(
             type(IDotnsPopController).interfaceId, POP_CONTROLLER_ID, "pop controller id unchanged"
-        );
-        assertEq(
-            type(IDotnsPopControllerLegacy).interfaceId,
-            POP_CONTROLLER_LEGACY_ID,
-            "pop controller legacy id unchanged"
         );
 
         assertTrue(dotnsNameEscrow.supportsInterface(ESCROW_ID), "escrow");
@@ -836,9 +827,6 @@ contract DotnsRevocationTest is BaseDotns {
             "pop resolver clearing"
         );
         assertTrue(dotnsPopController.supportsInterface(POP_CONTROLLER_ID), "pop controller");
-        assertTrue(
-            dotnsPopController.supportsInterface(POP_CONTROLLER_LEGACY_ID), "pop controller legacy"
-        );
         assertTrue(
             dotnsPopController.supportsInterface(type(IDotnsPopGovernance).interfaceId),
             "pop governance"

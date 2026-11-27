@@ -122,17 +122,6 @@ abstract contract BaseDotns is Test {
     bytes4 internal constant SELECTOR_ISSUE_PERSONHOOD_NAME =
         bytes4(keccak256("issuePersonhoodName((string,address,(uint8,string,bytes)))"));
 
-    /// @notice Selector of `reserveLiteName((string,address,bytes))`.
-    /// @dev A literal: the legacy selectors never change while the legacy interface exists, so a
-    ///      signature edit fails the pin in the legacy suite.
-    bytes4 internal constant SELECTOR_LEGACY_RESERVE_LITE_NAME = 0x220015c0;
-
-    /// @notice Selector of `reserveBaseName(((string,address,bytes),string))`.
-    bytes4 internal constant SELECTOR_LEGACY_RESERVE_BASE_NAME = 0xd89f1bce;
-
-    /// @notice Selector of `registerBaseName((string,address,(uint8,string,bytes)))`.
-    bytes4 internal constant SELECTOR_LEGACY_REGISTER_BASE_NAME = 0x7c4b376b;
-
     /// @notice Default reservation duration used by the PoP controller.
     uint64 public constant DEFAULT_RESERVATION_DURATION = 30 days;
 
@@ -566,7 +555,8 @@ abstract contract BaseDotns is Test {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_ISSUE_DEVICE_NAME, params));
     }
 
-    /// @notice Dispatches the typed `reserveBaseName` call under a mocked Root origin.
+    /// @notice Dispatches the typed `issueDeviceNameWithReservation` call under a mocked Root
+    /// origin.
     function _rootIssueDeviceNameWithReservation(
         IDotnsPopController.DeviceNameIssuanceWithReservation memory params
     )
@@ -591,29 +581,6 @@ abstract contract BaseDotns is Test {
         internal
     {
         _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_ISSUE_PERSONHOOD_NAME, params));
-    }
-
-    /// @notice Dispatches the legacy `reserveLiteName` call under a mocked Root origin.
-    function _rootLegacyReserveLiteName(IDotnsPopController.DeviceNameIssuance memory params)
-        internal
-    {
-        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_LEGACY_RESERVE_LITE_NAME, params));
-    }
-
-    /// @notice Dispatches the legacy `reserveBaseName` call under a mocked Root origin.
-    function _rootLegacyReserveBaseName(
-        IDotnsPopController.DeviceNameIssuanceWithReservation memory params
-    )
-        internal
-    {
-        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_LEGACY_RESERVE_BASE_NAME, params));
-    }
-
-    /// @notice Dispatches the legacy `registerBaseName` call under a mocked Root origin.
-    function _rootLegacyRegisterBaseName(IDotnsPopController.PersonhoodNameIssuance memory params)
-        internal
-    {
-        _dispatchFromRoot(abi.encodeWithSelector(SELECTOR_LEGACY_REGISTER_BASE_NAME, params));
     }
 
     /// @notice Calls `payload` on the PoP controller under a mocked Root origin.

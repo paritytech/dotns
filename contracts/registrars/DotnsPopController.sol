@@ -13,7 +13,6 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IDotnsPopController} from "./IDotnsPopController.sol";
-import {IDotnsPopControllerLegacy} from "./IDotnsPopControllerLegacy.sol";
 import {IDotnsPopGovernance} from "./IDotnsPopGovernance.sol";
 import {IDotnsRegistrar} from "./IDotnsRegistrar.sol";
 import {IDotnsProtocolRegistry} from "../registry/IDotnsProtocolRegistry.sol";
@@ -80,7 +79,6 @@ contract DotnsPopController is
     ProtocolOwnedUpgradeable,
     ERC165Upgradeable,
     IDotnsPopController,
-    IDotnsPopControllerLegacy,
     IDotnsPopGovernance
 {
     using StringUtils for *;
@@ -243,13 +241,7 @@ contract DotnsPopController is
     /// @inheritdoc IDotnsPopController
     function issueDeviceName(DeviceNameIssuance calldata params) external override onlyRoot {
         Deps memory deps;
-        _issueDeviceName(deps, params, false);
-    }
-
-    /// @inheritdoc IDotnsPopControllerLegacy
-    function reserveLiteName(DeviceNameIssuance calldata params) external override onlyRoot {
-        Deps memory deps;
-        _issueDeviceName(deps, params, true);
+        _issueDeviceName(deps, params);
     }
 
     /// @inheritdoc IDotnsPopController
@@ -258,16 +250,7 @@ contract DotnsPopController is
         override
         onlyRoot
     {
-        _issueDeviceNameWithReservation(params, false);
-    }
-
-    /// @inheritdoc IDotnsPopControllerLegacy
-    function reserveBaseName(DeviceNameIssuanceWithReservation calldata params)
-        external
-        override
-        onlyRoot
-    {
-        _issueDeviceNameWithReservation(params, true);
+        _issueDeviceNameWithReservation(params);
     }
 
     /// @inheritdoc IDotnsPopController
@@ -277,7 +260,7 @@ contract DotnsPopController is
         onlyRoot
     {
         Deps memory deps;
-        (bytes32 reservedHash,) = _validateReservablePersonhoodLabel(deps, params.label, false);
+        (bytes32 reservedHash,) = _validateReservablePersonhoodLabel(deps, params.label);
         bool slotKept =
             _advanceExpiredHead(deps, reservedHash, MAX_QUEUE_STEPS_PER_CALL, true, address(0));
         if (_keepOrDropReservation(deps, reservedHash, params.user)) return;
@@ -290,32 +273,23 @@ contract DotnsPopController is
         override
         onlyRoot
     {
-        _issuePersonhoodName(params, false);
+        _issuePersonhoodName(params);
     }
 
-    /// @inheritdoc IDotnsPopControllerLegacy
-    function registerBaseName(PersonhoodNameIssuance calldata params) external override onlyRoot {
-        _issuePersonhoodName(params, true);
-    }
-
-    /// @notice Body shared by @custom:function issueDeviceNameWithReservation and its legacy
-    /// entrypoint.
+    /// @notice Body of @custom:function issueDeviceNameWithReservation.
     /// @dev The reservation is validated before the issuance so an unreservable label aborts the
-    /// whole call. `legacy` selects the label errors, as in @custom:function _issueDeviceName.
-    function _issueDeviceNameWithReservation(
-        DeviceNameIssuanceWithReservation calldata params,
-        bool legacy
-    )
+    /// whole call.
+    function _issueDeviceNameWithReservation(DeviceNameIssuanceWithReservation calldata params)
         internal
     {
         Deps memory deps;
         bytes32 reservedHash;
         bool hasReservation = bytes(params.reservedLabel).length != 0;
         if (hasReservation) {
-            (reservedHash,) = _validateReservablePersonhoodLabel(deps, params.reservedLabel, legacy);
+            (reservedHash,) = _validateReservablePersonhoodLabel(deps, params.reservedLabel);
         }
 
-        _issueDeviceName(deps, params.issuance, legacy);
+        _issueDeviceName(deps, params.issuance);
 
         if (hasReservation) {
             bool slotKept =
@@ -328,30 +302,23 @@ contract DotnsPopController is
     }
 
     /// @notice Device-name issuance shared by @custom:function issueDeviceName, the issuance of
-    /// @custom:function issueDeviceNameWithReservation, and their legacy entrypoints.
+    /// @custom:function issueDeviceNameWithReservation.
     /// @dev Gateway attestation is the authority for devicehood on this path; the on-chain
     /// precompile is not consulted. The label is stored in the `stem.NN` form the gateway sends,
     /// which is the canonical form of the name, so no normalisation happens here. The shape check
     /// runs before classification so a malformed label reverts with a controller error, which the
     /// gateway decodes by selector; letting `classifyName` catch it instead would surface an
-    /// undecodable PopRules string. `legacy` selects @custom:reverts InvalidLiteLabel over
-    /// @custom:reverts InvalidDeviceLabel for the callers that decode the legacy error.
-    function _issueDeviceName(
-        Deps memory deps,
-        DeviceNameIssuance calldata params,
-        bool legacy
-    )
-        internal
-    {
-        _requireDeviceLabel(params.label.isDeviceLabel(), legacy);
+    /// undecodable PopRules string.
+    function _issueDeviceName(Deps memory deps, DeviceNameIssuance calldata params) internal {
+        require(params.label.isDeviceLabel(), InvalidDeviceLabel());
         _requireValidChatKey(params.chatKey);
 
         (IPopRules.PopStatus required,,) = PopClassification.classify(params.label);
         // The shape check fixes the suffix, so classification lands on Devicehood (stem 6-8),
         // NoStatus (stem 9 or more), or Reserved (stem 5 or fewer). Accept the first two; a
         // stem short enough to be governance-reserved is not issued from this path.
-        _requireDeviceLabel(required != IPopRules.PopStatus.Reserved, legacy);
-        (bytes32 labelhash, bytes32 node) = _validateDeviceLabel(deps, params.label, legacy);
+        require(required != IPopRules.PopStatus.Reserved, InvalidDeviceLabel());
+        (bytes32 labelhash, bytes32 node) = _validateDeviceLabel(deps, params.label);
 
         _completeGatewayRegistration(
             deps, params.user, params.label, labelhash, node, params.chatKey, bytes32(0)
@@ -360,22 +327,19 @@ contract DotnsPopController is
         emit DeviceNameIssued(labelhash, params.user, params.label);
     }
 
-    /// @notice Personhood-name issuance shared by @custom:function issuePersonhoodName and its
-    /// legacy entrypoint.
-    /// @dev `legacy` selects @custom:reverts InvalidLiteLabel / @custom:reverts InvalidBaseLabel
-    /// over the new label errors for the callers that decode the legacy ones.
-    function _issuePersonhoodName(PersonhoodNameIssuance calldata params, bool legacy) internal {
+    /// @notice Body of @custom:function issuePersonhoodName.
+    function _issuePersonhoodName(PersonhoodNameIssuance calldata params) internal {
         Link calldata link = params.link;
         address user = params.user;
         string calldata label = params.label;
 
         Deps memory deps;
-        (bytes32 labelhash, bytes32 node) = _validatePersonhoodLabel(deps, label, legacy);
+        (bytes32 labelhash, bytes32 node) = _validatePersonhoodLabel(deps, label);
 
         (IPopRules.PopStatus required,,) = PopClassification.classify(label);
-        _requirePersonhoodLabel(
+        require(
             required != IPopRules.PopStatus.Reserved && required != IPopRules.PopStatus.Devicehood,
-            legacy
+            InvalidPersonhoodLabel()
         );
         _requireNotGranted(node);
 
@@ -411,8 +375,8 @@ contract DotnsPopController is
         bytes32 deviceNode;
         bytes memory chatKeyToPersist;
         if (link.kind == LinkKind.DeviceName) {
-            _requireDeviceLabel(link.deviceLabel.isDeviceLabel(), legacy);
-            (deviceLabelhash, deviceNode) = _validateDeviceLabel(deps, link.deviceLabel, legacy);
+            require(link.deviceLabel.isDeviceLabel(), InvalidDeviceLabel());
+            (deviceLabelhash, deviceNode) = _validateDeviceLabel(deps, link.deviceLabel);
             // A device name is a subnode, so its owner lives in the registry record rather than
             // the registrar's ERC-721 ledger.
             require(
@@ -473,7 +437,7 @@ contract DotnsPopController is
     /// @inheritdoc IDotnsPopGovernance
     function evictReservations(string calldata label) external override onlyRoot {
         Deps memory deps;
-        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label, false);
+        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label);
 
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         if (meta.head == meta.tail) return;
@@ -495,7 +459,7 @@ contract DotnsPopController is
     /// @inheritdoc IDotnsPopController
     function expireReservation(string calldata label) external override {
         Deps memory deps;
-        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label, false);
+        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label);
         // A signed call outside the gateway's limit: it always has room to clear the whole queue.
         _advanceExpiredHead(deps, labelhash, MAX_RESERVATION_QUEUE, false, address(0));
     }
@@ -620,7 +584,7 @@ contract DotnsPopController is
         returns (bool reserved, address holder)
     {
         Deps memory deps;
-        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label, false);
+        (bytes32 labelhash,) = _validatePersonhoodLabel(deps, label);
         ReservationQueueMeta memory meta = _reservationMeta[labelhash];
         if (meta.head >= meta.tail) return (false, address(0));
 
@@ -746,7 +710,6 @@ contract DotnsPopController is
         returns (bool)
     {
         return interfaceId == type(IDotnsPopController).interfaceId
-            || interfaceId == type(IDotnsPopControllerLegacy).interfaceId
             || interfaceId == type(IDotnsPopGovernance).interfaceId
             || super.supportsInterface(interfaceId);
     }
@@ -1066,8 +1029,12 @@ contract DotnsPopController is
     /// `maxSteps` is not zero, @custom:function _advanceExpiredHead clears up to `maxSteps`
     /// entries from there, the emptied entry among them, and moves PopRules to the next user with
     /// an active reservation or releases it when none is left. Otherwise the front and PopRules
-    /// stay unchanged. Emits nothing itself; callers go through
-    /// @custom:function _dropUserReservation. `reservation` is the user's live reservation,
+    /// stay unchanged. When it was the back of the queue behind the front, the back moves down past
+    /// it, so leaving from the back frees its place instead of leaving a hole: an account alone at
+    /// the back cannot fill a queue by joining and leaving it. Holes left behind entries other
+    /// accounts added later still count toward capacity until the front passes them. Emits nothing
+    /// itself; callers go through @custom:function _dropUserReservation. `reservation` is the
+    /// user's live reservation,
     /// already read by the caller.
     function _removeUserFromQueue(
         Deps memory deps,
@@ -1083,8 +1050,11 @@ contract DotnsPopController is
         delete _userReservations[user];
         delete _reservationEntries[labelhash][entryIndex];
 
-        if (maxSteps != 0 && entryIndex == _reservationMeta[labelhash].head) {
-            _advanceExpiredHead(deps, labelhash, maxSteps, false, address(0));
+        ReservationQueueMeta memory meta = _reservationMeta[labelhash];
+        if (entryIndex == meta.head) {
+            if (maxSteps != 0) _advanceExpiredHead(deps, labelhash, maxSteps, false, address(0));
+        } else if (entryIndex + 1 == meta.tail) {
+            _reservationMeta[labelhash].tail = entryIndex;
         }
     }
 
@@ -1093,18 +1063,16 @@ contract DotnsPopController is
     /// hyphen before any node is derived. `node` is the hierarchical subnode `stem` under the
     /// numeric container `NN`, the node a resolver reaches by walking the dotted name, and
     /// `labelhash` stays the keccak of the whole label so it is a stable text identifier for events
-    /// and the reservation queue. `legacy` selects the label error, as in
-    /// @custom:function _requireDeviceLabel.
+    /// and the reservation queue.
     function _validateDeviceLabel(
         Deps memory deps,
-        string memory deviceLabel,
-        bool legacy
+        string memory deviceLabel
     )
         internal
         view
         returns (bytes32 labelhash, bytes32 node)
     {
-        _requireDeviceLabel(deviceLabel.isDeviceLabelMemory(), legacy);
+        require(deviceLabel.isDeviceLabelMemory(), InvalidDeviceLabel());
         labelhash = LabelUtils.labelhashMemory(deviceLabel);
         node = _deviceSubnode(deps, deviceLabel);
     }
@@ -1130,11 +1098,9 @@ contract DotnsPopController is
     /// @notice Validates a personhood name and derives `(labelhash, node)`.
     /// @dev Letters only, so this is stricter than a DNS label: a hyphen or an interior digit
     /// is rejected here even though @custom:function StringUtils.isSingleLabel would admit it.
-    /// `legacy` selects the label error, as in @custom:function _requirePersonhoodLabel.
     function _validatePersonhoodLabel(
         Deps memory deps,
-        string calldata label,
-        bool legacy
+        string calldata label
     )
         internal
         view
@@ -1144,7 +1110,7 @@ contract DotnsPopController is
         // a person chose, so it admits no digits and no hyphens. Classification does not cover
         // this on its own: a label carrying a digit or a hyphen is measured as written, so one of
         // six or more characters classifies as Personhood or NoStatus and would otherwise pass.
-        _requirePersonhoodLabel(label.isPersonhoodLabel(), legacy);
+        require(label.isPersonhoodLabel(), InvalidPersonhoodLabel());
         (labelhash, node) = LabelUtils.deriveNode(_tldNodeOf(deps), label);
     }
 
@@ -1161,17 +1127,16 @@ contract DotnsPopController is
     /// still register.
     function _validateReservablePersonhoodLabel(
         Deps memory deps,
-        string calldata label,
-        bool legacy
+        string calldata label
     )
         internal
         view
         returns (bytes32 labelhash, bytes32 node)
     {
-        (labelhash, node) = _validatePersonhoodLabel(deps, label, legacy);
+        (labelhash, node) = _validatePersonhoodLabel(deps, label);
 
         (IPopRules.PopStatus required,,) = PopClassification.classify(label);
-        _requirePersonhoodLabel(required != IPopRules.PopStatus.Reserved, legacy);
+        require(required != IPopRules.PopStatus.Reserved, InvalidPersonhoodLabel());
         require(!_registrarOf(deps).exists(uint256(node)), PersonhoodNameUnavailable());
         _requireNotGranted(node);
     }
@@ -1188,26 +1153,6 @@ contract DotnsPopController is
             WhitelistUtils.granteeOf(protocolRegistry, node) == address(0),
             PersonhoodNameUnavailable()
         );
-    }
-
-    /// @notice Reverts with the device-label error the caller decodes when `ok` is false.
-    /// @dev `legacy` is set only on the @custom:contract IDotnsPopControllerLegacy entrypoints,
-    /// whose callers decode @custom:reverts InvalidLiteLabel; every other path reverts
-    /// @custom:reverts InvalidDeviceLabel.
-    function _requireDeviceLabel(bool ok, bool legacy) internal pure {
-        if (ok) return;
-        if (legacy) revert InvalidLiteLabel();
-        revert InvalidDeviceLabel();
-    }
-
-    /// @notice Reverts with the personhood-label error the caller decodes when `ok` is false.
-    /// @dev `legacy` is set only on the @custom:contract IDotnsPopControllerLegacy entrypoints,
-    /// whose callers decode @custom:reverts InvalidBaseLabel; every other path reverts
-    /// @custom:reverts InvalidPersonhoodLabel.
-    function _requirePersonhoodLabel(bool ok, bool legacy) internal pure {
-        if (ok) return;
-        if (legacy) revert InvalidBaseLabel();
-        revert InvalidPersonhoodLabel();
     }
 
     /// @notice Reverts when a non-empty chat key is not exactly `CHAT_KEY_LENGTH` bytes.
