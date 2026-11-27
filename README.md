@@ -16,7 +16,44 @@ dotNS is a naming system for Polkadot. An account can register a .dot name, rece
 
 ### System diagram
 
-![System diagram](./diagrams/system.png)
+```mermaid
+flowchart LR
+    gateway["<b>dotNS gateway pallet</b><br/>Asset Hub runtime<br/>verifies devicehood and personhood"]
+    gov["<b>Governance</b><br/>Root<br/>maintainer account<br/>bootstrap owner, until renounced"]
+    users["<b>Accounts and apps</b><br/>wallets, dApps, CLI"]
+    readers["<b>Readers</b><br/>wallets, indexers, web gateways"]
+
+    subgraph dotns["dotNS contracts"]
+        direction TB
+        reg["<b>Registration</b><br/><code>DotnsRegistrarController</code><br/><code>DotnsPopController</code>"]
+        rules["<b>Rules and pricing</b><br/><code>PopRules</code><br/><code>DotnsCostModelRegistry</code><br/><code>DotnsNameWhitelist</code>"]
+        own["<b>Ownership</b><br/><code>DotnsRegistrar</code><br/><code>DotnsRegistry</code><br/><code>DotnsNameEscrow</code>"]
+        rec["<b>Records</b><br/><code>DotnsResolver</code><br/><code>DotnsContentResolver</code><br/><code>DotnsReverseResolver</code><br/><code>DotnsPopResolver</code><br/><code>LabelStore</code><br/><code>UserStore</code>"]
+    end
+
+    gateway -- "issue and reserve device<br/>and personhood names" --> dotns
+    gov -- "grants, revocations,<br/>settings, upgrades" --> dotns
+    dotns <-- "register, request grants,<br/>transfer, subnames, records,<br/>release and redeem, upkeep" --> users
+    dotns <-- "resolve names,<br/>read state" --> readers
+
+    reg -- "check price<br/>and eligibility" --> rules
+    reg -- "mint" --> own
+    reg -- "write first records" --> rec
+
+    classDef actor fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
+    classDef runtime fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
+    classDef governance fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a
+    classDef contract fill:#ffffff,stroke:#16a34a,stroke-width:2px,color:#0f172a
+    classDef reader fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#0f172a
+    class users actor
+    class gateway runtime
+    class gov governance
+    class reg,rules,own,rec contract
+    class readers reader
+    style dotns fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#0f172a
+```
+
+Every contract finds the others through `DotnsProtocolRegistry`, the protocol's address book. Readers can batch calls through Multicall3 and read PoP data through `DotnsPopLens`.
 
 ## Actors
 
@@ -167,7 +204,7 @@ All three are Root-gated and revert with `NotRoot` for a signed caller. The regi
 
 ### Refund ledgers
 
-The escrow keeps two separate pull-payment ledgers. One has no cooldown and serves as the fallback when a registration overpayment cannot be pushed back to the sender inline. The other gives every entry its own cooldown clock and holds the transfer-fee overpayments earlier releases credited; nothing adds to it. A deposit unlocked by releasing a funded name lands on the no-cooldown ledger; its delay comes instead from the position's own `withdrawAvailableAt` stamp, so once `withdraw` lands the credit is immediately pullable. `claimWithdrawal` pays the no-cooldown balance to its owner, and `claimWithdrawalTo` pays it to an address the owner names, which is how a contract that rejects incoming value collects its overpayment. Clients enumerate pending refunds through the escrow's public views, which page under a fixed cap so discovery stays bounded.
+The escrow keeps two separate pull-payment ledgers. One has no cooldown and serves as the fallback when a registration overpayment cannot be pushed back to the sender inline; that overpayment is credited to the name's owner, like the deposit. The other gives every entry its own cooldown clock and holds the transfer-fee overpayments earlier releases credited; nothing adds to it. A deposit unlocked by releasing a funded name lands on the no-cooldown ledger; its delay comes instead from the position's own `withdrawAvailableAt` stamp, so once `withdraw` lands the credit is immediately pullable. `claimWithdrawal` pays the no-cooldown balance to its owner, and `claimWithdrawalTo` pays it to an address the owner names, which is how a contract that rejects incoming value collects its overpayment. Clients enumerate pending refunds through the escrow's public views, which page under a fixed cap so discovery stays bounded.
 
 Clients that need the exact moment a released name becomes registrable should read `redeemableUntil` from `getReleasePosition` rather than polling `available`.
 
@@ -310,7 +347,7 @@ Tier assignment is read on every pricing call, not stored: PopRules queries the 
 
 Classification is not the same thing as effective holder context. A long label such as andrewsays is always a NoStatus-tier label by shape, but it may be held by a Personhood, Devicehood, or NoStatus account. Consumers that need to know what rules apply to that live name should combine three reads: classify the label, query the registrar owner, then query the owner's dotns-context PoP status through the precompile (`PopRules.popStatusOf`). The escrow position is the economic qualifier: if the token has an active release position with a non-zero amount, it came through the paid public path, whoever paid; if no such deposit exists, the name was issued for free, so a verified holder can own the same long label without it being deposit-backed. In other words, andrewsays does not become a Personhood-tier label when a Personhood account owns it, but the owner can still hold personhood for reverse resolution and UI display. Any transferable name moves for free whatever its holder's tier.
 
-Name grants are the exception path for users or organisations that need to register without satisfying the live PoP tier check. dotNS still does not accept self-attestation: the contracts only consume PoP status from the personhood precompile, and a user cannot set or prove their own status inside dotNS. Instead, `DotnsNameWhitelist` binds a specific label to a specific beneficiary, and registerReserved mints it at zero base cost, bypassing the PoP pricing gate while still using the normal commit-reveal and availability checks. Only governance issues a grant: every admin action on the whitelist requires a substrate Root dispatch, so no key can grant a name, the bootstrap owner included. A Root dispatch can also mint a reserved name directly, without a grant. That covers the whitelist path. The registrar's controller set and the protocol registry's keys are managed by Root or the bootstrap owner, so a bootstrap owner keeps other routes to the same outcome until Root renounces it.
+Name grants are the exception path for users or organisations that need to register without satisfying the live PoP tier check. dotNS still does not accept self-attestation: the contracts only consume PoP status from the personhood precompile, and a user cannot set or prove their own status inside dotNS. Instead, `DotnsNameWhitelist` binds a specific label to a specific beneficiary, and registerReserved mints it at zero base cost, bypassing the PoP pricing gate while still using the normal commit-reveal and availability checks. Only governance issues a grant: every decision about who holds a name on the whitelist requires a substrate Root dispatch, so no key can grant a name, the bootstrap owner or the maintainer account included. A Root dispatch can also mint a reserved name directly, without a grant. That covers the whitelist path. The registrar's controller set and the protocol registry's keys are managed by Root or the bootstrap owner, so a bootstrap owner keeps other routes to the same outcome until Root renounces it.
 
 A grant is deliberately narrow. It names one label rather than permitting any available name, it names the address the name must mint to, and it is spent by that mint, so it cannot seed a second registration. While it is live, it binds the label on every path: the paid `register` path and the gateway refuse the label for everyone, the grantee included, so `registerReserved` is the only way to register it. A grant expires a governance-set period after it is made, 30 days by default. The label is then open to every path again, and governance can grant it afresh without revoking the old grant. The gate reads the intended owner rather than the caller, so a relayer may submit the registration on the beneficiary's behalf; the name still lands on the beneficiary. The reserved path writes no reverse record, because the submitter is not necessarily the beneficiary and setReverseName overwrites unconditionally; the owner claims their own primary afterwards through claimReverseRecord.
 

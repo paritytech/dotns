@@ -395,6 +395,18 @@ contract DotnsNameEscrowRedeemTest is BaseDotns {
         assertEq(dotnsRegistrar.ownerOf(tokenId), newOwner);
     }
 
+    /// @dev Custody belongs to a released position only. Taken by the escrow, the name would get
+    ///      a fresh position whose recipient no account can act as.
+    function test_revert_reclaim_to_the_escrow_itself() public {
+        uint256 tokenId = _mintWithZeroPosition(FREE_LABEL, ed);
+        _approveAndRelease(tokenId, ed);
+        vm.warp(_positionOf(tokenId).redeemableUntil);
+
+        vm.prank(address(dotnsRegistrarController));
+        vm.expectRevert(IDotnsNameEscrow.InvalidRecipient.selector);
+        dotnsNameEscrow.reclaim(tokenId, address(dotnsNameEscrow));
+    }
+
     /// @dev Acceptance criterion: the credit has no deadline, so a holder who reappears much later
     ///      is still made whole.
     function test_settled_deposit_stays_claimable_long_after_reclaim() public {

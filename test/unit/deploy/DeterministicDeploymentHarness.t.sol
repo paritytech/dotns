@@ -71,6 +71,10 @@ contract DeterministicDeploymentHarness is BaseDeployer {
         _setCreate3Factory(factory);
     }
 
+    function runsBuildOf(address target, string memory artefact) external view returns (bool) {
+        return _runsBuildOf(target, vm.getDeployedCode(artefact));
+    }
+
     function deployUups(
         address owner,
         string memory artefact,

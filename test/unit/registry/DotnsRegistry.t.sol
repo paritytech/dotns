@@ -393,6 +393,52 @@ contract DotnsRegistryTests is BaseDotns {
         dotnsRegistry.setSubnodeOwner(subnodeRecord);
     }
 
+    /// @dev The cap is on the parent path in octets, so it binds well within the depth limit when
+    ///      each level spends a long label: a 255-octet parent path is accepted, and the next level
+    ///      down, whose parent path is longer, is refused.
+    function test_revert_subnode_owner_past_the_name_path_cap() public {
+        string memory path = "parentnode12";
+        bytes32 node = _register(path, owner, IPopRules.PopStatus.NoStatus);
+        address holder = owner;
+
+        // 12 + 3 * 64 + 51 = 255 octets: three 63-octet levels, then one of 50.
+        uint256[4] memory lengths = [uint256(63), 63, 63, 50];
+        for (uint256 i; i < lengths.length; ++i) {
+            string memory sub = _repeat("a", lengths[i]);
+            vm.prank(holder);
+            node = dotnsRegistry.setSubnodeOwner(
+                IDotnsRegistry.SubnodeRecord({
+                    parentNode: node, subLabel: sub, parentLabel: path, owner: ed, persist: true
+                })
+            );
+            path = string.concat(sub, ".", path);
+            holder = ed;
+        }
+        assertEq(bytes(path).length, 255, "the last parent path sits at the cap");
+
+        vm.prank(ed);
+        node = dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: node, subLabel: "b", parentLabel: path, owner: ed, persist: true
+            })
+        );
+
+        string memory overCap = string.concat("b.", path);
+        vm.prank(ed);
+        vm.expectRevert(IDotnsRegistry.ParentLabelMismatch.selector);
+        dotnsRegistry.setSubnodeOwner(
+            IDotnsRegistry.SubnodeRecord({
+                parentNode: node, subLabel: "c", parentLabel: overCap, owner: ed, persist: true
+            })
+        );
+    }
+
+    function _repeat(string memory unit, uint256 count) internal pure returns (string memory out) {
+        for (uint256 i; i < count; ++i) {
+            out = string.concat(out, unit);
+        }
+    }
+
     function test_revert_subnode_owner_with_dotted_sublabel() public {
         string memory parentLabel = "parentnode07";
         bytes32 parentNode = _register(parentLabel, owner, IPopRules.PopStatus.NoStatus);

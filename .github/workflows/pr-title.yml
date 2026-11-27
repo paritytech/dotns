@@ -20,10 +20,11 @@ jobs:
   title:
     name: PR Title
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check PR title
         id: title
-        uses: amannn/action-semantic-pull-request@v5
+        uses: amannn/action-semantic-pull-request@e32d7e603df1aa1ba07e981f2a23455dee596825 # v5
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -53,7 +54,7 @@ jobs:
 
       - name: Update PR comment
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           SECTION: PR Title
           RESULT: ${{ steps.run.outputs.result }}
@@ -97,7 +98,7 @@ jobs:
 
             rows[section] = result;
 
-            const order = ["4naly3er Analysis", "Slither Analysis", "Contract Tests", "Coverage", "Documentation", "Format & Lint", "File Validation", "Deploy Contracts", "PR Title", "Labels"];
+            const order = ["Slither Analysis", "Contract Tests", "Coverage", "Documentation", "Format & Lint", "File Validation", "Deploy Contracts", "PR Title", "Labels"];
             const sortedKeys = Object.keys(rows).sort((a, b) => {
               const ai = order.indexOf(a), bi = order.indexOf(b);
               return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
@@ -130,18 +131,19 @@ jobs:
   labels:
     name: Labels
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Auto-label
-        uses: actions/labeler@v5
+        uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9 # v5.0.0
         continue-on-error: true
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validate labels
         id: run
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -172,7 +174,7 @@ jobs:
 
       - name: Update PR comment
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           SECTION: Labels
           RESULT: ${{ steps.run.outputs.result }}
@@ -233,7 +235,7 @@ jobs:
               delete existingDetails[section];
             }
 
-            const order = ["4naly3er Analysis", "Slither Analysis", "Contract Tests", "Coverage", "Documentation", "Format & Lint", "File Validation", "Deploy Contracts", "PR Title", "Labels"];
+            const order = ["Slither Analysis", "Contract Tests", "Coverage", "Documentation", "Format & Lint", "File Validation", "Deploy Contracts", "PR Title", "Labels"];
             const sortedKeys = Object.keys(rows).sort((a, b) => {
               const ai = order.indexOf(a), bi = order.indexOf(b);
               return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
@@ -244,7 +246,7 @@ jobs:
               table += `| ${key} | ${rows[key]} |\n`;
             }
 
-            const detailsOrder = ["4naly3er Analysis", "Slither Analysis", "Contract Tests", "Coverage", "Documentation", "Format & Lint", "File Validation", "Deploy Contracts", "PR Title", "Labels"];
+            const detailsOrder = ["Slither Analysis", "Contract Tests", "Coverage", "Documentation", "Format & Lint", "File Validation", "Deploy Contracts", "PR Title", "Labels"];
             const sortedDetails = Object.keys(existingDetails).sort((a, b) => {
               const ai = detailsOrder.indexOf(a), bi = detailsOrder.indexOf(b);
               return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);

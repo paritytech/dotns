@@ -52,6 +52,10 @@ contract DeployCore is BaseDeployer {
             abi.encodeCall(DotnsProtocolRegistry.initialize, (owner, tldLabel())),
             "DotnsProtocolRegistry"
         );
+        // An adopted registry keeps the arguments its first deploy was initialised with, and
+        // anyone can make that first deploy. Every later stage trusts it, so its owner and TLD
+        // must be this run's before anything is written through it.
+        _requireRegistryConfig(proxy, owner);
     }
 
     function _deployStoreFactory(address owner, address protocolRegistry) internal {

@@ -29,15 +29,16 @@ concurrency:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.event.action != 'closed'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           submodules: recursive
 
       - uses: ./.github/actions/setup-foundry
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
 
@@ -45,7 +46,8 @@ jobs:
           FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
         run: forge install && forge build --build-info
 
-      - run: pip3 install slither-analyzer
+      # Pinned so the analyzer, and the findings it reports, change only on purpose.
+      - run: pip3 install slither-analyzer==0.11.6
 
       - name: Run Slither
         continue-on-error: true
@@ -81,7 +83,7 @@ jobs:
           cp slither-report.html /tmp/deploy/
           bash scripts/shell/deploy-to-gh-pages.sh /tmp/deploy ${{ steps.path.outputs.target }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: slither-report
@@ -93,7 +95,7 @@ jobs:
 
       - name: Update PR comment
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           SECTION: Slither Analysis
           RESULT: ${{ steps.run.outputs.result }}
@@ -139,12 +141,12 @@ jobs:
               existingDetails[section] = `<details>\n<summary><strong>${section}</strong></summary>\n\n${details}\n\n[View full report](${reportUrl}) | [View logs](https://github.com/${repoFull}/actions/runs/${runId})\n\n</details>`;
             } else { delete existingDetails[section]; }
 
-            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Gas Report', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const order = ['Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Gas Report', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
             const sortedKeys = Object.keys(rows).sort((a, b) => (order.indexOf(a) === -1 ? 999 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 999 : order.indexOf(b)));
             let table = `| Check | Result |\n|:------|:-------|\n`;
             for (const key of sortedKeys) table += `| ${key} | ${rows[key]} |\n`;
 
-            const detailsOrder = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Gas Report', 'Coverage'];
+            const detailsOrder = ['Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Gas Report', 'Coverage'];
             const sortedDetails = Object.keys(existingDetails).sort((a, b) => (detailsOrder.indexOf(a) === -1 ? 999 : detailsOrder.indexOf(a)) - (detailsOrder.indexOf(b) === -1 ? 999 : detailsOrder.indexOf(b)));
             let body = `${marker}\n## CI Summary\n\n${table}`;
             if (sortedDetails.length > 0) body += `\n${detailsMarker}\n\n---\n\n${sortedDetails.map(k => existingDetails[k]).join('\n\n')}`;
@@ -161,9 +163,10 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: github.event.action == 'closed'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: gh-pages
           fetch-depth: 0

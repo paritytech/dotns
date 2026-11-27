@@ -192,10 +192,17 @@ done
 # runs on a real work tree (CI, or a manual repo-root invocation). The pre-commit
 # hook validates staged content from a temp tree that is not a repository, where
 # the per-file YAML parse above still checks each workflow's syntax and actionlint
-# defers to the File Validation CI job.
-if [ -d .github/workflows ] && command -v actionlint > /dev/null 2>&1 \
-  && git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-  run_validation ".github/workflows" "GitHub Actions validation" actionlint
+# defers to the File Validation CI job. That job sets REQUIRE_ACTIONLINT=1, so a
+# missing actionlint fails the run instead of passing unlinted workflows.
+if [ -d .github/workflows ] && git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  if command -v actionlint > /dev/null 2>&1; then
+    # actionlint prints its findings on stdout, so fold it into the detail stream.
+    run_validation ".github/workflows" "GitHub Actions validation" \
+      sh -c 'actionlint 1>&2'
+  elif [ "${REQUIRE_ACTIONLINT:-}" = "1" ]; then
+    echo "actionlint is not installed" >"$validation_detail"
+    record_validation_failure ".github/workflows" "GitHub Actions validation"
+  fi
 fi
 
 if [ -s "$validation_errors" ]; then

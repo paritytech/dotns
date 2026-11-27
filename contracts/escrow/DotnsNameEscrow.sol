@@ -392,8 +392,9 @@ contract DotnsNameEscrow is
     ///      upgrade that needs a reinitializer starts at 3.
     ///      It clears lazily only and deletes no record outright: deleting would release the
     ///      storage deposit the holders paid to the signer of this call instead. Walks every name
-    ///      in custody in one call, so check @custom:function releasedTokenCount before relying on
-    ///      it. Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
+    ///      in custody in one call, so check @custom:function releasedTokenCount and dry-run the
+    ///      upgrade in the block it is sent, and pass this call only when the count is non-zero.
+    ///      Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
     ///      through ERC-165 stays the same.
     function clearCustodyOnUpgrade() external onlyRootOrOwner reinitializer(2) {
         uint256 count = _releasedTokens.length;
@@ -656,6 +657,9 @@ contract DotnsNameEscrow is
         nonReentrant
     {
         require(isReclaimable(tokenId), NotReclaimable(tokenId));
+        // Custody belongs to a released position only, so the escrow cannot take the name as its
+        // new owner: no account could act as the recipient of the position seeded next.
+        require(newOwner != address(this), InvalidRecipient());
 
         ReleasePosition storage position = _positions[tokenId];
         address previousRecipient = position.recipient;

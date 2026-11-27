@@ -27,9 +27,10 @@ import {SystemUtils} from "../utils/SystemUtils.sol";
 ///      caller cannot supply a mismatched hash. Claims are keyed by the beneficiary `user`, not
 ///      the submitter, so a relayer or a cross-chain sovereign account can submit on a user's
 ///      behalf and the name binds to that user. All state is on-chain and queryable through views;
-///      no event indexing is required. A name holds at most `maxClaimants` live claims, which
-///      bounds the loop that clears them on resolution. Resolving a name deletes its claims,
-///      refunding their storage deposit, so only reserved or won names persist. Grants,
+///      no event indexing is required. A name holds at most `maxClaimants` live claims. Claims
+///      are kept per round: resolving a name starts its next round, which leaves the previous
+///      round's claims unreachable in one write, so resolution costs the same however many
+///      claims a name holds. Grants,
 ///      revocations, acceptances, rejections and reservations are substrate Root only: those
 ///      gates check `SystemUtils.callerIsRoot`, true through the proxy's delegatecall frame, and
 ///      read no `msg.sender`. The request window and the caps are also open to the maintainer
@@ -68,11 +69,13 @@ contract DotnsNameWhitelist is
     /// @notice Resolved state per name.
     mapping(bytes32 node => NameRecord record) private _names;
 
-    /// @notice Claims per name, keyed by beneficiary.
-    mapping(bytes32 node => mapping(address user => Claim claim)) private _claims;
+    /// @notice Claims per round of a name, keyed by beneficiary.
+    /// @dev Keyed by @custom:function _roundKey, never by the bare node.
+    mapping(bytes32 roundKey => mapping(address user => Claim claim)) private _claims;
 
-    /// @notice Beneficiaries with a live claim per name.
-    mapping(bytes32 node => EnumerableSet.AddressSet claimants) private _claimants;
+    /// @notice Beneficiaries with a live claim per round of a name.
+    /// @dev Keyed by @custom:function _roundKey, never by the bare node.
+    mapping(bytes32 roundKey => EnumerableSet.AddressSet claimants) private _claimants;
 
     /// @notice Names holding reserved, claimed or claim-holding state, kept enumerable for review.
     EnumerableSet.Bytes32Set private _activeNodes;
@@ -94,8 +97,14 @@ contract DotnsNameWhitelist is
     ///      keep binding.
     uint64 private _legacyGrantExpiresAt;
 
+    /// @notice Round of claims each name is on.
+    /// @dev Resolving a name moves it to the next round, so the previous round's claims become
+    ///      unreachable without a write per claim. Zero until a name is first resolved, and round
+    ///      zero keys claims by the bare node, so claims made before rounds existed stay live.
+    mapping(bytes32 node => uint256 round) private _claimRounds;
+
     /// @dev Reserved storage space to allow for layout changes in the future.
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     /// @notice Restricts a call to a substrate Root dispatch.
     /// @dev Every decision about who holds a name is governance-only: no key grants, revokes or
@@ -238,25 +247,41 @@ contract DotnsNameWhitelist is
 
         bytes32 node = _nodeOf(label);
         require(_clearExpiredGrant(_names[node]) == NameStatus.Open, NameNotOpen(node));
-        require(_claims[node][user].status == ClaimStatus.None, AlreadyClaimed(node, user));
-        require(_claimants[node].length() < maxClaimants, TooManyClaimants(node));
+        bytes32 key = _roundKey(node);
+        require(_claims[key][user].status == ClaimStatus.None, AlreadyClaimed(node, user));
+        require(_claimants[key].length() < maxClaimants, TooManyClaimants(node));
 
-        _claims[node][user] = Claim({
+        _claims[key][user] = Claim({
             user: user,
             status: ClaimStatus.Requested,
             requestedAt: uint64(block.timestamp),
             submitter: msg.sender,
             reason: reason
         });
-        _claimants[node].add(user);
+        _claimants[key].add(user);
         _activate(node, label);
-        emit NameRequested(node, user, label, reason);
+        emit NameRequested(node, user, msg.sender, label, reason);
+    }
+
+    /// @inheritdoc IDotnsNameWhitelist
+    function withdrawClaim(string calldata label) external override {
+        bytes32 node = _nodeOf(label);
+        bytes32 key = _roundKey(node);
+        require(
+            _claims[key][msg.sender].status == ClaimStatus.Requested, NotRequested(node, msg.sender)
+        );
+        delete _claims[key][msg.sender];
+        _claimants[key].remove(msg.sender);
+        emit ClaimWithdrawn(node, msg.sender, label);
+        _deactivate(node);
     }
 
     /// @inheritdoc IDotnsNameWhitelist
     function accept(string calldata label, address user) external override onlyGovernance {
         bytes32 node = _nodeOf(label);
-        require(_claims[node][user].status == ClaimStatus.Requested, NotRequested(node, user));
+        require(
+            _claims[_roundKey(node)][user].status == ClaimStatus.Requested, NotRequested(node, user)
+        );
         emit NameAccepted(node, user, label);
         _settle(node, user, label);
     }
@@ -264,16 +289,17 @@ contract DotnsNameWhitelist is
     /// @inheritdoc IDotnsNameWhitelist
     function reject(string calldata label, address user) external override onlyGovernance {
         bytes32 node = _nodeOf(label);
-        Claim storage claim = _claims[node][user];
+        bytes32 key = _roundKey(node);
+        Claim storage claim = _claims[key][user];
         require(claim.status == ClaimStatus.Requested, NotRequested(node, user));
         // Free the claimant slot either way. Keep a sticky Rejected record only for a self-filed
-        // claim, so the beneficiary cannot re-request; a claim filed on their behalf is
-        // deleted and never binds them.
-        _claimants[node].remove(user);
+        // claim, so the beneficiary cannot re-request in this round; a claim filed on their
+        // behalf is deleted and never binds them.
+        _claimants[key].remove(user);
         if (claim.submitter == user) {
             claim.status = ClaimStatus.Rejected;
         } else {
-            delete _claims[node][user];
+            delete _claims[key][user];
         }
         emit NameRejected(node, user, label);
         _deactivate(node);
@@ -297,11 +323,11 @@ contract DotnsNameWhitelist is
         bytes32 node = _nodeOf(label);
         NameRecord storage record = _names[node];
         require(
-            record.status == NameStatus.Claimed || _claimants[node].length() != 0,
+            record.status == NameStatus.Claimed || _claimants[_roundKey(node)].length() != 0,
             NothingToRevoke(node)
         );
         address winner = record.winner;
-        _clearClaimants(node, address(0), label);
+        _closeRound(node, label);
         record.status = NameStatus.Open;
         record.winner = address(0);
         record.expiresAt = 0;
@@ -318,7 +344,7 @@ contract DotnsNameWhitelist is
             require(_clearExpiredGrant(record) == NameStatus.Open, NameNotOpen(node));
             // Clear any pending claims the way a grant does, so a permissionless requestName
             // cannot force governance to revokeName before it can reserve.
-            _clearClaimants(node, address(0), label);
+            _closeRound(node, label);
             record.status = NameStatus.Reserved;
             _activate(node, label);
             emit NameReserved(node, label);
@@ -424,12 +450,12 @@ contract DotnsNameWhitelist is
         override
         returns (Claim memory claim)
     {
-        return _claims[_nodeOf(label)][user];
+        return _claims[_roundKey(_nodeOf(label))][user];
     }
 
     /// @inheritdoc IDotnsNameWhitelist
     function claimantCount(string calldata label) external view override returns (uint256 count) {
-        return _claimants[_nodeOf(label)].length();
+        return _claimants[_roundKey(_nodeOf(label))].length();
     }
 
     /// @inheritdoc IDotnsNameWhitelist
@@ -443,8 +469,8 @@ contract DotnsNameWhitelist is
         override
         returns (Claim[] memory page)
     {
-        bytes32 node = _nodeOf(label);
-        EnumerableSet.AddressSet storage set = _claimants[node];
+        bytes32 key = _roundKey(_nodeOf(label));
+        EnumerableSet.AddressSet storage set = _claimants[key];
         uint256 total = set.length();
         if (offset >= total) {
             return new Claim[](0);
@@ -453,7 +479,7 @@ contract DotnsNameWhitelist is
         uint256 count = limit < available ? limit : available;
         page = new Claim[](count);
         for (uint256 i; i < count; ++i) {
-            page[i] = _claims[node][set.at(offset + i)];
+            page[i] = _claims[key][set.at(offset + i)];
         }
     }
 
@@ -525,7 +551,7 @@ contract DotnsNameWhitelist is
         _settle(node, user, label);
     }
 
-    /// @notice Marks a name claimed for `winner` and clears its claims, rejecting the losers.
+    /// @notice Marks a name claimed for `winner` and ends its round of claims.
     /// @param node Namehash of the label under the active TLD.
     /// @param winner Beneficiary the name binds to.
     /// @param label Bare label, stored for review.
@@ -537,7 +563,7 @@ contract DotnsNameWhitelist is
         // `initializeGrantExpiry` sets the shared legacy expiry.
         record.expiresAt = grantDuration == 0 ? 0 : uint64(block.timestamp) + grantDuration;
         _activate(node, label);
-        _clearClaimants(node, winner, label);
+        _closeRound(node, label);
     }
 
     /// @notice Returns the live winner of the name at `node`, or the zero address.
@@ -587,20 +613,28 @@ contract DotnsNameWhitelist is
         }
     }
 
-    /// @notice Deletes every claim on a name, rejecting each claimant that is not `winner`.
+    /// @notice Ends the current round of claims on a name and starts the next.
+    /// @dev One write, however many claims the round holds: its claims stay in storage, where no
+    ///      view or gate reads them again. A rejection kept for a self-filed claim holds for the
+    ///      round it was made in. @custom:emits ClaimsCleared when the round held live claims.
     /// @param node Namehash of the label under the active TLD.
-    /// @param winner Claimant spared a rejection event; the zero address rejects every claimant.
-    /// @param label Bare label emitted with each rejection.
-    function _clearClaimants(bytes32 node, address winner, string calldata label) internal {
-        address[] memory current = _claimants[node].values();
-        for (uint256 i; i < current.length; ++i) {
-            address claimant = current[i];
-            delete _claims[node][claimant];
-            _claimants[node].remove(claimant);
-            if (claimant != winner) {
-                emit NameRejected(node, claimant, label);
-            }
+    /// @param label Bare label emitted with the event.
+    function _closeRound(bytes32 node, string calldata label) internal {
+        uint256 live = _claimants[_roundKey(node)].length();
+        uint256 round = _claimRounds[node] + 1;
+        _claimRounds[node] = round;
+        if (live != 0) {
+            emit ClaimsCleared(node, label, round - 1, live);
         }
+    }
+
+    /// @notice Returns the key the current round of claims on `node` is stored under.
+    /// @dev Round zero uses the bare node, which keeps claims made before rounds existed live.
+    /// @param node Namehash of the label under the active TLD.
+    /// @return key Storage key for `_claims` and `_claimants`.
+    function _roundKey(bytes32 node) internal view returns (bytes32 key) {
+        uint256 round = _claimRounds[node];
+        return round == 0 ? node : keccak256(abi.encode(node, round));
     }
 
     /// @notice Records a name as active and stores its label the first time it is seen.
@@ -618,7 +652,7 @@ contract DotnsNameWhitelist is
     /// @param node Namehash of the label under the active TLD.
     function _deactivate(bytes32 node) internal {
         NameRecord storage record = _names[node];
-        if (record.status == NameStatus.Open && _claimants[node].length() == 0) {
+        if (record.status == NameStatus.Open && _claimants[_roundKey(node)].length() == 0) {
             _activeNodes.remove(node);
             delete record.label;
         }

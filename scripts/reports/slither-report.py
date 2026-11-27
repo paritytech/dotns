@@ -10,6 +10,7 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 
 SEVERITY_ORDER = ["High", "Medium", "Low", "Informational"]
@@ -89,9 +90,9 @@ def generate_html(findings):
 
         for finding in items:
             lines.append('<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">')
-            lines.append(f'<td class="py-2 px-3 font-mono {color}">{finding["check"]}</td>')
-            lines.append(f'<td class="py-2 px-3 text-gray-200">{finding["description"]}</td>')
-            lines.append(f'<td class="py-2 px-3 font-mono text-gray-500">{finding["location"]}</td>')
+            lines.append(f'<td class="py-2 px-3 font-mono {color}">{escape(finding["check"])}</td>')
+            lines.append(f'<td class="py-2 px-3 text-gray-200">{escape(finding["description"])}</td>')
+            lines.append(f'<td class="py-2 px-3 font-mono text-gray-500">{escape(finding["location"])}</td>')
             lines.append("</tr>")
 
         lines.append("</tbody></table></div>")

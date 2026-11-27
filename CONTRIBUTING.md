@@ -227,13 +227,16 @@ Also note:
 ### Local commit checks
 
 The repository ships a pre-commit hook under `.githooks/pre-commit`. `setup.bash`
-installs it by setting `core.hooksPath=.githooks`.
+installs it by setting `core.hooksPath=.githooks` when run with
+`DOTNS_INSTALL_HOOKS=1` (for example `DOTNS_INSTALL_HOOKS=1 bun install`); a plain
+install leaves your git config alone.
 
 The hook validates repository files, including `.github`, while ignoring external
 dependencies under `lib/` and `node_modules/`. It checks structured
 configuration and script files such as YAML, JSON, TOML, shell, Python,
 JavaScript, `.env.example`, and `.gitmodules`; if `actionlint` is installed, it
-also validates GitHub Actions workflow semantics. It then runs `forge fmt`. If
+also validates GitHub Actions workflow semantics, which the File Validation CI job
+always checks. It then runs `forge fmt`. If
 formatting changes any tracked project file, the commit stops so the formatted
 files can be reviewed and staged. Finally it runs `forge build` and fails on
 compiler warnings from project code. Warnings from external dependencies under

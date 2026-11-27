@@ -24,10 +24,11 @@ jobs:
   # this keeps every release on reviewed code.
   guard:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -43,8 +44,9 @@ jobs:
   beta-release:
     needs: guard
     runs-on: ubuntu-latest
-    # Gated: this job reads the genesis owner key, which lives only on the `releases`
-    # environment, so every run waits for a reviewer's approval there.
+    timeout-minutes: 150
+    # Gated: this job reads the genesis owner key and the factory deployer key, which live
+    # only on the `releases` environment, so every run waits for a reviewer's approval there.
     environment: releases
     # One genesis per TLD, since the TLD is baked into the registry: `.testnet` for previewnet,
     # `.paseo` for Paseo Asset Hub Next V2. Job-level: several steps name the files it yields.
@@ -89,7 +91,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           submodules: recursive
 
@@ -113,20 +115,20 @@ jobs:
             exit 1
           fi
           DERIVED="$(cast wallet address --private-key "$DOTNS_ADMIN_KEY")"
-          if [ "$(printf '%s' "$DERIVED" | tr 'A-Z' 'a-z')" != "$(printf '%s' "$DOTNS_ADMIN_ADDRESS" | tr 'A-Z' 'a-z')" ]; then
+          if [ "$(printf '%s' "$DERIVED" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$DOTNS_ADMIN_ADDRESS" | tr '[:upper:]' '[:lower:]')" ]; then
             echo "::error::DOTNS_ADMIN_KEY derives to $DERIVED, the environment declares $DOTNS_ADMIN_ADDRESS"
             exit 1
           fi
           echo "Owner key derives to the declared address $DERIVED"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.2.6"
           no-cache: true
 
       # `openzeppelin-foundry-upgrades` shells out to `npx @openzeppelin/upgrades-core`
       # via `vm.ffi` during tests; bun does not provide `npx`, so install Node here.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
 
@@ -295,7 +297,7 @@ jobs:
             --json release/abi-diff.json >> release-body.md
 
       - name: Create draft pre-release with artifacts
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           # The tag that started this run.
           tag_name: ${{ env.RELEASE_TAG }}

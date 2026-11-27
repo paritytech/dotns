@@ -489,6 +489,45 @@ contract DotnsRegistrarControllerLifecycleTest is BaseDotns {
         assertEq(dotnsNameEscrow.pendingWithdrawal(address(receiver)), 0, "the credit is spent");
     }
 
+    /// @dev A payer that cannot take the refund, such as a forwarder anyone can call, would
+    ///      otherwise hold a credit any of its callers could claim. The credit follows the deposit
+    ///      to the owner.
+    function test_register_overpayment_a_payer_rejects_is_credited_to_the_owner() public {
+        string memory label = NOSTATUS_LABEL_B;
+
+        RefundRejecter payer = new RefundRejecter();
+        vm.deal(address(payer), DEFAULT_BALANCE);
+        _grantNoStatus(address(payer));
+        _grantNoStatus(leonardo);
+
+        IDotnsRegistrarController.Registration memory registration =
+            IDotnsRegistrarController.Registration({
+                label: label,
+                owner: leonardo,
+                secret: keccak256("forwarded-overpay"),
+                reserved: false,
+                maxPrice: type(uint256).max,
+                pricingVersion: popRules.pricingVersion()
+            });
+        bytes32 commitment = dotnsRegistrarController.makeCommitment(registration);
+        vm.prank(address(payer));
+        dotnsRegistrarController.commit(commitment);
+        vm.warp(block.timestamp + dotnsRegistrarController.minCommitmentAge() + 1);
+
+        uint256 price = popRules.priceWithCheck(label, leonardo).price;
+        uint256 overpayment = 1 ether;
+
+        vm.expectEmit(true, false, false, true, address(dotnsNameEscrow));
+        emit IDotnsNameEscrow.OverpaymentRefunded(leonardo, overpayment);
+
+        vm.prank(address(payer));
+        dotnsRegistrarController.register{value: price + overpayment}(registration);
+
+        assertEq(dotnsRegistrar.ownerOf(_tokenIdForLabel(label)), leonardo);
+        assertEq(dotnsNameEscrow.pendingWithdrawal(leonardo), overpayment, "the owner holds it");
+        assertEq(dotnsNameEscrow.pendingWithdrawal(address(payer)), 0, "the payer holds nothing");
+    }
+
     function test_register_overpayment_reentrant_attacker_falls_back_to_ledger() public {
         string memory label = NOSTATUS_LABEL_A;
 

@@ -10,6 +10,7 @@ import re
 import sys
 from collections import OrderedDict
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 
 
@@ -117,7 +118,7 @@ def generate_html(suites):
 
         lines.append('<div class="mb-4 bg-gray-900 border border-gray-800 rounded-lg">')
         lines.append('<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">')
-        lines.append(f'<div><span class="font-semibold text-white">{suite["contract"]}</span><span class="ml-2 text-xs text-gray-500">{suite["file"]}</span></div>')
+        lines.append(f'<div><span class="font-semibold text-white">{escape(suite["contract"])}</span><span class="ml-2 text-xs text-gray-500">{escape(suite["file"])}</span></div>')
         lines.append(f'<span class="text-sm font-mono {suite_status_color}">{suite_passed}/{suite_total}</span>')
         lines.append("</div>")
 
@@ -134,9 +135,9 @@ def generate_html(suites):
                 error_text = test["error"] if test["error"] else ""
 
                 lines.append('<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">')
-                lines.append(f'<td class="py-2 px-3 font-mono text-gray-200">{test["name"]}</td>')
-                lines.append(f'<td class="py-2 px-3 font-mono {result_color}">{test["outcome"]}</td>')
-                lines.append(f'<td class="py-2 px-3 text-sm text-red-300">{error_text}</td>')
+                lines.append(f'<td class="py-2 px-3 font-mono text-gray-200">{escape(test["name"])}</td>')
+                lines.append(f'<td class="py-2 px-3 font-mono {result_color}">{escape(test["outcome"])}</td>')
+                lines.append(f'<td class="py-2 px-3 text-sm text-red-300">{escape(error_text)}</td>')
                 lines.append("</tr>")
 
             lines.append("</tbody></table></div>")

@@ -14,6 +14,8 @@ import {DotnsReverseResolver} from "../../../contracts/resolvers/DotnsReverseRes
 import {StoreFactory} from "../../../contracts/store/StoreFactory.sol";
 import {DotnsConstants} from "../../../contracts/utils/DotnsConstants.sol";
 
+import {Create3FactoryCode} from "../../../scripts/deploy/Create3FactoryCode.sol";
+
 import {DeterministicDeploymentHarness} from "./DeterministicDeploymentHarness.t.sol";
 
 contract DeterministicDeploymentTest is Test {
@@ -321,7 +323,7 @@ contract DeterministicDeploymentTest is Test {
 
     function test_reusedFactoryMakesAddressesDeployerIndependent() public {
         // A CREATE3 factory deployed once, independently of any pipeline run.
-        Create3Factory shared = new Create3Factory();
+        Create3Factory shared = Create3Factory(payable(Create3FactoryCode.deploy()));
 
         // Two separate deployer runs that reuse the same factory must predict
         // the same address, even though neither minted it.
@@ -352,7 +354,7 @@ contract DeterministicDeploymentTest is Test {
     }
 
     function test_ensureReusesConfiguredFactory() public {
-        Create3Factory preDeployed = new Create3Factory();
+        Create3Factory preDeployed = Create3Factory(payable(Create3FactoryCode.deploy()));
         vm.setEnv("CREATE3_FACTORY", vm.toString(address(preDeployed)));
 
         DeterministicDeploymentHarness reuse = new DeterministicDeploymentHarness();
@@ -365,6 +367,66 @@ contract DeterministicDeploymentTest is Test {
 
         // Reset so later tests mint their own factory.
         vm.setEnv("CREATE3_FACTORY", vm.toString(address(0)));
+    }
+
+    /// @notice An occupant whose `UUPSUpgradeable.__self` holds another address is rejected.
+    /// @dev The byte comparison skips address-derived words, so the genuine artefact deployed
+    ///      elsewhere and copied here matches everywhere else. Its `__self` names the original
+    ///      address, which an honest deploy at this one never writes.
+    function test_an_occupant_with_a_foreign_self_address_is_rejected() public {
+        _skipUnderCoverage();
+        address elsewhere =
+            deployer.deployCreate3(owner, "StoreFactory.sol:StoreFactory", "", "Elsewhere");
+        vm.etch(deployer.predictCreate3("StoreFactory", "contract"), elsewhere.code);
+
+        _assertAdoptionRejected("StoreFactory.sol:StoreFactory", "", "StoreFactory");
+    }
+
+    /// @notice An occupant built with zeroed immutables is rejected.
+    /// @dev `vm.getDeployedCode` zeroes immutables, so a codehash fast path would match it.
+    function test_an_occupant_with_zeroed_immutables_is_rejected() public {
+        _skipUnderCoverage();
+        vm.etch(
+            deployer.predictCreate3("StoreFactory", "contract"),
+            vm.getDeployedCode("StoreFactory.sol:StoreFactory")
+        );
+
+        _assertAdoptionRejected("StoreFactory.sol:StoreFactory", "", "StoreFactory");
+    }
+
+    /// @notice A configured factory whose code is not the canonical factory code is refused.
+    function test_adoptRevertsWhenFactoryCodeIsForeign() public {
+        DeterministicDeploymentHarness fresh = new DeterministicDeploymentHarness();
+        fresh.initManifest();
+        address impostor = address(new Squatter());
+        vm.expectRevert(
+            bytes("Create3Factory: code at factory address is not the canonical factory code")
+        );
+        fresh.adoptCreate3Factory(impostor);
+    }
+
+    /// @notice Code an earlier build of the same logic deployed matches: only its metadata differs.
+    function test_runsBuildOfIgnoresTheMetadata() public {
+        _skipUnderCoverage();
+        bytes memory code = vm.getDeployedCode("UserStore.sol:UserStore");
+        address target = makeAddr("earlier-build");
+
+        // The byte before the two length bytes sits inside the metadata.
+        code[code.length - 3] = bytes1(uint8(code[code.length - 3]) ^ 0xff);
+        vm.etch(target, code);
+        assertTrue(deployer.runsBuildOf(target, "UserStore.sol:UserStore"), "metadata edit");
+
+        vm.etch(target, bytes.concat(code, hex"00"));
+        assertFalse(deployer.runsBuildOf(target, "UserStore.sol:UserStore"), "length change");
+
+        bytes memory lengthEdit = bytes.concat(code);
+        lengthEdit[code.length - 1] = bytes1(uint8(code[code.length - 1]) ^ 0x01);
+        vm.etch(target, lengthEdit);
+        assertFalse(deployer.runsBuildOf(target, "UserStore.sol:UserStore"), "length bytes edit");
+
+        code[0] = bytes1(uint8(code[0]) ^ 0xff);
+        vm.etch(target, code);
+        assertFalse(deployer.runsBuildOf(target, "UserStore.sol:UserStore"), "logic edit");
     }
 
     function test_adoptRevertsWhenFactoryHasNoCode() public {

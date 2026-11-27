@@ -79,7 +79,6 @@ module.exports = async ({ github, context }) => {
 
   // Rebuild the comment
   const order = [
-    "4naly3er Analysis",
     "Slither Analysis",
     "Contract Tests",
     "Gas Report",

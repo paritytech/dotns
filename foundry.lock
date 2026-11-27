@@ -1,7 +1,4 @@
 {
-  "halmos-cheatcodes": {
-    "rev": "6da4e692c357ba6d641a2e677a28298cac9f76ab"
-  },
   "lib/forge-std": {
     "tag": {
       "name": "v1.12.0",

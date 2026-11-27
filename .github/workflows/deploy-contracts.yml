@@ -25,7 +25,8 @@ jobs:
 
     # Shared across steps. ACCOUNT_* is anvil test account 7 (public test keys,
     # never valid on a real network) used to run the pipeline. FACTORY_DEPLOYER is
-    # the public address of the single-purpose factory key. CANONICAL is the
+    # the public address of the single-purpose factory key, which anvil
+    # impersonates. CANONICAL is the
     # committed expected-address set this deploy has to reproduce: what a fresh
     # deploy of this revision lands through the pinned factory (see "Network
     # manifests and the expected set" in DEPLOYMENTS.md). MANIFEST is
@@ -53,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout repo (with submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           submodules: recursive
           fetch-depth: 1
@@ -69,7 +70,7 @@ jobs:
           echo "Expecting the factory at $FACTORY, per $CANONICAL."
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.2.6"
           no-cache: true
@@ -80,7 +81,7 @@ jobs:
       - name: Make scripts executable
         run: chmod +x setup.bash
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: node_modules
           key: bun-${{ hashFiles('bun.lock') }}
@@ -119,49 +120,36 @@ jobs:
       - name: Deploy contracts (production flow on a fresh chain)
         id: deploy
         if: steps.rpc_wait.outcome == 'success'
-        # Runs the exact production two-key `deploy:all` on a fresh anvil. The
-        # factory key (a repo secret) deploys the CREATE3 factory at nonce 0,
-        # landing it at the canonical PINNED_FACTORY, then the pipeline (anvil test
-        # account 7) deploys everything through it. EXPECTED_CREATE3_FACTORY aborts
-        # the run if the factory lands anywhere else. This is a genuine new-chain
-        # deploy, so the addresses it produces are the ones every environment gets.
+        # Runs the production two-key `deploy:all` on a fresh anvil. Anvil
+        # impersonates the factory deployer, so its nonce-0 deploy lands the
+        # CREATE3 factory at the canonical PINNED_FACTORY without the factory key:
+        # this job runs pull request code, and only the publish workflows read
+        # the key. The pipeline (anvil test account 7) then deploys everything
+        # through the factory. EXPECTED_CREATE3_FACTORY aborts the run if the
+        # factory lands anywhere else. This is a genuine new-chain deploy, so the
+        # addresses it produces are the ones every environment gets.
         env:
           # Pipeline account: anvil test account 7, imported on first run.
           PRIVATE_KEY: "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356"
-          # Factory account: the single-purpose key that owns the canonical factory
-          # address, supplied as a repo secret so CI signs the nonce-0 deploy for
-          # real. Its password is CI-local; the keystore is imported on first run.
-          FACTORY_ACCOUNT: create3-factory
-          FACTORY_PASSWORD: anvil-default-password
-          FACTORY_PRIVATE_KEY: ${{ secrets.FACTORY_DEPLOYER_KEY }}
+          # Factory account: sent from through anvil's impersonation (factory.sh).
+          FACTORY_UNLOCKED_SENDER: ${{ env.FACTORY_DEPLOYER }}
           EXPECTED_CREATE3_FACTORY: ${{ env.PINNED_FACTORY }}
         run: |
           set +e
-          if [ -z "$FACTORY_PRIVATE_KEY" ]; then
-            echo "result=Failed - FACTORY_DEPLOYER_KEY secret unavailable" >> "$GITHUB_OUTPUT"
-            echo "has_details=true" >> "$GITHUB_OUTPUT"
-            {
-              echo "### Factory key secret unavailable"
-              echo ""
-              echo "The \`FACTORY_DEPLOYER_KEY\` repo secret is not set, or is withheld on a"
-              echo "fork PR. The reproduction deploy needs it to sign the nonce-0 factory"
-              echo "deploy that lands the factory at its canonical address."
-            } > deploy-error.md
-            cat deploy-error.md
-            exit 1
-          fi
-
-          # Fund the factory deployer on anvil; it is not a prefunded dev account.
+          # Fund and impersonate the factory deployer on anvil; it is not a
+          # prefunded dev account.
           cast rpc anvil_setBalance "$FACTORY_DEPLOYER" 0x3635C9ADC5DEA00000 \
+            --rpc-url http://127.0.0.1:8545 > /dev/null
+          cast rpc anvil_impersonateAccount "$FACTORY_DEPLOYER" \
             --rpc-url http://127.0.0.1:8545 > /dev/null
 
           bun run deploy:all > deploy.log 2>&1
           DEPLOY_EXIT=$?
 
-          # Drop the factory credentials the moment the deploy is done, so nothing
-          # later in this step (the error extractor that feeds the public PR
-          # comment, or any future command) inherits the key in its environment.
-          unset FACTORY_PRIVATE_KEY FACTORY_PASSWORD PRIVATE_KEY
+          # Drop the pipeline key the moment the deploy is done, so nothing later
+          # in this step (the error extractor that feeds the public PR comment, or
+          # any future command) inherits it in its environment.
+          unset PRIVATE_KEY
 
           if [ $DEPLOY_EXIT -eq 0 ]; then
             echo "result=Deployment successful" >> "$GITHUB_OUTPUT"
@@ -429,12 +417,14 @@ jobs:
         if: always()
         run: |
           for f in deploy-error.md *.log; do
-            [ -f "$f" ] && sed -E -i 's/(0x)?[0-9a-fA-F]{64}/[REDACTED]/g' "$f" || true
+            if [ -f "$f" ]; then
+              sed -E -i 's/(0x)?[0-9a-fA-F]{64}/[REDACTED]/g' "$f"
+            fi
           done
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: deployment-logs
           path: |
@@ -452,7 +442,7 @@ jobs:
         if: >-
           always() && github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           SECTION: Deploy Contracts
           RESULT: ${{ steps.result.outputs.result }}
@@ -519,7 +509,7 @@ jobs:
               delete existingDetails[section];
             }
 
-            const order = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
+            const order = ['Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Coverage', 'Documentation', 'Format & Lint', 'File Validation', 'Deploy Contracts', 'PR Title', 'Labels'];
             const sortedKeys = Object.keys(rows).sort((a, b) => {
               const ai = order.indexOf(a), bi = order.indexOf(b);
               return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
@@ -530,7 +520,7 @@ jobs:
               table += `| ${key} | ${rows[key]} |\n`;
             }
 
-            const detailsOrder = ['4naly3er Analysis', 'Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Coverage', 'Deploy Contracts'];
+            const detailsOrder = ['Slither Analysis', 'Contract Tests (Unit + Fuzz)', 'Contract Tests (Invariant)', 'Coverage', 'Deploy Contracts'];
             const sortedDetails = Object.keys(existingDetails).sort((a, b) => {
               const ai = detailsOrder.indexOf(a), bi = detailsOrder.indexOf(b);
               return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);

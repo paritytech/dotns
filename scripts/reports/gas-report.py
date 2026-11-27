@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -163,7 +164,7 @@ def generate_html(master_contracts, current_contracts):
 
         lines.append('<div class="mb-6 bg-gray-900 border border-gray-800 rounded-lg">')
         lines.append('<div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">')
-        lines.append(f'<span class="font-semibold text-white">{contract_name}</span>')
+        lines.append(f'<span class="font-semibold text-white">{escape(contract_name)}</span>')
         lines.append(f'<span class="text-xs text-gray-500">Deploy: {current_deploy_cost:,} <span class="{deploy_color}">({deploy_sign}{deploy_diff:,})</span></span>')
         lines.append("</div>")
 
@@ -190,7 +191,7 @@ def generate_html(master_contracts, current_contracts):
                 diff_color = color_class(avg_diff)
 
                 lines.append('<tr class="border-b border-gray-800/50 hover:bg-gray-800/30">')
-                lines.append(f'<td class="py-2 px-3 font-mono text-gray-200">{function_name}</td>')
+                lines.append(f'<td class="py-2 px-3 font-mono text-gray-200">{escape(function_name)}</td>')
                 lines.append(f'<td class="py-2 px-3 font-mono text-right">{master_avg:,}</td>')
                 lines.append(f'<td class="py-2 px-3 font-mono text-right">{current_avg:,}</td>')
                 lines.append(f'<td class="py-2 px-3 font-mono text-right {diff_color}">{diff_sign}{avg_diff:,}</td>')

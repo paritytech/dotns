@@ -5,9 +5,12 @@ test = "test"
 script = "scripts"
 libs = ["lib"]
 
-# OZ Foundry Upgrades and deploy simulations need file access to artifacts.
-# Keep broad access only if narrower permissions break upgrade validation or deployment scripts.
-fs_permissions = [{ access = "read-write", path = "./" }]
+# OZ Foundry Upgrades and the deploy scripts read the build output; the deploy
+# scripts also write the network manifests. Nothing else is reachable.
+fs_permissions = [
+    { access = "read", path = "./out" },
+    { access = "read-write", path = "./deployments" },
+]
 ffi = true
 
 ast = true

@@ -48,7 +48,7 @@ These are vendored under `lib/` (pinned by commit in `setup.bash` or `.gitmodule
 
 Note on halmos-cheatcodes: it is AGPL-3.0, but no contract, script, or test in this repository imports
 it, so it does not affect the licensing of this project's code. Consider removing it from `setup.bash`
-if it is no longer needed.
+and `.gitmodules` if it is no longer needed.
 
 ## External interface definitions
 

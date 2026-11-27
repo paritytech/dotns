@@ -114,8 +114,10 @@ contract DotnsPopController is
     /// @notice Most expired or emptied entries one gateway call clears from the front of a
     /// reservation queue.
     /// @dev A gateway call runs under a fixed weight limit, and each entry visited costs a
-    /// storage read. A longer run is cleared over several calls, each keeping its progress, or at
-    /// once by @custom:function expireReservation.
+    /// storage read. A longer run is cleared over several reservation calls, each keeping its
+    /// progress, or at once by @custom:function expireReservation. A personhood claim keeps none:
+    /// one that still finds another entry at the front reverts @custom:reverts NotHolder, which
+    /// undoes its clearing, so a claimant behind a longer run clears it first.
     uint256 public constant MAX_QUEUE_STEPS_PER_CALL = 4;
 
     /// @notice Protocol-level address registry for all dotNS contracts.
@@ -971,10 +973,11 @@ contract DotnsPopController is
 
     /// @notice Clears up to `maxSteps` expired or emptied entries from the front of the queue.
     /// @dev Every entry visited costs a storage read, and a gateway call runs under a fixed weight
-    /// limit, so a call clears at most `maxSteps` entries and keeps that progress; a later call
-    /// carries on. Clearing writes nothing per entry: entries and pointers stay below the new
-    /// front, where they read as gone (@custom:function _isEvicted), and queue indices only ever
-    /// grow.
+    /// limit, so a call clears at most `maxSteps` entries and keeps that progress unless it
+    /// reverts afterwards, as a personhood claim that still finds another entry at the front
+    /// does; a later call carries on. Clearing writes nothing per entry: entries and pointers stay
+    /// below the new front, where they read as gone (@custom:function _isEvicted), and queue
+    /// indices only ever grow.
     /// When clearing reaches an active reservation, PopRules moves to that user, unless it is
     /// `claimant`, whose claim in the same call releases the slot. When it empties the queue, the
     /// PopRules slot is released, unless the caller is `refilling` it in the same call: then the

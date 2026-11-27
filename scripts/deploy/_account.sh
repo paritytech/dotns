@@ -23,8 +23,8 @@ ENV_FILE="${ENV_FILE:-.env}"
 
 # Source .env WITHOUT auto-export (no `set -a`), so secrets such as
 # ACCOUNT_PASSWORD and PRIVATE_KEY stay as shell variables and are never
-# exported into child processes (forge and cast receive them as explicit
-# flags). The few variables forge scripts read from the environment
+# exported into child processes (forge and cast read the password from an
+# owner-only file, see below). The few variables forge scripts read from the environment
 # (ACCOUNT_NAME here; DEPLOYMENT_NETWORK, CREATE3_FACTORY in
 # run.sh) are exported explicitly.
 # Preserve caller-provided account details (for example deployall.sh selecting
@@ -53,7 +53,7 @@ export ACCOUNT_NAME
 
 # Prompt for the keystore password when it has not been supplied by `.env` or
 # the shell. Reading once keeps the prompt to a single keystroke even though
-# every forge invocation receives --password.
+# every forge invocation reads the password file.
 if [ -z "${ACCOUNT_PASSWORD:-}" ]; then
   if [ ! -t 0 ]; then
     echo "ACCOUNT_PASSWORD is required (set in $ENV_FILE or as env var, or run from a terminal that can prompt)" >&2
@@ -77,17 +77,26 @@ if [ ! -f "$KEYSTORE_PATH" ]; then
   # normalised shell value keeps the command shape predictable.
   PK="${PRIVATE_KEY#0x}"
 
-  cast wallet import "$ACCOUNT_NAME" \
-    --private-key "$PK" \
-    --unsafe-password "$ACCOUNT_PASSWORD" >/dev/null
+  # The password goes through the environment of this one command, never argv.
+  # The raw key has no non-interactive route off argv, so it is visible to local
+  # process listings for this one-time import only. umask 077 keeps the new
+  # keystore readable by its owner alone.
+  (
+    umask 077
+    CAST_UNSAFE_PASSWORD="$ACCOUNT_PASSWORD" cast wallet import "$ACCOUNT_NAME" \
+      --private-key "$PK" >/dev/null
+  )
 
   unset PK PRIVATE_KEY
 fi
 
-# Plain shell variables: the sourcing script reads them directly, and forge and
-# cast receive them as explicit flags, so nothing needs the password in a child
-# process's environment.
-SENDER=$(cast wallet address --account "$ACCOUNT_NAME" --password "$ACCOUNT_PASSWORD")
+# forge and cast read the password from an owner-only file, so it reaches neither
+# a child process's environment nor argv, which every local user can list. The
+# file lives as long as the sourcing script.
+ACCOUNT_PASSWORD_FILE=$(mktemp "${TMPDIR:-/tmp}/dotns-password.XXXXXX")
+trap 'rm -f "$ACCOUNT_PASSWORD_FILE"' EXIT
+printf '%s' "$ACCOUNT_PASSWORD" > "$ACCOUNT_PASSWORD_FILE"
+SENDER=$(cast wallet address --account "$ACCOUNT_NAME" --password-file "$ACCOUNT_PASSWORD_FILE")
 # shellcheck disable=SC2034  # consumed by the sourcing script (run.sh)
 CHAIN_ID=$(cast chain-id --rpc-url "$RPC_URL")
 
@@ -101,7 +110,7 @@ CHAIN_ID=$(cast chain-id --rpc-url "$RPC_URL")
 FORGE_DEPLOY_ARGS=(
   --rpc-url "$RPC_URL"
   --account "$ACCOUNT_NAME"
-  --password "$ACCOUNT_PASSWORD"
+  --password-file "$ACCOUNT_PASSWORD_FILE"
   --sender "$SENDER"
   --broadcast
   --slow

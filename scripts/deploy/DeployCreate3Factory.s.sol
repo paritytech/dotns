@@ -3,7 +3,7 @@ pragma solidity ^0.8.34;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {Create3Factory} from "../../contracts/deploy/Create3Factory.sol";
+import {Create3FactoryCode} from "./Create3FactoryCode.sol";
 
 /// @title DeployCreate3Factory
 /// @notice Deploys the CREATE3 factory on its own, from a single-purpose key.
@@ -29,7 +29,7 @@ contract DeployCreate3Factory is Script {
         );
 
         vm.broadcast(deployer);
-        factory = address(new Create3Factory());
+        factory = Create3FactoryCode.deploy();
 
         console.log("Create3Factory deployed at:", factory);
         console.log("Pass this address to the deploy pipeline as CREATE3_FACTORY.");

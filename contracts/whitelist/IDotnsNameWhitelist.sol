@@ -30,9 +30,10 @@ interface IDotnsNameWhitelist {
     }
 
     /// @notice Status of a single claim on a name.
-    /// @dev `None` is the zero-value default of an absent claim. `Rejected` is sticky: it is kept
-    ///      only when the beneficiary filed the claim themselves, so they cannot re-request; a
-    ///      claim filed on their behalf is deleted on rejection and does not bind them.
+    /// @dev `None` is the zero-value default of an absent claim. `Rejected` is sticky for the round
+    ///      of claims it was made in: it is kept only when the beneficiary filed the claim
+    ///      themselves, so they cannot re-request until the name is resolved; a claim filed on
+    ///      their behalf is deleted on rejection and does not bind them.
     enum ClaimStatus {
         None,
         Requested,
@@ -87,12 +88,30 @@ interface IDotnsNameWhitelist {
     }
 
     /// @notice Emitted when a beneficiary claims a name.
-    event NameRequested(bytes32 indexed node, address indexed user, string label, string reason);
+    /// @param submitter Address that filed the claim, which may differ from the beneficiary.
+    event NameRequested(
+        bytes32 indexed node,
+        address indexed user,
+        address indexed submitter,
+        string label,
+        string reason
+    );
+
+    /// @notice Emitted when a beneficiary withdraws their pending claim.
+    event ClaimWithdrawn(bytes32 indexed node, address indexed user, string label);
+
+    /// @notice Emitted when resolving a name clears the live claims of its round.
+    /// @dev Replaces a rejection event per claim, so resolution costs the same however many claims
+    ///      a name holds. Every claim of `round` that was still pending ends without winning,
+    ///      except the accepted one, which @custom:emits NameAccepted names.
+    /// @param round Round of claims that ended.
+    /// @param cleared Live claims the round held, the accepted one included.
+    event ClaimsCleared(bytes32 indexed node, string label, uint256 round, uint256 cleared);
 
     /// @notice Emitted when a claim wins a name, including a direct governance grant.
     event NameAccepted(bytes32 indexed node, address indexed user, string label);
 
-    /// @notice Emitted when a claim is cleared without winning.
+    /// @notice Emitted when governance rejects a single claim.
     event NameRejected(bytes32 indexed node, address indexed user, string label);
 
     /// @notice Emitted when a name is reset to Open by governance.
@@ -222,11 +241,19 @@ interface IDotnsNameWhitelist {
     /// @param user Beneficiary the name binds to if this claim wins.
     function requestName(string calldata label, string calldata reason, address user) external;
 
+    /// @notice Withdraws the caller's pending claim on `label`.
+    /// @dev The caller is the beneficiary, whoever filed the claim, so a claim filed in their name
+    ///      never blocks their own request. Deletes the claim and frees its slot.
+    ///      @custom:reverts NotRequested when the caller holds no pending claim on the name.
+    ///      @custom:emits ClaimWithdrawn.
+    /// @param label Bare label the claim is on.
+    function withdrawClaim(string calldata label) external;
+
     /// @notice Accepts `user`'s claim as the winner of `label`.
     /// @dev Restricted to a substrate Root dispatch. Requires `user`'s claim `Requested`.
-    /// Sets the name `Claimed` with `user` the winner and clears every claim on the name, rejecting
-    ///      the losers. @custom:reverts NotRequested. @custom:emits NameAccepted for the winner and
-    ///      @custom:emits NameRejected for each loser.
+    /// Sets the name `Claimed` with `user` the winner and clears every claim on the name.
+    ///      @custom:reverts NotRequested. @custom:emits NameAccepted for the winner and
+    ///      @custom:emits ClaimsCleared for the round.
     /// @param label Bare label to resolve.
     /// @param user Beneficiary whose claim wins.
     function accept(string calldata label, address user) external;
@@ -244,7 +271,7 @@ interface IDotnsNameWhitelist {
     /// `Claimed` with `user` the winner, starts the grant period, and clears any pending
     ///      claims. @custom:reverts NameNotOpen, @custom:reverts ZeroUser or
     ///      @custom:reverts InvalidLabel. @custom:emits NameAccepted, and
-    ///      @custom:emits NameRejected for each cleared claim.
+    ///      @custom:emits ClaimsCleared when the name held claims.
     /// @param label Bare label to grant.
     /// @param user Beneficiary the name binds to.
     function grantName(string calldata label, address user) external;
@@ -262,13 +289,13 @@ interface IDotnsNameWhitelist {
     /// name, an expired grant included, so governance can tidy a lapsed entry from the active
     /// set; a Reserved name is released through @custom:function setReserved, not here.
     ///      @custom:reverts NothingToRevoke when the name is not Claimed and holds no claims.
-    ///      @custom:emits NameRevoked, and @custom:emits NameRejected for each cleared claim.
+    ///      @custom:emits NameRevoked, and @custom:emits ClaimsCleared when the name held claims.
     /// @param label Bare label to reset.
     function revokeName(string calldata label) external;
 
     /// @notice Reserves or releases `label`.
     /// @dev Restricted to a substrate Root dispatch. Reserving requires the name Open and clears
-    /// any pending claims, rejecting each; releasing requires it `Reserved`. @custom:reverts
+    /// any pending claims; releasing requires it `Reserved`. @custom:reverts
     /// NameNotOpen or @custom:reverts NotReserved. @custom:emits NameReserved or @custom:emits
     /// NameUnreserved. @param label Bare label.
     /// @param reserved True to reserve, false to release.
@@ -301,10 +328,10 @@ interface IDotnsNameWhitelist {
     /// @dev Root or the maintainer account, otherwise @custom:reverts NotRootOrMaintainer. While a
     /// window is open or scheduled, the maintainer can only raise it, otherwise
     /// @custom:reverts MaintainerNotAllowed. The cap is bounded by
-    /// `DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT`, which bounds the resolution clear-loop.
-    /// The cap only stops new requests: a name that collected more claims under a higher cap
-    /// keeps them, and governance rejects some with @custom:function reject before a
-    /// @custom:function grantName on it fits one call.
+    /// `DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT`, which bounds the claims governance reviews
+    /// per name. The cap only stops new requests: a name that collected more claims under a
+    /// higher cap keeps them. Resolving a name ends its round of claims in one write, so no cap
+    /// bounds the cost of a grant.
     /// @custom:reverts MaxClaimantsOutOfRange when `newMax` is zero or above the ceiling.
     /// @custom:emits MaxClaimantsSet.
     /// @param newMax New per-name claim cap.
