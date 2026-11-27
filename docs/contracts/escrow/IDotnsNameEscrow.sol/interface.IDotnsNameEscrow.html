@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnameescrow"><a class="header" href="#idotnsnameescrow">IDotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/978022915afdc8cf6c5e9b52b02d4ad8183f8c3e/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/09bc587ae5a450b3df36ffc0a476c96cae676217/contracts/escrow/IDotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Name Escrow Interface</p>
 <p>Escrows refundable deposits for registered names and manages the release lifecycle.</p>
@@ -401,7 +401,10 @@ reverts: InvalidRecipient. Emits @custom:emits WithdrawalClaimed for the caller.
 <p>Moves the NFT from custody straight to <code>newOwner</code>. Only the configured
 controller may call this, otherwise @custom:reverts NotController, and the position
 must be released with <code>redeemableUntil</code> reached, otherwise @custom:reverts
-NotReclaimable. Emits @custom:emits NameReclaimed once custody is transferred.
+NotReclaimable. <code>newOwner</code> cannot be the escrow itself, otherwise</p>
+<p><strong>Note:</strong>
+reverts: InvalidRecipient. Emits @custom:emits NameReclaimed once custody is
+transferred.
 Reclaim does not require the deposit to have been withdrawn first. If the position
 still holds value, this call settles it: the amount is debited from <code>tokenReserved</code>
 (@custom:reverts InsufficientFunds if the reserve is short) and credited to the

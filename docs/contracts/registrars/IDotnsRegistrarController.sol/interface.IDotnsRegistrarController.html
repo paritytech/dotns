@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsregistrarcontroller"><a class="header" href="#idotnsregistrarcontroller">IDotnsRegistrarController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/978022915afdc8cf6c5e9b52b02d4ad8183f8c3e/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/09bc587ae5a450b3df36ffc0a476c96cae676217/contracts/registrars/IDotnsRegistrarController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 <a href="/contracts/registrars/IDotnsController.sol/interface.IDotnsController.html">IDotnsController</a></p>
 <p><strong>Title:</strong>
@@ -268,8 +268,12 @@ deposit. The reveal prices the name at the committed
 and rejects a total charge above the committed ceiling with @custom:reverts PriceExceedsMax
 before checking payment. The caller must supply at least the charge
 (otherwise @custom:reverts InsufficientValue); any overpayment is pushed back to
-<code>msg.sender</code> inline and, on failure, credited to the escrow's pull-payment ledger so
-contract receivers cannot block registration. Emits @custom:emits OverpaymentRefunded
+<code>msg.sender</code> inline and, on failure, credited to <code>registration.owner</code> on the escrow's
+pull-payment ledger, like the deposit, so contract receivers cannot block registration
+and a forwarder such as Multicall3 never holds a claimable balance. Emits</li>
+</ul>
+<ul>
+<li>emits: OverpaymentRefunded
 on the inline branch, the escrow's own @custom:emits OverpaymentRefunded on the pull
 fallback, and @custom:emits NameRegistered on success.</li>
 </ul>

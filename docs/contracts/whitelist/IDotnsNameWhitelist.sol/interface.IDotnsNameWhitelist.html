@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="idotnsnamewhitelist"><a class="header" href="#idotnsnamewhitelist">IDotnsNameWhitelist</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/978022915afdc8cf6c5e9b52b02d4ad8183f8c3e/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/09bc587ae5a450b3df36ffc0a476c96cae676217/contracts/whitelist/IDotnsNameWhitelist.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 IDotnsNameWhitelist</p>
 <p>Interface for the pre-launch name whitelist. A name is Open until governance either
@@ -229,13 +229,39 @@ name.</p>
 <tr><td><code>user</code></td><td><code>address</code></td><td>Beneficiary the name binds to if this claim wins.</td></tr>
 </tbody></table>
 </div>
+<h3 id="withdrawclaim"><a class="header" href="#withdrawclaim">withdrawClaim</a></h3>
+<p>Withdraws the caller's pending claim on <code>label</code>.</p>
+<p>The caller is the beneficiary, whoever filed the claim, so a claim filed in their name
+never blocks their own request. Deletes the claim and frees its slot.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotRequested when the caller holds no pending claim on the name.</p>
+</li>
+<li>
+<p>emits: ClaimWithdrawn.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function withdrawClaim(string calldata label) external;
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>label</code></td><td><code>string</code></td><td>Bare label the claim is on.</td></tr>
+</tbody></table>
+</div>
 <h3 id="accept"><a class="header" href="#accept">accept</a></h3>
 <p>Accepts <code>user</code>'s claim as the winner of <code>label</code>.</p>
 <p>Restricted to a substrate Root dispatch. Requires <code>user</code>'s claim <code>Requested</code>.
-Sets the name <code>Claimed</code> with <code>user</code> the winner and clears every claim on the name, rejecting
-the losers. @custom:reverts NotRequested. @custom:emits NameAccepted for the winner and</p>
-<p><strong>Note:</strong>
-emits: NameRejected for each loser.</p>
+Sets the name <code>Claimed</code> with <code>user</code> the winner and clears every claim on the name.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>
+<p>reverts: NotRequested. @custom:emits NameAccepted for the winner and</p>
+</li>
+<li>
+<p>emits: ClaimsCleared for the round.</p>
+</li>
+</ul>
 <pre><code class="language-solidity">function accept(string calldata label, address user) external;
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -269,7 +295,7 @@ claims. @custom:reverts NameNotOpen, @custom:reverts ZeroUser or</p>
 <p>reverts: InvalidLabel. @custom:emits NameAccepted, and</p>
 </li>
 <li>
-<p>emits: NameRejected for each cleared claim.</p>
+<p>emits: ClaimsCleared when the name held claims.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function grantName(string calldata label, address user) external;
@@ -305,7 +331,7 @@ set; a Reserved name is released through @custom:function setReserved, not here.
 <p>reverts: NothingToRevoke when the name is not Claimed and holds no claims.</p>
 </li>
 <li>
-<p>emits: NameRevoked, and @custom:emits NameRejected for each cleared claim.</p>
+<p>emits: NameRevoked, and @custom:emits ClaimsCleared when the name held claims.</p>
 </li>
 </ul>
 <pre><code class="language-solidity">function revokeName(string calldata label) external;
@@ -318,7 +344,7 @@ set; a Reserved name is released through @custom:function setReserved, not here.
 <h3 id="setreserved"><a class="header" href="#setreserved">setReserved</a></h3>
 <p>Reserves or releases <code>label</code>.</p>
 <p>Restricted to a substrate Root dispatch. Reserving requires the name Open and clears
-any pending claims, rejecting each; releasing requires it <code>Reserved</code>. @custom:reverts
+any pending claims; releasing requires it <code>Reserved</code>. @custom:reverts
 NameNotOpen or @custom:reverts NotReserved. @custom:emits NameReserved or @custom:emits
 NameUnreserved. @param label Bare label.</p>
 <pre><code class="language-solidity">function setReserved(string calldata label, bool reserved) external;
@@ -377,12 +403,10 @@ window is open or scheduled, the maintainer can only raise it, otherwise</p>
 <ul>
 <li>
 <p>reverts: MaintainerNotAllowed. The cap is bounded by
-<code>DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT</code>, which bounds the resolution clear-loop.
-The cap only stops new requests: a name that collected more claims under a higher cap
-keeps them, and governance rejects some with @custom:function reject before a</p>
-</li>
-<li>
-<p>function: grantName on it fits one call.</p>
+<code>DotnsConstants.WHITELIST_MAX_CLAIMANTS_LIMIT</code>, which bounds the claims governance reviews
+per name. The cap only stops new requests: a name that collected more claims under a
+higher cap keeps them. Resolving a name ends its round of claims in one write, so no cap
+bounds the cost of a grant.</p>
 </li>
 <li>
 <p>reverts: MaxClaimantsOutOfRange when <code>newMax</code> is zero or above the ceiling.</p>
@@ -698,14 +722,48 @@ with no winner.</p>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
 <h3 id="namerequested"><a class="header" href="#namerequested">NameRequested</a></h3>
 <p>Emitted when a beneficiary claims a name.</p>
-<pre><code class="language-solidity">event NameRequested(bytes32 indexed node, address indexed user, string label, string reason);
+<pre><code class="language-solidity">event NameRequested(
+    bytes32 indexed node,
+    address indexed user,
+    address indexed submitter,
+    string label,
+    string reason
+);
 </code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td></td></tr>
+<tr><td><code>user</code></td><td><code>address</code></td><td></td></tr>
+<tr><td><code>submitter</code></td><td><code>address</code></td><td>Address that filed the claim, which may differ from the beneficiary.</td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td></td></tr>
+<tr><td><code>reason</code></td><td><code>string</code></td><td></td></tr>
+</tbody></table>
+</div>
+<h3 id="claimwithdrawn"><a class="header" href="#claimwithdrawn">ClaimWithdrawn</a></h3>
+<p>Emitted when a beneficiary withdraws their pending claim.</p>
+<pre><code class="language-solidity">event ClaimWithdrawn(bytes32 indexed node, address indexed user, string label);
+</code></pre>
+<h3 id="claimscleared"><a class="header" href="#claimscleared">ClaimsCleared</a></h3>
+<p>Emitted when resolving a name clears the live claims of its round.</p>
+<p>Replaces a rejection event per claim, so resolution costs the same however many claims
+a name holds. Every claim of <code>round</code> that was still pending ends without winning,
+except the accepted one, which @custom:emits NameAccepted names.</p>
+<pre><code class="language-solidity">event ClaimsCleared(bytes32 indexed node, string label, uint256 round, uint256 cleared);
+</code></pre>
+<p><strong>Parameters</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>node</code></td><td><code>bytes32</code></td><td></td></tr>
+<tr><td><code>label</code></td><td><code>string</code></td><td></td></tr>
+<tr><td><code>round</code></td><td><code>uint256</code></td><td>Round of claims that ended.</td></tr>
+<tr><td><code>cleared</code></td><td><code>uint256</code></td><td>Live claims the round held, the accepted one included.</td></tr>
+</tbody></table>
+</div>
 <h3 id="nameaccepted"><a class="header" href="#nameaccepted">NameAccepted</a></h3>
 <p>Emitted when a claim wins a name, including a direct governance grant.</p>
 <pre><code class="language-solidity">event NameAccepted(bytes32 indexed node, address indexed user, string label);
 </code></pre>
 <h3 id="namerejected"><a class="header" href="#namerejected">NameRejected</a></h3>
-<p>Emitted when a claim is cleared without winning.</p>
+<p>Emitted when governance rejects a single claim.</p>
 <pre><code class="language-solidity">event NameRejected(bytes32 indexed node, address indexed user, string label);
 </code></pre>
 <h3 id="namerevoked"><a class="header" href="#namerevoked">NameRevoked</a></h3>
@@ -980,9 +1038,10 @@ withheld by governance. <code>Claimed</code> has a single winner until the grant
 </code></pre>
 <h3 id="claimstatus"><a class="header" href="#claimstatus">ClaimStatus</a></h3>
 <p>Status of a single claim on a name.</p>
-<p><code>None</code> is the zero-value default of an absent claim. <code>Rejected</code> is sticky: it is kept
-only when the beneficiary filed the claim themselves, so they cannot re-request; a
-claim filed on their behalf is deleted on rejection and does not bind them.</p>
+<p><code>None</code> is the zero-value default of an absent claim. <code>Rejected</code> is sticky for the round
+of claims it was made in: it is kept only when the beneficiary filed the claim
+themselves, so they cannot re-request until the name is resolved; a claim filed on
+their behalf is deleted on rejection and does not bind them.</p>
 <pre><code class="language-solidity">enum ClaimStatus {
     None,
     Requested,

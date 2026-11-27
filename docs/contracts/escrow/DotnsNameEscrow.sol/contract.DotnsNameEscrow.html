@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsnameescrow"><a class="header" href="#dotnsnameescrow">DotnsNameEscrow</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/978022915afdc8cf6c5e9b52b02d4ad8183f8c3e/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/09bc587ae5a450b3df36ffc0a476c96cae676217/contracts/escrow/DotnsNameEscrow.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, <a href="/contracts/utils/ProtocolOwnedUpgradeable.sol/abstract.ProtocolOwnedUpgradeable.html">ProtocolOwnedUpgradeable</a>, ReentrancyGuardTransient, ERC165Upgradeable, IERC721Receiver, <a href="/contracts/escrow/IDotnsNameEscrow.sol/interface.IDotnsNameEscrow.html">IDotnsNameEscrow</a>, <a href="/contracts/escrow/IDotnsNameEscrowRevocation.sol/interface.IDotnsNameEscrowRevocation.html">IDotnsNameEscrowRevocation</a>, <a href="/contracts/escrow/IDotnsNameEscrowGovernance.sol/interface.IDotnsNameEscrowGovernance.html">IDotnsNameEscrowGovernance</a></p>
 <p><strong>Title:</strong>
@@ -544,8 +544,9 @@ InvalidInitialization on a second call); it takes initializer version 2, so a la
 upgrade that needs a reinitializer starts at 3.
 It clears lazily only and deletes no record outright: deleting would release the
 storage deposit the holders paid to the signer of this call instead. Walks every name
-in custody in one call, so check @custom:function releasedTokenCount before relying on
-it. Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
+in custody in one call, so check @custom:function releasedTokenCount and dry-run the
+upgrade in the block it is sent, and pass this call only when the count is non-zero.
+Kept off @custom:interface IDotnsNameEscrow, so the interface id the escrow reports
 through ERC-165 stays the same.</p>
 <pre><code class="language-solidity">function clearCustodyOnUpgrade() external onlyRootOrOwner reinitializer(2);
 </code></pre>
@@ -744,7 +745,10 @@ enumeration array.</p>
 <p>Moves the NFT from custody straight to <code>newOwner</code>. Only the configured
 controller may call this, otherwise @custom:reverts NotController, and the position
 must be released with <code>redeemableUntil</code> reached, otherwise @custom:reverts
-NotReclaimable. Emits @custom:emits NameReclaimed once custody is transferred.
+NotReclaimable. <code>newOwner</code> cannot be the escrow itself, otherwise</p>
+<p><strong>Note:</strong>
+reverts: InvalidRecipient. Emits @custom:emits NameReclaimed once custody is
+transferred.
 Reclaim does not require the deposit to have been withdrawn first. If the position
 still holds value, this call settles it: the amount is debited from <code>tokenReserved</code>
 (@custom:reverts InsufficientFunds if the reserve is short) and credited to the

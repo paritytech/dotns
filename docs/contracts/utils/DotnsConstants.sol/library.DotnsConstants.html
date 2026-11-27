@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnsconstants"><a class="header" href="#dotnsconstants">DotnsConstants</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/978022915afdc8cf6c5e9b52b02d4ad8183f8c3e/contracts/utils/DotnsConstants.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/09bc587ae5a450b3df36ffc0a476c96cae676217/contracts/utils/DotnsConstants.sol">Git Source</a></p>
 <p><strong>Title:</strong>
 dotNS Constants</p>
 <p>Protocol-level invariants shared across dotNS contracts.</p>
@@ -278,9 +278,8 @@ and callers page through larger sets with <code>offset</code>.</p>
 </code></pre>
 <h3 id="whitelist_max_claimants_limit"><a class="header" href="#whitelist_max_claimants_limit">WHITELIST_MAX_CLAIMANTS_LIMIT</a></h3>
 <p>Upper bound on the whitelist live-claim cap.</p>
-<p>A grant clears every claim on the name in one call, so at this bound a referendum's
-<code>grantName</code> still fits the weight one governance call can execute, with each claim
-carrying the longest reason. The pallet-revive benchmark checks it.</p>
+<p>Bounds the claims governance reviews per name. Resolving a name ends its round of
+claims in one write, so the cap does not bound the cost of a grant.</p>
 <pre><code class="language-solidity">uint16 internal constant WHITELIST_MAX_CLAIMANTS_LIMIT = 30
 </code></pre>
 <h3 id="whitelist_max_reason_limit"><a class="header" href="#whitelist_max_reason_limit">WHITELIST_MAX_REASON_LIMIT</a></h3>

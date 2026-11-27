@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dotnspopcontroller"><a class="header" href="#dotnspopcontroller">DotnsPopController</a></h1>
-<p><a href="https://github.com/paritytech/dotns/blob/978022915afdc8cf6c5e9b52b02d4ad8183f8c3e/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
+<p><a href="https://github.com/paritytech/dotns/blob/09bc587ae5a450b3df36ffc0a476c96cae676217/contracts/registrars/DotnsPopController.sol">Git Source</a></p>
 <p><strong>Inherits:</strong>
 Initializable, UUPSUpgradeable, <a href="/contracts/utils/ProtocolOwnedUpgradeable.sol/abstract.ProtocolOwnedUpgradeable.html">ProtocolOwnedUpgradeable</a>, ERC165Upgradeable, <a href="/contracts/registrars/IDotnsPopController.sol/interface.IDotnsPopController.html">IDotnsPopController</a>, <a href="/contracts/registrars/IDotnsPopControllerLegacy.sol/interface.IDotnsPopControllerLegacy.html">IDotnsPopControllerLegacy</a>, <a href="/contracts/registrars/IDotnsPopGovernance.sol/interface.IDotnsPopGovernance.html">IDotnsPopGovernance</a></p>
 <p><strong>Title:</strong>
@@ -269,8 +269,10 @@ state has been committed.</p>
 <p>Most expired or emptied entries one gateway call clears from the front of a
 reservation queue.</p>
 <p>A gateway call runs under a fixed weight limit, and each entry visited costs a
-storage read. A longer run is cleared over several calls, each keeping its progress, or at
-once by @custom:function expireReservation.</p>
+storage read. A longer run is cleared over several reservation calls, each keeping its
+progress, or at once by @custom:function expireReservation. A personhood claim keeps none:
+one that still finds another entry at the front reverts @custom:reverts NotHolder, which
+undoes its clearing, so a claimant behind a longer run clears it first.</p>
 <pre><code class="language-solidity">uint256 public constant MAX_QUEUE_STEPS_PER_CALL = 4
 </code></pre>
 <h2 id="state-variables"><a class="header" href="#state-variables">State Variables</a></h2>
@@ -1144,10 +1146,11 @@ in one queue only, the name being reserved, so its cost stays within the weight 
 <h3 id="_advanceexpiredhead"><a class="header" href="#_advanceexpiredhead">_advanceExpiredHead</a></h3>
 <p>Clears up to <code>maxSteps</code> expired or emptied entries from the front of the queue.</p>
 <p>Every entry visited costs a storage read, and a gateway call runs under a fixed weight
-limit, so a call clears at most <code>maxSteps</code> entries and keeps that progress; a later call
-carries on. Clearing writes nothing per entry: entries and pointers stay below the new
-front, where they read as gone (@custom:function _isEvicted), and queue indices only ever
-grow.
+limit, so a call clears at most <code>maxSteps</code> entries and keeps that progress unless it
+reverts afterwards, as a personhood claim that still finds another entry at the front
+does; a later call carries on. Clearing writes nothing per entry: entries and pointers stay
+below the new front, where they read as gone (@custom:function _isEvicted), and queue
+indices only ever grow.
 When clearing reaches an active reservation, PopRules moves to that user, unless it is
 <code>claimant</code>, whose claim in the same call releases the slot. When it empties the queue, the
 PopRules slot is released, unless the caller is <code>refilling</code> it in the same call: then the
